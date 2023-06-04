@@ -1,0 +1,6 @@
+group_id: org.knime
+name: llm
+description: "LLM Extension"
+author: KNIME GmbH
+extension_module: knime_llm
+version: 0.0.0

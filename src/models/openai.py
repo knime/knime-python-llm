@@ -9,7 +9,13 @@ from .base import (
 )
 
 openai_icon = "./icons/openai.png"
-openai_category = ""
+openai_category = knext.category(
+    path="/community",
+    level_id="top",
+    name="Model Loaders",
+    description="All nodes related to models",
+    icon="./icons/ml.svg"
+)
 
 
 @knext.node(

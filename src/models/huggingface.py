@@ -9,7 +9,13 @@ from .base import (
 )
 
 huggingface_icon = "./icons/huggingface.png"
-huggingface_category = ""
+huggingface_category = knext.category(
+    path="/community",
+    level_id="top",
+    name="Model Loaders",
+    description="All nodes related to models",
+    icon="./icons/ml.svg"
+)
 
 
 @knext.node(

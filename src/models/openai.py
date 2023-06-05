@@ -7,6 +7,7 @@ from .base import (
     LLMPortObject,
     llm_port_type,
 )
+from langchain.llms import OpenAI
 
 openai_icon = "./icons/openai.png"
 openai_category = knext.category(
@@ -14,8 +15,42 @@ openai_category = knext.category(
     level_id="top",
     name="Model Loaders",
     description="All nodes related to models",
-    icon="./icons/ml.svg"
+    icon="./icons/ml.svg",
 )
+
+
+@knext.parameter_group(label="Input")
+class OpenAIInputSettings:
+    class ModelOptions(knext.EnumParameterOptions):
+        Ada = (
+            "text-ada-001",
+            "Capable of very simple tasks, usually the fastest model in the GPT-3 series, and lowest cost.",
+        )
+        DaVinci = (
+            "text-davinci-003",
+            "Can do any language task with better quality, longer output, and consistent instruction-following than the curie, babbage, or ada models.",
+        )
+        Babbage = (
+            "text-babbage-001",
+            "Capable of straightforward tasks, very fast, and lower cost.",
+        )
+        Curie = (
+            "text-curie-001",
+            "Very capable, but faster and lower cost than Davinci.",
+        )
+
+    model_name = knext.EnumParameter(
+        "Model name",
+        "GPT-3 (ada, babbage, curie) and GPT-3.5 (davinci) models",
+        ModelOptions.Ada.name,
+        ModelOptions,
+    )
+
+    credentials_param = knext.StringParameter(
+        label="Credential parameter",
+        description="Choices is a callable",
+        choices=lambda a: knext.DialogCreationContext.get_credential_names(a),
+    )
 
 
 @knext.node(
@@ -40,6 +75,8 @@ class OpenAIEmbeddingsLoader:
 )
 @knext.output_port("OpenAI LLM", "A large language model from OpenAI.", llm_port_type)
 class OpenAILLMLoader:
+    input_settings = OpenAIInputSettings()
+
     def configure(self, ctx: knext.ConfigurationContext) -> LLMPortObjectSpec:
         return LLMPortObjectSpec()
 

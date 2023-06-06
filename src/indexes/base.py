@@ -7,12 +7,20 @@ from models.base import (
 
 
 class VectorStorePortObjectSpec(knext.PortObjectSpec):
+    def __init__(self, persist_directory) -> None:
+        super().__init__()
+        self._persist_directory = persist_directory
+
+    @property
+    def persist_directory(self):
+        return self._persist_directory
+
     def serialize(self) -> dict:
-        return {}
+        return {"persist_directory": self._persist_directory}
 
     @classmethod
     def deserialize(cls, data: dict) -> "VectorStorePortObjectSpec":
-        return cls()
+        return cls(data["persist_directory"])
 
 
 class VectorStorePortObject(knext.PortObject):

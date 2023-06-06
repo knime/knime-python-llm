@@ -8,7 +8,7 @@ class EmbeddingsPortObjectSpec(knext.PortObjectSpec):
         self._model_name = model_name
 
     @property
-    def cred(self):
+    def credentials(self):
         return self._credentials
 
     @property

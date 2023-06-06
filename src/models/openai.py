@@ -11,6 +11,9 @@ from langchain.llms import OpenAI
 import logging
 
 LOGGER = logging.getLogger(__name__)
+import logging
+
+LOGGER = logging.getLogger(__name__)
 
 openai_icon = "./icons/openai.png"
 openai_category = knext.category(

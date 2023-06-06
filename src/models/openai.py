@@ -85,14 +85,38 @@ class OpenAILLMLoader:
     input_settings = OpenAIInputSettings()
 
     def configure(self, ctx: knext.ConfigurationContext) -> LLMPortObjectSpec:
-        return LLMPortObjectSpec()
+        return LLMPortObjectSpec(None, None)
 
     def execute(self, ctx: knext.ExecutionContext) -> LLMPortObject:
-        credentials = ctx.get_credentials(self.input_settings.credentials_param)
+
+        cred_params = self.input_settings.credentials_param
+        model_name=self.input_settings.ModelOptions[
+                self.input_settings.model_name].label
+        
+        return LLMPortObject(LLMPortObjectSpec(cred_params, model_name))
+
+@knext.node(
+    "OpenAI LLM Prompter", knext.NodeType.SOURCE, openai_icon, category=openai_category
+)
+@knext.input_port("OpenAI LLM", "A large language model from OpenAI.", llm_port_type)
+@knext.output_port("OpenAI LLM", "A large language model from OpenAI.", llm_port_type)
+class OpenAILLMPrompter:
+    prompt = knext.StringParameter(
+        "Prompt",
+        "The prompt that is being asked",
+        ""
+    )
+
+    def configure(self, ctx: knext.ConfigurationContext, spec: LLMPortObjectSpec) -> LLMPortObjectSpec:
+        return spec
+
+    def execute(self, ctx: knext.ExecutionContext, llm_port: LLMPortObject) -> LLMPortObject:
+
         llm = OpenAI(
-            model_name=self.input_settings.ModelOptions[
-                self.input_settings.model_name
-            ].label,
-            openai_api_key=credentials.password,
+            model_name=llm_port.spec.model_name,
+            openai_api_key=ctx.get_credentials(llm_port.spec.cred).password,
         )
-        return LLMPortObject(LLMPortObjectSpec())
+
+        LOGGER.info(llm(self.prompt))
+
+        return llm_port

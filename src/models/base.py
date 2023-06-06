@@ -2,12 +2,25 @@ import knime.extension as knext
 
 
 class EmbeddingsPortObjectSpec(knext.PortObjectSpec):
+    def __init__(self, credentials: str, model_name: str) -> None:
+        super().__init__()
+        self._credentials = credentials
+        self._model_name = model_name
+
+    @property
+    def cred(self):
+        return self._credentials
+
+    @property
+    def model_name(self):
+        return self._model_name
+
     def serialize(self) -> dict:
-        return {}
+        return {"credentials": self._credentials, "model_name": self._model_name}
 
     @classmethod
     def deserialize(cls, data: dict) -> "EmbeddingsPortObjectSpec":
-        return cls()
+        return cls(data["credentials"], data["model_name"])
 
 
 class EmbeddingsPortObject(knext.PortObject):
@@ -30,25 +43,25 @@ embeddings_port_type = knext.port_type(
 
 
 class LLMPortObjectSpec(knext.PortObjectSpec):
-    def __init__(self, cred: str, model_name: str) -> None:
+    def __init__(self, credentials: str, model_name: str) -> None:
         super().__init__()
-        self._cred = cred
+        self._credentials = credentials
         self._model_name = model_name
 
     @property
     def cred(self):
-        return self._cred
-    
+        return self._credentials
+
     @property
     def model_name(self):
         return self._model_name
 
     def serialize(self) -> dict:
-        return {"cred": self._cred, "model_name": self._model_name}
+        return {"credentials": self._credentials, "model_name": self._model_name}
 
     @classmethod
     def deserialize(cls, data: dict) -> "LLMPortObjectSpec":
-        return cls(data["cred"], data["model_name"])
+        return cls(data["credentials"], data["model_name"])
 
 
 class LLMPortObject(knext.PortObject):

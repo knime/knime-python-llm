@@ -10,6 +10,10 @@ from .base import (
     vectorstore_port_type,
 )
 
+from langchain.vectorstores import Chroma
+from langchain.text_splitter import CharacterTextSplitter
+from langchain.document_loaders import TextLoader
+
 vectorstore_category = ""
 chroma_icon = "./icons/chroma.png"
 

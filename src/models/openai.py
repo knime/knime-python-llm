@@ -22,8 +22,8 @@ openai_category = knext.category(
 )
 
 
-@knext.parameter_group(label="Input")
-class OpenAIInputSettings:
+@knext.parameter_group(label="OpenAI LLM Settings")
+class LLMLoaderInputSettings:
     class ModelOptions(knext.EnumParameterOptions):
         Ada = (
             "text-ada-001",
@@ -53,6 +53,9 @@ class OpenAIInputSettings:
         ModelOptions,
     )
 
+
+@knext.parameter_group(label="Credentials")
+class CredentialsSettings:
     credentials_param = knext.StringParameter(
         label="Credentials parameter",
         description="Credentials parameter name for accessing OpenAI API key",
@@ -70,11 +73,18 @@ class OpenAIInputSettings:
     "OpenAI Embeddings", "An embeddings model from OpenAI.", embeddings_port_type
 )
 class OpenAIEmbeddingsLoader:
+    credentials_settings = CredentialsSettings()
+
     def configure(self, ctx: knext.ConfigurationContext) -> EmbeddingsPortObjectSpec:
-        return EmbeddingsPortObjectSpec()
+        return EmbeddingsPortObjectSpec(None, None)
 
     def execute(self, ctx: knext.ExecutionContext) -> EmbeddingsPortObject:
-        return EmbeddingsPortObject(EmbeddingsPortObjectSpec())
+        credential_params = self.credentials_settings.credentials_param
+        model_name = "text-embedding-ada-002"
+
+        return EmbeddingsPortObject(
+            EmbeddingsPortObjectSpec(credential_params, model_name)
+        )
 
 
 @knext.node(
@@ -82,18 +92,20 @@ class OpenAIEmbeddingsLoader:
 )
 @knext.output_port("OpenAI LLM", "A large language model from OpenAI.", llm_port_type)
 class OpenAILLMLoader:
-    input_settings = OpenAIInputSettings()
+    input_settings = LLMLoaderInputSettings()
+    credentials_settings = CredentialsSettings()
 
     def configure(self, ctx: knext.ConfigurationContext) -> LLMPortObjectSpec:
         return LLMPortObjectSpec(None, None)
 
     def execute(self, ctx: knext.ExecutionContext) -> LLMPortObject:
+        credentials_params = self.credentials_settings.credentials_param
+        model_name = self.input_settings.ModelOptions[
+            self.input_settings.model_name
+        ].label
 
-        cred_params = self.input_settings.credentials_param
-        model_name=self.input_settings.ModelOptions[
-                self.input_settings.model_name].label
-        
-        return LLMPortObject(LLMPortObjectSpec(cred_params, model_name))
+        return LLMPortObject(LLMPortObjectSpec(credentials_params, model_name))
+
 
 @knext.node(
     "OpenAI LLM Prompter", knext.NodeType.SOURCE, openai_icon, category=openai_category
@@ -101,17 +113,16 @@ class OpenAILLMLoader:
 @knext.input_port("OpenAI LLM", "A large language model from OpenAI.", llm_port_type)
 @knext.output_port("OpenAI LLM", "A large language model from OpenAI.", llm_port_type)
 class OpenAILLMPrompter:
-    prompt = knext.StringParameter(
-        "Prompt",
-        "The prompt that is being asked",
-        ""
-    )
+    prompt = knext.StringParameter("Prompt", "The prompt that is being asked", "")
 
-    def configure(self, ctx: knext.ConfigurationContext, spec: LLMPortObjectSpec) -> LLMPortObjectSpec:
+    def configure(
+        self, ctx: knext.ConfigurationContext, spec: LLMPortObjectSpec
+    ) -> LLMPortObjectSpec:
         return spec
 
-    def execute(self, ctx: knext.ExecutionContext, llm_port: LLMPortObject) -> LLMPortObject:
-
+    def execute(
+        self, ctx: knext.ExecutionContext, llm_port: LLMPortObject
+    ) -> LLMPortObject:
         llm = OpenAI(
             model_name=llm_port.spec.model_name,
             openai_api_key=ctx.get_credentials(llm_port.spec.cred).password,

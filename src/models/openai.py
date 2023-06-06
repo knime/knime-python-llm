@@ -8,6 +8,9 @@ from .base import (
     llm_port_type,
 )
 from langchain.llms import OpenAI
+import logging
+
+LOGGER = logging.getLogger(__name__)
 
 openai_icon = "./icons/openai.png"
 openai_category = knext.category(
@@ -15,7 +18,7 @@ openai_category = knext.category(
     level_id="top",
     name="Model Loaders",
     description="All nodes related to models",
-    icon="./icons/ml.svg",
+    icon="icons/ml.svg",
 )
 
 
@@ -38,6 +41,10 @@ class OpenAIInputSettings:
             "text-curie-001",
             "Very capable, but faster and lower cost than Davinci.",
         )
+        GPT_3_5_Turbo = (
+            "gpt-3.5-turbo",
+            "Most capable GPT-3.5 model and optimized for chat at 1/10th the cost of text-davinci-003.",
+        )
 
     model_name = knext.EnumParameter(
         "Model name",
@@ -47,8 +54,8 @@ class OpenAIInputSettings:
     )
 
     credentials_param = knext.StringParameter(
-        label="Credential parameter",
-        description="Choices is a callable",
+        label="Credentials parameter",
+        description="Credentials parameter name for accessing OpenAI API key",
         choices=lambda a: knext.DialogCreationContext.get_credential_names(a),
     )
 
@@ -81,4 +88,11 @@ class OpenAILLMLoader:
         return LLMPortObjectSpec()
 
     def execute(self, ctx: knext.ExecutionContext) -> LLMPortObject:
+        credentials = ctx.get_credentials(self.input_settings.credentials_param)
+        llm = OpenAI(
+            model_name=self.input_settings.ModelOptions[
+                self.input_settings.model_name
+            ].label,
+            openai_api_key=credentials.password,
+        )
         return LLMPortObject(LLMPortObjectSpec())

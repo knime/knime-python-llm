@@ -14,7 +14,7 @@ huggingface_category = knext.category(
     level_id="top",
     name="Model Loaders",
     description="All nodes related to models",
-    icon="./icons/ml.svg"
+    icon="./icons/ml.svg",
 )
 
 

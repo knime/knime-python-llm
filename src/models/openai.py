@@ -4,7 +4,9 @@ from .base import (
     EmbeddingsPortObject,
     embeddings_port_type,
     LLMPortObjectSpec,
+    LLMPortObjectSpecContent,
     LLMPortObject,
+    LLMPortObjectContent,
     llm_port_type,
 )
 from langchain.llms import OpenAI
@@ -21,6 +23,27 @@ openai_category = knext.category(
     icon="icons/ml.svg",
 )
 
+class OpenAILLMPortObjectSpecContent(LLMPortObjectSpecContent):
+
+    def __init__(self, params) -> None:
+        super().__init__()
+        self._params = params
+
+    def serialize(self) -> dict:
+        return self._params
+    
+LLMPortObjectContent.register_content_type(OpenAILLMPortObjectSpecContent)
+
+class OpenAILLMPortObjectContent(LLMPortObjectContent):
+
+    def create_llm(self, ctx):
+        
+        # TODO get info from spec
+
+        return OpenAI(
+            openai_api_key=None, 
+            model=None
+        )
 
 @knext.parameter_group(label="OpenAI LLM Settings")
 class LLMLoaderInputSettings:
@@ -105,29 +128,3 @@ class OpenAILLMLoader:
         ].label
 
         return LLMPortObject(LLMPortObjectSpec(credentials_params, model_name))
-
-
-@knext.node(
-    "OpenAI LLM Prompter", knext.NodeType.SOURCE, openai_icon, category=openai_category
-)
-@knext.input_port("OpenAI LLM", "A large language model from OpenAI.", llm_port_type)
-@knext.output_port("OpenAI LLM", "A large language model from OpenAI.", llm_port_type)
-class OpenAILLMPrompter:
-    prompt = knext.StringParameter("Prompt", "The prompt that is being asked", "")
-
-    def configure(
-        self, ctx: knext.ConfigurationContext, spec: LLMPortObjectSpec
-    ) -> LLMPortObjectSpec:
-        return spec
-
-    def execute(
-        self, ctx: knext.ExecutionContext, llm_port: LLMPortObject
-    ) -> LLMPortObject:
-        llm = OpenAI(
-            model_name=llm_port.spec.model_name,
-            openai_api_key=ctx.get_credentials(llm_port.spec.credentials).password,
-        )
-
-        LOGGER.info(llm(self.prompt))
-
-        return llm_port

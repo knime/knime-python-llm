@@ -1,6 +1,9 @@
+from knime.api.schema import PortObjectSpec
 import knime.extension as knext
 import pickle
+import logging
 
+LOGGER = logging.getLogger(__name__)
 class EmbeddingsPortObjectSpec(knext.PortObjectSpec):
     def __init__(self, credentials: str, model_name: str) -> None:
         super().__init__()
@@ -44,6 +47,7 @@ embeddings_port_type = knext.port_type(
 class LLMPortObjectSpecContent(knext.PortObjectSpec):
     pass
 
+
 class LLMPortObjectSpec(knext.PortObjectSpec):
 
     content_registry = {}
@@ -54,17 +58,13 @@ class LLMPortObjectSpec(knext.PortObjectSpec):
 
     def serialize(self):
         return {
-            "type": str(type(self.content)),
+            "type": str(type(self._content)),
             "content": self._content.serialize()
         }
-    
-    @property
-    def content(self):
-        return self._content
 
     @classmethod
     def register_content_type(cls, content_type: type):
-        cls.content_registry[str(type)] = type
+        cls.content_registry[str(content_type)] = content_type
 
     @classmethod
     def deserialize(cls, data: dict) -> "LLMPortObjectSpec":
@@ -75,8 +75,17 @@ class LLMPortObjectSpec(knext.PortObjectSpec):
 
 class LLMPortObjectContent(knext.PortObject):
 
-    def create_llm(self, ctx):
-        pass
+        def create_llm(self, ctx):
+            raise NotImplementedError()
+        
+        #TODO: Why do i need to name 'serialize' and 'deserialize' here?
+        def serialize(self):
+            pass
+
+        def deserialize():
+            pass
+
+    
 
 class LLMPortObject(knext.PortObject):
 
@@ -87,12 +96,12 @@ class LLMPortObject(knext.PortObject):
         self._content = content
     
     def create_llm(self, ctx):
-        return self._content.create_llm(ctx)
+        return self._content.create_llm(self, ctx)
 
 
     def serialize(self):
         config = {
-            "type": type(self._content), 
+            "type": str(type(self._content)),
             "content": self._content.serialize()
         }
         return pickle.dumps(config)
@@ -104,42 +113,61 @@ class LLMPortObject(knext.PortObject):
     @classmethod
     def deserialize(cls, spec: LLMPortObjectSpec, data) -> "LLMPortObject":
         config = pickle.loads(data)
+        # TODO understand why str is necessary here. Look at the type of config["type"]
         content_cls = cls.content_registry[config["type"]]
-        return cls(spec, content_cls.deserialize(spec.content, config["content"]))
+        return cls(spec, content_cls)
 
-
+#.deserialize(spec.content, config["content"])
 llm_port_type = knext.port_type("LLM", LLMPortObject, LLMPortObjectSpec)
 
 @knext.node(
     "LLM Prompter", knext.NodeType.SOURCE, "icons/ml.svg", ""
 )
 @knext.input_port("LLM", "A large language model.", llm_port_type)
-#TODO: Output column with promt and answer instead of log
-#@knext.output_table("Answer Table", "A table containing the answers to the promts.")
+@knext.input_table("Prompt Table", "A table containing prompts.")
+@knext.output_table("Answer Table", "A table containing prompts and answers.")
 class LLMPrompter:
-    # TODO: Take in column of promts
-    prompt = knext.StringParameter("Prompt", "The prompt that wil be send", "")
+
+    promt_column = knext.ColumnParameter(
+        "Prompt column",
+        """Selection of column used as the prompts column.""",
+        port_index=1,
+    )
 
     def configure(
         self, 
         ctx: knext.ConfigurationContext, 
-        llm_spec: LLMPortObjectSpec
+        llm_spec: LLMPortObjectSpec,
+        input_table: knext.Table
     ):
-        #return knext.Schema.from_columns([
-        #        knext.Column(knext.string(), "Promts"),
-        #        knext.Column(knext.string(), "Results"),
-        #    ]
-        #)
-        return llm_spec
+        #TODO: Check for string column in input
+
+        return knext.Schema.from_columns([
+                knext.Column(knext.string(), "Prompts"),
+                knext.Column(knext.string(), "Answers"),
+            ]
+        )
 
     def execute(
         self, 
         ctx: knext.ExecutionContext, 
-        llm_port: LLMPortObject
+        llm_port: LLMPortObject,
+        input_table: knext.Table
     ):
-        
+        import pandas as pd
+
+        prompts = input_table.to_pandas()
+        df = pd.DataFrame(prompts)
+
+
         llm = llm_port.create_llm(ctx)
+        answers = []
+
+        for prompt in df[self.promt_column]:
+            answers.append(llm(prompt))
         
-        LOGGER.info(llm("What is an apple?"))
+        result_table = pd.DataFrame()
+        result_table["Prompts"] = prompts
+        result_table["Answers"] = answers
         
-        return
+        return knext.Table.from_pandas(result_table)

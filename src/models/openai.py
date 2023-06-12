@@ -10,6 +10,8 @@ from .base import (
     llm_port_type,
 )
 from langchain.llms import OpenAI
+import openai
+
 import logging
 
 LOGGER = logging.getLogger(__name__)
@@ -25,25 +27,33 @@ openai_category = knext.category(
 
 class OpenAILLMPortObjectSpecContent(LLMPortObjectSpecContent):
 
-    def __init__(self, params) -> None:
+    def __init__(self, credentials, model_name) -> None:
         super().__init__()
-        self._params = params
+        self._credentials = credentials
+        self._model_name = model_name
 
     def serialize(self) -> dict:
-        return self._params
+        return {
+            "credentials": self._credentials,
+            "model": self._model_name
+        }
     
-LLMPortObjectContent.register_content_type(OpenAILLMPortObjectSpecContent)
+    @classmethod
+    def deserialize(cls, data: dict):
+        return cls(data["credentials"],data["model"])
+
+    
+LLMPortObjectSpec.register_content_type(OpenAILLMPortObjectSpecContent)
 
 class OpenAILLMPortObjectContent(LLMPortObjectContent):
 
     def create_llm(self, ctx):
-        
-        # TODO get info from spec
-
         return OpenAI(
-            openai_api_key=None, 
-            model=None
+            openai_api_key=ctx.get_credentials(self.spec.serialize()["credentials"]).password, 
+            model=self.spec.serialize()["model"]
         )
+    
+LLMPortObject.register_content_type(OpenAILLMPortObjectContent)
 
 @knext.parameter_group(label="OpenAI LLM Settings")
 class LLMLoaderInputSettings:
@@ -119,12 +129,21 @@ class OpenAILLMLoader:
     credentials_settings = CredentialsSettings()
 
     def configure(self, ctx: knext.ConfigurationContext) -> LLMPortObjectSpec:
-        return LLMPortObjectSpec(None, None)
+        return LLMPortObjectSpec(self.create_spec_content())
 
     def execute(self, ctx: knext.ExecutionContext) -> LLMPortObject:
+
+        spec_content = self.create_spec_content()
+
+        return LLMPortObject(
+            spec=LLMPortObjectSpec(spec_content),
+            content=OpenAILLMPortObjectContent(spec_content)
+        )
+
+    def create_spec_content(self):
         credentials_params = self.credentials_settings.credentials_param
         model_name = self.input_settings.ModelOptions[
             self.input_settings.model_name
         ].label
 
-        return LLMPortObject(LLMPortObjectSpec(credentials_params, model_name))
+        return OpenAILLMPortObjectSpecContent(credentials_params, model_name)

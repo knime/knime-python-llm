@@ -142,6 +142,7 @@ class FAISSVectorStoreLoader:
         embeddings_port_object: EmbeddingsPortObject,
     ) -> VectorStorePortObject:
         
+        # TODO: Add check if .fiass and .pkl files are in the directory instead of instatiating as check
         FAISS.load_local(self.persist_directory, embeddings_port_object.create_model(ctx))
 
         return VectorStorePortObject(
@@ -170,6 +171,11 @@ class FAISSVectorStoreRetriever:
         port_index=1
     )
 
+    top_k = knext.IntParameter(
+        "Number of results",
+        "Number of top results to get from vector store search. Ranking from best to worst"
+    )
+
     def configure(
         self,
         ctx: knext.ConfigurationContext,
@@ -178,7 +184,7 @@ class FAISSVectorStoreRetriever:
     ):
         return knext.Schema.from_columns([
                 knext.Column(knext.string(), "Queries"),
-                knext.Column(knext.string(), "Documents"),
+                knext.Column(knext.ListType(knext.string()), "Documents"),
             ]
         )
     
@@ -194,13 +200,23 @@ class FAISSVectorStoreRetriever:
         queries = input_table.to_pandas()
         df = pd.DataFrame(queries)
 
-        documents = []
+        doc_collection = []
 
         for query in df[self.query_column]:
-            documents.append(db.similarity_search(query)[0].page_content)
+            similar_documents = db.similarity_search(query)
+
+            result_range = self.top_k if self.top_k <= len(similar_documents) else len(similar_documents)
+
+            relevant_documents = []
+
+            for index in range(result_range):
+                relevant_documents.append(similar_documents[index].page_content)
+
+            doc_collection.append(relevant_documents)
+
         
         result_table = pd.DataFrame()
         result_table["Queries"] = queries
-        result_table["Documents"] = documents
+        result_table["Documents"] = doc_collection
 
         return knext.Table.from_pandas(result_table)

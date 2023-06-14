@@ -1,42 +1,72 @@
 import knime.extension as knext
+import pickle
+
 from models.base import (
-    EmbeddingsPortObjectSpec,
     EmbeddingsPortObject,
-    embeddings_port_type,
+    ModelPortObjectSpecContent,
+    ModelPortObjectSpec,
 )
 
+class VectorStorePortObjectSpecContent(knext.PortObjectSpec):
+    pass
 
-class VectorStorePortObjectSpec(knext.PortObjectSpec):
-    def __init__(self, persist_directory) -> None:
-        super().__init__()
-        self._persist_directory = persist_directory
+class VectorStorePortObjectSpec(ModelPortObjectSpec):
 
-    @property
-    def persist_directory(self):
-        return self._persist_directory
-
-    def serialize(self) -> dict:
-        return {"persist_directory": self._persist_directory}
+    def __init__(self, content: ModelPortObjectSpecContent) -> None:
+        super().__init__(content)
 
     @classmethod
     def deserialize(cls, data: dict) -> "VectorStorePortObjectSpec":
-        return cls(data["persist_directory"])
+        content_cls = cls.content_registry[data["type"]]
+        return content_cls.deserialize(data["content"])
+    
+class VectorStorePortObjectContent(knext.PortObject):
 
-
-class VectorStorePortObject(knext.PortObject):
-    def __init__(self, spec: VectorStorePortObjectSpec) -> None:
+    def __init__(self, spec: knext.PortObjectSpec, embeddings_model: EmbeddingsPortObject) -> None:
         super().__init__(spec)
+        self._embeddings_model = embeddings_model
+    
+    def load_store(self, ctx):
+        raise NotImplementedError()
 
-    def serialize(self) -> bytes:
-        return b""
+    def serialize(self):
+        config = {
+            "embeddings_model": self._embeddings_model
+            }
+        return pickle.dumps(config)
+        
+    
+    @classmethod
+    def deserialize(cls, spec: VectorStorePortObjectSpec, data) -> "VectorStorePortObjectContent":
+        config = pickle.loads(data)
+        return cls(spec, config["embeddings_model"])
+        
+class VectorStorePortObject(knext.PortObject):
+
+    content_registry = {}
+
+    def __init__(self, spec: knext.PortObjectSpec, content: VectorStorePortObjectContent) -> None:
+        super().__init__(spec)
+        self._content = content
+    
+    def load_store(self, ctx):
+        return self._content.load_store(ctx)
+
+    def serialize(self):
+        config = {
+            "type": str(type(self._content)),
+            "content": self._content.serialize()
+        }
+        return pickle.dumps(config)
+    
+    @classmethod
+    def register_content_type(cls, content_type: type):
+        cls.content_registry[str(content_type)] = content_type
 
     @classmethod
-    def deserialize(
-        cls, spec: VectorStorePortObjectSpec, data: bytes
-    ) -> "VectorStorePortObject":
-        return cls(spec)
+    def deserialize(cls, spec: VectorStorePortObjectSpec, data) -> "VectorStorePortObject":
+        config = pickle.loads(data)
+        content_cls = cls.content_registry[config["type"]]
+        return cls(spec, content_cls.deserialize(spec, config["content"]))
 
-
-vectorstore_port_type = knext.port_type(
-    "Vectorstore", VectorStorePortObject, VectorStorePortObjectSpec
-)
+vector_store_port_type = knext.port_type("Vectorstore", VectorStorePortObject, VectorStorePortObjectSpec)

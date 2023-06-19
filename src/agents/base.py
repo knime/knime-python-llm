@@ -1,4 +1,11 @@
 import knime.extension as knext
+import pandas as pd
+import os
+
+from indexes.faiss import (
+    FAISSVectorstorePortObjectContent,
+    FAISSVectorstorePortObjectSpecContent,
+)
 from models.base import LLMPortObjectSpec, LLMPortObject, llm_port_type
 from indexes.base import (
     VectorStorePortObjectSpec,
@@ -6,85 +13,159 @@ from indexes.base import (
     vector_store_port_type,
 )
 
-import pandas as pd
-import os
+from langchain import LLMMathChain
+from langchain.chat_models import ChatOpenAI
+from langchain.agents import load_tools, initialize_agent, Tool, AgentType
+from langchain.chains import RetrievalQA
+from langchain.memory import ConversationBufferMemory
 
-from langchain.agents import load_tools
-from langchain.agents import initialize_agent, Tool
-from langchain.agents import AgentType
 
-langchain_icon = "./icons/langchain.png"
+langchain_icon = ""
 agent_category = ""
+
+import logging
+
+LOGGER = logging.getLogger(__name__)
+
+
+class AgentConnectionSpec(knext.PortObjectSpec):
+    def __init__(self) -> None:
+        super().__init__()
+
+    def serialize(self) -> dict:
+        return {}
+
+    @classmethod
+    def deserialize(cls, data: dict) -> "AgentConnectionSpec":
+        return cls()
+
+
+class AgentConnectionObject(knext.ConnectionPortObject):
+    def __init__(self, spec: AgentConnectionSpec, agent) -> None:
+        super().__init__(spec)
+        self._agent = agent
+
+    def serialize(self):
+        return {"agent": self._agent}
+
+    @property
+    def spec(self) -> AgentConnectionSpec:
+        return super().spec
+
+    @property
+    def agent(self):
+        return self._agent
+
+    @classmethod
+    def deserialize(cls, spec: AgentConnectionSpec, data) -> "AgentConnectionObject":
+        return cls(spec, data["agent"])
+
+
+agent_connection_port_type = knext.port_type(
+    "Agent Port Type",
+    AgentConnectionObject,
+    AgentConnectionSpec,
+)
+
+
+@knext.parameter_group(label="Credentials")
+class CredentialsSettings:
+    credentials_param = knext.StringParameter(
+        label="Credentials parameter",
+        description="Credentials parameter name for accessing Google Search API key",
+        choices=lambda a: knext.DialogCreationContext.get_credential_names(a),
+    )
 
 
 @knext.node(
-    "Agent", knext.NodeType.PREDICTOR, langchain_icon, category=agent_category
+    "ChatBot Agent Creator",
+    knext.NodeType.PREDICTOR,
+    langchain_icon,
+    category=agent_category,
 )
 @knext.input_port("LLM", "The large language model to chat with.", llm_port_type)
-@knext.input_port("Vector Store","The vector store to get context for the agent.",vector_store_port_type,)
-@knext.input_table("Queries", "Table containing a string column with the queries for the vectordb.")
-@knext.output_table("Queries and answers", "todo")
-#@knext.input_table("Chat", "The chat history.")
-#@knext.output_table("Reply", "The agents reply.")
-class ChatBotAgent:
-
-    query_column = knext.ColumnParameter(
-        "Queries",
-        "Column containing the queries",
-        port_index=2
-    )
-
+@knext.input_port("Vectorstore", "Vectorstore input.", vector_store_port_type)
+@knext.output_port("Agent", "Outputs a chatbot agent.", agent_connection_port_type)
+class ChatBotAgentCreator:
     def configure(
         self,
         ctx: knext.ConfigurationContext,
-        llm: LLMPortObjectSpec,
         vectorstore: VectorStorePortObjectSpec,
-        table_spec: knext.Schema,
+        llm: LLMPortObjectSpec,
     ):
-        return knext.Schema.from_columns([
-                knext.Column(knext.string(), "Queries"),
-                knext.Column(knext.string(), "Answers"),
-            ]
-        )
+        return AgentConnectionSpec()
 
     def execute(
         self,
         ctx: knext.ExecutionContext,
         llm_port: LLMPortObject,
         vectorstore: VectorStorePortObject,
-        input_table: knext.Table
     ):
-        from langchain.chains import RetrievalQA
-        from langchain.vectorstores import FAISS
-        
-        os.environ["SERPAPI_API_KEY"] = "a0ced4f64a04953c0d922fec371071c3e5f1d344325e27b219be836792baf8a1"
-        
         llm = llm_port.create_model(ctx)
+        memory = ConversationBufferMemory(memory_key="chat_history")
+
         db = vectorstore.load_store(ctx)
+        node_descriptions = RetrievalQA.from_chain_type(
+            llm=llm,
+            chain_type="refine",
+            retriever=db.as_retriever(search_kwargs={"k": 3}),
+        )
+        tools = []
 
-        node_descriptions = RetrievalQA.from_chain_type(llm=llm, chain_type="stuff", retriever=db.as_retriever())
-
-        tools = load_tools(["serpapi", "llm-math"], llm=llm)
+        # TODO: remove and get it from the vectorstoreportobject
         tools.append(
             Tool(
-                name = "Node Descriptions QA System",
+                name="Node Descriptions QA System",
                 func=node_descriptions.run,
-                description="useful for when you need to answer questions about how to configure a node in KNIME. Input should be a fully formed question."
-                )
+                description="useful for when you need to answer questions about how to configure a node in KNIME. Input should be a fully formed question.",
+            )
         )
 
-        agent = initialize_agent(tools, llm, agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION, verbose=True)
+        agent = initialize_agent(
+            tools,
+            llm,
+            agent=AgentType.CONVERSATIONAL_REACT_DESCRIPTION,
+            verbose=True,
+            memory=memory,
+        )
 
-        queries = input_table.to_pandas()
-        df = pd.DataFrame(queries)
+        return AgentConnectionObject(AgentConnectionSpec(), agent)
 
-        answers = []
 
-        for query in df[self.query_column]:
-            answers.append(agent.run(query))
-        
-        result_table = pd.DataFrame()
-        result_table["Queries"] = queries
-        result_table["Answers"] = answers
+@knext.node(
+    "ChatBot Agent Executor",
+    knext.NodeType.PREDICTOR,
+    langchain_icon,
+    category=agent_category,
+)
+@knext.input_port("Chatbot", "Chatbot agent", agent_connection_port_type)
+@knext.output_port("Chatbot", "Outputs a chatbot agent.", agent_connection_port_type)
+@knext.output_table("Response", "Outputs chatbot agent's response.")
+class ChatBotAgentExecutor:
+    message = knext.StringParameter("Chat input", "Human chat message")
 
-        return knext.Table.from_pandas(result_table)
+    def configure(
+        self,
+        ctx: knext.ConfigurationContext,
+        chatbot_spec: AgentConnectionSpec,
+    ):
+        response_table = knext.Schema.from_columns(
+            [
+                knext.Column(knext.string(), "Message"),
+                knext.Column(knext.string(), "Response"),
+            ]
+        )
+        return chatbot_spec, response_table
+
+    def execute(
+        self,
+        ctx: knext.ExecutionContext,
+        chatbot: AgentConnectionObject,
+    ):
+        response = chatbot.agent.run(input=self.message)
+        response_table = pd.DataFrame()
+
+        response_table["Message"] = self.message
+        response_table["Response"] = response
+
+        return chatbot, knext.Table.from_pandas(response_table)

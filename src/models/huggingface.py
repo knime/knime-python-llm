@@ -8,13 +8,13 @@ from .base import (
     llm_port_type,
 )
 
-huggingface_icon = "./icons/huggingface.png"
+huggingface_icon = ""
 huggingface_category = knext.category(
     path="/community",
-    level_id="top",
+    level_id="llm",
     name="Model Loaders",
     description="All nodes related to models",
-    icon="./icons/ml.svg",
+    icon="",
 )
 
 

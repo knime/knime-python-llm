@@ -12,14 +12,16 @@ from .base import (
 from langchain.llms import OpenAI
 from langchain.embeddings.openai import OpenAIEmbeddings
 
-openai_icon = "./icons/openai.png"
+openai_icon = ""
 openai_category = knext.category(
     path="/community",
-    level_id="top",
+    level_id="llm",
     name="Model Loaders",
     description="All nodes related to models",
-    icon="icons/ml.svg",
+    icon="",
 )
+
+
 @knext.parameter_group(label="Credentials")
 class CredentialsSettings:
     credentials_param = knext.StringParameter(
@@ -28,33 +30,36 @@ class CredentialsSettings:
         choices=lambda a: knext.DialogCreationContext.get_credential_names(a),
     )
 
-class OpenAILLMPortObjectSpecContent(ModelPortObjectSpecContent):
 
+class OpenAILLMPortObjectSpecContent(ModelPortObjectSpecContent):
     def __init__(self, credentials, model_name) -> None:
         super().__init__()
         self._credentials = credentials
         self._model_name = model_name
 
     def serialize(self) -> dict:
-        return {
-            "credentials": self._credentials,
-            "model": self._model_name
-        }
-    
+        return {"credentials": self._credentials, "model": self._model_name}
+
     @classmethod
     def deserialize(cls, data: dict):
-        return cls(data["credentials"],data["model"])
+        return cls(data["credentials"], data["model"])
+
 
 LLMPortObjectSpec.register_content_type(OpenAILLMPortObjectSpecContent)
 
-class OpenAILLMPortObjectContent(ModelPortObjectContent):
 
+class OpenAILLMPortObjectContent(ModelPortObjectContent):
     def create_model(self, ctx):
         return OpenAI(
-            openai_api_key=ctx.get_credentials(self.spec.serialize()["credentials"]).password, 
-            model=self.spec.serialize()["model"]
+            openai_api_key=ctx.get_credentials(
+                self.spec.serialize()["credentials"]
+            ).password,
+            model=self.spec.serialize()["model"],
         )
+
+
 LLMPortObject.register_content_type(OpenAILLMPortObjectContent)
+
 
 @knext.parameter_group(label="OpenAI LLM Settings")
 class LLMLoaderInputSettings:
@@ -80,7 +85,6 @@ class LLMLoaderInputSettings:
             "Can do any language task with better quality, longer output, and consistent instruction-following than the curie, babbage, or ada models.",
         )
 
-
     model_name = knext.EnumParameter(
         "Model name",
         "GPT-3 (Ada, Babbage, Curie) and GPT-3.5 (Davinci) models",
@@ -88,10 +92,18 @@ class LLMLoaderInputSettings:
         OpenAIModelCompletionsOptions,
     )
 
+
 @knext.node(
-    "OpenAI LLM Configurator", knext.NodeType.SOURCE, openai_icon, category=openai_category
+    "OpenAI LLM Configurator",
+    knext.NodeType.SOURCE,
+    openai_icon,
+    category=openai_category,
 )
-@knext.output_port("OpenAI LLM Configuration", "A large language model configuration for OpenAI.", llm_port_type)
+@knext.output_port(
+    "OpenAI LLM Configuration",
+    "A large language model configuration for OpenAI.",
+    llm_port_type,
+)
 class OpenAILLMConfigurator:
     input_settings = LLMLoaderInputSettings()
     credentials_settings = CredentialsSettings()
@@ -100,12 +112,11 @@ class OpenAILLMConfigurator:
         return LLMPortObjectSpec(self.create_spec_content())
 
     def execute(self, ctx: knext.ExecutionContext) -> LLMPortObject:
-
         spec_content = self.create_spec_content()
 
         return LLMPortObject(
             spec=LLMPortObjectSpec(spec_content),
-            content=OpenAILLMPortObjectContent(spec_content)
+            content=OpenAILLMPortObjectContent(spec_content),
         )
 
     def create_spec_content(self):
@@ -115,32 +126,37 @@ class OpenAILLMConfigurator:
         ].label
 
         return OpenAILLMPortObjectSpecContent(credential_params, model_name)
-    
+
+
 class OpenAIEmbeddingsPortObjectSpecContent(ModelPortObjectSpecContent):
-    
     def __init__(self, credentials, model_name) -> None:
         super().__init__()
         self._credentials = credentials
         self._model_name = model_name
 
     def serialize(self) -> dict:
-        return {
-            "credentials": self._credentials,
-            "model": self._model_name
-        }
-    
+        return {"credentials": self._credentials, "model": self._model_name}
+
     @classmethod
     def deserialize(cls, data: dict):
-        return cls(data["credentials"],data["model"])
+        return cls(data["credentials"], data["model"])
+
+
 EmbeddingsPortObjectSpec.register_content_type(OpenAIEmbeddingsPortObjectSpecContent)
+
 
 class OpenAIEmbeddingsPortObjectContent(ModelPortObjectContent):
     def create_model(self, ctx):
         return OpenAIEmbeddings(
-            openai_api_key=ctx.get_credentials(self.spec.serialize()["credentials"]).password,
-            model=self.spec.serialize()["model"]
+            openai_api_key=ctx.get_credentials(
+                self.spec.serialize()["credentials"]
+            ).password,
+            model=self.spec.serialize()["model"],
         )
+
+
 EmbeddingsPortObject.register_content_type(OpenAIEmbeddingsPortObjectContent)
+
 
 @knext.parameter_group(label="OpenAI Embeddings Configuration")
 class EmbeddingsLoaderInputSettings:
@@ -161,6 +177,7 @@ class EmbeddingsLoaderInputSettings:
         OpenAIEmbeddingsOptions,
     )
 
+
 @knext.node(
     "OpenAI Embeddings Configurator",
     knext.NodeType.SOURCE,
@@ -168,7 +185,9 @@ class EmbeddingsLoaderInputSettings:
     category=openai_category,
 )
 @knext.output_port(
-    "OpenAI Embeddings Configuration" , "An embeddings model configuration for OpenAI.", embeddings_port_type
+    "OpenAI Embeddings Configuration",
+    "An embeddings model configuration for OpenAI.",
+    embeddings_port_type,
 )
 class OpenAIEmbeddingsConfigurator:
     input_settings = EmbeddingsLoaderInputSettings()
@@ -178,14 +197,13 @@ class OpenAIEmbeddingsConfigurator:
         return EmbeddingsPortObjectSpec(self.create_spec_content())
 
     def execute(self, ctx: knext.ExecutionContext) -> EmbeddingsPortObject:
-
         spec_content = self.create_spec_content()
 
         return EmbeddingsPortObject(
             spec=EmbeddingsPortObjectSpec(spec_content),
-            content=OpenAIEmbeddingsPortObjectContent(spec_content)
+            content=OpenAIEmbeddingsPortObjectContent(spec_content),
         )
-    
+
     def create_spec_content(self):
         credential_params = self.credentials_settings.credentials_param
         model_name = self.input_settings.OpenAIEmbeddingsOptions[

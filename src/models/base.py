@@ -87,6 +87,24 @@ class LLMPortObject(ModelPortObject):
         return cls(spec, content_cls)
 
 
+class ChatModelPortObjectSpec(ModelPortObjectSpec):
+    def __init__(self, content: ModelPortObjectSpecContent) -> None:
+        super().__init__(content)
+
+    @classmethod
+    def deserialize(cls, data: dict) -> "ChatModelPortObjectSpec":
+        content_cls = cls.content_registry[data["type"]]
+        return content_cls.deserialize(data["content"])
+
+
+class ChatModelPortObject(ModelPortObject):
+    @classmethod
+    def deserialize(cls, spec: ChatModelPortObjectSpec, data) -> "ChatModelPortObject":
+        config = pickle.loads(data)
+        content_cls = cls.content_registry[config["type"]]
+        return cls(spec, content_cls)
+
+
 class EmbeddingsPortObjectSpec(ModelPortObjectSpec):
     def __init__(self, content: ModelPortObjectSpecContent) -> None:
         super().__init__(content)
@@ -108,6 +126,9 @@ class EmbeddingsPortObject(ModelPortObject):
 
 
 llm_port_type = knext.port_type("LLM", LLMPortObject, LLMPortObjectSpec)
+chat_model_port_type = knext.port_type(
+    "Chat Model", ChatModelPortObject, ChatModelPortObjectSpec
+)
 embeddings_port_type = knext.port_type(
     "Embeddings", EmbeddingsPortObject, EmbeddingsPortObjectSpec
 )

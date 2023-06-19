@@ -6,7 +6,14 @@ from indexes.faiss import (
     FAISSVectorstorePortObjectContent,
     FAISSVectorstorePortObjectSpecContent,
 )
-from models.base import LLMPortObjectSpec, LLMPortObject, llm_port_type
+from models.base import (
+    LLMPortObjectSpec,
+    LLMPortObject,
+    llm_port_type,
+    ChatModelPortObject,
+    ChatModelPortObjectSpec,
+    chat_model_port_type,
+)
 from indexes.base import (
     VectorStorePortObjectSpec,
     VectorStorePortObject,
@@ -91,22 +98,22 @@ class ChatBotAgentCreator:
         self,
         ctx: knext.ConfigurationContext,
         vectorstore: VectorStorePortObjectSpec,
-        llm: LLMPortObjectSpec,
+        chatmodel: ChatModelPortObjectSpec,
     ):
         return AgentConnectionSpec()
 
     def execute(
         self,
         ctx: knext.ExecutionContext,
-        llm_port: LLMPortObject,
+        chatmodel_port: ChatModelPortObject,
         vectorstore: VectorStorePortObject,
     ):
-        llm = llm_port.create_model(ctx)
+        chatmodel = chatmodel_port.create_model(ctx)
         memory = ConversationBufferMemory(memory_key="chat_history")
 
         db = vectorstore.load_store(ctx)
         node_descriptions = RetrievalQA.from_chain_type(
-            llm=llm,
+            llm=chatmodel,
             chain_type="refine",
             retriever=db.as_retriever(search_kwargs={"k": 3}),
         )
@@ -123,7 +130,7 @@ class ChatBotAgentCreator:
 
         agent = initialize_agent(
             tools,
-            llm,
+            chatmodel,
             agent=AgentType.CONVERSATIONAL_REACT_DESCRIPTION,
             verbose=True,
             memory=memory,

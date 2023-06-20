@@ -15,6 +15,7 @@ from .base import (
 )
 
 from langchain.llms import OpenAI
+from langchain.chat_models import ChatOpenAI
 from langchain.embeddings.openai import OpenAIEmbeddings
 
 openai_icon = ""
@@ -85,7 +86,7 @@ ChatModelPortObjectSpec.register_content_type(OpenAIChatModelPortObjectSpecConte
 
 class OpenAIChatModelPortObjectContent(ModelPortObjectContent):
     def create_model(self, ctx):
-        return OpenAI(
+        return ChatOpenAI(
             openai_api_key=ctx.get_credentials(
                 self.spec.serialize()["credentials"]
             ).password,

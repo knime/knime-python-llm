@@ -1,16 +1,19 @@
 import knime.extension as knext
 from .base import (
-    ChatModelPortObject,
-    ChatModelPortObjectSpec,
     ModelPortObjectSpecContent,
     ModelPortObjectContent,
-    EmbeddingsPortObjectSpec,
-    EmbeddingsPortObject,
-    embeddings_port_type,
     LLMPortObjectSpec,
+    ChatModelPortObjectSpec,
+    EmbeddingsPortObjectSpec,
     LLMPortObject,
+    ChatModelPortObject,
+    EmbeddingsPortObject,
     llm_port_type,
+    chat_model_port_type,
+    embeddings_port_type,
+
 )
+
 from langchain.llms import OpenAI
 from langchain.embeddings.openai import OpenAIEmbeddings
 
@@ -93,6 +96,36 @@ class OpenAIChatModelPortObjectContent(ModelPortObjectContent):
 ChatModelPortObject.register_content_type(OpenAILLMPortObjectContent)
 
 
+class OpenAIEmbeddingsPortObjectSpecContent(ModelPortObjectSpecContent):
+    def __init__(self, credentials, model_name) -> None:
+        super().__init__()
+        self._credentials = credentials
+        self._model_name = model_name
+
+    def serialize(self) -> dict:
+        return {"credentials": self._credentials, "model": self._model_name}
+
+    @classmethod
+    def deserialize(cls, data: dict):
+        return cls(data["credentials"], data["model"])
+
+
+EmbeddingsPortObjectSpec.register_content_type(OpenAIEmbeddingsPortObjectSpecContent)
+
+
+class OpenAIEmbeddingsPortObjectContent(ModelPortObjectContent):
+    def create_model(self, ctx):
+        return OpenAIEmbeddings(
+            openai_api_key=ctx.get_credentials(
+                self.spec.serialize()["credentials"]
+            ).password,
+            model=self.spec.serialize()["model"],
+        )
+
+
+EmbeddingsPortObject.register_content_type(OpenAIEmbeddingsPortObjectContent)
+
+
 @knext.parameter_group(label="OpenAI LLM Settings")
 class LLMLoaderInputSettings:
     class OpenAIModelCompletionsOptions(knext.EnumParameterOptions):
@@ -153,6 +186,26 @@ class ChatModelLoaderInputSettings:
     )
 
 
+@knext.parameter_group(label="OpenAI Embeddings Configuration")
+class EmbeddingsLoaderInputSettings:
+    class OpenAIEmbeddingsOptions(knext.EnumParameterOptions):
+        Ada1 = (
+            "text-search-ada-doc-001",
+            "Capable of very simple tasks, usually the fastest model in the GPT-3 series, and lowest cost.",
+        )
+        Ada2 = (
+            "text-embedding-ada-002",
+            "Capable of straightforward tasks, very fast, and lower cost.",
+        )
+
+    model_name = knext.EnumParameter(
+        "Embeddings model name",
+        "Ada text embedding models",
+        OpenAIEmbeddingsOptions.Ada1.name,
+        OpenAIEmbeddingsOptions,
+    )
+
+
 @knext.node(
     "OpenAI LLM Configurator",
     knext.NodeType.SOURCE,
@@ -195,9 +248,9 @@ class OpenAILLMConfigurator:
     category=openai_category,
 )
 @knext.output_port(
-    "OpenAI LLM Configuration",
+    "OpenAI Chat Model Configuration",
     "A chat model configuration for OpenAI.",
-    llm_port_type,
+    chat_model_port_type,
 )
 class OpenAIChatModelConfigurator:
     input_settings = ChatModelLoaderInputSettings()
@@ -209,9 +262,9 @@ class OpenAIChatModelConfigurator:
     def execute(self, ctx: knext.ExecutionContext) -> LLMPortObject:
         spec_content = self.create_spec_content()
 
-        return LLMPortObject(
-            spec=LLMPortObjectSpec(spec_content),
-            content=OpenAILLMPortObjectContent(spec_content),
+        return ChatModelPortObject(
+            spec=ChatModelPortObjectSpec(spec_content),
+            content=OpenAIChatModelPortObjectContent(spec_content),
         )
 
     def create_spec_content(self):
@@ -220,57 +273,7 @@ class OpenAIChatModelConfigurator:
             self.input_settings.model_name
         ].label
 
-        return OpenAILLMPortObjectSpecContent(credential_params, model_name)
-
-
-class OpenAIEmbeddingsPortObjectSpecContent(ModelPortObjectSpecContent):
-    def __init__(self, credentials, model_name) -> None:
-        super().__init__()
-        self._credentials = credentials
-        self._model_name = model_name
-
-    def serialize(self) -> dict:
-        return {"credentials": self._credentials, "model": self._model_name}
-
-    @classmethod
-    def deserialize(cls, data: dict):
-        return cls(data["credentials"], data["model"])
-
-
-EmbeddingsPortObjectSpec.register_content_type(OpenAIEmbeddingsPortObjectSpecContent)
-
-
-class OpenAIEmbeddingsPortObjectContent(ModelPortObjectContent):
-    def create_model(self, ctx):
-        return OpenAIEmbeddings(
-            openai_api_key=ctx.get_credentials(
-                self.spec.serialize()["credentials"]
-            ).password,
-            model=self.spec.serialize()["model"],
-        )
-
-
-EmbeddingsPortObject.register_content_type(OpenAIEmbeddingsPortObjectContent)
-
-
-@knext.parameter_group(label="OpenAI Embeddings Configuration")
-class EmbeddingsLoaderInputSettings:
-    class OpenAIEmbeddingsOptions(knext.EnumParameterOptions):
-        Ada1 = (
-            "text-search-ada-doc-001",
-            "Capable of very simple tasks, usually the fastest model in the GPT-3 series, and lowest cost.",
-        )
-        Ada2 = (
-            "text-embedding-ada-002",
-            "Capable of straightforward tasks, very fast, and lower cost.",
-        )
-
-    model_name = knext.EnumParameter(
-        "Embeddings model name",
-        "Ada text embedding models",
-        OpenAIEmbeddingsOptions.Ada1.name,
-        OpenAIEmbeddingsOptions,
-    )
+        return OpenAIChatModelPortObjectSpecContent(credential_params, model_name)
 
 
 @knext.node(

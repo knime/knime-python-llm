@@ -1,12 +1,9 @@
-from knime.api.schema import PortObjectSpec
 import knime.extension as knext
 import pickle
 
 from models.base import (
     EmbeddingsPortObject,
     ModelPortObjectSpecContent,
-    ModelPortObjectSpec,
-    ModelPortObject,
 )
 
 

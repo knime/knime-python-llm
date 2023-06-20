@@ -1,10 +1,6 @@
 import knime.extension as knext
 import pandas as pd
 
-from langchain.vectorstores import FAISS
-from langchain.docstore.document import Document
-from langchain.document_loaders import YoutubeLoader
-
 from models.base import (
     EmbeddingsPortObjectSpec,
     EmbeddingsPortObject,
@@ -18,9 +14,9 @@ from .base import (
     VectorStorePortObjectContent,
     vector_store_port_type,
 )
-import logging
 
-LOGGER = logging.getLogger(__name__)
+from langchain.vectorstores import FAISS
+from langchain.docstore.document import Document
 
 
 class FAISSVectorstorePortObjectSpecContent(VectorStorePortObjectSpecContent):
@@ -225,14 +221,6 @@ class FAISSVectorStoreRetriever:
 
         for query in df[self.query_column]:
             similar_documents = db.similarity_search(query, k=self.top_k)
-
-            # result_range = (
-            #     self.top_k
-            #     if self.top_k <= len(similar_documents)
-            #     else len(similar_documents)
-            # )
-
-            # LOGGER.info(result_range)
 
             relevant_documents = []
 

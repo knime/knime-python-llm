@@ -1,6 +1,11 @@
+from knime.api.schema import PortObjectSpec
 import knime.extension as knext
 import pickle
 import pandas as pd
+
+import logging
+
+LOGGER = logging.getLogger(__name__)
 
 
 class ModelPortObjectSpecContent(knext.PortObjectSpec):
@@ -134,6 +139,53 @@ embeddings_port_type = knext.port_type(
 )
 
 
+class SuperPortObjectSpec(knext.PortObjectSpec):
+    pass
+
+class SuperPortObject(knext.PortObject):
+
+    def __init__(self, spec: SuperPortObjectSpec) -> None:
+        super().__init__(spec)
+
+    def create_model(self, ctx):
+        raise NotImplementedError()
+    
+super_port_type = knext.port_type("Super Port Type", SuperPortObject, SuperPortObjectSpec)
+
+class SubPortObjectSpec(SuperPortObjectSpec):
+    def __init__(self, credentials, model_name) -> None:
+        super().__init__()
+        self._credentials = credentials
+        self._model = model_name
+
+    def serialize(self) -> dict:
+        return {"credentials": self._credentials, "model": self._model}
+
+    @classmethod
+    def deserialize(cls, data: dict):
+        return cls(data["credentials"], data["model"])
+
+class SubPortObject(SuperPortObject):
+
+    def serialize(self) -> bytes:
+        return b""
+    
+    @classmethod
+    def deserialize(cls, spec):
+        return cls(spec)
+
+    def create_model(self, ctx):
+        from langchain.llms import OpenAI
+
+        return OpenAI(
+            openai_api_key=ctx.get_credentials(
+                self.spec.serialize()["credentials"]
+            ).password,
+            model=self.spec.serialize()["model"],
+        )
+
+sub_port_type = knext.port_type("Sub Port Type", SubPortObject, SubPortObjectSpec)
+
 @knext.node("LLM Prompter", knext.NodeType.SOURCE, "", "")
 @knext.input_port("LLM", "A large language model.", llm_port_type)
 @knext.input_table("Prompt Table", "A table containing a string column with prompts.")
@@ -168,13 +220,18 @@ class LLMPrompter:
         llm_port: LLMPortObject,
         input_table: knext.Table,
     ):
+        
+        LOGGER.info(llm_port)
+        LOGGER.info(vars(llm_port))
+        LOGGER.info(llm_port.serialize())
+        
         prompts = input_table.to_pandas()
         df = pd.DataFrame(prompts)
 
         llm = llm_port.create_model(ctx)
         answers = []
 
-        for prompt in df[self.promt_column]:
+        for prompt in df["Prompts"]:
             answers.append(llm(prompt))
 
         result_table = pd.DataFrame()

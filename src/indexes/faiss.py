@@ -102,7 +102,10 @@ class FAISSVectorStoreCreator:
         input_table: knext.Table,
     ) -> VectorStorePortObject:
         df = input_table.to_pandas()
-        documents = [Document(page_content=text) for text in df[self.document_column]]
+        #TODO: Change back to this line
+        #documents = [Document(page_content=text) for text in df[self.document_column]]
+        documents = [Document(page_content=text) for text in df["Documents"]]
+
 
         db = FAISS.from_documents(
             documents=documents,

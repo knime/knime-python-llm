@@ -12,6 +12,11 @@ from .base import (
     chat_model_port_type,
     embeddings_port_type,
 
+    SuperPortObjectSpec,
+    SuperPortObject,
+    SubPortObject,
+    SubPortObjectSpec,
+    sub_port_type
 )
 
 from langchain.llms import OpenAI
@@ -94,7 +99,7 @@ class OpenAIChatModelPortObjectContent(ModelPortObjectContent):
         )
 
 
-ChatModelPortObject.register_content_type(OpenAILLMPortObjectContent)
+ChatModelPortObject.register_content_type(OpenAIChatModelPortObjectContent)
 
 
 class OpenAIEmbeddingsPortObjectSpecContent(ModelPortObjectSpecContent):
@@ -257,15 +262,14 @@ class OpenAIChatModelConfigurator:
     input_settings = ChatModelLoaderInputSettings()
     credentials_settings = CredentialsSettings()
 
-    def configure(self, ctx: knext.ConfigurationContext) -> LLMPortObjectSpec:
-        return LLMPortObjectSpec(self.create_spec_content())
+    def configure(self, ctx: knext.ConfigurationContext) -> ChatModelPortObjectSpec:
+        return ChatModelPortObjectSpec(self.create_spec_content())
 
-    def execute(self, ctx: knext.ExecutionContext) -> LLMPortObject:
-        spec_content = self.create_spec_content()
+    def execute(self, ctx: knext.ExecutionContext) -> ChatModelPortObject:
 
         return ChatModelPortObject(
-            spec=ChatModelPortObjectSpec(spec_content),
-            content=OpenAIChatModelPortObjectContent(spec_content),
+            spec=ChatModelPortObjectSpec(self.create_spec_content()),
+            content=OpenAIChatModelPortObjectContent(self.create_spec_content()),
         )
 
     def create_spec_content(self):
@@ -310,3 +314,42 @@ class OpenAIEmbeddingsConfigurator:
         ].label
 
         return OpenAIEmbeddingsPortObjectSpecContent(credential_params, model_name)
+
+
+@knext.node(
+    "OpenAI LLM Configurator 2",
+    knext.NodeType.SOURCE,
+    openai_icon,
+    category=openai_category,
+)
+@knext.output_port(
+    "OpenAI LLM Configuration",
+    "A large language model configuration for OpenAI.",
+    sub_port_type,
+)
+class OpenAILLMConfiguratorTwo:
+    input_settings = LLMLoaderInputSettings()
+    credentials_settings = CredentialsSettings()
+
+    def configure(self, ctx: knext.ConfigurationContext) -> SubPortObjectSpec:
+        cred, mod = self.create_spec_content()
+        return SubPortObjectSpec(cred, mod)
+
+    def execute(self, ctx: knext.ExecutionContext) -> SubPortObject:
+
+        cred, mod = self.create_spec_content()
+        return SubPortObject(SubPortObjectSpec(cred, mod))
+
+        return LLMPortObject(
+            spec=LLMPortObjectSpec(spec_content),
+            content=OpenAILLMPortObjectContent(spec_content),
+        )
+
+    def create_spec_content(self):
+        credential_params = self.credentials_settings.credentials_param
+        model_name = self.input_settings.OpenAIModelCompletionsOptions[
+            self.input_settings.model_name
+        ].label
+
+        return credential_params, model_name
+

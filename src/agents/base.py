@@ -18,11 +18,14 @@ from indexes.base import (
     VectorStorePortObjectSpec,
     VectorStorePortObject,
     vector_store_port_type,
+    tool_list_port_type,
+    ToolListPortObject,
+    ToolListPortObjectSpec,
 )
 
-from langchain import LLMMathChain
+from langchain import LLMMathChain, LLMChain
 from langchain.chat_models import ChatOpenAI
-from langchain.agents import load_tools, initialize_agent, Tool, AgentType
+from langchain.agents import load_tools, initialize_agent, Tool, AgentType, ZeroShotAgent, AgentExecutor, ConversationalChatAgent, ConversationalAgent
 from langchain.chains import RetrievalQA
 from langchain.memory import ConversationBufferMemory
 
@@ -176,3 +179,83 @@ class ChatBotAgentExecutor:
         response_table["Response"] = response
 
         return chatbot, knext.Table.from_pandas(response_table)
+
+
+@knext.node(
+    "ChatBot Agent Creator 2",
+    knext.NodeType.PREDICTOR,
+    langchain_icon,
+    category=agent_category,
+)
+@knext.input_port("Chat", "The large language model to chat with.", chat_model_port_type)
+@knext.input_port("Tool List", "Vectorstore input.", tool_list_port_type)
+@knext.output_port("Agent", "Outputs a chatbot agent.", agent_connection_port_type)
+class ChatBotAgentCreatorTwo:
+    def configure(
+        self,
+        ctx: knext.ConfigurationContext,
+        chatmodel: ChatModelPortObjectSpec,
+        tool_list_spec: ToolListPortObjectSpec,
+    ):
+        return AgentConnectionSpec()
+
+    def execute(
+        self,
+        ctx: knext.ExecutionContext,
+        chatmodel_port: ChatModelPortObject,
+        tool_list_port: ToolListPortObject,
+    ):
+        chatmodel = chatmodel_port.create_model(ctx)
+
+        tools = []
+        for tool in tool_list_port.tool_list:
+            tools.append(tool.create_tool(ctx))
+
+
+        from langchain.memory import ChatMessageHistory, ConversationBufferMemory
+        prefix = """Have a conversation with a human, answering the following questions as best you can and like a pirate. You have access to the following tools:"""
+        suffix = """Begin!"
+            {chat_history}
+            Question: {input}
+            {agent_scratchpad}"""
+
+        prompt = ZeroShotAgent.create_prompt(
+            tools,
+            prefix=prefix,
+            suffix=suffix,
+            input_variables=["input", "chat_history", "agent_scratchpad"],
+        )
+        
+        memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)    
+
+        llm_chain = LLMChain(llm=chatmodel_port.create_model(ctx), prompt=prompt)
+
+        agent = ZeroShotAgent(llm_chain=llm_chain, allowed_tools=["Youtube Transcript QA System", "Node Description QA System"], verbose=True)
+        agent_chain = AgentExecutor.from_agent_and_tools(
+            agent=agent, tools=tools, verbose=True, memory=memory
+        )
+
+        agent_chain.run(input="How to filter KNIME columns with regex for columns which have names starting with a letter 's' and which node would we need for that?")
+        #LOGGER.info(agent_chain.run(input=""))
+
+        agent_chain.run(input="Using the node you suggested, what columns will stay in the table if my columns are named 'germany', 'austria', 'switzerland'")
+        # LOGGER.info(agent_chain.memory.buffer)
+
+
+        #agent = initialize_agent(
+        #    tools,
+        #    chatmodel,
+        #    agent=AgentType.CONVERSATIONAL_REACT_DESCRIPTION,
+        #    verbose=True,
+        #    memory=memory_list
+        #)
+
+
+
+        #LOGGER.info(agent.run(
+        #    "How to filter KNIME columns with regex?"))
+        #LOGGER.info(agent.run("What did biden say about ketanji brown jackson in the state of the union address?"))
+
+        return AgentConnectionObject(AgentConnectionSpec(), agent)
+    
+

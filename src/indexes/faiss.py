@@ -106,12 +106,10 @@ class FAISSVectorStoreCreator:
         #documents = [Document(page_content=text) for text in df[self.document_column]]
         documents = [Document(page_content=text) for text in df["Documents"]]
 
-
         db = FAISS.from_documents(
             documents=documents,
             embedding=embeddings.create_model(ctx),
         )
-
         db.save_local(self.persist_directory)
 
         return VectorStorePortObject(

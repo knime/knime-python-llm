@@ -1,22 +1,20 @@
+from typing import Dict
 import knime.extension as knext
+
 from .base import (
     ModelPortObjectSpecContent,
     ModelPortObjectContent,
     LLMPortObjectSpec,
-    ChatModelPortObjectSpec,
-    EmbeddingsPortObjectSpec,
     LLMPortObject,
-    ChatModelPortObject,
-    EmbeddingsPortObject,
     llm_port_type,
-    chat_model_port_type,
-    embeddings_port_type,
 
-    SuperPortObjectSpec,
-    SuperPortObject,
-    SubPortObject,
-    SubPortObjectSpec,
-    sub_port_type
+    ChatModelPortObjectSpec,
+    ChatModelPortObject,
+    chat_model_port_type,
+
+    EmbeddingsPortObjectSpec,
+    EmbeddingsPortObject,
+    embeddings_port_type,
 )
 
 from langchain.llms import OpenAI
@@ -32,6 +30,9 @@ openai_category = knext.category(
     icon="",
 )
 
+import logging
+
+LOGGER = logging.getLogger(__name__)
 
 @knext.parameter_group(label="Credentials")
 class CredentialsSettings:
@@ -132,6 +133,8 @@ class OpenAIEmbeddingsPortObjectContent(ModelPortObjectContent):
 EmbeddingsPortObject.register_content_type(OpenAIEmbeddingsPortObjectContent)
 
 
+# TODO: Retrieve these Settings from OpenAI with OpenAi Connector
+
 @knext.parameter_group(label="OpenAI LLM Settings")
 class LLMLoaderInputSettings:
     class OpenAIModelCompletionsOptions(knext.EnumParameterOptions):
@@ -211,6 +214,62 @@ class EmbeddingsLoaderInputSettings:
         OpenAIEmbeddingsOptions,
     )
 
+class OpenAIModelListPortObjectSpec(knext.PortObjectSpec):
+    def serialize(self) -> dict:
+        return {}
+
+    @classmethod
+    def deserialize(cls, data: Dict):
+        return cls()
+
+class OpenAIModelListPortObject(knext.PortObject):
+    def __init__(self, spec: OpenAIModelListPortObjectSpec, model_list) -> None:
+        super().__init__(spec)
+        self._model_list = model_list
+
+    #TODO: Create keys for the different models (llm, embeddings, ...)
+    def serialize(self):
+        return {
+            "model_list": self._model_list
+        }
+    
+    @classmethod
+    def deserialize(cls, spec: knext.PortObjectSpec, data):
+        return cls(spec, data["model_list"])
+
+openai_connection_port_type = knext.port_type("OpenAI Connection", OpenAIModelListPortObject, OpenAIModelListPortObjectSpec)
+
+@knext.node(
+    "OpenAI Model List Retriever",
+    knext.NodeType.SOURCE,
+    openai_icon,
+    category=openai_category,
+)
+@knext.output_port(
+    name= "OpenAI Model List", 
+    description= "The retrieved list of all available models from OpenAI.",
+    port_type= openai_connection_port_type)
+class OpenAIConnector:
+    credentials_settings = CredentialsSettings()
+
+    def configure(self, ctx: knext.ConfigurationContext) -> OpenAIModelListPortObjectSpec:
+        return OpenAIModelListPortObjectSpec()
+
+    def execute(self, ctx: knext.ExecutionContext) -> OpenAIModelListPortObject:
+
+        import openai
+        openai.api_key = ctx.get_credentials(self.credentials_settings.credentials_param).password
+        model_list = openai.Model.list()
+
+        #TODO: Find out which models belong to which categorie (llm, embeddings...)
+        
+        LOGGER.info(model_list.keys())
+        LOGGER.info(model_list["data"][3])
+
+        return OpenAIModelListPortObject(
+            OpenAIModelListPortObjectSpec(),
+            model_list
+        )
 
 @knext.node(
     "OpenAI LLM Configurator",
@@ -245,7 +304,6 @@ class OpenAILLMConfigurator:
         ].label
 
         return OpenAILLMPortObjectSpecContent(credential_params, model_name)
-
 
 @knext.node(
     "OpenAI ChatModel Configurator",
@@ -314,42 +372,3 @@ class OpenAIEmbeddingsConfigurator:
         ].label
 
         return OpenAIEmbeddingsPortObjectSpecContent(credential_params, model_name)
-
-
-@knext.node(
-    "OpenAI LLM Configurator 2",
-    knext.NodeType.SOURCE,
-    openai_icon,
-    category=openai_category,
-)
-@knext.output_port(
-    "OpenAI LLM Configuration",
-    "A large language model configuration for OpenAI.",
-    sub_port_type,
-)
-class OpenAILLMConfiguratorTwo:
-    input_settings = LLMLoaderInputSettings()
-    credentials_settings = CredentialsSettings()
-
-    def configure(self, ctx: knext.ConfigurationContext) -> SubPortObjectSpec:
-        cred, mod = self.create_spec_content()
-        return SubPortObjectSpec(cred, mod)
-
-    def execute(self, ctx: knext.ExecutionContext) -> SubPortObject:
-
-        cred, mod = self.create_spec_content()
-        return SubPortObject(SubPortObjectSpec(cred, mod))
-
-        return LLMPortObject(
-            spec=LLMPortObjectSpec(spec_content),
-            content=OpenAILLMPortObjectContent(spec_content),
-        )
-
-    def create_spec_content(self):
-        credential_params = self.credentials_settings.credentials_param
-        model_name = self.input_settings.OpenAIModelCompletionsOptions[
-            self.input_settings.model_name
-        ].label
-
-        return credential_params, model_name
-

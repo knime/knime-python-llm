@@ -1,12 +1,8 @@
-from knime.api.schema import PortObjectSpec
 import knime.extension as knext
 import pickle
 import pandas as pd
 
-import logging
-
-LOGGER = logging.getLogger(__name__)
-
+import util
 
 class ModelPortObjectSpecContent(knext.PortObjectSpec):
     pass
@@ -189,9 +185,7 @@ sub_port_type = knext.port_type("Sub Port Type", SubPortObject, SubPortObjectSpe
 @knext.node("LLM Prompter", knext.NodeType.SOURCE, "", "")
 @knext.input_port("LLM", "A large language model.", llm_port_type)
 @knext.input_table("Prompt Table", "A table containing a string column with prompts.")
-@knext.output_table(
-    "Answer Table", "A table containing prompts and their respective answer."
-)
+@knext.output_table("Result Table", "A table containing prompts and their respective answer.")
 class LLMPrompter:
     promt_column = knext.ColumnParameter(
         "Prompt column",
@@ -203,16 +197,20 @@ class LLMPrompter:
         self,
         ctx: knext.ConfigurationContext,
         llm_spec: LLMPortObjectSpec,
-        input_table: knext.Table,
+        input_table: knext.Schema,
     ):
-        # TODO: Check for string column in input
+        nominal_columns = [
+            (c.name, c.ktype) for c in input_table if util.is_nominal(c)
+        ]
 
-        return knext.Schema.from_columns(
-            [
-                knext.Column(knext.string(), "Prompts"),
-                knext.Column(knext.string(), "Answers"),
-            ]
-        )
+        if len(nominal_columns) == 0:
+            raise knext.InvalidParametersError("""The number of nominal columns are 0. Expected at least 
+                one nominal column for prompts."""
+            )
+        
+        input_table.append(knext.Column(knext.string(), "Prompt Result"))
+
+        return input_table
 
     def execute(
         self,
@@ -221,21 +219,16 @@ class LLMPrompter:
         input_table: knext.Table,
     ):
         
-        LOGGER.info(llm_port)
-        LOGGER.info(vars(llm_port))
-        LOGGER.info(llm_port.serialize())
-        
         prompts = input_table.to_pandas()
         df = pd.DataFrame(prompts)
 
         llm = llm_port.create_model(ctx)
         answers = []
 
+        #TODO: Change to configured column parameter once its possible again
         for prompt in df["Prompts"]:
             answers.append(llm(prompt))
 
-        result_table = pd.DataFrame()
-        result_table["Prompts"] = prompts
-        result_table["Answers"] = answers
+        df["Prompt Result"] = answers
 
-        return knext.Table.from_pandas(result_table)
+        return knext.Table.from_pandas(df)

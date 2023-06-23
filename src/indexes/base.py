@@ -12,14 +12,7 @@ from models.base import (
 
 from langchain.chains import RetrievalQA
 from langchain.tools import Tool
-from langchain.agents.agent_toolkits import (
-    VectorStoreToolkit,
-    VectorStoreInfo,
-)
 
-import logging
-
-LOGGER = logging.getLogger(__name__)
 
 class VectorStorePortObjectSpecContent(knext.PortObjectSpec):
     pass
@@ -79,6 +72,9 @@ class VectorStorePortObject(knext.PortObject):
     
     def load_store(self, ctx):
         return self._content.load_store(ctx)
+    
+    def create_retriever(self, ctx):
+        return self.load_store(ctx).as_retriever()
 
     def serialize(self):
         config = {
@@ -125,11 +121,24 @@ class ToolPortObject(knext.PortObject):
     def __init__(self, spec: ToolPortObjectSpec) -> None:
         super().__init__(spec)
 
-    def create_tool(self):
+    def create(self):
         raise NotImplementedError()
     
 class VectorToolPortObjectSpec(ToolPortObjectSpec):
-    pass
+    def __init__(self, name, description, top_k) -> None:
+        super().__init__(name, description)
+        self._top_k = top_k
+
+    def serialize(self) -> dict:
+        return {
+            "name": self._name,
+            "description": self._description,
+            "top_k": self._top_k
+        }
+
+    @classmethod
+    def deserialize(cls, data: Dict):
+        return cls(data["name"], data["description"], data["top_k"])
 
 class VectorToolPortObject(ToolPortObject):
 
@@ -157,10 +166,10 @@ class VectorToolPortObject(ToolPortObject):
         return RetrievalQA.from_chain_type(
                 llm=llm,
                 chain_type="stuff",
-                retriever= vectorstore.as_retriever()
+                retriever= vectorstore.as_retriever(search_kwargs = {"k": self.spec.serialize()["top_k"]})
             )
 
-    def create_tool(self, ctx):
+    def create(self, ctx):
         return Tool(
             name= self.spec.serialize()["name"],
             func= self._create_function(ctx).run,
@@ -197,7 +206,7 @@ class ToolListPortObject(knext.PortObject):
 tool_list_port_type = knext.port_type("Tool list", ToolListPortObject, ToolListPortObjectSpec)
 
 @knext.node(
-    "Vector Store to Tool",
+    "Vector Store to Toollist",
     knext.NodeType.SOURCE,
     icon_path="icons/chroma.png",
     category=""
@@ -216,6 +225,13 @@ class VectorStoreToTool:
         label="Tool description",
         description="""The descripton for the tool through which an agent decides whether to use the tool. Provide a meaningful
         description under which circumstances the agent should try to use it."""
+    )
+
+    top_k = knext.IntParameter(
+        label="Retrieved documents",
+        description="The number of top results from the vector store that the tool will provide",
+        default_value=5,
+        is_advanced=True
     )
 
     def configure(
@@ -237,8 +253,8 @@ class VectorStoreToTool:
         tool_list = []
         tool_list.append(
             VectorToolPortObject(
-                spec=VectorToolPortObjectSpec(
-                    self.tool_name, self.tool_description
+                spec= VectorToolPortObjectSpec(
+                    self.tool_name, self.tool_description, self.top_k
                 ),
                 llm_port= llm_port,
                 vectorstore_port= vectorstore
@@ -251,14 +267,14 @@ class VectorStoreToTool:
         )
     
 @knext.node(
-    "Tool Combiner",
+    "Tool List Combiner",
     knext.NodeType.SOURCE,
     icon_path="icons/chroma.png",
     category=""
 )
-@knext.input_port("LLM", "A llm to search through the vector store.", tool_list_port_type)
-@knext.input_port("Vector Store", "A vector store transform into a Tool object for an agent to use.", tool_list_port_type)
-@knext.output_port("Tool","A tool object for an agent to use", tool_list_port_type)
+@knext.input_port("Tool List", "A list of tools for an agent to use.", tool_list_port_type)
+@knext.input_port("Tool List", "A list of tools for an agent to use.", tool_list_port_type)
+@knext.output_port("Tool List","The concatenated tools from both lists.", tool_list_port_type)
 class ToolCombiner:
 
     def configure(
@@ -274,14 +290,9 @@ class ToolCombiner:
         self,
         ctx: knext.ExecutionContext,
         tool_list_one: ToolListPortObject,
-        tool_list_twp: ToolListPortObject
+        tool_list_two: ToolListPortObject
 
     ):
-        tool_list = []
-        tool_list = tool_list + tool_list_one.tool_list
-        tool_list = tool_list + tool_list_twp.tool_list
+        tool_list_one._tool_list = tool_list_one._tool_list + tool_list_two.tool_list
 
-        return ToolListPortObject(
-            ToolListPortObjectSpec(),
-            tool_list
-        )
+        return tool_list_one

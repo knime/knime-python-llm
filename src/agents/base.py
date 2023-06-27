@@ -13,18 +13,14 @@ from indexes.base import (
     ToolListPortObjectSpec,
 )
 
+from langchain.prompts import MessagesPlaceholder
 from langchain.memory import ConversationBufferMemory
-from langchain import LLMChain 
-from langchain.agents import ZeroShotAgent, AgentExecutor
+from langchain.agents import  initialize_agent, AgentType
 from langchain.memory import ConversationBufferMemory
-
 
 langchain_icon = ""
 agent_category = ""
 
-import logging
-
-LOGGER = logging.getLogger(__name__)
 
 @knext.parameter_group(label="Credentials")
 class CredentialsSettings:
@@ -84,50 +80,45 @@ class ChatBotAgent:
         tool_list_port: ToolListPortObject,
         input_table: knext.Table
     ):
+        
         chat_history_df = input_table.to_pandas()
 
         memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+
+        memory.save_context(
+                {"system": self.system_prefix}, {"outputs": ""}
+            )
         
         if all(col_name in ["Type", "Message"] for col_name in input_table.column_names):
             self.load_messages_from_input_table(memory, chat_history_df)
         else:
             chat_history_df[["Type", "Message"]] = None
 
-        prefix = self.system_prefix
-        suffix = """Begin!"
-            {chat_history}
-            Question: {input}
-            {agent_scratchpad}"""
-        
         tool_list = tool_list_port.tool_list
         tools = [ tool.create(ctx) for tool in tool_list ]
 
-        prompt = ZeroShotAgent.create_prompt(
-            tools,
-            prefix=prefix,
-            suffix=suffix,
-            input_variables=["input", "chat_history", "agent_scratchpad"],
-        )
-
         chatmodel = chatmodel_port.create_model(ctx)
+        chat_history = MessagesPlaceholder(variable_name="chat_history")
 
-        llm_chain = LLMChain(llm=chatmodel, prompt=prompt)
-
-        agent = ZeroShotAgent(llm_chain=llm_chain, tools=tools, verbose=True)
-
-        agent_chain = AgentExecutor.from_agent_and_tools(
-            agent=agent, tools=tools, verbose=True, memory=memory
+        agent_chain = initialize_agent(
+            tools, 
+            chatmodel, 
+            agent=AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION,
+            verbose=True,
+            memory=memory,
+            agent_kwargs = {
+                "memory_prompts": [chat_history],
+                "input_variables": ["input", "agent_scratchpad", "chat_history"]
+            },
+            handle_parsing_errors="Check your output and make sure it conforms!"
         )
 
-        agent_answer = agent_chain.run(input=self.chat_message)
+        answer = agent_chain.run(input=self.chat_message)
 
         user_input_row = ["input", self.chat_message]
-        agent_output_row = ["output", agent_answer]
+        agent_output_row = ["output", answer]
 
-        chat_history_df.loc[len(chat_history_df)] = user_input_row
-        chat_history_df.loc[len(chat_history_df)] = agent_output_row
+        chat_history_df.loc[f'Row{len(chat_history_df)}'] = user_input_row
+        chat_history_df.loc[f'Row{len(chat_history_df)}'] = agent_output_row
 
         return knext.Table.from_pandas(chat_history_df)
-    
-
-

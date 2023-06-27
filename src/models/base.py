@@ -3,6 +3,7 @@ import pickle
 import pandas as pd
 
 import util
+import logging
 
 class ModelPortObjectSpecContent(knext.PortObjectSpec):
     pass
@@ -197,10 +198,10 @@ class LLMPrompter:
         self,
         ctx: knext.ConfigurationContext,
         llm_spec: LLMPortObjectSpec,
-        input_table: knext.Schema,
+        input_table_spec: knext.Schema,
     ):
         nominal_columns = [
-            (c.name, c.ktype) for c in input_table if util.is_nominal(c)
+            (c.name, c.ktype) for c in input_table_spec if util.is_nominal(c)
         ]
 
         if len(nominal_columns) == 0:
@@ -208,9 +209,11 @@ class LLMPrompter:
                 one nominal column for prompts."""
             )
         
-        input_table.append(knext.Column(knext.string(), "Prompt Result"))
+        input_table_spec.append(knext.Column(knext.string(), "Prompt Result"))
+        #input_table.insert((knext.Column(knext.string(), "Prompt Result")), len(input_table.column_names))
+        #input_table_spec.column_names.append((knext.string(), "Prompt Result"))
 
-        return input_table
+        return input_table_spec
 
     def execute(
         self,
@@ -226,7 +229,7 @@ class LLMPrompter:
         answers = []
 
         #TODO: Change to configured column parameter once its possible again
-        for prompt in df["Prompts"]:
+        for prompt in df[self.promt_column]:
             answers.append(llm(prompt))
 
         df["Prompt Result"] = answers

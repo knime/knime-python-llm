@@ -1,4 +1,5 @@
 # TODO: Done Alex -- check?
+# TODO: Node idea: Chat Prompter that gets a conversation table
 
 # KNIME / own imports
 import knime.extension as knext

@@ -399,7 +399,7 @@ class HuggingFaceHubConnector:
     model_kwargs = knext.StringParameter(
         label="Model kwargs",
         description="Keyword arguments to pass to the model. Expected to be a string type dictionary.",
-        default_value="{'argument'}",
+        default_value="{'temperature': 0, 'max_length': 64}",
     )
 
     def configure(

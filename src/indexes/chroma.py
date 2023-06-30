@@ -7,7 +7,7 @@ import pandas as pd
 from models.base import (
     EmbeddingsPortObjectSpec,
     EmbeddingsPortObject,
-    embeddings_port_type,
+    embeddings_model_port_type,
 )
 
 from .base import (
@@ -76,7 +76,7 @@ VectorStorePortObject.register_content_type(ChromaVectorstorePortObjectContent)
 @knext.input_port(
     "Embeddings",
     "The embeddings model to use for the vector store.",
-    embeddings_port_type,
+    embeddings_model_port_type,
 )
 @knext.input_table(
     name="Documents",
@@ -142,7 +142,7 @@ class ChromaVectorStoreCreator:
 @knext.input_port(
     "Embeddings",
     "The embeddings model to use for the vector store.",
-    embeddings_port_type,
+    embeddings_model_port_type,
 )
 @knext.output_port(
     "Chroma Vector Store", "The loaded vector store.", vector_store_port_type

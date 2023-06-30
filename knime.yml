@@ -4,3 +4,4 @@ description: "LLM Extension"
 author: KNIME GmbH
 extension_module: src/knime_llm
 version: 0.0.1
+env_yml_path: env.yml

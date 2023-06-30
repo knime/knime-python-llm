@@ -1,5 +1,3 @@
-# TODO: Done Alex -- check?
-# TODO: Have the same naming standard for all specs and objects in general as well as in the configure and execute methods
 # TODO: Node idea: Re implement the Model List Retriever for better usability (for customers with data apps e.g. to select the model there)
 
 # KNIME / own imports
@@ -503,7 +501,7 @@ class OpenAIChatModelConnector:
     "Connection to a specific Embeddings Model from OpenAI.",
     openai_embeddings_port_type,
 )
-class OpenAIEmbeddingsConfigurator:
+class OpenAIEmbeddingsConnector:
     """
     Connect to an OpenAI Embedding Model
 

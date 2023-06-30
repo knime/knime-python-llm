@@ -1,7 +1,6 @@
 # TODO: Have the same naming standard for all specs and objects in general as well as in the configure and execute methods
 
 
-
 import knime.extension as knext
 import pandas as pd
 
@@ -17,7 +16,7 @@ from .base import (
     VectorStorePortObjectSpecContent,
     VectorStorePortObjectContent,
     vector_store_port_type,
-    store_category
+    store_category,
 )
 
 from langchain.vectorstores import Chroma
@@ -32,6 +31,7 @@ chroma_category = knext.category(
     description="",
     icon=chroma_icon,
 )
+
 
 class ChromaVectorstorePortObjectSpecContent(VectorStorePortObjectSpecContent):
     def __init__(self, persist_directory) -> None:
@@ -60,7 +60,7 @@ class ChromaVectorstorePortObjectContent(VectorStorePortObjectContent):
 
     def load_store(self, ctx):
         return Chroma(
-            persist_directory= self.spec.serialize()["persist_directory"],
+            persist_directory=self.spec.serialize()["persist_directory"],
         )
 
 
@@ -112,14 +112,14 @@ class ChromaVectorStoreCreator:
         input_table: knext.Table,
     ) -> VectorStorePortObject:
         df = input_table.to_pandas()
-        
+
         documents = [Document(page_content=text) for text in df[self.document_column]]
         db = Chroma.from_documents(
-            documents= documents, 
-            embedding= embeddings.create_model(ctx), 
-            persist_directory=self.persist_directory
-            )
-        
+            documents=documents,
+            embedding=embeddings.create_model(ctx),
+            persist_directory=self.persist_directory,
+        )
+
         db.persist()
 
         return VectorStorePortObject(
@@ -167,7 +167,9 @@ class ChromaVectorStoreLoader:
     ) -> VectorStorePortObject:
         # TODO: Add check if Chroma files are here instead of instantiation
 
-        Chroma(self.persist_directory,)
+        Chroma(
+            self.persist_directory,
+        )
 
         return VectorStorePortObject(
             spec=VectorStorePortObjectSpec(self.create_spec_content()),

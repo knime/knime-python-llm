@@ -34,6 +34,10 @@ class FAISSVectorstorePortObjectSpec(VectorStorePortObjectSpec):
         super().__init__()
         self._persist_directory = persist_directory
 
+    @property
+    def persist_directory(self):
+        return self._persist_directory
+
     def serialize(self) -> dict:
         return {
             "persist_directory": self._persist_directory,
@@ -53,13 +57,13 @@ class FAISSVectorstorePortObject(VectorStorePortObject):
 
     def load_store(self, ctx):
         return FAISS.load_local(
-            self.spec.serialize()["persist_directory"],
+            self.spec.persist_directory,
             self._embeddings_port_object.create_model(ctx),
         )
 
 
-fiass_vector_store_port_type = knext.port_type(
-    "FIASS Vector Store", FAISSVectorstorePortObject, FAISSVectorstorePortObjectSpec
+faiss_vector_store_port_type = knext.port_type(
+    "FAISS Vector Store", FAISSVectorstorePortObject, FAISSVectorstorePortObjectSpec
 )
 
 
@@ -81,7 +85,7 @@ fiass_vector_store_port_type = knext.port_type(
 @knext.output_port(
     "FAISS Vector Store",
     "The created FAISS vector store.",
-    fiass_vector_store_port_type,
+    faiss_vector_store_port_type,
 )
 class FAISSVectorStoreCreator:
     document_column = knext.ColumnParameter(
@@ -100,7 +104,7 @@ class FAISSVectorStoreCreator:
         ctx: knext.ConfigurationContext,
         embeddings_spec: EmbeddingsPortObjectSpec,
         input_table: knext.Schema,
-    ):
+    ) -> FAISSVectorstorePortObjectSpec:
         return self.create_spec()
 
     def execute(
@@ -108,11 +112,10 @@ class FAISSVectorStoreCreator:
         ctx: knext.ExecutionContext,
         embeddings: EmbeddingsPortObject,
         input_table: knext.Table,
-    ) -> VectorStorePortObject:
+    ) -> FAISSVectorstorePortObject:
         df = input_table.to_pandas()
-        # TODO: Change back to this line
-        # documents = [Document(page_content=text) for text in df[self.document_column]]
-        documents = [Document(page_content=text) for text in df["Documents"]]
+
+        documents = [Document(page_content=text) for text in df[self.document_column]]
 
         db = FAISS.from_documents(
             documents=documents,
@@ -138,7 +141,7 @@ class FAISSVectorStoreCreator:
     embeddings_model_port_type,
 )
 @knext.output_port(
-    "FAISS Vector Store", "The loaded vector store.", fiass_vector_store_port_type
+    "FAISS Vector Store", "The loaded vector store.", faiss_vector_store_port_type
 )
 class FAISSVectorStoreLoader:
     persist_directory = knext.StringParameter(
@@ -167,71 +170,3 @@ class FAISSVectorStoreLoader:
 
     def create_spec(self):
         return FAISSVectorstorePortObjectSpec(self.persist_directory)
-
-
-@knext.node(
-    "FAISS Vector Store Retriever",
-    knext.NodeType.SOURCE,
-    faiss_icon,
-    category=faiss_category,
-)
-@knext.input_port(
-    "Vector Store", "A vector store port object.", fiass_vector_store_port_type
-)
-@knext.input_table(
-    "Queries", "Table containing a string column with the queries for the vector store."
-)
-@knext.output_table(
-    "Result table", "Table containing the queries and their closest match from the db."
-)
-class FAISSVectorStoreRetriever:
-    query_column = knext.ColumnParameter(
-        "Queries", "Column containing the queries", port_index=1
-    )
-
-    top_k = knext.IntParameter(
-        "Number of results",
-        "Number of top results to get from vector store search. Ranking from best to worst",
-    )
-
-    def configure(
-        self,
-        ctx: knext.ConfigurationContext,
-        vectorstore_spec: VectorStorePortObjectSpec,
-        table_spec: knext.Schema,
-    ):
-        return knext.Schema.from_columns(
-            [
-                knext.Column(knext.string(), "Queries"),
-                knext.Column(knext.ListType(knext.string()), "Documents"),
-            ]
-        )
-
-    def execute(
-        self,
-        ctx: knext.ExecutionContext,
-        vectorstore: VectorStorePortObject,
-        input_table: knext.Table,
-    ):
-        db = vectorstore.load_store(ctx)
-
-        queries = input_table.to_pandas()
-        df = pd.DataFrame(queries)
-
-        doc_collection = []
-
-        for query in df[self.query_column]:
-            similar_documents = db.similarity_search(query, k=self.top_k)
-
-            relevant_documents = []
-
-            for document in similar_documents:
-                relevant_documents.append(document.page_content)
-
-            doc_collection.append(relevant_documents)
-
-        result_table = pd.DataFrame()
-        result_table["Queries"] = queries
-        result_table["Documents"] = doc_collection
-
-        return knext.Table.from_pandas(result_table)

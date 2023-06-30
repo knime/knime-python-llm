@@ -11,15 +11,13 @@ from models.base import (
 )
 
 from .base import (
-    VectorStorePortObject,
     VectorStorePortObjectSpec,
-    vector_store_port_type,
+    VectorStorePortObject,
     store_category,
 )
 
 from langchain.vectorstores import Chroma
 from langchain.docstore.document import Document
-
 
 chroma_icon = "icons/chroma.png"
 chroma_category = knext.category(
@@ -31,10 +29,14 @@ chroma_category = knext.category(
 )
 
 
-class ChromaVectorstorePortObjectSpecContent(VectorStorePortObjectSpecContent):
+class ChromaVectorstorePortObjectSpec(VectorStorePortObjectSpec):
     def __init__(self, persist_directory) -> None:
         super().__init__()
         self._persist_directory = persist_directory
+
+    @property
+    def persist_directory(self):
+        return self._persist_directory
 
     def serialize(self) -> dict:
         return {
@@ -46,23 +48,24 @@ class ChromaVectorstorePortObjectSpecContent(VectorStorePortObjectSpecContent):
         return cls(data["persist_directory"])
 
 
-VectorStorePortObjectSpec.register_content_type(ChromaVectorstorePortObjectSpecContent)
-
-
-class ChromaVectorstorePortObjectContent(VectorStorePortObjectContent):
+class ChromaVectorstorePortObject(VectorStorePortObject):
     def __init__(
-        self, spec: knext.PortObjectSpec, embeddings_port_object: EmbeddingsPortObject
+        self,
+        spec: ChromaVectorstorePortObjectSpec,
+        embeddings_port_object: EmbeddingsPortObject,
     ) -> None:
         super().__init__(spec, embeddings_port_object)
         self._embeddings_port_object = embeddings_port_object
 
     def load_store(self, ctx):
         return Chroma(
-            persist_directory=self.spec.serialize()["persist_directory"],
+            persist_directory=self.spec.persist_directory,
         )
 
 
-VectorStorePortObject.register_content_type(ChromaVectorstorePortObjectContent)
+chroma_vector_store_port_type = knext.port_type(
+    "Chroma Vector Store", ChromaVectorstorePortObject, ChromaVectorstorePortObjectSpec
+)
 
 
 @knext.node(
@@ -81,7 +84,9 @@ VectorStorePortObject.register_content_type(ChromaVectorstorePortObjectContent)
     description="""Table containing a string column representing documents that will be used in the vector store.""",
 )
 @knext.output_port(
-    "FAISS Vector Store", "The created FAISS vector store.", vector_store_port_type
+    "Chroma Vector Store",
+    "The created Chroma vector store.",
+    chroma_vector_store_port_type,
 )
 class ChromaVectorStoreCreator:
     document_column = knext.ColumnParameter(
@@ -100,15 +105,15 @@ class ChromaVectorStoreCreator:
         ctx: knext.ConfigurationContext,
         embeddings_spec: EmbeddingsPortObjectSpec,
         input_table: knext.Schema,
-    ):
-        return VectorStorePortObjectSpec(self.create_spec_content())
+    ) -> ChromaVectorstorePortObjectSpec:
+        return self.create_spec()
 
     def execute(
         self,
         ctx: knext.ExecutionContext,
         embeddings: EmbeddingsPortObject,
         input_table: knext.Table,
-    ) -> VectorStorePortObject:
+    ) -> ChromaVectorstorePortObject:
         df = input_table.to_pandas()
 
         documents = [Document(page_content=text) for text in df[self.document_column]]
@@ -120,15 +125,10 @@ class ChromaVectorStoreCreator:
 
         db.persist()
 
-        return VectorStorePortObject(
-            spec=VectorStorePortObjectSpec(self.create_spec_content()),
-            content=ChromaVectorstorePortObjectContent(
-                self.create_spec_content(), embeddings
-            ),
-        )
+        return ChromaVectorstorePortObject(self.create_spec(), embeddings)
 
-    def create_spec_content(self):
-        return ChromaVectorstorePortObjectSpecContent(self.persist_directory)
+    def create_spec(self):
+        return ChromaVectorstorePortObjectSpec(self.persist_directory)
 
 
 @knext.node(
@@ -143,7 +143,7 @@ class ChromaVectorStoreCreator:
     embeddings_model_port_type,
 )
 @knext.output_port(
-    "Chroma Vector Store", "The loaded vector store.", vector_store_port_type
+    "Chroma Vector Store", "The loaded vector store.", chroma_vector_store_port_type
 )
 class ChromaVectorStoreLoader:
     persist_directory = knext.StringParameter(
@@ -155,92 +155,19 @@ class ChromaVectorStoreLoader:
         self,
         ctx: knext.ConfigurationContext,
         embeddings_spec: EmbeddingsPortObjectSpec,
-    ) -> VectorStorePortObjectSpec:
-        return VectorStorePortObjectSpec(self.create_spec_content())
+    ) -> ChromaVectorstorePortObjectSpec:
+        return self.create_spec_content()
 
     def execute(
         self,
         ctx: knext.ExecutionContext,
         embeddings_port_object: EmbeddingsPortObject,
-    ) -> VectorStorePortObject:
+    ) -> ChromaVectorstorePortObject:
         # TODO: Add check if Chroma files are here instead of instantiation
 
-        Chroma(
-            self.persist_directory,
-        )
+        Chroma(self.persist_directory, embeddings_port_object.create_model(ctx))
 
-        return VectorStorePortObject(
-            spec=VectorStorePortObjectSpec(self.create_spec_content()),
-            content=ChromaVectorstorePortObjectContent(
-                self.create_spec_content(), embeddings_port_object
-            ),
-        )
+        return ChromaVectorstorePortObject(self.create_spec(), embeddings_port_object)
 
-    def create_spec_content(self):
-        return ChromaVectorstorePortObjectSpecContent(self.persist_directory)
-
-
-@knext.node(
-    "Chroma Vector Store Retriever",
-    knext.NodeType.SOURCE,
-    chroma_icon,
-    category=chroma_category,
-)
-@knext.input_port("Vector Store", "A vector store port object.", vector_store_port_type)
-@knext.input_table(
-    "Queries", "Table containing a string column with the queries for the vector store."
-)
-@knext.output_table(
-    "Result table", "Table containing the queries and their closest match from the db."
-)
-class ChromaVectorStoreRetriever:
-    query_column = knext.ColumnParameter(
-        "Queries", "Column containing the queries", port_index=1
-    )
-
-    top_k = knext.IntParameter(
-        "Number of results",
-        "Number of top results to get from vector store search. Ranking from best to worst",
-    )
-
-    def configure(
-        self,
-        ctx: knext.ConfigurationContext,
-        vectorstore_spec: VectorStorePortObjectSpec,
-        table_spec: knext.Schema,
-    ):
-        return knext.Schema.from_columns(
-            [
-                knext.Column(knext.string(), "Queries"),
-                knext.Column(knext.ListType(knext.string()), "Documents"),
-            ]
-        )
-
-    def execute(
-        self,
-        ctx: knext.ExecutionContext,
-        vectorstore: VectorStorePortObject,
-        input_table: knext.Table,
-    ):
-        db = vectorstore.load_store(ctx)
-
-        queries = input_table.to_pandas()
-        df = pd.DataFrame(queries)
-
-        doc_collection = []
-
-        for query in df[self.query_column]:
-            similar_documents = db.similarity_search(query, k=self.top_k)
-
-            relevant_documents = []
-
-            for document in similar_documents:
-                relevant_documents.append(document.page_content)
-
-            doc_collection.append(relevant_documents)
-
-        result_table = pd.DataFrame()
-        result_table["Queries"] = queries
-        result_table["Documents"] = doc_collection
-
-        return knext.Table.from_pandas(result_table)
+    def create_spec(self):
+        return ChromaVectorstorePortObjectSpec(self.persist_directory)

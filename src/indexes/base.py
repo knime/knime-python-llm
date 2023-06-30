@@ -11,17 +11,17 @@ from models.base import (
 from langchain.chains import RetrievalQA
 from langchain.tools import Tool
 
+import pandas as pd
 import pickle
-
 import util
 
-
+store_icon = "icons/store.png"
 store_category = knext.category(
     path=util.main_cat,
     level_id="stores",
     name="Vector Stores",
     description="",
-    icon="icons/store.png",
+    icon=store_icon,
 )
 
 
@@ -171,6 +171,80 @@ class ToolListPortObject(knext.PortObject):
 tool_list_port_type = knext.port_type(
     "Tool list", ToolListPortObject, ToolListPortObjectSpec
 )
+
+
+@knext.node(
+    "Vector Store Retriever",
+    knext.NodeType.SOURCE,
+    store_icon,
+    category=store_category,
+)
+@knext.input_port("Vector Store", "A vector store port object.", vector_store_port_type)
+@knext.input_table(
+    "Queries", "Table containing a string column with the queries for the vector store."
+)
+@knext.output_table(
+    "Result table", "Table containing the queries and their closest match from the db."
+)
+class VectorStoreRetriever:
+    """
+    Performs a similarity search on the vectore store
+
+
+    """
+
+    query_column = knext.ColumnParameter(
+        "Queries", "Column containing the queries", port_index=1
+    )
+
+    top_k = knext.IntParameter(
+        "Number of results",
+        "Number of top results to get from vector store search. Ranking from best to worst",
+        default_value=3,
+    )
+
+    def configure(
+        self,
+        ctx: knext.ConfigurationContext,
+        vectorstore_spec: VectorStorePortObjectSpec,
+        table_spec: knext.Schema,
+    ):
+        return knext.Schema.from_columns(
+            [
+                knext.Column(knext.string(), "Queries"),
+                knext.Column(knext.ListType(knext.string()), "Documents"),
+            ]
+        )
+
+    def execute(
+        self,
+        ctx: knext.ExecutionContext,
+        vectorstore: VectorStorePortObject,
+        input_table: knext.Table,
+    ):
+        db = vectorstore.load_store(ctx)
+
+        queries = input_table.to_pandas()
+        df = pd.DataFrame(queries)
+
+        doc_collection = []
+
+        for query in df[self.query_column]:
+            similar_documents = db.similarity_search(query, k=self.top_k)
+
+            relevant_documents = []
+
+            for document in similar_documents:
+                relevant_documents.append(document.page_content)
+
+            doc_collection.append(relevant_documents)
+
+        result_table = pd.DataFrame()
+        result_table["Queries"] = queries
+        result_table["Documents"] = doc_collection
+
+        return knext.Table.from_pandas(result_table)
+
 
 # TODO: Add better descriptions
 @knext.node(

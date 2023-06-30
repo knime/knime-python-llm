@@ -79,7 +79,7 @@ class GPT4AllLLMConfigurator:
     """
     Configuration for a local GPT4All LMM
 
-    Configures a local GPT4All LLM. Use the installer from https://gpt4all.io/index.html to download
+    Configures a local GPT4All LLM. Use the installer from [GPT4All](https://gpt4all.io/index.html) to download
     a specific model and enter its path here to use it.
     """
 

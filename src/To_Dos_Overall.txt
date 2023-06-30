@@ -65,13 +65,6 @@ class SubPortObject(SubPortObject):
     def __init__(self, spec: SubPortObjectSpec):
         super().__init__(spec)
 
-    def serialize(self) -> bytes:
-        return b""
-    
-    @classmethod
-    def deserialize(cls, spec, data):
-        return cls(spec)
-
     def optional_method(self, ctx):
         return something
 

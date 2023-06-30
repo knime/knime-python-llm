@@ -1,0 +1,93 @@
+1. Have a standardized Template for every thing
+1.1.1 SuperPortObject (Spec) Interfaces:
+
+class SuperPortObjectSpec(knext.PortObjectSpec):
+    def serialize(self) -> dict:
+        return {}
+
+    @classmethod
+    def deserialize(cls, data: Dict):
+        return cls()
+
+class SuperPortObject(knext.PortObject):
+
+    def __init__(self, spec: LLMPortObjectSpec) -> None:
+        super().__init__(spec)
+
+    def serialize(self) -> bytes:
+        return b""
+    
+    @classmethod
+    def deserialize(cls, spec: SuperPortObject, storage: bytes):
+        return cls(spec)
+
+    def optional_method(self, ctx):
+        raise NotImplementedError()
+
+super_port_type = knext.port_type("Super Port Type", SuperPortObject, SuperPortObjectSpec)
+# Consumer input_port is super_port_type
+
+1.1.2 SubPortObject Implementation:
+
+class SubPortObjectSpec(SuperPortObjectSpec):
+    def __init__(self, optional_var) -> None:
+        super().__init__()
+        self._optional_var = optional_var
+
+    @property
+    def optional_var(self):
+        return self._optional_var
+
+    def serialize(self) -> dict:
+        return {
+            "optional_var": self._optional_var
+            }
+
+    @classmethod
+    def deserialize(cls, data: dict):
+        return cls(data["optional_var"])
+
+class SubPortObject(SubPortObject):
+    def __init__(self, spec: SubPortObjectSpec):
+        super().__init__(spec)
+
+    def serialize(self) -> bytes:
+        return b""
+    
+    @classmethod
+    def deserialize(cls, spec, data):
+        return cls(spec)
+
+    def optional_method(self, ctx):
+        return something
+
+sub_port_type = knext.port_type("Sub Port Type", SubPortObject, SubPortObjectSpec)
+# Provider output_port is sub_port_type 
+
+1.2.1
+    def configure(
+        self,
+        ctx: knext.ConfigurationContext,
+        x_type_spec: SubPortObjectSpec,
+        input_table_spec: knext.Schema,
+    )
+
+1.2.2
+    def execute(
+        self,
+        ctx: knext.ExecutionContext,
+        x_type: SubPortObject,
+        input_table: knext.Table,
+    ):
+
+Rethink naming
+Rethink colour of nodes 
+Rethink Port names 
+
+
+Make extensive node descriptions for every node
+
+Rework the configuration dialogs for each node to have the necessary Options
+
+Workflow to Tool 
+Other Tools 

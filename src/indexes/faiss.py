@@ -1,25 +1,35 @@
+# TODO: Have the same naming standard for all specs and objects in general as well as in the configure and execute methods
+
+
 import knime.extension as knext
 import pandas as pd
 
 from models.base import (
     EmbeddingsPortObjectSpec,
     EmbeddingsPortObject,
-    embeddings_port_type,
+    embeddings_model_port_type,
 )
 
 from .base import (
     VectorStorePortObject,
     VectorStorePortObjectSpec,
-    VectorStorePortObjectSpecContent,
-    VectorStorePortObjectContent,
     vector_store_port_type,
+    store_category
 )
 
 from langchain.vectorstores import FAISS
 from langchain.docstore.document import Document
 
+faiss_icon = "icons/ml.svg"
+faiss_category = knext.category(
+    path=store_category,
+    level_id="faiss",
+    name="FAISS",
+    description="",
+    icon=faiss_icon,
+)
 
-class FAISSVectorstorePortObjectSpecContent(VectorStorePortObjectSpecContent):
+class FAISSVectorstorePortObjectSpec(VectorStorePortObjectSpec):
     def __init__(self, persist_directory) -> None:
         super().__init__()
         self._persist_directory = persist_directory
@@ -34,10 +44,7 @@ class FAISSVectorstorePortObjectSpecContent(VectorStorePortObjectSpecContent):
         return cls(data["persist_directory"])
 
 
-VectorStorePortObjectSpec.register_content_type(FAISSVectorstorePortObjectSpecContent)
-
-
-class FAISSVectorstorePortObjectContent(VectorStorePortObjectContent):
+class FAISSVectorstorePortObject(VectorStorePortObject):
     def __init__(
         self, spec: knext.PortObjectSpec, embeddings_port_object: EmbeddingsPortObject
     ) -> None:
@@ -50,30 +57,24 @@ class FAISSVectorstorePortObjectContent(VectorStorePortObjectContent):
             self._embeddings_port_object.create_model(ctx),
         )
 
-
-VectorStorePortObject.register_content_type(FAISSVectorstorePortObjectContent)
-
-vectorstore_category = ""
-faiss_icon = ""
-
-
+fiass_vector_store_port_type = knext.port_type("FIASS Vector Store", FAISSVectorstorePortObject, FAISSVectorstorePortObjectSpec)
 @knext.node(
     "FAISS Vector Store Creator",
     knext.NodeType.SOURCE,
     faiss_icon,
-    category=vectorstore_category,
+    category=faiss_category,
 )
 @knext.input_port(
     "Embeddings",
     "The embeddings model to use for the vector store.",
-    embeddings_port_type,
+    embeddings_model_port_type,
 )
 @knext.input_table(
     name="Documents",
     description="""Table containing a string column representing documents that will be used in the vector store.""",
 )
 @knext.output_port(
-    "FAISS Vector Store", "The created FAISS vector store.", vector_store_port_type
+    "FAISS Vector Store", "The created FAISS vector store.", fiass_vector_store_port_type
 )
 class FAISSVectorStoreCreator:
     document_column = knext.ColumnParameter(
@@ -93,7 +94,7 @@ class FAISSVectorStoreCreator:
         embeddings_spec: EmbeddingsPortObjectSpec,
         input_table: knext.Schema,
     ):
-        return VectorStorePortObjectSpec(self.create_spec_content())
+        return self.create_spec()
 
     def execute(
         self,
@@ -112,30 +113,27 @@ class FAISSVectorStoreCreator:
         )
         db.save_local(self.persist_directory)
 
-        return VectorStorePortObject(
-            spec=VectorStorePortObjectSpec(self.create_spec_content()),
-            content=FAISSVectorstorePortObjectContent(
-                self.create_spec_content(), embeddings
-            ),
+        return FAISSVectorstorePortObject(
+            self.create_spec(),
+            embeddings
         )
 
-    def create_spec_content(self):
-        return FAISSVectorstorePortObjectSpecContent(self.persist_directory)
-
+    def create_spec(self):
+        return FAISSVectorstorePortObjectSpec(self.persist_directory)
 
 @knext.node(
     "FAISS Vector Store Loader",
     knext.NodeType.SOURCE,
     faiss_icon,
-    category=vectorstore_category,
+    category=faiss_category,
 )
 @knext.input_port(
     "Embeddings",
     "The embeddings model to use for the vector store.",
-    embeddings_port_type,
+    embeddings_model_port_type,
 )
 @knext.output_port(
-    "FAISS Vector Store", "The loaded vector store.", vector_store_port_type
+    "FAISS Vector Store", "The loaded vector store.", fiass_vector_store_port_type
 )
 class FAISSVectorStoreLoader:
     persist_directory = knext.StringParameter(
@@ -147,37 +145,36 @@ class FAISSVectorStoreLoader:
         self,
         ctx: knext.ConfigurationContext,
         embeddings_spec: EmbeddingsPortObjectSpec,
-    ) -> VectorStorePortObjectSpec:
-        return VectorStorePortObjectSpec(self.create_spec_content())
+    ) -> FAISSVectorstorePortObjectSpec:
+        return self.create_spec()
 
     def execute(
         self,
         ctx: knext.ExecutionContext,
         embeddings_port_object: EmbeddingsPortObject,
-    ) -> VectorStorePortObject:
+    ) -> FAISSVectorstorePortObject:
+        
         # TODO: Add check if .fiass and .pkl files are in the directory instead of instatiating as check
         FAISS.load_local(
             self.persist_directory, embeddings_port_object.create_model(ctx)
         )
 
-        return VectorStorePortObject(
-            spec=VectorStorePortObjectSpec(self.create_spec_content()),
-            content=FAISSVectorstorePortObjectContent(
-                self.create_spec_content(), embeddings_port_object
-            ),
+        return FAISSVectorstorePortObject(
+            self.create_spec(),
+            embeddings_port_object
         )
 
-    def create_spec_content(self):
-        return FAISSVectorstorePortObjectSpecContent(self.persist_directory)
+    def create_spec(self):
+        return FAISSVectorstorePortObjectSpec(self.persist_directory)
 
 
 @knext.node(
     "FAISS Vector Store Retriever",
     knext.NodeType.SOURCE,
     faiss_icon,
-    category=vectorstore_category,
+    category=faiss_category,
 )
-@knext.input_port("Vector Store", "A vector store port object.", vector_store_port_type)
+@knext.input_port("Vector Store", "A vector store port object.", fiass_vector_store_port_type)
 @knext.input_table(
     "Queries", "Table containing a string column with the queries for the vector store."
 )

@@ -1,194 +1,100 @@
+# TODO: Have the same naming standard for all specs and objects in general as well as in the configure and execute methods
+
+
+from typing import Dict
 import knime.extension as knext
-import pickle
 import pandas as pd
 
 import util
-import logging
 
-class ModelPortObjectSpecContent(knext.PortObjectSpec):
-    pass
-
-
-class ModelPortObjectSpec(knext.PortObjectSpec):
-    content_registry = {}
-
-    def __init__(self, content: ModelPortObjectSpecContent) -> None:
-        super().__init__()
-        self._content = content
-
-    def serialize(self):
-        return {"type": str(type(self._content)), "content": self._content.serialize()}
-
-    @classmethod
-    def register_content_type(cls, content_type: type):
-        cls.content_registry[str(content_type)] = content_type
-
-    @classmethod
-    def deserialize(cls, data: dict) -> "ModelPortObjectSpec":
-        content_cls = cls.content_registry[data["type"]]
-        return content_cls.deserialize(data["content"])
-
-
-class ModelPortObjectContent(knext.PortObject):
-    def create_model(self, ctx):
-        raise NotImplementedError()
-
-    # TODO: Why do i need to name 'serialize' and 'deserialize' here?
-    def serialize(self):
-        pass
-
-    def deserialize():
-        pass
-
-
-class ModelPortObject(knext.PortObject):
-    content_registry = {}
-
-    def __init__(
-        self, spec: knext.PortObjectSpec, content: ModelPortObjectContent
-    ) -> None:
-        super().__init__(spec)
-        self._content = content
-
-    def create_model(self, ctx):
-        return self._content.create_model(self, ctx)
-
-    def serialize(self):
-        config = {
-            "type": str(type(self._content)),
-            "content": self._content.serialize(),
-        }
-        return pickle.dumps(config)
-
-    @classmethod
-    def register_content_type(cls, content_type: type):
-        cls.content_registry[str(content_type)] = content_type
-
-    @classmethod
-    def deserialize(cls, spec: ModelPortObjectSpec, data) -> "ModelPortObject":
-        config = pickle.loads(data)
-        content_cls = cls.content_registry[config["type"]]
-        return cls(spec, content_cls)
-
-
-class LLMPortObjectSpec(ModelPortObjectSpec):
-    def __init__(self, content: ModelPortObjectSpecContent) -> None:
-        super().__init__(content)
-
-    @classmethod
-    def deserialize(cls, data: dict) -> "LLMPortObjectSpec":
-        content_cls = cls.content_registry[data["type"]]
-        return content_cls.deserialize(data["content"])
-
-
-class LLMPortObject(ModelPortObject):
-    @classmethod
-    def deserialize(cls, spec: LLMPortObjectSpec, data) -> "LLMPortObject":
-        config = pickle.loads(data)
-        content_cls = cls.content_registry[config["type"]]
-        return cls(spec, content_cls)
-
-
-class ChatModelPortObjectSpec(ModelPortObjectSpec):
-    def __init__(self, content: ModelPortObjectSpecContent) -> None:
-        super().__init__(content)
-
-    @classmethod
-    def deserialize(cls, data: dict) -> "ChatModelPortObjectSpec":
-        content_cls = cls.content_registry[data["type"]]
-        return content_cls.deserialize(data["content"])
-
-
-class ChatModelPortObject(ModelPortObject):
-    @classmethod
-    def deserialize(cls, spec: ChatModelPortObjectSpec, data) -> "ChatModelPortObject":
-        config = pickle.loads(data)
-        content_cls = cls.content_registry[config["type"]]
-        return cls(spec, content_cls)
-
-
-class EmbeddingsPortObjectSpec(ModelPortObjectSpec):
-    def __init__(self, content: ModelPortObjectSpecContent) -> None:
-        super().__init__(content)
-
-    @classmethod
-    def deserialize(cls, data: dict) -> "EmbeddingsPortObjectSpec":
-        content_cls = cls.content_registry[data["type"]]
-        return content_cls.deserialize(data["content"])
-
-
-class EmbeddingsPortObject(ModelPortObject):
-    @classmethod
-    def deserialize(
-        cls, spec: EmbeddingsPortObjectSpec, data
-    ) -> "EmbeddingsPortObject":
-        config = pickle.loads(data)
-        content_cls = cls.content_registry[config["type"]]
-        return cls(spec, content_cls)
-
-
-llm_port_type = knext.port_type("LLM", LLMPortObject, LLMPortObjectSpec)
-chat_model_port_type = knext.port_type(
-    "Chat Model", ChatModelPortObject, ChatModelPortObjectSpec
-)
-embeddings_port_type = knext.port_type(
-    "Embeddings", EmbeddingsPortObject, EmbeddingsPortObjectSpec
+model_category = knext.category(
+    path=util.main_cat,
+    level_id="models",
+    name="Models",
+    description="",
+    icon="icons/ml.svg",
 )
 
+class LLMPortObjectSpec(knext.PortObjectSpec):
+    def serialize(self):
+        return {}
 
-class SuperPortObjectSpec(knext.PortObjectSpec):
-    pass
-
-class SuperPortObject(knext.PortObject):
-
-    def __init__(self, spec: SuperPortObjectSpec) -> None:
-        super().__init__(spec)
-
-    def create_model(self, ctx):
-        raise NotImplementedError()
+    @classmethod
+    def deserialize(cls, data: Dict):
+        return cls()
     
-super_port_type = knext.port_type("Super Port Type", SuperPortObject, SuperPortObjectSpec)
+class LLMPortObject(knext.PortObject):
 
-class SubPortObjectSpec(SuperPortObjectSpec):
-    def __init__(self, credentials, model_name) -> None:
-        super().__init__()
-        self._credentials = credentials
-        self._model = model_name
-
-    def serialize(self) -> dict:
-        return {"credentials": self._credentials, "model": self._model}
-
-    @classmethod
-    def deserialize(cls, data: dict):
-        return cls(data["credentials"], data["model"])
-
-class SubPortObject(SuperPortObject):
+    def __init__(self, spec: LLMPortObjectSpec) -> None:
+        super().__init__(spec)
 
     def serialize(self) -> bytes:
         return b""
     
     @classmethod
-    def deserialize(cls, spec):
+    def deserialize(cls, spec: LLMPortObjectSpec, storage: bytes):
         return cls(spec)
 
     def create_model(self, ctx):
-        from langchain.llms import OpenAI
+        raise NotImplementedError()
+    
+class ChatModelPortObjectSpec(knext.PortObjectSpec):
+    def serialize(self):
+        return {}
 
-        return OpenAI(
-            openai_api_key=ctx.get_credentials(
-                self.spec.serialize()["credentials"]
-            ).password,
-            model=self.spec.serialize()["model"],
-        )
+    @classmethod
+    def deserialize(cls, data: Dict):
+        return cls()
 
-sub_port_type = knext.port_type("Sub Port Type", SubPortObject, SubPortObjectSpec)
+class ChatModelPortObject(knext.PortObject):
 
-@knext.node("LLM Prompter", knext.NodeType.SOURCE, "", "")
+    def __init__(self, spec: ChatModelPortObjectSpec) -> None:
+        super().__init__(spec)
+
+    def serialize(self):
+        return b""
+
+    @classmethod
+    def deserialize(cls, spec, data: Dict):
+        return cls(spec)
+
+    def create_model(self, ctx):
+        raise NotImplementedError()
+
+class EmbeddingsPortObjectSpec(knext.PortObjectSpec):
+    def serialize(self):
+        return {}
+
+    @classmethod
+    def deserialize(cls, data: Dict):
+        return cls()
+    
+class EmbeddingsPortObject(knext.PortObject):
+
+    def __init__(self, spec: EmbeddingsPortObjectSpec) -> None:
+        super().__init__(spec)
+
+    def serialize(self):
+        return b""
+
+    @classmethod
+    def deserialize(cls, spec, data: Dict):
+        return cls(spec)
+
+    def create_model(self, ctx):
+        raise NotImplementedError()
+    
+llm_port_type = knext.port_type("LLM Port Type", LLMPortObject, LLMPortObjectSpec)
+chat_model_port_type = knext.port_type("Chat Model Port Type", ChatModelPortObject, ChatModelPortObjectSpec)
+embeddings_model_port_type = knext.port_type("Embeddings Port Type", EmbeddingsPortObject, EmbeddingsPortObjectSpec)
+
+
+@knext.node("LLM Prompter", knext.NodeType.SOURCE, "", model_category)
 @knext.input_port("LLM", "A large language model.", llm_port_type)
 @knext.input_table("Prompt Table", "A table containing a string column with prompts.")
 @knext.output_table("Result Table", "A table containing prompts and their respective answer.")
 class LLMPrompter:
-    promt_column = knext.ColumnParameter(
+    prompt_column = knext.ColumnParameter(
         "Prompt column",
         """Selection of column used as the prompts column.""",
         port_index=1,
@@ -209,11 +115,12 @@ class LLMPrompter:
                 one nominal column for prompts."""
             )
         
-        input_table_spec.append(knext.Column(knext.string(), "Prompt Result"))
-        #input_table.insert((knext.Column(knext.string(), "Prompt Result")), len(input_table.column_names))
-        #input_table_spec.column_names.append((knext.string(), "Prompt Result"))
-
-        return input_table_spec
+        return knext.Schema.from_columns(
+            [
+                knext.Column(knext.string(), self.prompt_column),
+                knext.Column(knext.string(), "Prompt Result"),
+            ]
+        )
 
     def execute(
         self,
@@ -228,8 +135,7 @@ class LLMPrompter:
         llm = llm_port.create_model(ctx)
         answers = []
 
-        #TODO: Change to configured column parameter once its possible again
-        for prompt in df[self.promt_column]:
+        for prompt in df[self.prompt_column]:
             answers.append(llm(prompt))
 
         df["Prompt Result"] = answers

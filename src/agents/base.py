@@ -1,3 +1,5 @@
+# TODO: Have the same naming standard for all specs and objects in general as well as in the configure and execute methods
+
 import knime.extension as knext
 import pandas as pd
 
@@ -12,16 +14,27 @@ from indexes.base import (
     ToolListPortObject,
     ToolListPortObjectSpec,
 )
+import util
 
 from langchain.prompts import MessagesPlaceholder
 from langchain.memory import ConversationBufferMemory
 from langchain.agents import  initialize_agent, AgentType
 from langchain.memory import ConversationBufferMemory
 
-langchain_icon = ""
-agent_category = ""
+agent_icon = "icons/agent.png"
+agent_category = knext.category(
+    path=util.main_cat,
+    level_id="agents",
+    name="Agents",
+    description="",
+    icon=agent_icon,
+)
 
+# TODO: Add more agents that behave differently e.g. no tools, with specific tools, or have agent types in the config option
 
+import logging
+
+LOGGER = logging.getLogger(__name__)
 @knext.parameter_group(label="Credentials")
 class CredentialsSettings:
     credentials_param = knext.StringParameter(
@@ -33,7 +46,7 @@ class CredentialsSettings:
 @knext.node(
     "ChatBot Agent",
     knext.NodeType.PREDICTOR,
-    langchain_icon,
+    agent_icon,
     category=agent_category,
 )
 @knext.input_port("Chat", "The large language model to chat with.", chat_model_port_type)
@@ -94,6 +107,7 @@ class ChatBotAgent:
         else:
             chat_history_df[["Type", "Message"]] = None
 
+        LOGGER.info(chat_history_df)
         tool_list = tool_list_port.tool_list
         tools = [ tool.create(ctx) for tool in tool_list ]
 
@@ -115,8 +129,8 @@ class ChatBotAgent:
 
         answer = agent_chain.run(input=self.chat_message)
 
-        user_input_row = ["input", self.chat_message]
-        agent_output_row = ["output", answer]
+        user_input_row = ["", "input", self.chat_message]
+        agent_output_row = ["", "output", answer]
 
         chat_history_df.loc[f'Row{len(chat_history_df)}'] = user_input_row
         chat_history_df.loc[f'Row{len(chat_history_df)}'] = agent_output_row

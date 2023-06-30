@@ -1,4 +1,5 @@
-#TODO: Implement me
+# TODO: Have the same naming standard for all specs and objects in general as well as in the configure and execute methods
+
 
 
 import knime.extension as knext
@@ -16,11 +17,21 @@ from .base import (
     VectorStorePortObjectSpecContent,
     VectorStorePortObjectContent,
     vector_store_port_type,
+    store_category
 )
 
 from langchain.vectorstores import Chroma
 from langchain.docstore.document import Document
 
+
+chroma_icon = "icons/chroma.png"
+chroma_category = knext.category(
+    path=store_category,
+    level_id="chroma",
+    name="Chroma",
+    description="",
+    icon=chroma_icon,
+)
 
 class ChromaVectorstorePortObjectSpecContent(VectorStorePortObjectSpecContent):
     def __init__(self, persist_directory) -> None:
@@ -55,14 +66,12 @@ class ChromaVectorstorePortObjectContent(VectorStorePortObjectContent):
 
 VectorStorePortObject.register_content_type(ChromaVectorstorePortObjectContent)
 
-vectorstore_category = ""
-chroma_icon = "icons/choma.png"
 
 @knext.node(
     "Chroma Vector Store Creator",
     knext.NodeType.SOURCE,
     chroma_icon,
-    category=vectorstore_category,
+    category=chroma_category,
 )
 @knext.input_port(
     "Embeddings",
@@ -128,7 +137,7 @@ class ChromaVectorStoreCreator:
     "Chroma Vector Store Loader",
     knext.NodeType.SOURCE,
     chroma_icon,
-    category=vectorstore_category,
+    category=chroma_category,
 )
 @knext.input_port(
     "Embeddings",
@@ -158,7 +167,6 @@ class ChromaVectorStoreLoader:
     ) -> VectorStorePortObject:
         # TODO: Add check if Chroma files are here instead of instantiation
 
-
         Chroma(self.persist_directory,)
 
         return VectorStorePortObject(
@@ -176,7 +184,7 @@ class ChromaVectorStoreLoader:
     "Chroma Vector Store Retriever",
     knext.NodeType.SOURCE,
     chroma_icon,
-    category=vectorstore_category,
+    category=chroma_category,
 )
 @knext.input_port("Vector Store", "A vector store port object.", vector_store_port_type)
 @knext.input_table(

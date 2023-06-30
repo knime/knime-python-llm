@@ -1,4 +1,4 @@
-group_id: org.knime
+group_id: org.knime.python
 name: llm
 description: "LLM Extension"
 author: KNIME GmbH

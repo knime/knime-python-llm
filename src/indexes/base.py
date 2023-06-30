@@ -1,48 +1,41 @@
+# TODO: Have the same naming standard for all specs and objects in general as well as in the configure and execute methods
+
+
 from typing import Dict
 import knime.extension as knext
 import pickle
 
 from models.base import (
-    LLMPortObject,
-    EmbeddingsPortObject,
     LLMPortObjectSpec,
-    ModelPortObjectSpecContent,
-    llm_port_type
+    LLMPortObject,
+    llm_port_type,
+
+    EmbeddingsPortObject,
 )
+import util
 
 from langchain.chains import RetrievalQA
 from langchain.tools import Tool
 
 
-class VectorStorePortObjectSpecContent(knext.PortObjectSpec):
-    pass
-
+store_category = knext.category(
+    path=util.main_cat,
+    level_id="stores",
+    name="Vector Stores",
+    description="",
+    icon="icons/store.png",
+)
 
 class VectorStorePortObjectSpec(knext.PortObjectSpec):
-    content_registry = {}
-
-    def __init__(self, content: ModelPortObjectSpecContent) -> None:
-        super().__init__()
-        self._content = content
-
-    def serialize(self):
-        return {"type": str(type(self._content)), "content": self._content.serialize()}
+    def serialize(self) -> dict:
+        return {}
 
     @classmethod
-    def register_content_type(cls, content_type: type):
-        cls.content_registry[str(content_type)] = content_type
-
-    @classmethod
-    def deserialize(cls, data: dict) -> "VectorStorePortObjectSpec":
-        content_cls = cls.content_registry[data["type"]]
-        return content_cls.deserialize(data["content"])
-
-
-class VectorStorePortObjectContent(knext.PortObject):
-    def __init__(
-        self, spec: knext.PortObjectSpec, 
-        embeddings_model: EmbeddingsPortObject
-    ) -> None:
+    def deserialize(cls, data: Dict):
+        return cls()
+    
+class VectorStorePortObject(knext.PortObject):
+    def __init__(self, spec: VectorStorePortObjectSpec, embeddings_model: EmbeddingsPortObject) -> None:
         super().__init__(spec)
         self._embeddings_model = embeddings_model
 
@@ -54,47 +47,10 @@ class VectorStorePortObjectContent(knext.PortObject):
         return pickle.dumps(config)
 
     @classmethod
-    def deserialize(
-        cls, spec: VectorStorePortObjectSpec, data
-    ) -> "VectorStorePortObjectContent":
+    def deserialize(cls, spec: VectorStorePortObjectSpec, data) -> "VectorStorePortObject":
         config = pickle.loads(data)
         return cls(spec, config["embeddings_model"])
-
-
-class VectorStorePortObject(knext.PortObject):
-    content_registry = {}
-
-    def __init__(
-        self, spec: knext.PortObjectSpec, content: VectorStorePortObjectContent
-    ) -> None:
-        super().__init__(spec)
-        self._content = content
     
-    def load_store(self, ctx):
-        return self._content.load_store(ctx)
-    
-    def create_retriever(self, ctx):
-        return self.load_store(ctx).as_retriever()
-
-    def serialize(self):
-        config = {
-            "type": str(type(self._content)),
-            "content": self._content.serialize(),
-        }
-        return pickle.dumps(config)
-
-    @classmethod
-    def register_content_type(cls, content_type: type):
-        cls.content_registry[str(content_type)] = content_type
-
-    @classmethod
-    def deserialize(
-        cls, spec: VectorStorePortObjectSpec, data
-    ) -> "VectorStorePortObject":
-        config = pickle.loads(data)
-        content_cls = cls.content_registry[config["type"]]
-        return cls(spec, content_cls.deserialize(spec, config["content"]))
-
 
 vector_store_port_type = knext.port_type(
     "Vectorstore", VectorStorePortObject, VectorStorePortObjectSpec
@@ -208,8 +164,8 @@ tool_list_port_type = knext.port_type("Tool list", ToolListPortObject, ToolListP
 @knext.node(
     "Vector Store to Toollist",
     knext.NodeType.SOURCE,
-    icon_path="icons/chroma.png",
-    category=""
+    icon_path="icons/store.png",
+    category=store_category
 )
 @knext.input_port("LLM", "A llm to search through the vector store.", llm_port_type)
 @knext.input_port("Vector Store", "A vector store transform into a Tool object for an agent to use.", vector_store_port_type)
@@ -269,8 +225,8 @@ class VectorStoreToTool:
 @knext.node(
     "Tool List Combiner",
     knext.NodeType.SOURCE,
-    icon_path="icons/chroma.png",
-    category=""
+    icon_path="icons/store.png",
+    category=store_category
 )
 @knext.input_port("Tool List", "A list of tools for an agent to use.", tool_list_port_type)
 @knext.input_port("Tool List", "A list of tools for an agent to use.", tool_list_port_type)

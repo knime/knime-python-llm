@@ -215,13 +215,6 @@ class OpenAILLMPortObject(LLMPortObject):
     def __init__(self, spec: OpenAILLMPortObjectSpec):
         super().__init__(spec)
 
-    def serialize(self) -> bytes:
-        return b""
-    
-    @classmethod
-    def deserialize(cls, spec, data):
-        return cls(spec)
-
     def create_model(self, ctx):
         return OpenAI(
             openai_api_key=ctx.get_credentials(
@@ -257,13 +250,6 @@ class OpenAIChatModelPortObject(ChatModelPortObject):
 
     def __init__(self, spec: OpenAIChatModelPortObjectSpec):
         super().__init__(spec)
-
-    def serialize(self) -> bytes:
-        return b""
-    
-    @classmethod
-    def deserialize(cls, spec, data):
-        return cls(spec)
     
     def create_model(self, ctx):
         return ChatOpenAI(
@@ -300,13 +286,6 @@ class OpenAIEmbeddingsPortObject(EmbeddingsPortObject):
 
     def __init__(self, spec: EmbeddingsPortObjectSpec):
         super().__init__(spec)
-
-    def serialize(self) -> bytes:
-        return b""
-    
-    @classmethod
-    def deserialize(cls, spec, data):
-        return cls(spec)
     
     def create_model(self, ctx):
         return OpenAIEmbeddings(

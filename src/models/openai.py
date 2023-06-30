@@ -1,31 +1,31 @@
 # TODO: Have the same naming standard for all specs and objects in general as well as in the configure and execute methods
+# TODO: Node idea: Re implement the Model List Retriever for better usability (for customers with data apps e.g. to select the model there)
 
-
-from typing import Dict
+# KNIME / own imports
 import knime.extension as knext
-
 from .base import (
     LLMPortObjectSpec,
     LLMPortObject,
-    llm_port_type,
 
     ChatModelPortObjectSpec,
     ChatModelPortObject,
-    chat_model_port_type,
 
     EmbeddingsPortObjectSpec,
     EmbeddingsPortObject,
-    embeddings_model_port_type,
 
     model_category
 )
-import re
-import openai
 
+# Langchain imports
 from langchain.llms import OpenAI
 from langchain.chat_models import ChatOpenAI
 from langchain.embeddings.openai import OpenAIEmbeddings
 
+# Other imports
+import re
+import openai
+
+# TODO: Get someone to do new icons
 openai_icon = "icons/openai.png"
 openai_category = knext.category(
     path=model_category,
@@ -35,8 +35,8 @@ openai_category = knext.category(
     icon=openai_icon,
 )
 
+# This logger is necessary
 import logging
-
 LOGGER = logging.getLogger(__name__)
 
 @knext.parameter_group(label="Credentials")
@@ -47,22 +47,35 @@ class CredentialsSettings:
         choices=lambda a: knext.DialogCreationContext.get_credential_names(a),
     )
 
-
-
-# TODO: Retrieve these Settings from OpenAI with OpenAi Connector
-
 def get_model_list(ctx: knext.DialogCreationContext):
 
-    #TODO: Ask if we need to filter for OpenAIAuthenticationPortObjectSpec
-    spec = ctx.get_input_specs()[0]
-    credentials = spec.credentials
+    for spec in ctx.get_input_specs():
+        if isinstance(spec, OpenAIAuthenticationPortObjectSpec):
+            auth_spec = spec
 
-    openai.api_key = ctx.get_credentials(credentials).password
+    if not auth_spec:
+        raise ValueError("No OpenAI Authentication provided")
+    
+    openai.api_key = ctx.get_credentials(auth_spec.credentials).password
+
     model_list = ["unselected"]
     for model in  openai.Model.list()["data"]:
+            # If model has '-<number>' string or is not owned_by openai
             if re.search(r'-\d', model["id"]) or "openai" not in model["owned_by"]:
                 model_list.append(model["id"])
+
+    model_list.sort()
     return model_list
+
+specific_model_name = knext.StringParameter(
+        label="Specific Model ID",
+        description="""Select from a list of all available OpenAI models.
+        The model chosen has to match the type that the node wants to instantiate.
+        """,
+        choices=lambda c: get_model_list(c),
+        default_value="unselected",
+        is_advanced=True,
+    )
 
 @knext.parameter_group(label="OpenAI LLM Settings")
 class LLMLoaderInputSettings:
@@ -88,20 +101,14 @@ class LLMLoaderInputSettings:
             "Can do any language task with better quality, longer output, and consistent instruction-following than the curie, babbage, or ada models.",
         )
 
-    model_name = knext.EnumParameter(
+    default_model_name = knext.EnumParameter(
         "Model ID",
         "GPT-3 (Ada, Babbage, Curie) and GPT-3.5 (Davinci) models",
         OpenAIModelCompletionsOptions.Ada.name,
         OpenAIModelCompletionsOptions,
     )
 
-    custom_model_name = knext.StringParameter(
-        label="Specific Model ID",
-        description="TODO",
-        choices=lambda c: get_model_list(c),
-        default_value="unselected",
-        is_advanced=True,
-    )
+    specific_model_name = specific_model_name
 
 
 @knext.parameter_group(label="OpenAI Chat Model Settings")
@@ -131,13 +138,7 @@ class ChatModelLoaderInputSettings:
         OpenAIModelCompletionsOptions,
     )
 
-    custom_model_name = knext.StringParameter(
-        label="Specific Model ID",
-        description="TODO.",
-        choices=lambda c: get_model_list(c),
-        default_value="unselected",
-        is_advanced=True,
-    )
+    specific_model_name = specific_model_name
 
 
 @knext.parameter_group(label="OpenAI Embeddings Configuration")
@@ -169,10 +170,6 @@ class EmbeddingsLoaderInputSettings:
 
 
 
-
-############## DONE
-
-
 class OpenAIAuthenticationPortObjectSpec(knext.PortObjectSpec):
     def __init__(self, credentials) -> None:
         super().__init__()
@@ -182,20 +179,18 @@ class OpenAIAuthenticationPortObjectSpec(knext.PortObjectSpec):
     def credentials(self):
         return self._credentials
 
-    def serialize(self):
-        return {
-            "credentials": self._credentials
-        }
+    def serialize(self) -> dict:
+        return {"credentials": self._credentials}
     
     @classmethod
-    def deserialize(cls, data: Dict):
+    def deserialize(cls, data: dict):
         return cls(data["credentials"])
     
 class OpenAIAuthenticationPortObject(knext.PortObject):
     def __init__(self, spec: OpenAIAuthenticationPortObjectSpec) -> None:
         super().__init__(spec)
 
-    def serialize(self):
+    def serialize(self) -> bytes:
         return b""
     
     @classmethod
@@ -203,44 +198,6 @@ class OpenAIAuthenticationPortObject(knext.PortObject):
         return cls(spec)
 
 openai_authentication_port_type = knext.port_type("OpenAI Authentication", OpenAIAuthenticationPortObject, OpenAIAuthenticationPortObjectSpec)
-
-@knext.node(
-    "OpenAI Authenticator",
-    knext.NodeType.SOURCE,
-    openai_icon,
-    category=openai_category,
-)
-@knext.output_port(
-    "OpenAI Authentication", 
-    "All available OpenAI models by ID.",
-    openai_authentication_port_type
-)
-class OpenAIAuthenticator:
-    credentials_settings = CredentialsSettings()
-
-    def configure(self, ctx: knext.ConfigurationContext) -> OpenAIAuthenticationPortObjectSpec:
-
-        return OpenAIAuthenticationPortObjectSpec(
-            self.credentials_settings.credentials_param
-        )
-
-    def execute(self, ctx: knext.ExecutionContext) -> OpenAIAuthenticationPortObject:
-
-        try:
-            openai.api_key = ctx.get_credentials(
-                self.credentials_settings.credentials_param
-            ).password
-
-            openai.Model.list()
-        except:
-            raise ValueError("Wrong API key provided")
-
-        return OpenAIAuthenticationPortObject(
-            OpenAIAuthenticationPortObjectSpec(
-                self.credentials_settings.credentials_param
-            )
-        )
-
 
 class OpenAILLMPortObjectSpec(LLMPortObjectSpec):
     def __init__(self, credentials, model_name) -> None:
@@ -327,6 +284,120 @@ class OpenAIChatModelPortObject(ChatModelPortObject):
 
 openai_chat_port_type = knext.port_type("OpenAI Chat Model", OpenAIChatModelPortObject, OpenAIChatModelPortObjectSpec)
 
+#TODO: Better node description text
+@knext.node(
+    "OpenAI Authenticator",
+    knext.NodeType.SOURCE,
+    openai_icon,
+    category=openai_category,
+)
+@knext.output_port(
+    "OpenAI Authentication", 
+    "Successfull authentication to OpenAI.",
+    openai_authentication_port_type
+)
+class OpenAIAuthenticator:
+    """
+    Authenticates the OpenAI API Key
+
+    This node makes a call to openai.Model.list() to check
+    whether the provided API key is valid.
+    """
+    credentials_settings = CredentialsSettings()
+
+    def configure(self, ctx: knext.ConfigurationContext) -> OpenAIAuthenticationPortObjectSpec:
+
+        if not ctx.get_credential_names():
+            raise ValueError("No credentials provided to node")
+        
+        if not self.credentials_settings.credentials_param:
+            raise ValueError("No credentials selected")
+
+        return self.create_spec()
+
+    def execute(self, ctx: knext.ExecutionContext) -> OpenAIAuthenticationPortObject:
+
+        try:
+            openai.api_key = ctx.get_credentials(
+                self.credentials_settings.credentials_param
+            ).password
+
+            openai.Model.list()
+        except:
+            raise ValueError("Wrong API key provided")
+
+        return OpenAIAuthenticationPortObject(self.create_spec())
+    
+    def create_spec(self):
+        return OpenAIAuthenticationPortObjectSpec(
+                self.credentials_settings.credentials_param
+            )
+
+#TODO: Better node description text
+#TODO: Check proxy settings and add them to configuration
+#TODO: Generate prompts as configuration dialog as seen on langchain llm.generate(["Tell me a joke", "Tell me a poem"]*15)
+@knext.node(
+    "OpenAI LLM Connector",
+    knext.NodeType.SOURCE,
+    openai_icon,
+    category=openai_category,
+)
+@knext.input_port(
+    "OpenAI Authentication", 
+    "Successfull authentication to OpenAI.",
+    openai_authentication_port_type
+)
+@knext.output_port(
+    "OpenAI LLM",
+    "Connection to a specific LLM from OpenAI.",
+    openai_llm_port_type,
+)
+class OpenAILLMConnector:
+    """
+    Connect to an OpenAI Large Language Model
+
+    Given the successfull authentication through the OpenAI Authenticator Node,
+    choose one of the available LLMs from either a predefined list or through
+    the advanced options from all available models that are available
+    for the given connection.
+    """
+
+    input_settings = LLMLoaderInputSettings()
+
+    def configure(
+            self, 
+            ctx: knext.ConfigurationContext,
+            openai_auth_spec: OpenAIAuthenticationPortObjectSpec
+        ) -> OpenAILLMPortObjectSpec:
+        
+        return self.create_spec(openai_auth_spec)
+
+    def execute(
+            self, 
+            ctx: knext.ExecutionContext,
+            openai_auth_port: OpenAIAuthenticationPortObject
+        ) -> OpenAILLMPortObject:
+
+        return OpenAILLMPortObject(
+            self.create_spec(openai_auth_port.spec)
+        )
+
+    def create_spec(self, openai_auth_spec: OpenAIAuthenticationPortObjectSpec) -> OpenAILLMPortObjectSpec:
+        
+        if self.input_settings.specific_model_name != "unselected":
+            model_name = self.input_settings.specific_model_name
+        else:
+            model_name = self.input_settings.OpenAIModelCompletionsOptions[
+                self.input_settings.default_model_name
+            ].label
+
+        LOGGER.info(f"Connecting to {model_name}")
+
+        return OpenAILLMPortObjectSpec(openai_auth_spec.credentials, model_name)
+
+
+
+
 class OpenAIEmbeddingsPortObjectSpec(EmbeddingsPortObjectSpec):
     def __init__(self, credentials, model_name) -> None:
         super().__init__()
@@ -370,86 +441,55 @@ class OpenAIEmbeddingsPortObject(EmbeddingsPortObject):
 
 openai_embeddings_port_type = knext.port_type("OpenAI Embeddings Model", OpenAIEmbeddingsPortObject, OpenAIEmbeddingsPortObjectSpec)
 
+
+#TODO: Better node description text
 @knext.node(
-    "OpenAI LLM Configurator",
+    "OpenAI Chat Model Connector",
     knext.NodeType.SOURCE,
     openai_icon,
     category=openai_category,
 )
 @knext.input_port(
     "OpenAI Authentication", 
-    "Credentials to OpenAI.",
+    "Successfull authentication to OpenAI.",
     openai_authentication_port_type
 )
 @knext.output_port(
-    "OpenAI LLM Configuration",
-    "A large language model configuration for OpenAI.",
-    openai_llm_port_type,
-)
-class OpenAILLMConfigurator:
-
-    input_settings = LLMLoaderInputSettings()
-
-    def configure(
-            self, 
-            ctx: knext.ConfigurationContext,
-            openai_auth_port_spec: OpenAIAuthenticationPortObjectSpec
-        ) -> OpenAILLMPortObjectSpec:
-        
-        return self.create_spec(openai_auth_port_spec)
-
-    def execute(
-            self, 
-            ctx: knext.ExecutionContext,
-            openai_auth_port: OpenAIAuthenticationPortObject
-        ) -> OpenAILLMPortObject:
-
-        return OpenAILLMPortObject(
-            self.create_spec(openai_auth_port.spec)
-        )
-
-    def create_spec(self, openai_auth_spec: OpenAIAuthenticationPortObjectSpec) -> OpenAILLMPortObjectSpec:
-        credential_params = openai_auth_spec.credentials
-        
-        if self.input_settings.custom_model_name != "unselected":
-            model_name = self.input_settings.custom_model_name
-        else:
-            model_name = self.input_settings.OpenAIModelCompletionsOptions[
-                self.input_settings.model_name
-            ].label
-
-        return OpenAILLMPortObjectSpec(credential_params, model_name)
-    
-
-
-@knext.node(
-    "OpenAI ChatModel Configurator",
-    knext.NodeType.SOURCE,
-    openai_icon,
-    category=openai_category,
-)
-@knext.input_port(
-    "OpenAI Authentication", 
-    "All available OpenAI models by ID.",
-    openai_authentication_port_type
-)
-@knext.output_port(
-    "OpenAI Chat Model Configuration",
-    "A chat model configuration for OpenAI.",
+    "OpenAI Chat Model",
+    "Connection to a specific Chat Model from OpenAI.",
     openai_chat_port_type,
 )
 class OpenAIChatModelConfigurator:
+    """
+    Connect to an OpenAI Chat Model
+
+    Given the successfull authentication through the OpenAI Authenticator Node,
+    choose one of the available chat models from either a predefined list or through
+    the advanced options from all available models that are available
+    for the given connection.
+    """
+
     input_settings = ChatModelLoaderInputSettings()
 
-    def configure(self, ctx: knext.ConfigurationContext, openai_auth_port_spec: OpenAIAuthenticationPortObjectSpec) -> OpenAIChatModelPortObjectSpec:
-        return self.create_spec(openai_auth_port_spec)
+    def configure(
+            self, 
+            ctx: knext.ConfigurationContext, 
+            openai_auth_spec: OpenAIAuthenticationPortObjectSpec
+        ) -> OpenAIChatModelPortObjectSpec:
 
-    def execute(self, ctx: knext.ExecutionContext, openai_auth_port: OpenAIAuthenticationPortObject) -> OpenAIChatModelPortObject:
+        return self.create_spec(openai_auth_spec)
 
-        return OpenAIChatModelPortObject(self.create_spec(openai_auth_port.spec))
+    def execute(
+            self, 
+            ctx: knext.ExecutionContext, 
+            openai_auth_port: OpenAIAuthenticationPortObject
+        ) -> OpenAIChatModelPortObject:
+
+        return OpenAIChatModelPortObject(
+            self.create_spec(openai_auth_port.spec)
+        )
 
     def create_spec(self, openai_auth_spec: OpenAIAuthenticationPortObjectSpec) -> OpenAIChatModelPortObjectSpec:
-        credential_params = openai_auth_spec.credentials
         
         if self.input_settings.custom_model_name != "unselected":
             model_name = self.input_settings.custom_model_name
@@ -458,39 +498,58 @@ class OpenAIChatModelConfigurator:
                 self.input_settings.model_name
             ].label
 
-        return OpenAIChatModelPortObjectSpec(credential_params, model_name)
+        LOGGER.info(f"Connecting to {model_name}")
 
+        return OpenAIChatModelPortObjectSpec(openai_auth_spec.credentials, model_name)
 
+#TODO: Better node description text
 @knext.node(
-    "OpenAI Embeddings Configurator",
+    "OpenAI Embeddings Connector",
     knext.NodeType.SOURCE,
     openai_icon,
     category=openai_category,
 )
 @knext.input_port(
     "OpenAI Authentication", 
-    "All available OpenAI models by ID.",
+    "Successfull authentication to OpenAI.",
     openai_authentication_port_type
 )
 @knext.output_port(
-    "OpenAI Embeddings Configuration",
-    "An embeddings model configuration for OpenAI.",
+    "OpenAI Embeddings Model",
+    "Connection to a specific Embeddings Model from OpenAI.",
     openai_embeddings_port_type,
 )
 class OpenAIEmbeddingsConfigurator:
+    """
+    Connect to an OpenAI Embedding Model
+
+    Given the successfull authentication through the OpenAI Authenticator Node,
+    choose one of the available embedding models from either a predefined list or through
+    the advanced options from all available models that are available
+    for the given connection.
+    """
+
     input_settings = EmbeddingsLoaderInputSettings()
 
-    def configure(self, ctx: knext.ConfigurationContext, openai_auth_port_spec: OpenAIAuthenticationPortObjectSpec) -> OpenAIEmbeddingsPortObjectSpec:
-        return self.create_spec(openai_auth_port_spec)
+    def configure(
+            self, 
+            ctx: knext.ConfigurationContext, 
+            openai_auth_spec: OpenAIAuthenticationPortObjectSpec
+        ) -> OpenAIEmbeddingsPortObjectSpec:
 
-    def execute(self, ctx: knext.ExecutionContext, openai_auth_port: OpenAIAuthenticationPortObject) -> OpenAIEmbeddingsPortObject:
+        return self.create_spec(openai_auth_spec)
+
+    def execute(
+            self, 
+            ctx: knext.ExecutionContext, 
+            openai_auth_port: OpenAIAuthenticationPortObject
+        ) -> OpenAIEmbeddingsPortObject:
 
         return OpenAIEmbeddingsPortObject(
             self.create_spec(openai_auth_port.spec)
         )
 
     def create_spec(self, openai_auth_spec: OpenAIAuthenticationPortObjectSpec) -> OpenAIEmbeddingsPortObjectSpec:
-        credential_params = openai_auth_spec.credentials
         
         if self.input_settings.custom_model_name != "unselected":
             model_name = self.input_settings.custom_model_name
@@ -499,6 +558,6 @@ class OpenAIEmbeddingsConfigurator:
                 self.input_settings.model_name
             ].label
 
-        return OpenAIEmbeddingsPortObjectSpec(credential_params, model_name)
+        LOGGER.info(f"Connecting to {model_name}")
 
-
+        return OpenAIEmbeddingsPortObjectSpec(openai_auth_spec.credentials, model_name)

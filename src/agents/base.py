@@ -30,11 +30,10 @@ agent_category = knext.category(
     icon=agent_icon,
 )
 
-# TODO: Add more agents that behave differently e.g. no tools, with specific tools, or have agent types in the config option
-
 import logging
-
 LOGGER = logging.getLogger(__name__)
+
+# TODO: Add more agents that behave differently e.g. no tools, with specific tools, or have agent types in the config option
 @knext.parameter_group(label="Credentials")
 class CredentialsSettings:
     credentials_param = knext.StringParameter(

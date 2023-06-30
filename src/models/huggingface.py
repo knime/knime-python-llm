@@ -1,43 +1,38 @@
 # TODO: Have the same naming standard for all specs and objects in general as well as in the configure and execute methods
+# TODO: Add Authenticator & LLM Connector Node similar to OpenAI nodes? Donezo
 
-
+# KNIME / own imports
 import knime.extension as knext
+from models.openai import CredentialsSettings
 from .base import (
     LLMPortObjectSpec,
     LLMPortObject,
-    llm_port_type,
-    model_category,
-
     EmbeddingsPortObjectSpec,
     EmbeddingsPortObject,
+    huggingface_icon,
+    huggingface,
 )
 
+# Langchain imports
 from langchain import HuggingFaceHub
 from langchain.llms import HuggingFaceTextGenInference
 from langchain.embeddings import HuggingFaceEmbeddings
 
+# Other imports
+import json
 
-huggingface_icon = "icons/huggingface.svg"
-huggingface = knext.category(
-    path=model_category,
-    level_id="hugging",
-    name="Hugging Face",
-    description="",
-    icon=huggingface_icon,
-)
-#TODO: Remove serialize
 
 class HuggingFaceTextGenInfLLMPortObjectSpec(LLMPortObjectSpec):
     def __init__(
-            self, 
-            inference_server_url, 
-            max_new_tokens,
-            top_k,
-            top_p,
-            typical_p,
-            temperature,
-            repetition_penalty
-            ) -> None:
+        self,
+        inference_server_url,
+        max_new_tokens,
+        top_k,
+        top_p,
+        typical_p,
+        temperature,
+        repetition_penalty,
+    ) -> None:
         super().__init__()
         self._inference_server_url = inference_server_url
         self._max_new_tokens = max_new_tokens
@@ -47,23 +42,49 @@ class HuggingFaceTextGenInfLLMPortObjectSpec(LLMPortObjectSpec):
         self._temperature = temperature
         self._repetition_penalty = repetition_penalty
 
+    @property
+    def inference_server_url(self):
+        return self._inference_server_url
 
+    @property
+    def max_new_tokens(self):
+        return self._max_new_tokens
+
+    @property
+    def top_k(self):
+        return self._top_k
+
+    @property
+    def top_p(self):
+        return self._top_p
+
+    @property
+    def typical_p(self):
+        return self._typical_p
+
+    @property
+    def temperature(self):
+        return self._temperature
+
+    @property
+    def repetition_penalty(self):
+        return self._repetition_penalty
 
     def serialize(self) -> dict:
         return {
-            "inference_server_url": self._inference_server_url, 
-            "max_new_tokens": self._max_new_tokens,
-            "top_k": self._top_k,
-            "top_p": self._top_p,
-            "typical_p": self._typical_p,
-            "temperature": self._temperature,
-            "repetition_penalty": self._repetition_penalty,
-            }
+            "inference_server_url": self.inference_server_url,
+            "max_new_tokens": self.max_new_tokens,
+            "top_k": self.top_k,
+            "top_p": self.top_p,
+            "typical_p": self.typical_p,
+            "temperature": self.temperature,
+            "repetition_penalty": self.repetition_penalty,
+        }
 
     @classmethod
     def deserialize(cls, data: dict):
         return cls(
-            data["inference_server_url"], 
+            data["inference_server_url"],
             data["max_new_tokens"],
             data["top_k"],
             data["top_p"],
@@ -72,33 +93,37 @@ class HuggingFaceTextGenInfLLMPortObjectSpec(LLMPortObjectSpec):
             data["repetition_penalty"],
         )
 
-class HuggingFaceTextGenInfLLMPortObject(LLMPortObject):
 
+class HuggingFaceTextGenInfLLMPortObject(LLMPortObject):
     def __init__(self, spec: HuggingFaceTextGenInfLLMPortObjectSpec) -> None:
         super().__init__(spec)
 
     def create_model(self, ctx):
-        spec = self.spec.serialize()
-
         return HuggingFaceTextGenInference(
-            inference_server_url=spec["inference_server_url"],
-            max_new_tokens=spec["max_new_tokens"],
-            top_k=spec["top_k"],
-            top_p=spec["top_p"],
-            typical_p=spec["typical_p"],
-            temperature=spec["temperature"],
-            repetition_penalty=spec["repetition_penalty"],
+            inference_server_url=self.spec.inference_server_url,
+            max_new_tokens=self.spec.max_new_tokens,
+            top_k=self.spec.top_k,
+            top_p=self.spec.top_p,
+            typical_p=self.spec.typical_p,
+            temperature=self.spec.temperature,
+            repetition_penalty=self.spec.repetition_penalty,
         )
-    
-huggingface_textGenInf_llm_port_type = knext.port_type("Huggingface LLM", HuggingFaceTextGenInfLLMPortObject, HuggingFaceTextGenInfLLMPortObjectSpec)
 
-class HuggingFacHubLLMPortObjectSpec(LLMPortObjectSpec):
+
+huggingface_textGenInference_llm_port_type = knext.port_type(
+    "Hugging Face LLM",
+    HuggingFaceTextGenInfLLMPortObject,
+    HuggingFaceTextGenInfLLMPortObjectSpec,
+)
+
+
+class HuggingFaceHubLLMPortObjectSpec(LLMPortObjectSpec):
     def __init__(
-            self, 
-            credentials, 
-            repo_id,
-            model_kwargs,
-            ) -> None:
+        self,
+        credentials,
+        repo_id,
+        model_kwargs,
+    ) -> None:
         super().__init__()
         self._credentials = credentials
         self._repo_id = repo_id
@@ -106,26 +131,25 @@ class HuggingFacHubLLMPortObjectSpec(LLMPortObjectSpec):
 
     def serialize(self) -> dict:
         return {
-            "credentials": self._credentials, 
+            "credentials": self._credentials,
             "repo_id": self._repo_id,
             "model_kwargs": self._model_kwargs,
-            }
+        }
 
     @classmethod
     def deserialize(cls, data: dict):
         return cls(
-            data["credentials"], 
+            data["credentials"],
             data["repo_id"],
             data["model_kwargs"],
         )
 
-class HuggingFaceHubLLMPortObject(LLMPortObject):
 
-    def __init__(self, spec: HuggingFacHubLLMPortObjectSpec) -> None:
+class HuggingFaceHubLLMPortObject(LLMPortObject):
+    def __init__(self, spec: HuggingFaceHubLLMPortObjectSpec) -> None:
         super().__init__(spec)
 
     def create_model(self, ctx):
-        import json
         spec = self.spec.serialize()
 
         return HuggingFaceHub(
@@ -134,7 +158,47 @@ class HuggingFaceHubLLMPortObject(LLMPortObject):
             model_kwargs=json.loads(spec["model_kwargs"]),
         )
 
-huggingface_hub_llm_port_type = knext.port_type("Huggingface LLM", HuggingFaceHubLLMPortObject, HuggingFacHubLLMPortObjectSpec)
+
+huggingface_hub_llm_port_type = knext.port_type(
+    "Hugging Face LLM", HuggingFaceHubLLMPortObject, HuggingFaceHubLLMPortObjectSpec
+)
+
+
+class HuggingFaceAuthenticationPortObjectSpec(knext.PortObjectSpec):
+    def __init__(self, credentials) -> None:
+        super().__init__()
+        self._credentials = credentials
+
+    @property
+    def credentials(self):
+        return self._credentials
+
+    def serialize(self) -> dict:
+        return {"credentials": self._credentials}
+
+    @classmethod
+    def deserialize(cls, data: dict):
+        return cls(data["credentials"])
+
+
+class HuggingFaceAuthenticationPortObject(knext.PortObject):
+    def __init__(self, spec: HuggingFaceAuthenticationPortObjectSpec) -> None:
+        super().__init__(spec)
+
+    def serialize(self) -> bytes:
+        return b""
+
+    @classmethod
+    def deserialize(cls, spec: HuggingFaceAuthenticationPortObjectSpec, storage: bytes):
+        return cls(spec)
+
+
+huggingface_authentication_port_type = knext.port_type(
+    "Hugging Face Hub Authentication",
+    HuggingFaceAuthenticationPortObject,
+    HuggingFaceAuthenticationPortObjectSpec,
+)
+
 
 class HuggingFaceEmbeddingsPortObjectSpec(EmbeddingsPortObjectSpec):
     def __init__(self) -> None:
@@ -147,29 +211,33 @@ class HuggingFaceEmbeddingsPortObjectSpec(EmbeddingsPortObjectSpec):
     def deserialize(cls, data: dict):
         return cls()
 
+
 class HuggingFacePortObject(EmbeddingsPortObject):
     def __init__(self, spec: HuggingFaceEmbeddingsPortObjectSpec):
         super().__init__(spec)
 
     def serialize(self) -> bytes:
         return b""
-    
+
     @classmethod
     def deserialize(cls, spec):
         return cls(spec)
 
     def create_model(self, ctx):
-
         return HuggingFaceEmbeddings()
 
-huggingface_embeddings_port_type = knext.port_type("Huggingface Embeddings Port Type", HuggingFacePortObject, HuggingFaceEmbeddingsPortObjectSpec)
+
+huggingface_embeddings_port_type = knext.port_type(
+    "Hugging Face Embeddings Port Type",
+    HuggingFacePortObject,
+    HuggingFaceEmbeddingsPortObjectSpec,
+)
 
 
-@knext.parameter_group(label="Huggingface TextGen Inference Settings")
+@knext.parameter_group(label="Hugging Face TextGen Inference Settings")
 class TextGenInferenceInputSettings:
-    
     server_url = knext.StringParameter(
-        label="Inference Server Url",
+        label="Inference Server URL",
         description="The URL of the inference server to use.",
         default_value="",
     )
@@ -185,13 +253,13 @@ class TextGenInferenceInputSettings:
         label="Top k",
         description="The number of top-k tokens to consider when generating text.",
         default_value=1,
-        min_value=1,
+        min_value=0,
     )
 
     top_p = knext.DoubleParameter(
         label="Top p",
         description="The cumulative probability threshold for generating text.",
-        default_value=1.0,
+        default_value=0.95,
         max_value=1.0,
         min_value=0.0,
     )
@@ -199,16 +267,15 @@ class TextGenInferenceInputSettings:
     typical_p = knext.DoubleParameter(
         label="Typical p",
         description="The typical probability threshold for generating text.",
-        default_value=1.0,
+        default_value=0.95,
         max_value=1.0,
-        min_value=0.0,
+        min_value=0.1,
     )
 
     temperature = knext.DoubleParameter(
         label="Temperature",
         description="The temperature to use when generating text.",
-        default_value=1.0,
-        max_value=1.0,
+        default_value=0.01,
         min_value=0.0,
     )
 
@@ -219,6 +286,7 @@ class TextGenInferenceInputSettings:
         min_value=0.0,
     )
 
+
 @knext.node(
     "HF TextGen Inference Configurator",
     knext.NodeType.SOURCE,
@@ -227,20 +295,25 @@ class TextGenInferenceInputSettings:
 )
 @knext.output_port(
     "Huggingface TextGen Inference Configuration",
-    "A large language model text gen configuration.",
-    huggingface_textGenInf_llm_port_type,
+    "Connection to a self hosted LLM using HuggingFace Text Generation Inference.",
+    huggingface_textGenInference_llm_port_type,
 )
 class HuggingfaceTextGenInferenceConfigurator:
+    """
+    Connects to [Text Generation Inference] (https://github.com/huggingface/text-generation-inference), and uses a self hosted LLM by Hugging Face.
+
+    See [LangChain documentation](https://python.langchain.com/docs/modules/model_io/models/llms/integrations/huggingface_textgen_inference) of the Hugging Face TextGen Inference for more details.
+    """
 
     settings = TextGenInferenceInputSettings()
 
     def configure(self, ctx: knext.ConfigurationContext):
-        return self.get_spec_content()
+        return self.create_spec()
 
     def execute(self, ctx: knext.ExecutionContext):
-        return HuggingFaceTextGenInfLLMPortObject(self.get_spec_content())
-    
-    def get_spec_content(self):
+        return HuggingFaceTextGenInfLLMPortObject(self.create_spec())
+
+    def create_spec(self):
         return HuggingFaceTextGenInfLLMPortObjectSpec(
             self.settings.server_url,
             self.settings.max_new_tokens,
@@ -248,53 +321,108 @@ class HuggingfaceTextGenInferenceConfigurator:
             self.settings.top_p,
             self.settings.typical_p,
             self.settings.temperature,
-            self.settings.repetition_penalty
+            self.settings.repetition_penalty,
         )
 
+
 @knext.node(
-    "HF Hub LLM Configurator",
+    "HF Hub Authenticator",
     knext.NodeType.SOURCE,
     huggingface_icon,
     category=huggingface,
 )
 @knext.output_port(
-    "Hugging Face LLM", "A large language model from Hugging Face.", huggingface_hub_llm_port_type
+    "Hugging Face Hub Authentication",
+    "Successful authentication to Hugging Face Hub.",
+    huggingface_authentication_port_type,
 )
-class HuggingfaceHubConfigurator:
+class HuggingFaceHubAuthenticator:
+    """
+    Authenticates the Hugging Face Hub API Key.
+    """
 
-    credentials_param = knext.StringParameter(
-        label="Credentials parameter",
-        description="Credentials parameter name for accessing the Huggingface API key",
-        choices=lambda a: knext.DialogCreationContext.get_credential_names(a),
-    )
+    credentials_settings = CredentialsSettings()
+
+    def configure(
+        self, ctx: knext.ConfigurationContext
+    ) -> HuggingFaceAuthenticationPortObjectSpec:
+        if not ctx.get_credential_names():
+            raise ValueError("No credentials provided to node.")
+
+        if not self.credentials_settings.credentials_param:
+            raise ValueError("No credentials selected.")
+
+        return self.create_spec()
+
+    def execute(self, ctx: knext.ExecutionContext):
+        return HuggingFaceAuthenticationPortObject(self.create_spec())
+
+    def create_spec(self):
+        return HuggingFaceAuthenticationPortObjectSpec(
+            self.credentials_settings.credentials_param,
+        )
+
+
+@knext.node(
+    "HF Hub LLM Connector",
+    knext.NodeType.SOURCE,
+    huggingface_icon,
+    category=huggingface,
+)
+@knext.input_port(
+    "Hugging Face Authentication",
+    "Successfull authentication to Hugging Face.",
+    huggingface_authentication_port_type,
+)
+@knext.output_port(
+    "Hugging Face LLM",
+    "Connection to a specific LLM from Hugging Face.",
+    huggingface_hub_llm_port_type,
+)
+class HuggingFaceHubConnector:
+    """
+    Connects to a Hugging Face Large Language Model.
+
+    Given the successfull authentication through the Hugging Face Authenticator Node,
+    input one of the available LLM repository names from [Hugging Face Hub](https://python.langchain.com/docs/modules/model_io/models/llms/integrations/huggingface_hub), and
+    keyword arguments for the given connection.
+
+    See [LangChain documentation](https://python.langchain.com/docs/modules/model_io/models/llms/integrations/huggingface_hub) of the LLM integration for more details.
+    """
 
     repo_id = knext.StringParameter(
         label="Repo ID",
         description="Model name to use e.g 'Writer/camel-5b-hf'",
-        default_value=""
+        default_value="",
     )
 
     model_kwargs = knext.StringParameter(
         label="Model kwargs",
-        description="Key word arguments to pass to the model. Expected to be a string type dictionary.",
-        default_value="{'argument'}"
+        description="Keyword arguments to pass to the model. Expected to be a string type dictionary.",
+        default_value="{'argument'}",
     )
 
-    def configure(self, ctx: knext.ConfigurationContext):
-        return self.get_spec_content()
+    def configure(
+        self,
+        ctx: knext.ConfigurationContext,
+        huggingface_auth_spec: HuggingFaceAuthenticationPortObjectSpec,
+    ) -> HuggingFaceHubLLMPortObjectSpec:
+        return self.create_spec(huggingface_auth_spec)
 
-    def execute(self, ctx: knext.ExecutionContext):
-        return HuggingFaceHubLLMPortObject(
-            self.get_spec_content()
+    def execute(
+        self,
+        ctx: knext.ExecutionContext,
+        huggingface_auth_spec: HuggingFaceAuthenticationPortObjectSpec,
+    ) -> HuggingFaceHubLLMPortObject:
+        return HuggingFaceHubLLMPortObject(self.create_spec(huggingface_auth_spec.spec))
+
+    def create_spec(
+        self, huggingface_auth_spec: HuggingFaceAuthenticationPortObjectSpec
+    ):
+        return HuggingFaceHubLLMPortObjectSpec(
+            huggingface_auth_spec.credentials, self.repo_id, self.model_kwargs
         )
 
-    def get_spec_content(self):
-        return HuggingFacHubLLMPortObjectSpec(
-            self.credentials_param,
-            self.repo_id,
-            self.model_kwargs,
-        )
-    
 
 @knext.node(
     "HF Embeddings Configurator",
@@ -303,14 +431,13 @@ class HuggingfaceHubConfigurator:
     category=huggingface,
 )
 @knext.output_port(
-    "Hugging Face Embeddings", "An embeddings model configuration from Huggingface Hub.", huggingface_embeddings_port_type
+    "Hugging Face Embeddings",
+    "An embeddings model configuration from Hugging Face Hub.",
+    huggingface_embeddings_port_type,
 )
 class HuggingFaceEmbeddingsConfigurator:
-        
     def configure(self, ctx: knext.ConfigurationContext):
         return HuggingFaceEmbeddingsPortObjectSpec()
 
     def execute(self, ctx: knext.ExecutionContext):
-        return HuggingFacePortObject(
-            HuggingFaceEmbeddingsPortObjectSpec()
-        )
+        return HuggingFacePortObject(HuggingFaceEmbeddingsPortObjectSpec())

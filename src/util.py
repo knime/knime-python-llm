@@ -17,7 +17,7 @@ def is_nominal(column):
 main_cat = knext.category(
     path="/community",
     level_id="kai",
-    name="K-AI",
+    name="AI",
     description="",
     icon="icons/ml.png",
 )

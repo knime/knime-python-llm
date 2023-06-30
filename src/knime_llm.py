@@ -1,6 +1,7 @@
 import indexes.base
 import indexes.faiss
-import indexes.chroma
+
+# import indexes.chroma
 
 import models.base
 import models.huggingface

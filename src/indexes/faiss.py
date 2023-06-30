@@ -14,13 +14,13 @@ from .base import (
     VectorStorePortObject,
     VectorStorePortObjectSpec,
     vector_store_port_type,
-    store_category
+    store_category,
 )
 
 from langchain.vectorstores import FAISS
 from langchain.docstore.document import Document
 
-faiss_icon = "icons/ml.svg"
+faiss_icon = "icons/ml.png"
 faiss_category = knext.category(
     path=store_category,
     level_id="faiss",
@@ -28,6 +28,7 @@ faiss_category = knext.category(
     description="",
     icon=faiss_icon,
 )
+
 
 class FAISSVectorstorePortObjectSpec(VectorStorePortObjectSpec):
     def __init__(self, persist_directory) -> None:
@@ -57,7 +58,12 @@ class FAISSVectorstorePortObject(VectorStorePortObject):
             self._embeddings_port_object.create_model(ctx),
         )
 
-fiass_vector_store_port_type = knext.port_type("FIASS Vector Store", FAISSVectorstorePortObject, FAISSVectorstorePortObjectSpec)
+
+fiass_vector_store_port_type = knext.port_type(
+    "FIASS Vector Store", FAISSVectorstorePortObject, FAISSVectorstorePortObjectSpec
+)
+
+
 @knext.node(
     "FAISS Vector Store Creator",
     knext.NodeType.SOURCE,
@@ -74,7 +80,9 @@ fiass_vector_store_port_type = knext.port_type("FIASS Vector Store", FAISSVector
     description="""Table containing a string column representing documents that will be used in the vector store.""",
 )
 @knext.output_port(
-    "FAISS Vector Store", "The created FAISS vector store.", fiass_vector_store_port_type
+    "FAISS Vector Store",
+    "The created FAISS vector store.",
+    fiass_vector_store_port_type,
 )
 class FAISSVectorStoreCreator:
     document_column = knext.ColumnParameter(
@@ -103,8 +111,8 @@ class FAISSVectorStoreCreator:
         input_table: knext.Table,
     ) -> VectorStorePortObject:
         df = input_table.to_pandas()
-        #TODO: Change back to this line
-        #documents = [Document(page_content=text) for text in df[self.document_column]]
+        # TODO: Change back to this line
+        # documents = [Document(page_content=text) for text in df[self.document_column]]
         documents = [Document(page_content=text) for text in df["Documents"]]
 
         db = FAISS.from_documents(
@@ -113,13 +121,11 @@ class FAISSVectorStoreCreator:
         )
         db.save_local(self.persist_directory)
 
-        return FAISSVectorstorePortObject(
-            self.create_spec(),
-            embeddings
-        )
+        return FAISSVectorstorePortObject(self.create_spec(), embeddings)
 
     def create_spec(self):
         return FAISSVectorstorePortObjectSpec(self.persist_directory)
+
 
 @knext.node(
     "FAISS Vector Store Loader",
@@ -153,16 +159,12 @@ class FAISSVectorStoreLoader:
         ctx: knext.ExecutionContext,
         embeddings_port_object: EmbeddingsPortObject,
     ) -> FAISSVectorstorePortObject:
-        
         # TODO: Add check if .fiass and .pkl files are in the directory instead of instatiating as check
         FAISS.load_local(
             self.persist_directory, embeddings_port_object.create_model(ctx)
         )
 
-        return FAISSVectorstorePortObject(
-            self.create_spec(),
-            embeddings_port_object
-        )
+        return FAISSVectorstorePortObject(self.create_spec(), embeddings_port_object)
 
     def create_spec(self):
         return FAISSVectorstorePortObjectSpec(self.persist_directory)
@@ -174,7 +176,9 @@ class FAISSVectorStoreLoader:
     faiss_icon,
     category=faiss_category,
 )
-@knext.input_port("Vector Store", "A vector store port object.", fiass_vector_store_port_type)
+@knext.input_port(
+    "Vector Store", "A vector store port object.", fiass_vector_store_port_type
+)
 @knext.input_table(
     "Queries", "Table containing a string column with the queries for the vector store."
 )

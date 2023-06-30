@@ -2,7 +2,7 @@ name: llm
 author: Seray Arsland, Alexander Jauch-Walser
 env_yml_path: env.yml
 extension_module: src/knime_llm
-description: AI Extension
+description: KNIME AI Extension
 long_description: This extension provides functionality that everyone wants to have for AI.
 group_id: org.knime.python
 version: 0.1.0

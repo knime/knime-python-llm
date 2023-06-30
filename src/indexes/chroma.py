@@ -13,8 +13,6 @@ from models.base import (
 from .base import (
     VectorStorePortObject,
     VectorStorePortObjectSpec,
-    VectorStorePortObjectSpecContent,
-    VectorStorePortObjectContent,
     vector_store_port_type,
     store_category,
 )

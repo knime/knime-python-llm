@@ -200,10 +200,11 @@ openai_authentication_port_type = knext.port_type(
 
 
 class OpenAILLMPortObjectSpec(LLMPortObjectSpec):
-    def __init__(self, credentials, model_name) -> None:
+    def __init__(self, credentials, model_name, temperature) -> None:
         super().__init__()
         self._credentials = credentials
         self._model = model_name
+        self._temperature = temperature
 
     @property
     def credentials(self):
@@ -213,12 +214,20 @@ class OpenAILLMPortObjectSpec(LLMPortObjectSpec):
     def model(self):
         return self._model
 
+    @property
+    def temperature(self):
+        return self._temperature
+
     def serialize(self) -> dict:
-        return {"credentials": self._credentials, "model": self._model}
+        return {
+            "credentials": self._credentials,
+            "model": self._model,
+            "temperature": self._temperature,
+        }
 
     @classmethod
     def deserialize(cls, data: dict):
-        return cls(data["credentials"], data["model"])
+        return cls(data["credentials"], data["model"], data["temperature"])
 
 
 class OpenAILLMPortObject(LLMPortObject):
@@ -229,6 +238,7 @@ class OpenAILLMPortObject(LLMPortObject):
         return OpenAI(
             openai_api_key=ctx.get_credentials(self.spec.credentials).password,
             model=self.spec.model,
+            temperature=self.spec.temperature,
         )
 
 
@@ -397,6 +407,14 @@ class OpenAILLMConnector:
 
     input_settings = LLMLoaderInputSettings()
 
+    temperature = knext.DoubleParameter(
+        label="Temperature",
+        description="The temperature to use when generating text.",
+        default_value=0.2,
+        min_value=0.0,
+        max_value=2.0,
+    )
+
     def configure(
         self,
         ctx: knext.ConfigurationContext,
@@ -423,7 +441,9 @@ class OpenAILLMConnector:
 
         LOGGER.info(f"Connecting to {model_name}")
 
-        return OpenAILLMPortObjectSpec(openai_auth_spec.credentials, model_name)
+        return OpenAILLMPortObjectSpec(
+            openai_auth_spec.credentials, model_name, self.temperature
+        )
 
 
 # TODO: Better node description text

@@ -110,7 +110,6 @@ class LLMLoaderInputSettings:
 
     specific_model_name = specific_model_name
 
-
 @knext.parameter_group(label="OpenAI Chat Model Settings")
 class ChatModelLoaderInputSettings:
     class OpenAIModelCompletionsOptions(knext.EnumParameterOptions):
@@ -140,7 +139,6 @@ class ChatModelLoaderInputSettings:
 
     specific_model_name = specific_model_name
 
-
 @knext.parameter_group(label="OpenAI Embeddings Configuration")
 class EmbeddingsLoaderInputSettings:
     class OpenAIEmbeddingsOptions(knext.EnumParameterOptions):
@@ -160,15 +158,7 @@ class EmbeddingsLoaderInputSettings:
         OpenAIEmbeddingsOptions,
     )
 
-    custom_model_name = knext.StringParameter(
-        label="Specific Model ID",
-        description="TODO",
-        choices=lambda c: get_model_list(c),
-        default_value="unselected",
-        is_advanced=True,
-    )
-
-
+    specific_model_name = specific_model_name
 
 class OpenAIAuthenticationPortObjectSpec(knext.PortObjectSpec):
     def __init__(self, credentials) -> None:
@@ -284,6 +274,49 @@ class OpenAIChatModelPortObject(ChatModelPortObject):
 
 openai_chat_port_type = knext.port_type("OpenAI Chat Model", OpenAIChatModelPortObject, OpenAIChatModelPortObjectSpec)
 
+class OpenAIEmbeddingsPortObjectSpec(EmbeddingsPortObjectSpec):
+    def __init__(self, credentials, model_name) -> None:
+        super().__init__()
+        self._credentials = credentials
+        self._model = model_name
+
+    @property
+    def credentials(self):
+        return self._credentials
+    
+    @property
+    def model(self):
+        return self._model
+
+    def serialize(self) -> dict:
+        return {"credentials": self._credentials, "model": self._model}
+
+    @classmethod
+    def deserialize(cls, data: dict):
+        return cls(data["credentials"], data["model"])
+
+class OpenAIEmbeddingsPortObject(EmbeddingsPortObject):
+
+    def __init__(self, spec: EmbeddingsPortObjectSpec):
+        super().__init__(spec)
+
+    def serialize(self) -> bytes:
+        return b""
+    
+    @classmethod
+    def deserialize(cls, spec, data):
+        return cls(spec)
+    
+    def create_model(self, ctx):
+        return OpenAIEmbeddings(
+            openai_api_key=ctx.get_credentials(
+                self.spec.credentials
+            ).password,
+            model=self.spec.model,
+        )
+
+openai_embeddings_port_type = knext.port_type("OpenAI Embeddings Model", OpenAIEmbeddingsPortObject, OpenAIEmbeddingsPortObjectSpec)
+
 #TODO: Better node description text
 @knext.node(
     "OpenAI Authenticator",
@@ -395,53 +428,6 @@ class OpenAILLMConnector:
 
         return OpenAILLMPortObjectSpec(openai_auth_spec.credentials, model_name)
 
-
-
-
-class OpenAIEmbeddingsPortObjectSpec(EmbeddingsPortObjectSpec):
-    def __init__(self, credentials, model_name) -> None:
-        super().__init__()
-        self._credentials = credentials
-        self._model = model_name
-
-    @property
-    def credentials(self):
-        return self._credentials
-    
-    @property
-    def model(self):
-        return self._model
-
-    def serialize(self) -> dict:
-        return {"credentials": self._credentials, "model": self._model}
-
-    @classmethod
-    def deserialize(cls, data: dict):
-        return cls(data["credentials"], data["model"])
-
-class OpenAIEmbeddingsPortObject(EmbeddingsPortObject):
-
-    def __init__(self, spec: EmbeddingsPortObjectSpec):
-        super().__init__(spec)
-
-    def serialize(self) -> bytes:
-        return b""
-    
-    @classmethod
-    def deserialize(cls, spec, data):
-        return cls(spec)
-    
-    def create_model(self, ctx):
-        return OpenAIEmbeddings(
-            openai_api_key=ctx.get_credentials(
-                self.spec.credentials
-            ).password,
-            model=self.spec.model,
-        )
-
-openai_embeddings_port_type = knext.port_type("OpenAI Embeddings Model", OpenAIEmbeddingsPortObject, OpenAIEmbeddingsPortObjectSpec)
-
-
 #TODO: Better node description text
 @knext.node(
     "OpenAI Chat Model Connector",
@@ -491,8 +477,8 @@ class OpenAIChatModelConfigurator:
 
     def create_spec(self, openai_auth_spec: OpenAIAuthenticationPortObjectSpec) -> OpenAIChatModelPortObjectSpec:
         
-        if self.input_settings.custom_model_name != "unselected":
-            model_name = self.input_settings.custom_model_name
+        if self.input_settings.specific_model_name != "unselected":
+            model_name = self.input_settings.specific_model_name
         else:
             model_name = self.input_settings.OpenAIModelCompletionsOptions[
                 self.input_settings.model_name
@@ -551,8 +537,8 @@ class OpenAIEmbeddingsConfigurator:
 
     def create_spec(self, openai_auth_spec: OpenAIAuthenticationPortObjectSpec) -> OpenAIEmbeddingsPortObjectSpec:
         
-        if self.input_settings.custom_model_name != "unselected":
-            model_name = self.input_settings.custom_model_name
+        if self.input_settings.specific_model_name != "unselected":
+            model_name = self.input_settings.specific_model_name
         else:
             model_name = self.input_settings.OpenAIEmbeddingsOptions[
                 self.input_settings.model_name

@@ -1,34 +1,32 @@
 # TODO: Have the same naming standard for all specs and objects in general as well as in the configure and execute methods
 
-
+# KNIME / own imports
 import knime.extension as knext
-
 from .base import (
     LLMPortObjectSpec,
     LLMPortObject,
+
     model_category,
 )
 
+# Langchain imports
 from langchain.llms import GPT4All
-
 
 class GPT4AllLLMPortbjectSpec(LLMPortObjectSpec):
     def __init__(self, local_path) -> None:
         super().__init__()
         self._local_path = local_path
 
-
+    @property
+    def local_path(self):
+        return self._local_path
 
     def serialize(self) -> dict:
-        return {
-            "local_path": self._local_path,
-            }
+        return {"local_path": self._local_path,}
 
     @classmethod
     def deserialize(cls, data: dict):
-        return cls(
-            data["local_path"],
-        )
+        return cls(data["local_path"])
 
 class GPT4AllLLMPortbject(LLMPortObject):
 
@@ -41,7 +39,7 @@ class GPT4AllLLMPortbject(LLMPortObject):
             verbose=True
         )
 
-gpt4all_port_type = knext.port_type("GPT4ALL LLM", GPT4AllLLMPortbject, GPT4AllLLMPortbjectSpec)
+gpt4all_llm_port_type = knext.port_type("GPT4ALL LLM", GPT4AllLLMPortbject, GPT4AllLLMPortbjectSpec)
 
 gpt4all_icon = "icons/gtp4all.png"
 gpt4all = knext.category(
@@ -52,16 +50,17 @@ gpt4all = knext.category(
     icon=gpt4all_icon,
 )
 
+ # TODO: Add more configuration options https://python.langchain.com/docs/modules/model_io/models/llms/integrations/gpt4all
 @knext.parameter_group(label="GPT4All Settings")
 class GPT4AllInputSettings:
     
-    # TODO: More settings
     local_path = knext.StringParameter(
         label="Model path",
         description="Path to the pre-trained GPT4All model file eg. my/path/model.bin.",
         default_value="",
     )
 
+#TODO: Better node descriptions
 @knext.node(
     "GPT4All LLM Configurator",
     knext.NodeType.SOURCE,
@@ -71,17 +70,24 @@ class GPT4AllInputSettings:
 @knext.output_port(
     "GPT4All LLM Configuration",
     "A GPT4All large language model configuration.",
-    gpt4all_port_type,
+    gpt4all_llm_port_type,
 )
 class GPT4AllLLMConfigurator:
+    """
+    Configuration for a local GPT4All LMM
 
+    Configures a local GPT4All LLM. Use the installer from https://gpt4all.io/index.html to download
+    a specific model and enter its path here to use it.
+    """
     settings = GPT4AllInputSettings()
 
-    def configure(self, ctx: knext.ConfigurationContext):
+    def configure(self, ctx: knext.ConfigurationContext) -> GPT4AllLLMPortbjectSpec:
         return GPT4AllLLMPortbjectSpec(self.settings.local_path)
 
-    def execute(self, ctx: knext.ExecutionContext):
+    def execute(self, ctx: knext.ExecutionContext) -> GPT4AllLLMPortbject:
 
         return GPT4AllLLMPortbject(
-            GPT4AllLLMPortbjectSpec(local_path=self.settings.local_path)
+            GPT4AllLLMPortbjectSpec(
+                local_path=self.settings.local_path
+            )
         )

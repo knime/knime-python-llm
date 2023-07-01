@@ -46,6 +46,63 @@ class CredentialsSettings:
     )
 
 
+@knext.parameter_group(label="Model Settings")
+class GeneralSettings:
+
+    temperature = knext.DoubleParameter(
+        label="Temperature",
+        description="""
+        What sampling temperature to use, between 0 and 1. 
+        Higher values like 0.8 will make the output more random, 
+        while lower values like 0.2 will make it more focused and deterministic.
+        
+        We generally recommend altering this or top_p but not both.
+        """,
+        default_value=0.2,
+        min_value=0.0,
+        max_value=1.0,
+    )
+
+    top_p = knext.DoubleParameter(
+        label="top_p",
+        description="""
+        An alternative to sampling with temperature, 
+        called nucleus sampling, where the model considers 
+        the results of the tokens with top_p probability mass. 
+        So 0.1 means only the tokens comprising the top 10% 
+        probability mass are considered.
+
+        We generally recommend altering this or temperature but not both.
+        """,
+        default_value=0.1,
+        min_value=0.01,
+        max_value=1.0,
+    )
+
+    max_tokens = knext.IntParameter(
+        label="Max tokens",
+        description="""
+        The maximum number of tokens to generate in the completion.
+
+        The token count of your prompt plus 
+        max_tokens cannot exceed the model's context length.
+        """,
+        default_value=512,
+        min_value=1,
+    )
+
+    n = knext.IntParameter(
+        label="n",
+        description="""
+        How many chat completion choices to generate for each input message.
+        This parameter generates many completions and
+        can quickly consume your token quota. 
+        """,
+        default_value=1,
+        min_value=1,
+    )
+
+
 def get_model_list(ctx: knext.DialogCreationContext):
     for spec in ctx.get_input_specs():
         if isinstance(spec, OpenAIAuthenticationPortObjectSpec):
@@ -200,11 +257,16 @@ openai_authentication_port_type = knext.port_type(
 
 
 class OpenAILLMPortObjectSpec(LLMPortObjectSpec):
-    def __init__(self, credentials, model_name, temperature) -> None:
+    def __init__(
+        self, credentials, model_name, temperature, top_p, max_tokens, n
+    ) -> None:
         super().__init__()
         self._credentials = credentials
         self._model = model_name
         self._temperature = temperature
+        self._top_p = top_p
+        self._max_tokens = max_tokens
+        self._n = n
 
     @property
     def credentials(self):
@@ -218,16 +280,38 @@ class OpenAILLMPortObjectSpec(LLMPortObjectSpec):
     def temperature(self):
         return self._temperature
 
+    @property
+    def top_p(self):
+        return self._top_p
+
+    @property
+    def max_tokens(self):
+        return self._max_tokens
+
+    @property
+    def n(self):
+        return self._n
+
     def serialize(self) -> dict:
         return {
             "credentials": self._credentials,
             "model": self._model,
             "temperature": self._temperature,
+            "top_p": self._top_p,
+            "max_tokens": self._max_tokens,
+            "n": self._n,
         }
 
     @classmethod
     def deserialize(cls, data: dict):
-        return cls(data["credentials"], data["model"], data["temperature"])
+        return cls(
+            data["credentials"],
+            data["model"],
+            data["temperature"],
+            data["top_p"],
+            data["max_tokens"],
+            data["n"],
+        )
 
 
 class OpenAILLMPortObject(LLMPortObject):
@@ -239,6 +323,9 @@ class OpenAILLMPortObject(LLMPortObject):
             openai_api_key=ctx.get_credentials(self.spec.credentials).password,
             model=self.spec.model,
             temperature=self.spec.temperature,
+            top_p=self.spec.top_p,
+            max_tokens=self.spec.max_tokens,
+            n=self.spec.n,
         )
 
 
@@ -248,10 +335,16 @@ openai_llm_port_type = knext.port_type(
 
 
 class OpenAIChatModelPortObjectSpec(ChatModelPortObjectSpec):
-    def __init__(self, credentials, model_name) -> None:
+    def __init__(
+        self, credentials, model_name, temperature, top_p, max_tokens, n
+    ) -> None:
         super().__init__()
         self._credentials = credentials
         self._model = model_name
+        self._temperature = temperature
+        self._top_p = top_p
+        self._max_tokens = max_tokens
+        self._n = n
 
     @property
     def credentials(self):
@@ -261,12 +354,42 @@ class OpenAIChatModelPortObjectSpec(ChatModelPortObjectSpec):
     def model(self):
         return self._model
 
+    @property
+    def temperature(self):
+        return self._temperature
+
+    @property
+    def top_p(self):
+        return self._top_p
+
+    @property
+    def max_tokens(self):
+        return self._max_tokens
+
+    @property
+    def n(self):
+        return self._n
+
     def serialize(self) -> dict:
-        return {"credentials": self._credentials, "model": self._model}
+        return {
+            "credentials": self._credentials,
+            "model": self._model,
+            "temperature": self._temperature,
+            "top_p": self._top_p,
+            "max_tokens": self._max_tokens,
+            "n": self._n,
+        }
 
     @classmethod
     def deserialize(cls, data: dict):
-        return cls(data["credentials"], data["model"])
+        return cls(
+            data["credentials"],
+            data["model"],
+            data["temperature"],
+            data["top_p"],
+            data["max_tokens"],
+            data["n"],
+        )
 
 
 class OpenAIChatModelPortObject(ChatModelPortObject):
@@ -407,13 +530,7 @@ class OpenAILLMConnector:
 
     input_settings = LLMLoaderInputSettings()
 
-    temperature = knext.DoubleParameter(
-        label="Temperature",
-        description="The temperature to use when generating text.",
-        default_value=0.2,
-        min_value=0.0,
-        max_value=2.0,
-    )
+    model_settings = GeneralSettings()
 
     def configure(
         self,
@@ -442,7 +559,12 @@ class OpenAILLMConnector:
         LOGGER.info(f"Connecting to {model_name}")
 
         return OpenAILLMPortObjectSpec(
-            openai_auth_spec.credentials, model_name, self.temperature
+            openai_auth_spec.credentials,
+            model_name,
+            self.model_settings.temperature,
+            self.model_settings.top_p,
+            self.model_settings.max_tokens,
+            self.model_settings.n,
         )
 
 
@@ -474,6 +596,7 @@ class OpenAIChatModelConnector:
     """
 
     input_settings = ChatModelLoaderInputSettings()
+    model_settings = GeneralSettings()
 
     def configure(
         self,
@@ -501,7 +624,14 @@ class OpenAIChatModelConnector:
 
         LOGGER.info(f"Connecting to {model_name}")
 
-        return OpenAIChatModelPortObjectSpec(openai_auth_spec.credentials, model_name)
+        return OpenAIChatModelPortObjectSpec(
+            openai_auth_spec.credentials,
+            model_name,
+            self.model_settings.temperature,
+            self.model_settings.top_p,
+            self.model_settings.max_tokens,
+            self.model_settings.n,
+        )
 
 
 # TODO: Better node description text

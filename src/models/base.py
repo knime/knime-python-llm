@@ -140,7 +140,7 @@ class GeneralSettings:
 
         It is generally recommend altering this or top_p but not both at once.
         """,
-        default_value=0.1,
+        default_value=0.15,
         min_value=0.01,
         max_value=1.0,
         is_advanced=True,
@@ -156,18 +156,6 @@ class GeneralSettings:
         """,
         default_value=512,
         min_value=1,
-    )
-
-    n = knext.IntParameter(
-        label="n",
-        description="""
-        How many chat completion choices to generate for each input message.
-        This parameter generates many completions and
-        can quickly consume your token quota. 
-        """,
-        default_value=1,
-        min_value=1,
-        is_advanced=True,
     )
 
 

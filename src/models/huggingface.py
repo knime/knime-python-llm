@@ -3,14 +3,13 @@
 
 # KNIME / own imports
 import knime.extension as knext
-from models.openai import CredentialsSettings
 from .base import (
     LLMPortObjectSpec,
     LLMPortObject,
     EmbeddingsPortObjectSpec,
     EmbeddingsPortObject,
-    huggingface_icon,
-    huggingface,
+    model_category,
+    CredentialsSettings,
 )
 
 # Langchain imports
@@ -20,6 +19,16 @@ from langchain.embeddings import HuggingFaceEmbeddings
 
 # Other imports
 import json
+
+# TODO: Get someone to do new icons
+huggingface_icon = "icons/huggingface.png"
+huggingface = knext.category(
+    path=model_category,
+    level_id="hugging",
+    name="Hugging Face",
+    description="",
+    icon=huggingface_icon,
+)
 
 
 class HuggingFaceTextGenInfLLMPortObjectSpec(LLMPortObjectSpec):

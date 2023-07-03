@@ -188,8 +188,8 @@ tool_list_port_type = knext.port_type(
 )
 class VectorStoreRetriever:
     """
-    Performs a similarity search on the vectore store
 
+    Performs a similarity search on the vectore store
 
     """
 
@@ -260,10 +260,12 @@ class VectorStoreRetriever:
 )
 class VectorStoreToTool:
     """
+
     Creates a Tool out of a Vector Store
 
     Provide a usefull name and description for an agent to know whether to use this Tool
     to answer your question.
+
     """
 
     tool_name = knext.StringParameter(
@@ -289,7 +291,6 @@ class VectorStoreToTool:
         llm_spec: LLMPortObjectSpec,
         vectorstore_spec: VectorStorePortObjectSpec,
     ):
-
         return ToolListPortObjectSpec()
 
     def execute(
@@ -334,7 +335,6 @@ class ToolCombiner:
         tool_list_one: ToolListPortObjectSpec,
         tool_list_twp: ToolListPortObjectSpec,
     ):
-
         return ToolListPortObjectSpec()
 
     def execute(

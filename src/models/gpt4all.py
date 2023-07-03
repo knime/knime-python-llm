@@ -78,10 +78,12 @@ gpt4all_llm_port_type = knext.port_type(
 )
 class GPT4AllLLMConfigurator:
     """
-    Configuration for a local GPT4All LMM
+
+    Configuration for a local GPT4All LMM.
 
     Configures a local GPT4All LLM. Use the installer from [GPT4All](https://gpt4all.io/index.html) to download
     a specific model and enter its path here to use it.
+
     """
 
     settings = GPT4AllInputSettings()

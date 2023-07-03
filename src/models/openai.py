@@ -44,7 +44,6 @@ LOGGER = logging.getLogger(__name__)
 
 # @knext.parameter_group(label="Model Settings") -- Imported
 class OpenAIGeneralSettings(GeneralSettings):
-
     n = knext.IntParameter(
         label="Completions generation",
         description="""
@@ -423,6 +422,7 @@ openai_embeddings_port_type = knext.port_type(
 )
 class OpenAIAuthenticator:
     """
+
     Authenticates the OpenAI API Key.
 
     This node validates the provided OpenAI API key by making a request to the https://api.openai.com/v1/models endpoint.
@@ -433,6 +433,7 @@ class OpenAIAuthenticator:
 
     If you dont have a OpenAI API key yet, generate one at
     [OpenAI](https://platform.openai.com/account/api-keys).
+
     """
 
     credentials_settings = CredentialsSettings()
@@ -487,12 +488,14 @@ class OpenAIAuthenticator:
 )
 class OpenAILLMConnector:
     """
+
     Connects to an OpenAI Large Language Model.
 
     Given the successfull authentication through the OpenAI Authenticator Node,
     choose one of the available LLMs from either a predefined list or through
     the advanced options from all available models that are available
     for the given connection.
+
     """
 
     input_settings = LLMLoaderInputSettings()
@@ -554,12 +557,14 @@ class OpenAILLMConnector:
 )
 class OpenAIChatModelConnector:
     """
-    Connect to an OpenAI Chat Model
+
+    Connects to an OpenAI Chat Model.
 
     Given the successfull authentication through the OpenAI Authenticator Node,
     choose one of the available chat models from either a predefined list or through
     the advanced options from all available models that are available
     for the given connection.
+
     """
 
     input_settings = ChatModelLoaderInputSettings()
@@ -620,12 +625,14 @@ class OpenAIChatModelConnector:
 )
 class OpenAIEmbeddingsConnector:
     """
-    Connect to an OpenAI Embedding Model
+
+    Connects to an OpenAI Embedding Model.
 
     Given the successfull authentication through the OpenAI Authenticator Node,
     choose one of the available embedding models from either a predefined list or through
     the advanced options from all available models that are available
     for the given connection.
+
     """
 
     input_settings = EmbeddingsLoaderInputSettings()

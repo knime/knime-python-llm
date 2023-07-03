@@ -33,9 +33,9 @@ huggingface = knext.category(
 
 # == SETTINGS ==
 
+
 # @knext.parameter_group(label="Model Settings") -- Imported
 class HuggingFaceModelSettings(GeneralSettings):
-
     top_k = knext.IntParameter(
         label="Top k",
         description="The number of top-k tokens to consider when generating text.",
@@ -58,6 +58,7 @@ class HuggingFaceModelSettings(GeneralSettings):
         description="The repetition penalty to use when generating text.",
         default_value=1.0,
         min_value=0.0,
+        max_value=100.0,
         is_advanced=True,
     )
 
@@ -77,6 +78,8 @@ class HFHubTask(knext.EnumParameterOptions):
         """A popular variant of Text Generation that predicts the next word given a bunch of words.
         The most popular models for this task are GPT-based models (such as GPT-3).
         Note that model capability has to match the task.
+
+        See available [models](https://huggingface.co/models?pipeline_tag=text-generation).
         """,
     )
     TEXT2TEXT_GENERATION = (
@@ -84,21 +87,22 @@ class HFHubTask(knext.EnumParameterOptions):
         """Task that is used for mapping between a pair of texts 
         (e.g. translation from one language to another).
         Note that model capability has to match the task.
+
+        See available [models](https://huggingface.co/models?pipeline_tag=text2text-generation).
         """,
     )
     SUMMARIZATION = (
         "summarization",
         """Task that is used to summarize text.
-
-
         Note that model capability has to match the task.
+        
+        See available [models](https://huggingface.co/models?pipeline_tag=summarization).
         """,
     )
 
 
 @knext.parameter_group(label="Hugging Face Hub Settings")
 class HuggingFaceHubSettings:
-
     repo_id = knext.StringParameter(
         label="Repo ID",
         description="Model name to use e.g 'Writer/camel-5b-hf'",
@@ -264,7 +268,6 @@ class HuggingFaceHubLLMPortObject(LLMPortObject):
         super().__init__(spec)
 
     def create_model(self, ctx):
-
         return HuggingFaceHub(
             huggingfacehub_api_token=ctx.get_credentials(
                 self.spec.credentials
@@ -366,9 +369,11 @@ huggingface_embeddings_port_type = knext.port_type(
 )
 class HuggingfaceTextGenInferenceConnector:
     """
+
     Connects to [Text Generation Inference] (https://github.com/huggingface/text-generation-inference), and uses a self hosted LLM by Hugging Face.
 
     See [LangChain documentation](https://python.langchain.com/docs/modules/model_io/models/llms/integrations/huggingface_textgen_inference) of the Hugging Face TextGen Inference for more details.
+
     """
 
     settings = HuggingFaceTextGenInferenceInputSettings()
@@ -405,7 +410,9 @@ class HuggingfaceTextGenInferenceConnector:
 )
 class HuggingFaceHubAuthenticator:
     """
+
     Authenticates the Hugging Face Hub API Key.
+
     """
 
     credentials_settings = CredentialsSettings()
@@ -448,6 +455,7 @@ class HuggingFaceHubAuthenticator:
 )
 class HuggingFaceHubConnector:
     """
+
     Connects to a Hugging Face Large Language Model.
 
     Given the successfull authentication through the Hugging Face Authenticator Node,
@@ -455,10 +463,10 @@ class HuggingFaceHubConnector:
     keyword arguments for the given connection.
 
     See [LangChain documentation](https://python.langchain.com/docs/modules/model_io/models/llms/integrations/huggingface_hub) of the LLM integration for more details.
+
     """
 
     hub_settings = HuggingFaceHubSettings()
-
     model_settings = HuggingFaceModelSettings()
 
     def configure(
@@ -478,11 +486,9 @@ class HuggingFaceHubConnector:
     def create_spec(
         self, huggingface_auth_spec: HuggingFaceAuthenticationPortObjectSpec
     ):
-
         model_kwargs = {
             "temperature": self.model_settings.temperature,
             "top_p": self.model_settings.top_p,
-            "typical_p": self.model_settings.typical_p,
             "top_k": self.model_settings.top_k,
             "max_new_tokens": self.model_settings.max_tokens,
         }

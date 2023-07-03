@@ -33,6 +33,7 @@ import logging
 
 LOGGER = logging.getLogger(__name__)
 
+
 # TODO: Add more agents that behave differently e.g. no tools, with specific tools, or have agent types in the config option
 @knext.parameter_group(label="Credentials")
 class CredentialsSettings:
@@ -82,10 +83,12 @@ class ChatMessageSettings:
 @knext.output_table("Chat History", "Table containing the chat history for the agent.")
 class ChatBotAgentExecutor:
     """
+
     Executes a chat agent equipped with tools and memory
 
     The memory table is expected to have at least two string columns and be
     either empty or filled by a previous agent execution.
+
     """
 
     history_settings = ChatHistorySettings()
@@ -94,7 +97,6 @@ class ChatBotAgentExecutor:
     def load_messages_from_input_table(
         self, memory: ConversationBufferMemory, chat_history_df: pd.DataFrame
     ):
-
         for index in range(0, len(chat_history_df), 2):
             memory.save_context(
                 {"input": chat_history_df.loc[f"Row{index}"].at["Message"]},
@@ -108,7 +110,6 @@ class ChatBotAgentExecutor:
         tool_list_spec: ToolListPortObjectSpec,
         input_table_spec: knext.Schema,
     ):
-
         if len(input_table_spec.column_names) < 2:
             raise ValueError("Please provide at least two string columns")
 
@@ -137,7 +138,6 @@ class ChatBotAgentExecutor:
         tool_list_port: ToolListPortObject,
         input_table: knext.Table,
     ):
-
         chat_history_df = input_table.to_pandas()
 
         memory = ConversationBufferMemory(

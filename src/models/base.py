@@ -29,7 +29,6 @@ class CredentialsSettings:
 
 @knext.parameter_group(label="Model Settings")
 class GeneralSettings:
-
     temperature = knext.DoubleParameter(
         label="Temperature",
         description="""
@@ -41,7 +40,7 @@ class GeneralSettings:
         """,
         default_value=0.2,
         min_value=0.0,
-        max_value=1.0,
+        max_value=100.0,
         is_advanced=True,
     )
 
@@ -69,8 +68,9 @@ class GeneralSettings:
         The token count of your prompt plus 
         max_tokens cannot exceed the model's context length.
         """,
-        default_value=512,
-        min_value=1,
+        default_value=50,
+        max_value=250,
+        min_value=0,
     )
 
 
@@ -170,10 +170,12 @@ embeddings_model_port_type = knext.port_type(
 )
 class LLMPrompter:
     """
-    Prompt a given Large Language Model.
+
+    Prompts a given Large Language Model.
 
     This node takes a string column of prompts and prompts the
     provided Large Language Model with each of the prompts.
+
     """
 
     prompt_column = knext.ColumnParameter(

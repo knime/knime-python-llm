@@ -40,8 +40,10 @@ LOGGER = logging.getLogger(__name__)
 @knext.parameter_group(label="Credentials")
 class CredentialsSettings:
     credentials_param = knext.StringParameter(
-        label="Credentials parameter",
-        description="Credentials parameter name for accessing the API key",
+        label="OpenAI API Key",
+        description="""
+        Credentials parameter for accessing the OpenAI API key
+        """,
         choices=lambda a: knext.DialogCreationContext.get_credential_names(a),
     )
 
@@ -52,31 +54,32 @@ class GeneralSettings:
     temperature = knext.DoubleParameter(
         label="Temperature",
         description="""
-        What sampling temperature to use, between 0 and 1. 
+        Sampling temperature to use, between 0 and 1. 
         Higher values like 0.8 will make the output more random, 
         while lower values like 0.2 will make it more focused and deterministic.
         
-        We generally recommend altering this or top_p but not both.
+        It is generally recommend altering this or top_p but not both at once.
         """,
         default_value=0.2,
         min_value=0.0,
         max_value=1.0,
+        is_advanced=True,
     )
 
     top_p = knext.DoubleParameter(
         label="top_p",
         description="""
         An alternative to sampling with temperature, 
-        called nucleus sampling, where the model considers 
-        the results of the tokens with top_p probability mass. 
-        So 0.1 means only the tokens comprising the top 10% 
-        probability mass are considered.
+        where the model considers the results of the tokens (words) 
+        with top_p probability mass. So 0.1 means only the tokens 
+        comprising the top 10% probability mass are considered.
 
-        We generally recommend altering this or temperature but not both.
+        It is generally recommend altering this or top_p but not both at once.
         """,
         default_value=0.1,
         min_value=0.01,
         max_value=1.0,
+        is_advanced=True,
     )
 
     max_tokens = knext.IntParameter(
@@ -100,6 +103,7 @@ class GeneralSettings:
         """,
         default_value=1,
         min_value=1,
+        is_advanced=True,
     )
 
 
@@ -126,7 +130,7 @@ def get_model_list(ctx: knext.DialogCreationContext):
 specific_model_name = knext.StringParameter(
     label="Specific Model ID",
     description="""Select from a list of all available OpenAI models.
-        The model chosen has to match the type that the node wants to instantiate.
+        The model chosen has to match the nodes output to ensure best behaviour.
         """,
     choices=lambda c: get_model_list(c),
     default_value="unselected",
@@ -134,7 +138,7 @@ specific_model_name = knext.StringParameter(
 )
 
 
-@knext.parameter_group(label="OpenAI LLM Settings")
+@knext.parameter_group(label="OpenAI Model Selection")
 class LLMLoaderInputSettings:
     class OpenAIModelCompletionsOptions(knext.EnumParameterOptions):
         Ada = (
@@ -168,7 +172,7 @@ class LLMLoaderInputSettings:
     specific_model_name = specific_model_name
 
 
-@knext.parameter_group(label="OpenAI Chat Model Settings")
+@knext.parameter_group(label="OpenAI Chat Model Selection")
 class ChatModelLoaderInputSettings:
     class OpenAIModelCompletionsOptions(knext.EnumParameterOptions):
         Turbo = (
@@ -189,7 +193,7 @@ class ChatModelLoaderInputSettings:
         )
 
     model_name = knext.EnumParameter(
-        "Model name",
+        "Model ID",
         "GPT-3.5 turbo, GPT-3.5 turbo 16k, GPT-4, GPT-4 32k",
         OpenAIModelCompletionsOptions.Turbo.name,
         OpenAIModelCompletionsOptions,
@@ -198,7 +202,7 @@ class ChatModelLoaderInputSettings:
     specific_model_name = specific_model_name
 
 
-@knext.parameter_group(label="OpenAI Embeddings Configuration")
+@knext.parameter_group(label="OpenAI Embeddings Selection")
 class EmbeddingsLoaderInputSettings:
     class OpenAIEmbeddingsOptions(knext.EnumParameterOptions):
         Ada1 = (
@@ -211,7 +215,7 @@ class EmbeddingsLoaderInputSettings:
         )
 
     model_name = knext.EnumParameter(
-        "Embeddings model name",
+        "Model ID",
         "Ada text embedding models",
         OpenAIEmbeddingsOptions.Ada1.name,
         OpenAIEmbeddingsOptions,
@@ -464,8 +468,14 @@ class OpenAIAuthenticator:
     """
     Authenticates the OpenAI API Key.
 
-    This node makes a call to openai.Model.list() to check
-    whether the provided API key is valid.
+    This node validates the provided OpenAI API key by making a request to the https://api.openai.com/v1/models endpoint.
+
+    Use the
+    [Credentials Configuration Node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
+    to provide the API key in a credentials object.
+
+    If you dont have a OpenAI API key yet, generate one at
+    [OpenAI](https://platform.openai.com/account/api-keys).
     """
 
     credentials_settings = CredentialsSettings()
@@ -474,7 +484,7 @@ class OpenAIAuthenticator:
         self, ctx: knext.ConfigurationContext
     ) -> OpenAIAuthenticationPortObjectSpec:
         if not ctx.get_credential_names():
-            raise ValueError("No credentials provided to node.")
+            raise ValueError("No credentials provided. Please ")
 
         if not self.credentials_settings.credentials_param:
             raise ValueError("No credentials selected.")
@@ -510,12 +520,12 @@ class OpenAIAuthenticator:
 )
 @knext.input_port(
     "OpenAI Authentication",
-    "Successfull authentication to OpenAI.",
+    "OpenAI Connection",
     openai_authentication_port_type,
 )
 @knext.output_port(
     "OpenAI LLM",
-    "Connection to a specific LLM from OpenAI.",
+    "Configured OpenAI LLM connection",
     openai_llm_port_type,
 )
 class OpenAILLMConnector:
@@ -577,12 +587,12 @@ class OpenAILLMConnector:
 )
 @knext.input_port(
     "OpenAI Authentication",
-    "Successfull authentication to OpenAI.",
+    "OpenAI Connection",
     openai_authentication_port_type,
 )
 @knext.output_port(
     "OpenAI Chat Model",
-    "Connection to a specific Chat Model from OpenAI.",
+    "Configured OpenAI Chat Model connection",
     openai_chat_port_type,
 )
 class OpenAIChatModelConnector:
@@ -643,12 +653,12 @@ class OpenAIChatModelConnector:
 )
 @knext.input_port(
     "OpenAI Authentication",
-    "Successfull authentication to OpenAI.",
+    "OpenAI Connection",
     openai_authentication_port_type,
 )
 @knext.output_port(
     "OpenAI Embeddings Model",
-    "Connection to a specific Embeddings Model from OpenAI.",
+    "Configured OpenAI Embeddings Model connection",
     openai_embeddings_port_type,
 )
 class OpenAIEmbeddingsConnector:

@@ -15,15 +15,6 @@ model_category = knext.category(
     icon="icons/ml.png",
 )
 
-huggingface_icon = "icons/huggingface.png"
-huggingface = knext.category(
-    path=model_category,
-    level_id="hugging",
-    name="Hugging Face",
-    description="",
-    icon=huggingface_icon,
-)
-
 
 class LLMPortObjectSpec(knext.PortObjectSpec):
     def serialize(self) -> dict:
@@ -108,6 +99,76 @@ class EmbeddingsPortObject(knext.PortObject):
 embeddings_model_port_type = knext.port_type(
     "Embeddings Port", EmbeddingsPortObject, EmbeddingsPortObjectSpec
 )
+
+
+@knext.parameter_group(label="Credentials")
+class CredentialsSettings:
+    credentials_param = knext.StringParameter(
+        label="OpenAI API Key",
+        description="""
+        Credentials parameter for accessing the OpenAI API key
+        """,
+        choices=lambda a: knext.DialogCreationContext.get_credential_names(a),
+    )
+
+
+@knext.parameter_group(label="Model Settings")
+class GeneralSettings:
+
+    temperature = knext.DoubleParameter(
+        label="Temperature",
+        description="""
+        Sampling temperature to use, between 0 and 1. 
+        Higher values like 0.8 will make the output more random, 
+        while lower values like 0.2 will make it more focused and deterministic.
+        
+        It is generally recommend altering this or top_p but not both at once.
+        """,
+        default_value=0.2,
+        min_value=0.0,
+        max_value=1.0,
+        is_advanced=True,
+    )
+
+    top_p = knext.DoubleParameter(
+        label="top_p",
+        description="""
+        An alternative to sampling with temperature, 
+        where the model considers the results of the tokens (words) 
+        with top_p probability mass. So 0.1 means only the tokens 
+        comprising the top 10% probability mass are considered.
+
+        It is generally recommend altering this or top_p but not both at once.
+        """,
+        default_value=0.1,
+        min_value=0.01,
+        max_value=1.0,
+        is_advanced=True,
+    )
+
+    max_tokens = knext.IntParameter(
+        label="Max tokens",
+        description="""
+        The maximum number of tokens to generate in the completion.
+
+        The token count of your prompt plus 
+        max_tokens cannot exceed the model's context length.
+        """,
+        default_value=512,
+        min_value=1,
+    )
+
+    n = knext.IntParameter(
+        label="n",
+        description="""
+        How many chat completion choices to generate for each input message.
+        This parameter generates many completions and
+        can quickly consume your token quota. 
+        """,
+        default_value=1,
+        min_value=1,
+        is_advanced=True,
+    )
 
 
 # TODO: Add configuration dialog to enable templates e.g. https://python.langchain.com/docs/modules/model_io/models/llms/integrations/openai

@@ -38,7 +38,7 @@ import logging
 
 LOGGER = logging.getLogger(__name__)
 
-
+# @knext.parameter_group(label="Model Settings") -- Imported
 class OpenAIGeneralSettings(GeneralSettings):
 
     n = knext.IntParameter(

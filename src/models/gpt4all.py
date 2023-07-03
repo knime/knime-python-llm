@@ -12,6 +12,26 @@ from .base import (
 from langchain.llms import GPT4All
 
 
+gpt4all_icon = "icons/gpt4all.png"
+gpt4all = knext.category(
+    path=model_category,
+    level_id="gpt4all",
+    name="GPT4All",
+    description="",
+    icon=gpt4all_icon,
+)
+
+
+# TODO: Add more configuration options https://python.langchain.com/docs/modules/model_io/models/llms/integrations/gpt4all
+@knext.parameter_group(label="GPT4All Settings")
+class GPT4AllInputSettings:
+    local_path = knext.StringParameter(
+        label="Model path",
+        description="Path to the pre-trained GPT4All model file eg. my/path/model.bin.",
+        default_value="",
+    )
+
+
 class GPT4AllLLMPortbjectSpec(LLMPortObjectSpec):
     def __init__(self, local_path) -> None:
         super().__init__()
@@ -42,25 +62,6 @@ class GPT4AllLLMPortbject(LLMPortObject):
 gpt4all_llm_port_type = knext.port_type(
     "GPT4ALL LLM", GPT4AllLLMPortbject, GPT4AllLLMPortbjectSpec
 )
-
-gpt4all_icon = "icons/gpt4all.png"
-gpt4all = knext.category(
-    path=model_category,
-    level_id="gpt4all",
-    name="GPT4All",
-    description="",
-    icon=gpt4all_icon,
-)
-
-
-# TODO: Add more configuration options https://python.langchain.com/docs/modules/model_io/models/llms/integrations/gpt4all
-@knext.parameter_group(label="GPT4All Settings")
-class GPT4AllInputSettings:
-    local_path = knext.StringParameter(
-        label="Model path",
-        description="Path to the pre-trained GPT4All model file eg. my/path/model.bin.",
-        default_value="",
-    )
 
 
 # TODO: Better node descriptions

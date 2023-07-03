@@ -38,6 +38,10 @@ import logging
 
 LOGGER = logging.getLogger(__name__)
 
+
+# == SETTINGS ==
+
+
 # @knext.parameter_group(label="Model Settings") -- Imported
 class OpenAIGeneralSettings(GeneralSettings):
 
@@ -169,6 +173,9 @@ class EmbeddingsLoaderInputSettings:
     )
 
     specific_model_name = specific_model_name
+
+
+# == Port Objects ==
 
 
 class OpenAIAuthenticationPortObjectSpec(knext.PortObjectSpec):
@@ -397,6 +404,9 @@ openai_embeddings_port_type = knext.port_type(
     OpenAIEmbeddingsPortObject,
     OpenAIEmbeddingsPortObjectSpec,
 )
+
+
+# == Nodes ==
 
 
 # TODO: Better node description text

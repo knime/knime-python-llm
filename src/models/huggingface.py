@@ -31,6 +31,7 @@ huggingface = knext.category(
     icon=huggingface_icon,
 )
 
+# == SETTINGS ==
 
 # @knext.parameter_group(label="Model Settings") -- Imported
 class HuggingFaceModelSettings(GeneralSettings):
@@ -110,6 +111,9 @@ class HuggingFaceHubSettings:
         HFHubTask.TEXT_GENERATION.name,
         HFHubTask,
     )
+
+
+# == Port Objects ==
 
 
 class HuggingFaceTextGenInfLLMPortObjectSpec(LLMPortObjectSpec):
@@ -344,6 +348,9 @@ huggingface_embeddings_port_type = knext.port_type(
     HuggingFacePortObject,
     HuggingFaceEmbeddingsPortObjectSpec,
 )
+
+
+# == Nodes ==
 
 
 @knext.node(

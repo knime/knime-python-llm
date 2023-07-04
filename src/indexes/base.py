@@ -168,6 +168,23 @@ class FilestoreVectorstorePortObject(FilestorePortObject, VectorStorePortObject)
         embeddings_obj = cls._read_embeddings(spec, file_path)
         return cls(spec, embeddings_obj, file_path)
 
+def pick_default_column(input_table: knext.Schema, ktype: knext.KnimeType):
+    string_type = knext.string()
+    for column in input_table:
+        if column.ktype == string_type:
+            return column.name
+    raise knext.InvalidParametersError(f"The input table does not contain any columns of type '{str(ktype)}'.")
+
+def validate_creator_document_column(input_table: knext.Schema, column: str):
+    if not column in input_table.column_names:
+        raise knext.InvalidParametersError(
+            f"The document column '{column}' is missing in the input table."
+        )
+    ktype = input_table[column].ktype
+    if ktype != knext.string():
+        raise knext.InvalidParametersError(
+            f"The document column '{column}' is of type {str(ktype)} but should be of type string."
+        )
 
 class ToolPortObjectSpec(knext.PortObjectSpec):
     def __init__(self, name, description) -> None:

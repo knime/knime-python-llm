@@ -11,6 +11,8 @@ from .base import (
     FilestoreVectorstorePortObjectSpec,
     FilestoreVectorstorePortObject,
     store_category,
+    pick_default_column,
+    validate_creator_document_column
 )
 
 from langchain.vectorstores import FAISS
@@ -99,7 +101,10 @@ class FAISSVectorStoreCreator:
         embeddings_spec: EmbeddingsPortObjectSpec,
         input_table: knext.Schema,
     ) -> FAISSVectorstorePortObjectSpec:
-        # TODO validate that the document column is contained
+        if self.document_column is None:
+            self.document_column = pick_default_column(input_table, knext.string())
+        else:
+            validate_creator_document_column(input_table, self.document_column)
         return FAISSVectorstorePortObjectSpec(embeddings_spec=embeddings_spec)
 
     def execute(

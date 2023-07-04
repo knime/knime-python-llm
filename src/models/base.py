@@ -44,12 +44,10 @@ class GeneralSettings:
     )
 
 
-@knext.parameter_group(label="Conversation History Settings")
+@knext.parameter_group(label="Conversation Settings")
 class ChatConversationSettings:
     type_column = knext.ColumnParameter(
-        "Message Type",
-        "Column that specifies the sender of the messages.",
-        port_index=1,
+        "Type", "Column that specifies the sender type of the messages", port_index=1
     )
 
     message_column = knext.ColumnParameter(
@@ -213,6 +211,8 @@ class LLMPrompter:
         return knext.Table.from_pandas(prompts)
 
 
+# TODO: Add configuration dialog to more general options to configure how LLM is prompted
+# TODO: Write better text
 @knext.node("Chat Model Prompter", knext.NodeType.PREDICTOR, "", model_category)
 @knext.input_port("Chat Model Port", "A chat model model.", chat_model_port_type)
 @knext.input_table(
@@ -240,7 +240,7 @@ class ChatModelPrompter:
     conversation_settings = ChatConversationSettings()
 
     system_message = knext.StringParameter(
-        "Chat System Prefix",
+        "System Prefix",
         """
         The first message given to the model describing how it should behave.
 
@@ -250,8 +250,8 @@ class ChatModelPrompter:
     )
 
     chat_message = knext.StringParameter(
-        "Chat message",
-        "The (next) message to send to the chat model.",
+        "Message",
+        "The (next) message that will be added to the conversation",
         default_value="",
     )
 
@@ -316,8 +316,9 @@ class ChatModelPrompter:
                             )
                         )
 
-        table.loc[f"Row{len(table)}"] = ["HumanMessage", self.chat_message]
-        conversation_messages.append(HumanMessage(content=self.chat_message))
+        if self.chat_message:
+            table.loc[f"Row{len(table)}"] = ["HumanMessage", self.chat_message]
+            conversation_messages.append(HumanMessage(content=self.chat_message))
 
         chat = chat_model.create_model(ctx)
 

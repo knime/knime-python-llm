@@ -1,5 +1,5 @@
 import knime.extension as knext
-import pandas as pd
+from typing import Optional
 
 from models.base import (
     EmbeddingsPortObjectSpec,
@@ -8,8 +8,8 @@ from models.base import (
 )
 
 from .base import (
-    VectorStorePortObject,
-    VectorStorePortObjectSpec,
+    FilestoreVectorstorePortObjectSpec,
+    FilestoreVectorstorePortObject,
     store_category,
 )
 
@@ -21,42 +21,27 @@ faiss_category = knext.category(
     path=store_category,
     level_id="faiss",
     name="FAISS",
-    description="",
+    description="Contains nodes for working with FAISS vector stores.",
     icon=faiss_icon,
 )
 
 
-class FAISSVectorstorePortObjectSpec(VectorStorePortObjectSpec):
-    def __init__(self, persist_directory) -> None:
-        super().__init__()
-        self._persist_directory = persist_directory
-
-    @property
-    def persist_directory(self):
-        return self._persist_directory
-
-    def serialize(self) -> dict:
-        return {
-            "persist_directory": self._persist_directory,
-        }
-
-    @classmethod
-    def deserialize(cls, data: dict):
-        return cls(data["persist_directory"])
+class FAISSVectorstorePortObjectSpec(FilestoreVectorstorePortObjectSpec):
+    # placeholder to enable use to add FAISS specific stuff later on
+    pass
 
 
-class FAISSVectorstorePortObject(VectorStorePortObject):
+class FAISSVectorstorePortObject(FilestoreVectorstorePortObject):
     def __init__(
-        self, spec: knext.PortObjectSpec, embeddings_port_object: EmbeddingsPortObject
+        self, spec: FAISSVectorstorePortObjectSpec, embeddings_port_object: EmbeddingsPortObject, folder_path: Optional[str] = None, vectorstore: Optional[FAISS] = None
     ) -> None:
-        super().__init__(spec, embeddings_port_object)
-        self._embeddings_port_object = embeddings_port_object
-
-    def load_store(self, ctx):
-        return FAISS.load_local(
-            self.spec.persist_directory,
-            self._embeddings_port_object.create_model(ctx),
-        )
+        super().__init__(spec, embeddings_port_object, folder_path, vectorstore=vectorstore)
+    
+    def load_vectorstore(self, embeddings, vectorstore_path) -> FAISS:
+        return FAISS.load_local(embeddings=embeddings, folder_path=vectorstore_path)
+    
+    def save_vectorstore(self, vectorstore_folder, vectorstore: FAISS):
+        vectorstore.save_local(vectorstore_folder)
 
 
 faiss_vector_store_port_type = knext.port_type(
@@ -104,18 +89,14 @@ class FAISSVectorStoreCreator:
         port_index=1,
     )
 
-    persist_directory = knext.StringParameter(
-        "Persist directory",
-        """Directory in which the vector store will be saved to.""",
-    )
-
     def configure(
         self,
         ctx: knext.ConfigurationContext,
         embeddings_spec: EmbeddingsPortObjectSpec,
         input_table: knext.Schema,
     ) -> FAISSVectorstorePortObjectSpec:
-        return self.create_spec()
+        # TODO validate that the document column is contained
+        return FAISSVectorstorePortObjectSpec(embeddings_spec=embeddings_spec)
 
     def execute(
         self,
@@ -131,12 +112,8 @@ class FAISSVectorStoreCreator:
             documents=documents,
             embedding=embeddings.create_model(ctx),
         )
-        db.save_local(self.persist_directory)
 
-        return FAISSVectorstorePortObject(self.create_spec(), embeddings)
-
-    def create_spec(self):
-        return FAISSVectorstorePortObjectSpec(self.persist_directory)
+        return FAISSVectorstorePortObject(FAISSVectorstorePortObjectSpec(embeddings.spec), embeddings, vectorstore=db)
 
 
 @knext.node(
@@ -153,6 +130,7 @@ class FAISSVectorStoreCreator:
 @knext.output_port(
     "FAISS Vector Store", "The loaded vector store.", faiss_vector_store_port_type
 )
+# TODO rename to reader
 class FAISSVectorStoreLoader:
     """
 
@@ -180,19 +158,15 @@ class FAISSVectorStoreLoader:
         ctx: knext.ConfigurationContext,
         embeddings_spec: EmbeddingsPortObjectSpec,
     ) -> FAISSVectorstorePortObjectSpec:
-        return self.create_spec()
+        return FAISSVectorstorePortObjectSpec(embeddings_spec)
 
     def execute(
         self,
         ctx: knext.ExecutionContext,
         embeddings_port_object: EmbeddingsPortObject,
     ) -> FAISSVectorstorePortObject:
-        # TODO: Add check if .fiass and .pkl files are in the directory
-        FAISS.load_local(
+        # TODO: Add check if .fiass and .pkl files are in the directory instead of instatiating as check
+        faiss = FAISS.load_local(
             self.persist_directory, embeddings_port_object.create_model(ctx)
         )
-
-        return FAISSVectorstorePortObject(self.create_spec(), embeddings_port_object)
-
-    def create_spec(self):
-        return FAISSVectorstorePortObjectSpec(self.persist_directory)
+        return FAISSVectorstorePortObject(FAISSVectorstorePortObjectSpec(embeddings_port_object.spec), embeddings_port_object, vectorstore=faiss)

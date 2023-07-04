@@ -10,7 +10,6 @@ from .base import (
     EmbeddingsPortObjectSpec,
     EmbeddingsPortObject,
     model_category,
-    CredentialsSettings,
     GeneralSettings,
 )
 
@@ -42,8 +41,32 @@ LOGGER = logging.getLogger(__name__)
 # == SETTINGS ==
 
 
+@knext.parameter_group(label="Credentials")
+class CredentialsSettings:
+    credentials_param = knext.StringParameter(
+        label="OpenAI API Key",
+        description="""
+        Credentials parameter for accessing the OpenAI API key
+        """,
+        choices=lambda a: knext.DialogCreationContext.get_credential_names(a),
+    )
+
+
 # @knext.parameter_group(label="Model Settings") -- Imported
 class OpenAIGeneralSettings(GeneralSettings):
+
+    max_tokens = knext.IntParameter(
+        label="Max tokens",
+        description="""
+        The maximum number of tokens to generate in the completion.
+
+        The token count of your prompt plus 
+        max_tokens cannot exceed the model's context length.
+        """,
+        default_value=50,
+        min_value=1,
+    )
+
     n = knext.IntParameter(
         label="Completions generation",
         description="""
@@ -425,7 +448,8 @@ class OpenAIAuthenticator:
 
     Authenticates the OpenAI API Key.
 
-    This node validates the provided OpenAI API key by making a request to the https://api.openai.com/v1/models endpoint.
+    This node validates the provided OpenAI API key by making a
+    request to the https://api.openai.com/v1/models endpoint.
 
     Use the
     [Credentials Configuration Node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
@@ -493,9 +517,8 @@ class OpenAILLMConnector:
 
     Given the successfull authentication through the OpenAI Authenticator Node,
     choose one of the available LLMs from either a predefined list or through
-    the advanced options from all available models that are available
-    for the given connection.
-
+    the advanced options from all available models that are available and fit
+    the task downstream.
     """
 
     input_settings = LLMLoaderInputSettings()
@@ -562,9 +585,8 @@ class OpenAIChatModelConnector:
 
     Given the successfull authentication through the OpenAI Authenticator Node,
     choose one of the available chat models from either a predefined list or through
-    the advanced options from all available models that are available
-    for the given connection.
-
+    the advanced options from all available models that are availableand fit
+    the task downstream.
     """
 
     input_settings = ChatModelLoaderInputSettings()
@@ -630,9 +652,8 @@ class OpenAIEmbeddingsConnector:
 
     Given the successfull authentication through the OpenAI Authenticator Node,
     choose one of the available embedding models from either a predefined list or through
-    the advanced options from all available models that are available
-    for the given connection.
-
+    the advanced options from all available models that are availableand fit
+    the task downstream.
     """
 
     input_settings = EmbeddingsLoaderInputSettings()

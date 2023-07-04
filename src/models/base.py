@@ -4,6 +4,15 @@
 # KNIME / own imports
 import knime.extension as knext
 import util
+import pandas as pd
+
+from langchain.prompts.chat import (
+    ChatPromptTemplate,
+    SystemMessagePromptTemplate,
+    AIMessagePromptTemplate,
+    HumanMessagePromptTemplate,
+)
+from langchain.schema import AIMessage, HumanMessage, SystemMessage
 
 # TODO: Add category description?
 # TODO: Get someone to do new icons
@@ -47,6 +56,19 @@ class GeneralSettings:
         min_value=0.01,
         max_value=1.0,
         is_advanced=True,
+    )
+
+
+@knext.parameter_group(label="Conversation History Settings")
+class ChatConversationSettings:
+    type_column = knext.ColumnParameter(
+        "Message Type", "Column that specifies the sender of the messages", port_index=1
+    )
+
+    message_column = knext.ColumnParameter(
+        "Messages",
+        "Column containing the messages that have been sent to and from the model",
+        port_index=1,
     )
 
 
@@ -205,3 +227,124 @@ class LLMPrompter:
         prompts["Prompt Result"] = answers
 
         return knext.Table.from_pandas(prompts)
+
+
+import logging
+
+LOGGER = logging.getLogger(__name__)
+
+# TODO: Add configuration dialog to more general options to configure how LLM is prompted
+# TODO: Write better text
+@knext.node("Chat Model Prompter", knext.NodeType.PREDICTOR, "", model_category)
+@knext.input_port("Chat Model Port", "A chat model model.", chat_model_port_type)
+@knext.input_table(
+    "Conversation Table", "A table containing a empty or filled conversation."
+)
+@knext.output_table(
+    "Conversation Table", "A table containing the conversation history."
+)
+class ChatModelPrompter:
+    """
+    Prompt a Chat Model.
+
+    The Chat Model Prompter takes a statement (prompt) and the conversation
+    history with user, ai and system messages. It then can generate a response
+    (e.g. generates text) for the prompt with the knowledge of the previous
+    conversation.
+
+    If you want to reduce the amount of tokens being used, consider cutting
+    the conversation table at a reasonable (e.g. 5 conversation steps) length
+    before re-providing it to the Chat Model Prompter.
+
+    """
+
+    conversation_settings = ChatConversationSettings()
+
+    system_message = knext.StringParameter(
+        "Chat System Prefix",
+        """
+        The first message given to the model describing how it should behave.
+
+        E.g. You are a helpfull assissant that needs answer questions truthfully and
+        state if you do not know a answer to a question.
+        """,
+    )
+
+    chat_message = knext.StringParameter(
+        "Chat message", "The (next) message to send to the chat model", default_value=""
+    )
+
+    def configure(
+        self,
+        ctx: knext.ConfigurationContext,
+        chat_model_spec: ChatModelPortObjectSpec,
+        input_table_spec: knext.Schema,
+    ):
+        nominal_columns = [
+            (c.name, c.ktype) for c in input_table_spec if util.is_nominal(c)
+        ]
+
+        if len(nominal_columns) < 2:
+            raise knext.InvalidParametersError(
+                """
+                The number of nominal columns have to be at least 2. ('Type', 'Message')
+                """
+            )
+
+        # TODO: Append the column to the given table instead of creating a new one
+        return knext.Schema.from_columns(
+            [
+                knext.Column(knext.string(), "Type"),
+                knext.Column(knext.string(), "Message"),
+            ]
+        )
+
+    def execute(
+        self,
+        ctx: knext.ExecutionContext,
+        chat_model: ChatModelPortObject,
+        input_table: knext.Table,
+    ):
+
+        table = input_table.to_pandas()
+
+        conversation_messages = []
+
+        if len(table.index) == 0:
+            if self.system_message:
+                conversation_messages.append(SystemMessage(content=self.system_message))
+                table.loc[f"Row{len(table)}"] = ["SystemMessage", self.system_message]
+
+        else:
+
+            for index, row in table.iterrows():
+                match row[self.conversation_settings.type_column]:
+                    case "AIMessage":
+                        conversation_messages.append(
+                            AIMessage(
+                                content=row[self.conversation_settings.message_column]
+                            )
+                        )
+                    case "HumanMessage":
+                        conversation_messages.append(
+                            HumanMessage(
+                                content=row[self.conversation_settings.message_column]
+                            )
+                        )
+                    case "SystemMessage":
+                        conversation_messages.append(
+                            SystemMessage(
+                                content=row[self.conversation_settings.message_column]
+                            )
+                        )
+
+        table.loc[f"Row{len(table)}"] = ["HumanMessage", self.chat_message]
+        conversation_messages.append(HumanMessage(content=self.chat_message))
+
+        chat = chat_model.create_model(ctx)
+
+        answer = chat(conversation_messages)
+
+        table.loc[f"Row{len(table)}"] = ["AIMessage", answer.content]
+
+        return knext.Table.from_pandas(table)

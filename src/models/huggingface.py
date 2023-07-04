@@ -44,17 +44,6 @@ class CredentialsSettings:
 
 # @knext.parameter_group(label="Model Settings") -- Imported
 class HuggingFaceModelSettings(GeneralSettings):
-    max_tokens = knext.IntParameter(
-        label="Max tokens",
-        description="""
-        The maximum number of tokens to generate in the completion.
-
-        The token count of your prompt plus max_tokens cannot exceed the model's context length.
-        """,
-        default_value=50,
-        max_value=250,
-        min_value=0,
-    )
 
     top_k = knext.IntParameter(
         label="Top k",
@@ -83,7 +72,7 @@ class HuggingFaceModelSettings(GeneralSettings):
     )
 
     max_new_tokens = knext.IntParameter(
-        label="Max tokens",
+        label="Max new tokens",
         description="""
         The maximum number of tokens to generate in the completion.
 
@@ -567,7 +556,7 @@ class HuggingFaceHubConnector:
             "temperature": self.model_settings.temperature,
             "top_p": self.model_settings.top_p,
             "top_k": self.model_settings.top_k,
-            "max_new_tokens": self.model_settings.max_tokens,
+            "max_new_tokens": self.model_settings.max_new_tokens,
         }
 
         return HuggingFaceHubLLMPortObjectSpec(

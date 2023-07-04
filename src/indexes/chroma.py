@@ -12,7 +12,7 @@ from .base import (
     FilestoreVectorstorePortObject,
     store_category,
     validate_creator_document_column,
-    pick_default_column
+    pick_default_column,
 )
 
 from langchain.vectorstores import Chroma
@@ -44,8 +44,30 @@ class ChromaVectorstorePortObject(FilestoreVectorstorePortObject):
         super().__init__(spec, embeddings_port_object, folder_path, vectorstore)
 
     def save_vectorstore(self, vectorstore_folder: str, vectorstore: Chroma):
-        # HACK because Chroma doesn't allow to set the path in another way
-        vectorstore._persist_directory = vectorstore_folder
+        if vectorstore._persist_directory is None or not vectorstore._persist_directory == vectorstore_folder:
+            # HACK because Chroma doesn't allow to add or change a persist directory after the fact  
+            import chromadb
+            import chromadb.config
+
+            settings = chromadb.config.Settings(
+                chroma_db_impl="duckdb+parquet", persist_directory=vectorstore_folder
+            )
+            existing_collection = vectorstore._collection
+            client = chromadb.Client(settings)
+            new_collection = client.get_or_create_collection(
+                name=existing_collection.name,
+                metadata=existing_collection.metadata,
+                embedding_function=existing_collection._embedding_function,
+            )
+            existing_entries = existing_collection.get()
+            new_collection.add(**existing_entries)
+            vectorstore = Chroma(
+                embedding_function=vectorstore._embedding_function,
+                persist_directory=vectorstore_folder,
+                client_settings=settings,
+                collection_metadata=existing_collection.metadata,
+                client=client,
+            )
         vectorstore.persist()
 
     def load_vectorstore(self, embeddings, vectorstore_path) -> Chroma:
@@ -119,7 +141,9 @@ class ChromaVectorStoreCreator:
             embedding=embeddings.create_model(ctx),
         )
 
-        return ChromaVectorstorePortObject(ChromaVectorstorePortObjectSpec(embeddings.spec), embeddings, vectorstore=db)
+        return ChromaVectorstorePortObject(
+            ChromaVectorstorePortObjectSpec(embeddings.spec), embeddings, vectorstore=db
+        )
 
 
 @knext.node(
@@ -144,6 +168,7 @@ class ChromaVectorStoreReader:
     is used in down-stream nodes (e.g. the Vector Store Retriever) to embed documents such that the vector store
     can find documents with similar embeddings.
     """
+
     persist_directory = knext.StringParameter(
         "Vectorstore directory",
         """Directory to store the vectordb.""",
@@ -162,6 +187,11 @@ class ChromaVectorStoreReader:
         embeddings_port_object: EmbeddingsPortObject,
     ) -> ChromaVectorstorePortObject:
         # TODO: Add check if Chroma files are here instead of instantiation
-        chroma = Chroma(self.persist_directory, embeddings_port_object.create_model(ctx))
-        return ChromaVectorstorePortObject(ChromaVectorstorePortObjectSpec(embeddings_port_object.spec), embeddings_port_object, vectorstore=chroma)
-
+        chroma = Chroma(
+            self.persist_directory, embeddings_port_object.create_model(ctx)
+        )
+        return ChromaVectorstorePortObject(
+            ChromaVectorstorePortObjectSpec(embeddings_port_object.spec),
+            embeddings_port_object,
+            vectorstore=chroma,
+        )

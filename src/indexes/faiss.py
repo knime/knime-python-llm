@@ -33,13 +33,19 @@ class FAISSVectorstorePortObjectSpec(FilestoreVectorstorePortObjectSpec):
 
 class FAISSVectorstorePortObject(FilestoreVectorstorePortObject):
     def __init__(
-        self, spec: FAISSVectorstorePortObjectSpec, embeddings_port_object: EmbeddingsPortObject, folder_path: Optional[str] = None, vectorstore: Optional[FAISS] = None
+        self,
+        spec: FAISSVectorstorePortObjectSpec,
+        embeddings_port_object: EmbeddingsPortObject,
+        folder_path: Optional[str] = None,
+        vectorstore: Optional[FAISS] = None,
     ) -> None:
-        super().__init__(spec, embeddings_port_object, folder_path, vectorstore=vectorstore)
-    
+        super().__init__(
+            spec, embeddings_port_object, folder_path, vectorstore=vectorstore
+        )
+
     def load_vectorstore(self, embeddings, vectorstore_path) -> FAISS:
         return FAISS.load_local(embeddings=embeddings, folder_path=vectorstore_path)
-    
+
     def save_vectorstore(self, vectorstore_folder, vectorstore: FAISS):
         vectorstore.save_local(vectorstore_folder)
 
@@ -71,13 +77,11 @@ faiss_vector_store_port_type = knext.port_type(
 )
 class FAISSVectorStoreCreator:
     """
-
-    Creates a FAISS Vector Store
+    Creates a FAISS vector store from a string column and an embeddings model.
 
     A vector store refers to a data structure or storage mechanism that holds
-    a collection of vectors. These vectors represent the embeddings or numerical
-    representations of objects such as documents, images, or other data points.
-    he vector store allows efficient storage, retrieval,
+    a collection of vectors paired with documents.
+    The vector store allows efficient storage, retrieval,
     and similarity search operations on these vectors.FAISS provides indexing methods
     and algorithms optimized for similarity search on large-scale vector collections.
 
@@ -113,7 +117,9 @@ class FAISSVectorStoreCreator:
             embedding=embeddings.create_model(ctx),
         )
 
-        return FAISSVectorstorePortObject(FAISSVectorstorePortObjectSpec(embeddings.spec), embeddings, vectorstore=db)
+        return FAISSVectorstorePortObject(
+            FAISSVectorstorePortObjectSpec(embeddings.spec), embeddings, vectorstore=db
+        )
 
 
 @knext.node(
@@ -143,7 +149,6 @@ class FAISSVectorStoreReader:
     and algorithms optimized for similarity search on large-scale vector collections.
 
     """
-    
     persist_directory = knext.StringParameter(
         "Vectorstore directory",
         """Directory to store the vectordb.""",
@@ -165,4 +170,8 @@ class FAISSVectorStoreReader:
         faiss = FAISS.load_local(
             self.persist_directory, embeddings_port_object.create_model(ctx)
         )
-        return FAISSVectorstorePortObject(FAISSVectorstorePortObjectSpec(embeddings_port_object.spec), embeddings_port_object, vectorstore=faiss)
+        return FAISSVectorstorePortObject(
+            FAISSVectorstorePortObjectSpec(embeddings_port_object.spec),
+            embeddings_port_object,
+            vectorstore=faiss,
+        )

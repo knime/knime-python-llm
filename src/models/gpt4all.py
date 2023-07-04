@@ -1,5 +1,3 @@
-# TODO: Have the same naming standard for all specs and objects in general as well as in the configure and execute methods
-
 # KNIME / own imports
 import knime.extension as knext
 from .base import (
@@ -64,7 +62,7 @@ gpt4all_llm_port_type = knext.port_type(
 )
 
 
-# TODO: Better node descriptions
+# TODO: Extend node descriptions
 @knext.node(
     "GPT4All LLM Configurator",
     knext.NodeType.SOURCE,
@@ -79,10 +77,10 @@ gpt4all_llm_port_type = knext.port_type(
 class GPT4AllLLMConfigurator:
     """
 
-    Configuration for a local GPT4All LMM.
+    Configuration for a local GPT4All LLM.
 
     Configures a local GPT4All LLM. Use the installer from [GPT4All](https://gpt4all.io/index.html) to download
-    a specific model and enter its path here to use it.
+    a specific model and enter its path in the 'Model path' setting to use it.
 
     """
 

@@ -17,7 +17,7 @@ import util
 
 store_icon = "icons/store.png"
 store_category = knext.category(
-    path=util.main_cat,
+    path=util.main_category,
     level_id="stores",
     name="Vector Stores",
     description="",
@@ -189,7 +189,7 @@ tool_list_port_type = knext.port_type(
 class VectorStoreRetriever:
     """
 
-    Performs a similarity search on a vectore store
+    Performs a similarity search on a vector store.
 
     A vector store retriever is a component or module that
     specializes in retrieving vectors from a vector store
@@ -200,17 +200,16 @@ class VectorStoreRetriever:
     """
 
     query_column = knext.ColumnParameter(
-        "Queries", "Column containing the queries", port_index=1
+        "Queries", "Column containing the queries.", port_index=1
     )
 
     top_k = knext.IntParameter(
         "Number of results",
-        "Number of top results to get from vector store search. Ranking from best to worst",
+        "Number of top results to get from vector store search. Ranking from best to worst.",
         default_value=3,
     )
 
     # TODO: Add options to retrieve meta data from the store
-
     def configure(
         self,
         ctx: knext.ConfigurationContext,
@@ -267,37 +266,37 @@ class VectorStoreRetriever:
 class VectorStoreToTool:
     """
 
-    Turns a Vector Store into a agent tool
+    Creates an agent tool from a vector store.
 
-    The power of an agent is, that it can decide whether it needs to
+    The power of an agent is that it can decide whether it needs to
     make use of an provided tool (e.g. looking for data in a vector store) to
     answer questions.
 
-    An agent needs to be provided with the store and the information of it's content.
-    A meaningful description and name is very important:
+    An agent needs to be provided with the store and the information of its content.
+    A meaningful name and description are very important:
 
     Example:
-    KNIME Node Description QA System
 
-    Use this tool whenever you need information about what nodes a user would need in a given
-    situation to retrieve a list of possible nodes or if you need inforamtion
-    about nodes configuration options.
+    Name: KNIME Node Description QA System
+
+    Description: Use this tool whenever you need information about which nodes a user would need in a given
+    situation or if you need information about nodes' configuration options.
 
     """
 
     tool_name = knext.StringParameter(
-        label="Tool name", description="The name for the Tool"
+        label="Tool name", description="The name for the Tool."
     )
 
     tool_description = knext.StringParameter(
         label="Tool description",
-        description="""The descripton for the tool through which an agent decides whether to use the tool. Provide a meaningful
-        description under which circumstances the agent should try to use it.""",
+        description="""The description for the tool through which an agent decides whether to use the tool or not. 
+        Provide a meaningful description to make the agent decide more optimally.""",
     )
 
     top_k = knext.IntParameter(
         label="Retrieved documents",
-        description="The number of top results from the vector store that the tool will provide",
+        description="The number of top results that the tool will provide from the vector store.",
         default_value=5,
         is_advanced=True,
     )
@@ -349,11 +348,11 @@ class VectorStoreToTool:
 )
 class ToolCombiner:
     """
-    Concatinates two Tools
+
+    Concatinates two Tools.
 
     A agent can be provided with a list of tools to choose from. Use this
-    node to concatinate existing tools into a list and provide
-    a agent with the tool list.
+    node to concatinate existing tools into a list and provide an agent with the tool list.
 
     """
 

@@ -1,23 +1,12 @@
-# TODO: Done Alex -- check?
-# TODO: Node idea: Chat Prompter that gets a conversation table
-
 # KNIME / own imports
 import knime.extension as knext
 import util
 import pandas as pd
 
-from langchain.prompts.chat import (
-    ChatPromptTemplate,
-    SystemMessagePromptTemplate,
-    AIMessagePromptTemplate,
-    HumanMessagePromptTemplate,
-)
 from langchain.schema import AIMessage, HumanMessage, SystemMessage
 
-# TODO: Add category description?
-# TODO: Get someone to do new icons
 model_category = knext.category(
-    path=util.main_cat,
+    path=util.main_category,
     level_id="models",
     name="Models",
     description="",
@@ -30,11 +19,9 @@ class GeneralSettings:
     temperature = knext.DoubleParameter(
         label="Temperature",
         description="""
-        Sampling temperature to use, between 0 and 1. 
-        Higher values like 0.8 will make the output more random, 
-        while lower values like 0.2 will make it more focused and deterministic.
-        
-        It is generally recommend altering this or top_p but not both at once.
+        Sampling temperature to use, between 0.0 and 100.0. 
+        Higher values will make the output more random, 
+        while lower values will make it more focused and deterministic.
         """,
         default_value=0.2,
         min_value=0.0,
@@ -47,10 +34,8 @@ class GeneralSettings:
         description="""
         An alternative to sampling with temperature, 
         where the model considers the results of the tokens (words) 
-        with top_p probability mass. So 0.1 means only the tokens 
+        with top_p probability mass. Hence, 0.1 means only the tokens 
         comprising the top 10% probability mass are considered.
-
-        It is generally recommend altering this or top_p but not both at once.
         """,
         default_value=0.15,
         min_value=0.01,
@@ -62,12 +47,14 @@ class GeneralSettings:
 @knext.parameter_group(label="Conversation History Settings")
 class ChatConversationSettings:
     type_column = knext.ColumnParameter(
-        "Message Type", "Column that specifies the sender of the messages", port_index=1
+        "Message Type",
+        "Column that specifies the sender of the messages.",
+        port_index=1,
     )
 
     message_column = knext.ColumnParameter(
         "Messages",
-        "Column containing the messages that have been sent to and from the model",
+        "Column containing the messages that have been sent to and from the model.",
         port_index=1,
     )
 
@@ -157,9 +144,7 @@ embeddings_model_port_type = knext.port_type(
 )
 
 
-# TODO: Add configuration dialog to enable templates e.g. https://python.langchain.com/docs/modules/model_io/models/llms/integrations/openai
-# TODO: Add configuration dialog to more general options to configure how LLM is prompted
-# TODO: Write better text
+# TODO: Add configuration dialog to enable templates, e.g. https://python.langchain.com/docs/modules/model_io/models/llms/integrations/openai
 @knext.node("LLM Prompter", knext.NodeType.PREDICTOR, "", model_category)
 @knext.input_port("LLM Port", "A large language model.", llm_port_type)
 @knext.input_table("Prompt Table", "A table containing a string column with prompts.")
@@ -168,12 +153,12 @@ embeddings_model_port_type = knext.port_type(
 )
 class LLMPrompter:
     """
-    Prompt a Large Language Model.
+
+    Prompts a Large Language Model.
 
     The LLM Prompter takes a statement (prompt) and creates a
-    response (e.g. generates text) for that single prompt. It has
-    no knowledge of the other prompts or any kind of conversation
-    memory.
+    response (i.e. generates text) for that single prompt. It does not have the
+    knowledge of the other prompts or any kind of conversation memory.
 
     """
 
@@ -204,7 +189,6 @@ class LLMPrompter:
         if not self.prompt_column:
             raise knext.InvalidParametersError("No column selected.")
 
-        # TODO: Append the column to the given table instead of creating a new one
         return knext.Schema.from_columns(
             [
                 knext.Column(knext.string(), self.prompt_column),
@@ -229,32 +213,26 @@ class LLMPrompter:
         return knext.Table.from_pandas(prompts)
 
 
-import logging
-
-LOGGER = logging.getLogger(__name__)
-
-
-# TODO: Add configuration dialog to more general options to configure how LLM is prompted
-# TODO: Write better text
 @knext.node("Chat Model Prompter", knext.NodeType.PREDICTOR, "", model_category)
 @knext.input_port("Chat Model Port", "A chat model model.", chat_model_port_type)
 @knext.input_table(
-    "Conversation Table", "A table containing a empty or filled conversation."
+    "Conversation Table", "A table containing an empty or filled conversation."
 )
 @knext.output_table(
     "Conversation Table", "A table containing the conversation history."
 )
 class ChatModelPrompter:
     """
-    Prompt a Chat Model.
+
+    Prompts a Chat Model.
 
     The Chat Model Prompter takes a statement (prompt) and the conversation
     history with user, ai and system messages. It then can generate a response
-    (e.g. generates text) for the prompt with the knowledge of the previous
+    (i.e. generates text) for the prompt with the knowledge of the previous
     conversation.
 
-    If you want to reduce the amount of tokens being used, consider cutting
-    the conversation table at a reasonable (e.g. 5 conversation steps) length
+    If you want to reduce the amount of tokens being used, consider reducing the
+    the conversation table length to a reasonable (e.g. 5 conversation steps) length
     before re-providing it to the Chat Model Prompter.
 
     """
@@ -266,13 +244,15 @@ class ChatModelPrompter:
         """
         The first message given to the model describing how it should behave.
 
-        E.g. You are a helpfull assissant that needs answer questions truthfully and
-        state if you do not know a answer to a question.
+        Example: You are a helpful assissant that has to answer questions truthfully, and
+        if you do not know an answer to a question, you should state that.
         """,
     )
 
     chat_message = knext.StringParameter(
-        "Chat message", "The (next) message to send to the chat model", default_value=""
+        "Chat message",
+        "The (next) message to send to the chat model.",
+        default_value="",
     )
 
     def configure(
@@ -288,11 +268,10 @@ class ChatModelPrompter:
         if len(nominal_columns) < 2:
             raise knext.InvalidParametersError(
                 """
-                The number of nominal columns have to be at least 2. ('Type', 'Message')
+                At least two nominal columns have to provided ('Type', 'Message').
                 """
             )
 
-        # TODO: Append the column to the given table instead of creating a new one
         return knext.Schema.from_columns(
             [
                 knext.Column(knext.string(), "Type"),

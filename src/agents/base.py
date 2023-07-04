@@ -1,7 +1,8 @@
-# TODO: Have the same naming standard for all specs and objects in general as well as in the configure and execute methods
-
 import knime.extension as knext
 import pandas as pd
+import util
+import pickle
+
 
 from models.base import (
     LLMPortObjectSpec,
@@ -13,7 +14,6 @@ from indexes.base import (
     ToolListPortObject,
     ToolListPortObjectSpec,
 )
-import util
 
 from langchain import PromptTemplate
 
@@ -28,13 +28,10 @@ from langchain.memory import (
     ConversationBufferMemory,
     ConversationBufferWindowMemory,
 )
-from langchain.agents import AgentType
-
-import pickle
 
 agent_icon = "icons/agent.png"
 agent_category = knext.category(
-    path=util.main_cat,
+    path=util.main_category,
     level_id="agents",
     name="Agents",
     description="",
@@ -49,12 +46,11 @@ agent_category = knext.category(
 # }
 
 
-# TODO: Add more agents that behave differently e.g. no tools, with specific tools, or have agent types in the config option
 @knext.parameter_group(label="Credentials")
 class CredentialsSettings:
     credentials_param = knext.StringParameter(
         label="Credentials parameter",
-        description="Credentials parameter name for accessing Google Search API key",
+        description="Credentials parameter name for accessing Google Search API key.",
         choices=lambda a: knext.DialogCreationContext.get_credential_names(a),
     )
 
@@ -62,11 +58,11 @@ class CredentialsSettings:
 @knext.parameter_group(label="Chat History Settings")
 class ChatHistorySettings:
     type_column = knext.ColumnParameter(
-        "Message Type", "Specifies the sender of the messages", port_index=1
+        "Message Type", "Specifies the sender of the messages.", port_index=1
     )
 
     message_column = knext.ColumnParameter(
-        "Messages", "Message sent to and from the agent", port_index=1
+        "Messages", "Message sent to and from the agent.", port_index=1
     )
 
     history_length = knext.IntParameter(
@@ -83,15 +79,17 @@ class ChatHistorySettings:
 @knext.parameter_group(label="Chat Message Settings")
 class ChatMessageSettings:
     chat_message = knext.StringParameter(
-        "Chat message", "Message to send to the Chat Bot"
+        "Chat message", "Message to send to the Chat Agent."
     )
 
     system_prefix = knext.StringParameter(
         "Agent prompt prefix",
-        "The prefix will be used for better control what its doing. Example: 'You are a friendly assisstant'",
+        """The prefix will be used for a better control on Agent's behaviour. Example: 
+        'You are a friendly KNIME assisstant'.""",
     )
 
 
+# TODO: Currently not used
 @knext.parameter_group(label="LMM Agent Type Selection")
 class LLMAgentTypeSettings:
     class AgentOptions(knext.EnumParameterOptions):
@@ -134,30 +132,28 @@ class MemoryTypeSettings:
     class MemoryOptions(knext.EnumParameterOptions):
         CONVERSATION_BUFFER_MEMORY = (
             "Conversation Buffer Memory",
-            """TODO""",
+            """ This memory allows for storing of messages and then extracts the messages in a variable.""",
         )
         CONVERSATION_BUFFER_WINDOW_MEMORY = (
             "Conversation Buffer Window Memory",
-            """TODO""",
+            """It keeps a list of the interactions of the conversation over time. It only uses the last K 
+            interactions. This can be useful for keeping a sliding window of the most recent interactions, 
+            so the buffer does not get too large.""",
         )
 
     memory = knext.EnumParameter(
         "Memory Type",
-        "Choose between different memory implementations",
+        "Choose between different memory implementations.",
         MemoryOptions.CONVERSATION_BUFFER_WINDOW_MEMORY.name,
         MemoryOptions,
     )
 
 
+# TODO: Add agent type in the future?
 class AgentPortObjectSpec(knext.PortObjectSpec):
     def __init__(self, memory_type) -> None:
         super().__init__()
-        # self._agent_type = agent_type
         self._memory_type = memory_type
-
-    # @property
-    # def agent_type(self):
-    #     return self._agent_type
 
     @property
     def memory_type(self):
@@ -203,7 +199,6 @@ class AgentPortObject(knext.PortObject):
 agent_port_type = knext.port_type("Agent", AgentPortObject, AgentPortObjectSpec)
 
 
-# TODO: Better descriptions
 @knext.node(
     "LLM Agent Creator",
     knext.NodeType.SOURCE,
@@ -214,13 +209,21 @@ agent_port_type = knext.port_type("Agent", AgentPortObject, AgentPortObjectSpec)
 @knext.input_port(
     "Tool List", "A list of tools for the agent to use.", tool_list_port_type
 )
-@knext.output_port("Agent", "A configured agent", agent_port_type)
+@knext.output_port("Agent", "A configured agent.", agent_port_type)
 class LLMAgentCreator:
     """
-    Creates a llm based agent equipped with tools.
+
+    Creates a LLM based agent equipped with tools provided.
+    Currently only ConversationalAgent is available and selected by default.
+
+    [Conversational Agent](https://python.langchain.com/docs/modules/agents/agent_types/chat_conversation_agent)
+    is optimized for conversation. It expects to be used with a memory component.
+
+    Available memory options are: Conversation Buffer Memory and Conversation Buffer Window Memory.
+    See parameter settings for more details on memory types.
+
     """
 
-    # agent_type = LLMAgentTypeSettings()
     memory_type = MemoryTypeSettings()
 
     def configure(
@@ -230,7 +233,6 @@ class LLMAgentCreator:
         tool_list_spec: ToolListPortObjectSpec,
     ):
         return AgentPortObjectSpec(
-            # self.agent_type.agent,
             self.memory_type.memory,
         )
 
@@ -242,7 +244,6 @@ class LLMAgentCreator:
     ):
         return AgentPortObject(
             AgentPortObjectSpec(
-                # self.agent_type.agent,
                 self.memory_type.memory,
             ),
             lmm,
@@ -250,7 +251,6 @@ class LLMAgentCreator:
         )
 
 
-# TODO: Better descriptions
 @knext.node(
     "Agent Executor",
     knext.NodeType.PREDICTOR,
@@ -262,10 +262,12 @@ class LLMAgentCreator:
 @knext.output_table("Chat History", "Table containing the chat history for the agent.")
 class AgentExecutor:
     """
-    Executes a chat agent equipped with tools and memory
+
+    Executes a chat agent equipped with tools and memory.
 
     The memory table is expected to have at least two string columns and be
     either empty or filled by a previous agent execution.
+
     """
 
     history_settings = ChatHistorySettings()
@@ -293,7 +295,7 @@ class AgentExecutor:
 
         if self.history_settings.type_column == self.history_settings.message_column:
             raise knext.InvalidParametersError(
-                "Type and Message columns cannot be the same"
+                "Type and Message columns cannot be the same."
             )
 
         for c in input_table_spec:
@@ -321,7 +323,7 @@ class AgentExecutor:
     ):
         chat_history_df = input_table.to_pandas()
 
-        template = """ .
+        template = """
         {chat_history}
         Human: {input}
         Agent:

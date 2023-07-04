@@ -1,6 +1,3 @@
-# TODO: Have the same naming standard for all specs and objects in general as well as in the configure and execute methods
-
-
 import knime.extension as knext
 import pandas as pd
 
@@ -89,6 +86,7 @@ faiss_vector_store_port_type = knext.port_type(
 )
 class FAISSVectorStoreCreator:
     """
+
     Creates a FAISS Vector Store
 
     A vector store refers to a data structure or storage mechanism that holds
@@ -108,7 +106,7 @@ class FAISSVectorStoreCreator:
 
     persist_directory = knext.StringParameter(
         "Persist directory",
-        """Directory in whcih the vector store will be written to.""",
+        """Directory in which the vector store will be saved to.""",
     )
 
     def configure(
@@ -157,6 +155,7 @@ class FAISSVectorStoreCreator:
 )
 class FAISSVectorStoreLoader:
     """
+
     Loads a FAISS Vector Store
 
     Loads the .fiass and .pkl file from a already
@@ -168,6 +167,7 @@ class FAISSVectorStoreLoader:
     he vector store allows efficient storage, retrieval,
     and similarity search operations on these vectors.FAISS provides indexing methods
     and algorithms optimized for similarity search on large-scale vector collections.
+
     """
 
     persist_directory = knext.StringParameter(
@@ -187,7 +187,7 @@ class FAISSVectorStoreLoader:
         ctx: knext.ExecutionContext,
         embeddings_port_object: EmbeddingsPortObject,
     ) -> FAISSVectorstorePortObject:
-        # TODO: Add check if .fiass and .pkl files are in the directory instead of instatiating as check
+        # TODO: Add check if .fiass and .pkl files are in the directory
         FAISS.load_local(
             self.persist_directory, embeddings_port_object.create_model(ctx)
         )

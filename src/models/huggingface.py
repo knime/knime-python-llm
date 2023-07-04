@@ -19,7 +19,6 @@ from langchain.embeddings import HuggingFaceEmbeddings
 # Other imports
 import huggingface_hub
 
-# TODO: Get someone to do new icons
 huggingface_icon = "icons/huggingface.png"
 huggingface = knext.category(
     path=model_category,
@@ -37,7 +36,7 @@ class CredentialsSettings:
     credentials_param = knext.StringParameter(
         label="Hugging Face API Key",
         description="""
-        Credentials parameter for accessing the Hugging Face API key
+        Credentials parameter for accessing the Hugging Face API key.
         """,
         choices=lambda a: knext.DialogCreationContext.get_credential_names(a),
     )
@@ -50,8 +49,7 @@ class HuggingFaceModelSettings(GeneralSettings):
         description="""
         The maximum number of tokens to generate in the completion.
 
-        The token count of your prompt plus 
-        max_tokens cannot exceed the model's context length.
+        The token count of your prompt plus max_tokens cannot exceed the model's context length.
         """,
         default_value=50,
         max_value=250,
@@ -115,8 +113,6 @@ class HFHubTask(knext.EnumParameterOptions):
         The most popular models for this task are GPT-based models (such as GPT-3).
         Note that model capability has to match the task.
 
-        See available [models](https://huggingface.co/models?pipeline_tag=text-generation).
-
         """,
     )
     TEXT2TEXT_GENERATION = (
@@ -126,8 +122,6 @@ class HFHubTask(knext.EnumParameterOptions):
         (e.g. translation from one language to another).
         Note that model capability has to match the task.
 
-        See available [models](https://huggingface.co/models?pipeline_tag=text2text-generation).
-
         """,
     )
     SUMMARIZATION = (
@@ -135,8 +129,6 @@ class HFHubTask(knext.EnumParameterOptions):
         """
         Task that is used to summarize text.
         Note that model capability has to match the task.
-
-        See available [models](https://huggingface.co/models?pipeline_tag=summarization).
 
         """,
     )
@@ -148,13 +140,21 @@ class HuggingFaceHubSettings:
         label="Repo ID",
         description="""Model name to use, e.g 'Writer/camel-5b-hf'. The repo ID corresponds to '<organizetion_name>/<model_name>'. 
 
-        [Available model repositories](https://huggingface.co/models).""",
+        [Available model repositories](https://huggingface.co/models)""",
         default_value="",
     )
 
     task = knext.EnumParameter(
         "Model Task",
-        "Task that the model is supposed to follow.",
+        """
+        Task type for a given model.
+
+        [Available Text Generation models](https://huggingface.co/models?pipeline_tag=text-generation)
+        
+        [Available Text to Text Generation models](https://huggingface.co/models?pipeline_tag=text2text-generation)
+        
+        [Available Summarization models](https://huggingface.co/models?pipeline_tag=summarization)
+        """,
         HFHubTask.TEXT_GENERATION.name,
         HFHubTask,
     )
@@ -413,16 +413,16 @@ huggingface_embeddings_port_type = knext.port_type(
 class HuggingfaceTextGenInferenceConnector:
     """
 
-    Connect to a dedicated TextGen Inference Server
+    Connects to a dedicated TextGen Inference Server.
 
     [Text Generation Inference](https://github.com/huggingface/text-generation-inference) is a Rust,
     Python and gRPC server for text generation inference. It is used in production at HuggingFace or
     to self-host and power LLMs api-inference widgets.
 
-    Note, this does not connect to the Hubbing Face Hub, but to your own Text Generation Inference Server.
+    Note, this does not connect to the Hubbing Face Hub, but to your local Text Generation Inference Server.
 
-
-    See [LangChain documentation](https://python.langchain.com/docs/modules/model_io/models/llms/integrations/huggingface_textgen_inference) of the Hugging Face TextGen Inference for more details.
+    See [LangChain documentation](https://python.langchain.com/docs/modules/model_io/models/llms/integrations/huggingface_textgen_inference)
+    of the Hugging Face TextGen Inference for more details.
 
     """
 
@@ -463,15 +463,14 @@ class HuggingFaceHubAuthenticator:
 
     Authenticates the Hugging Face API Key.
 
-    This node validates the provided Hugging Face API key by making a
-    request to the Hugging Face "whoami endpoint. The valid API key
-    is used with the Hub Connection node.
+    This node validates the provided Hugging Face API key.
+    The valid API key is then can be used with the Hub Connection node.
 
     Use the
     [Credentials Configuration Node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
     to provide the API key in a credentials object.
 
-    If you dont have a Hugging Face API key yet, generate one at
+    If you do not have a Hugging Face API key yet, generate one at
     [Hugging Face](https://huggingface.co/settings/tokens).
 
     """
@@ -515,7 +514,7 @@ class HuggingFaceHubAuthenticator:
 )
 @knext.input_port(
     "Hugging Face Authentication",
-    "Successfull authentication to Hugging Face.",
+    "Successful authentication to Hugging Face.",
     huggingface_authentication_port_type,
 )
 @knext.output_port(
@@ -528,7 +527,7 @@ class HuggingFaceHubConnector:
 
     Connects to a Hugging Face Hub hosted Large Language Model.
 
-    Given the successfull authentication through the Hugging Face Authenticator Node,
+    Given the successful authentication through the Hugging Face Authenticator Node,
     input one of the available LLM repository names from [Hugging Face Hub](https://python.langchain.com/docs/modules/model_io/models/llms/integrations/huggingface_hub), and
     keyword arguments for the given connection.
 

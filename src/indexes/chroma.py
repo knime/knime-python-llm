@@ -1,6 +1,3 @@
-# TODO: Have the same naming standard for all specs and objects in general as well as in the configure and execute methods
-
-
 import knime.extension as knext
 import pandas as pd
 
@@ -97,7 +94,7 @@ class ChromaVectorStoreCreator:
 
     persist_directory = knext.StringParameter(
         "Persist directory",
-        """Directory in whcih the vector store will be written to.""",
+        """Directory in which the vector store will be saved to.""",
     )
 
     def configure(
@@ -163,8 +160,7 @@ class ChromaVectorStoreLoader:
         ctx: knext.ExecutionContext,
         embeddings_port_object: EmbeddingsPortObject,
     ) -> ChromaVectorstorePortObject:
-        # TODO: Add check if Chroma files are here instead of instantiation
-
+        # TODO: Add check if Chroma files exist here
         Chroma(self.persist_directory, embeddings_port_object.create_model(ctx))
 
         return ChromaVectorstorePortObject(self.create_spec(), embeddings_port_object)

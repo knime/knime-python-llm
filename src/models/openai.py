@@ -1,5 +1,3 @@
-# TODO: Node idea: Re implement the Model List Retriever for better usability (for customers with data apps e.g. to select the model there)
-
 # KNIME / own imports
 import knime.extension as knext
 from .base import (
@@ -22,7 +20,6 @@ from langchain.embeddings.openai import OpenAIEmbeddings
 import re
 import openai
 
-# TODO: Get someone to do new icons
 openai_icon = "icons/openai.png"
 openai_category = knext.category(
     path=model_category,
@@ -46,7 +43,7 @@ class CredentialsSettings:
     credentials_param = knext.StringParameter(
         label="OpenAI API Key",
         description="""
-        Credentials parameter for accessing the OpenAI API key
+        Credentials parameter for accessing the provided OpenAI API key.
         """,
         choices=lambda a: knext.DialogCreationContext.get_credential_names(a),
     )
@@ -57,7 +54,7 @@ class OpenAIGeneralSettings(GeneralSettings):
     max_tokens = knext.IntParameter(
         label="Max tokens",
         description="""
-        The maximum number of tokens to generate in the completion.
+        The maximum number of tokens to generate.
 
         The token count of your prompt plus 
         max_tokens cannot exceed the model's context length.
@@ -116,7 +113,7 @@ def get_model_list(ctx: knext.DialogCreationContext):
 specific_model_name = knext.StringParameter(
     label="Specific Model ID",
     description="""Select from a list of all available OpenAI models.
-        The model chosen has to match the nodes output to ensure best behaviour.
+        The model chosen has to match the node's output to ensure the best behaviour.
         """,
     choices=lambda c: get_model_list(c),
     default_value="unselected",
@@ -150,7 +147,7 @@ class LLMLoaderInputSettings:
 
     default_model_name = knext.EnumParameter(
         "Model ID",
-        "GPT-3 (Ada, Babbage, Curie) and GPT-3.5 (Davinci) models",
+        "GPT-3 (Ada, Babbage, Curie) and GPT-3.5 (Davinci) models.",
         OpenAIModelCompletionsOptions.Ada.name,
         OpenAIModelCompletionsOptions,
     )
@@ -163,7 +160,8 @@ class ChatModelLoaderInputSettings:
     class OpenAIModelCompletionsOptions(knext.EnumParameterOptions):
         Turbo = (
             "gpt-3.5-turbo",
-            "Most capable GPT-3.5 model and optimized for chat at 1/10th the cost of text-davinci-003. Will be updated with our latest model iteration 2 weeks after it is released",
+            """Most capable GPT-3.5 model and optimized for chat at 1/10th the cost of text-davinci-003. 
+            Will be updated with our latest model iteration 2 weeks after it is released.""",
         )
         Turbo_16k = (
             "gpt-3.5-turbo-16k",
@@ -171,11 +169,13 @@ class ChatModelLoaderInputSettings:
         )
         GPT_4 = (
             "gpt-4",
-            "More capable than any GPT-3.5 model, able to do more complex tasks, and optimized for chat. Will be updated with our latest model iteration 2 weeks after it is released.",
+            """More capable than any GPT-3.5 model, able to do more complex tasks, and optimized for chat. 
+            Will be updated with our latest model iteration 2 weeks after it is released.""",
         )
         GPT_4_32k = (
             "gpt-4-32k",
-            "Same capabilities as the base gpt-4 mode but with 4x the context length. Will be updated with our latest model iteration.",
+            """Same capabilities as the base gpt-4 mode but with 4x the context length. Will be updated 
+            with our latest model iteration.""",
         )
 
     model_name = knext.EnumParameter(
@@ -504,7 +504,6 @@ class OpenAIAuthenticator:
         )
 
 
-# TODO: Better node description text
 # TODO: Check proxy settings and add them to configuration
 # TODO: Generate prompts as configuration dialog as seen on langchain llm.generate(["Tell me a joke", "Tell me a poem"]*15)
 @knext.node(
@@ -528,14 +527,14 @@ class OpenAILLMConnector:
 
     Connects to an OpenAI Large Language Model.
 
-    Given the successfull authentication through the OpenAI Authenticator Node,
+    Given the successful authentication through the OpenAI Authenticator Node,
     choose one of the available LLMs from either a predefined list or through
     the advanced options from all available models that are available and fit
     the task downstream.
+
     """
 
     input_settings = LLMLoaderInputSettings()
-
     model_settings = OpenAIGeneralSettings()
 
     def configure(
@@ -562,7 +561,7 @@ class OpenAILLMConnector:
                 self.input_settings.default_model_name
             ].label
 
-        LOGGER.info(f"Connecting to {model_name}")
+        LOGGER.info(f"Connecting to {model_name}...")
 
         return OpenAILLMPortObjectSpec(
             openai_auth_spec.credentials,
@@ -574,7 +573,6 @@ class OpenAILLMConnector:
         )
 
 
-# TODO: Better node description text
 @knext.node(
     "OpenAI Chat Model Connector",
     knext.NodeType.SOURCE,
@@ -596,10 +594,11 @@ class OpenAIChatModelConnector:
 
     Connects to an OpenAI Chat Model.
 
-    Given the successfull authentication through the OpenAI Authenticator Node,
+    Given the successful authentication through the OpenAI Authenticator Node,
     choose one of the available chat models from either a predefined list or through
     the advanced options from all available models that are availableand fit
     the task downstream.
+
     """
 
     input_settings = ChatModelLoaderInputSettings()
@@ -629,7 +628,7 @@ class OpenAIChatModelConnector:
                 self.input_settings.model_name
             ].label
 
-        LOGGER.info(f"Connecting to {model_name}")
+        LOGGER.info(f"Connecting to {model_name}...")
 
         return OpenAIChatModelPortObjectSpec(
             openai_auth_spec.credentials,
@@ -641,7 +640,6 @@ class OpenAIChatModelConnector:
         )
 
 
-# TODO: Better node description text
 @knext.node(
     "OpenAI Embeddings Connector",
     knext.NodeType.SOURCE,
@@ -667,6 +665,7 @@ class OpenAIEmbeddingsConnector:
     choose one of the available embedding models from either a predefined list or through
     the advanced options from all available models that are availableand fit
     the task downstream.
+
     """
 
     input_settings = EmbeddingsLoaderInputSettings()
@@ -695,6 +694,6 @@ class OpenAIEmbeddingsConnector:
                 self.input_settings.model_name
             ].label
 
-        LOGGER.info(f"Connecting to {model_name}")
+        LOGGER.info(f"Connecting to {model_name}...")
 
         return OpenAIEmbeddingsPortObjectSpec(openai_auth_spec.credentials, model_name)

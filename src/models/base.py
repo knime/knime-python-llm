@@ -60,19 +60,6 @@ class GeneralSettings:
         is_advanced=True,
     )
 
-    max_tokens = knext.IntParameter(
-        label="Max tokens",
-        description="""
-        The maximum number of tokens to generate in the completion.
-
-        The token count of your prompt plus 
-        max_tokens cannot exceed the model's context length.
-        """,
-        default_value=50,
-        max_value=250,
-        min_value=0,
-    )
-
 
 class LLMPortObjectSpec(knext.PortObjectSpec):
     def serialize(self) -> dict:

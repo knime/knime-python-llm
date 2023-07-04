@@ -176,14 +176,17 @@ def pick_default_column(input_table: knext.Schema, ktype: knext.KnimeType):
     raise knext.InvalidParametersError(f"The input table does not contain any columns of type '{str(ktype)}'.")
 
 def validate_creator_document_column(input_table: knext.Schema, column: str):
+    check_column(input_table, column, knext.string(), "document")
+    
+def check_column(input_table: knext.Schema, column: str, expected_type:knext.KnimeType, column_purpose: str):
     if not column in input_table.column_names:
         raise knext.InvalidParametersError(
-            f"The document column '{column}' is missing in the input table."
+            f"The {column_purpose} column '{column}' is missing in the input table."
         )
     ktype = input_table[column].ktype
-    if ktype != knext.string():
+    if ktype != expected_type:
         raise knext.InvalidParametersError(
-            f"The document column '{column}' is of type {str(ktype)} but should be of type string."
+            f"The {column_purpose} column '{column}' is of type {str(ktype)} but should be of type {str(expected_type)}."
         )
 
 class ToolPortObjectSpec(knext.PortObjectSpec):
@@ -341,6 +344,11 @@ class VectorStoreRetriever:
         vectorstore_spec: VectorStorePortObjectSpec,
         table_spec: knext.Schema,
     ):
+        if self.query_column is None:
+            self.query_column = pick_default_column(table_spec, knext.string())
+        else:
+            check_column(table_spec, self.query_column, knext.string(), "queries")
+            
         return knext.Schema.from_columns(
             [
                 knext.Column(knext.string(), "Queries"),

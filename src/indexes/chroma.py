@@ -78,7 +78,14 @@ chroma_vector_store_port_type = knext.port_type(
     chroma_vector_store_port_type,
 )
 class ChromaVectorStoreCreator:
-    # TODO add node description
+    """
+    Creates a Chroma vector store from a string column and an embeddings model.
+
+    The FAISS Vector Store Creator creates a Chroma vector store from a string column containing documents and an embeddings model.
+    For each document an embedding i.e. a numerical vector representing the document is extracted by the embeddings model and the embedding is
+    stored together with the document in the vector store. Down-stream nodes such as the Vector Store Retriever use the vector store to find documents
+    with similar semantic meaning given a query.
+    """
 
     document_column = knext.ColumnParameter(
         "Document column",
@@ -116,7 +123,7 @@ class ChromaVectorStoreCreator:
 
 
 @knext.node(
-    "Chroma Vector Store Loader",
+    "Chroma Vector Store Reader",
     knext.NodeType.SOURCE,
     chroma_icon,
     category=chroma_category,
@@ -129,9 +136,14 @@ class ChromaVectorStoreCreator:
 @knext.output_port(
     "Chroma Vector Store", "The loaded vector store.", chroma_vector_store_port_type
 )
-# TODO rename to reader
-class ChromaVectorStoreLoader:
-    # TODO add node description
+class ChromaVectorStoreReader:
+    """
+    Reads a Chroma vector store from a local path.
+
+    This node allows to read a Chroma vector store from a local path and combines it with an embeddings model that
+    is used in down-stream nodes (e.g. the Vector Store Retriever) to embed documents such that the vector store
+    can find documents with similar embeddings.
+    """
     persist_directory = knext.StringParameter(
         "Vectorstore directory",
         """Directory to store the vectordb.""",

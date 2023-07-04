@@ -79,6 +79,20 @@ class OpenAIGeneralSettings(GeneralSettings):
         is_advanced=True,
     )
 
+    max_tokens = knext.IntParameter(
+        label="Max tokens",
+        description="""
+        The maximum number of tokens to generate in the completion.
+
+        The token count of your prompt plus 
+        max_tokens cannot exceed the model's context length.
+
+        Max token limits per models can be found [here](https://platform.openai.com/docs/models/overview).
+        """,
+        default_value=50,
+        min_value=0,
+    )
+
 
 def get_model_list(ctx: knext.DialogCreationContext):
     for spec in ctx.get_input_specs():

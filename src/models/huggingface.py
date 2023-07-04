@@ -86,6 +86,19 @@ class HuggingFaceModelSettings(GeneralSettings):
         is_advanced=True,
     )
 
+    max_new_tokens = knext.IntParameter(
+        label="Max tokens",
+        description="""
+        The maximum number of tokens to generate in the completion.
+
+        The token count of your prompt plus 
+        max_tokens cannot exceed the model's context length.
+        """,
+        default_value=50,
+        max_value=256,
+        min_value=0,
+    )
+
 
 @knext.parameter_group(label="Hugging Face TextGen Inference Server Settings")
 class HuggingFaceTextGenInferenceInputSettings:
@@ -119,7 +132,7 @@ class HFHubTask(knext.EnumParameterOptions):
         "summarization",
         """Task that is used to summarize text.
         Note that model capability has to match the task.
-        
+
         See available [models](https://huggingface.co/models?pipeline_tag=summarization).
         """,
     )
@@ -419,7 +432,7 @@ class HuggingfaceTextGenInferenceConnector:
     def create_spec(self):
         return HuggingFaceTextGenInfLLMPortObjectSpec(
             self.settings.server_url,
-            self.model_settings.max_tokens,
+            self.model_settings.max_new_tokens,
             self.model_settings.top_k,
             self.model_settings.top_p,
             self.model_settings.typical_p,

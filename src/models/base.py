@@ -233,6 +233,7 @@ import logging
 
 LOGGER = logging.getLogger(__name__)
 
+
 # TODO: Add configuration dialog to more general options to configure how LLM is prompted
 # TODO: Write better text
 @knext.node("Chat Model Prompter", knext.NodeType.PREDICTOR, "", model_category)
@@ -305,7 +306,6 @@ class ChatModelPrompter:
         chat_model: ChatModelPortObject,
         input_table: knext.Table,
     ):
-
         table = input_table.to_pandas()
 
         conversation_messages = []
@@ -316,7 +316,6 @@ class ChatModelPrompter:
                 table.loc[f"Row{len(table)}"] = ["SystemMessage", self.system_message]
 
         else:
-
             for index, row in table.iterrows():
                 match row[self.conversation_settings.type_column]:
                     case "AIMessage":

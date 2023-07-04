@@ -361,8 +361,6 @@ class LLMAgentCreator:
             self.agent_type.AgentOptions[self.agent_type.agent].label,
             self.memory_type.MemoryOptions[self.memory_type.memory].label,
         )
-        LOGGER.info(vars(spec))
-        LOGGER.info(dir(spec))
 
         return AgentPortObjectSpec(
             self.agent_type.AgentOptions[self.agent_type.agent].label,

@@ -9,7 +9,6 @@ from .base import (
     EmbeddingsPortObjectSpec,
     EmbeddingsPortObject,
     model_category,
-    CredentialsSettings,
     GeneralSettings,
 )
 
@@ -19,7 +18,7 @@ from langchain.llms import HuggingFaceTextGenInference
 from langchain.embeddings import HuggingFaceEmbeddings
 
 # Other imports
-import json
+import huggingface_hub
 
 # TODO: Get someone to do new icons
 huggingface_icon = "icons/huggingface.png"
@@ -34,8 +33,33 @@ huggingface = knext.category(
 # == SETTINGS ==
 
 
+@knext.parameter_group(label="Credentials")
+class CredentialsSettings:
+    credentials_param = knext.StringParameter(
+        label="Hugging Face API Key",
+        description="""
+        Credentials parameter for accessing the Hugging Face API key
+        """,
+        choices=lambda a: knext.DialogCreationContext.get_credential_names(a),
+    )
+
+
 # @knext.parameter_group(label="Model Settings") -- Imported
 class HuggingFaceModelSettings(GeneralSettings):
+
+    max_tokens = knext.IntParameter(
+        label="Max tokens",
+        description="""
+        The maximum number of tokens to generate in the completion.
+
+        The token count of your prompt plus 
+        max_tokens cannot exceed the model's context length.
+        """,
+        default_value=50,
+        max_value=250,
+        min_value=0,
+    )
+
     top_k = knext.IntParameter(
         label="Top k",
         description="The number of top-k tokens to consider when generating text.",
@@ -364,13 +388,20 @@ huggingface_embeddings_port_type = knext.port_type(
 )
 @knext.output_port(
     "Huggingface TextGen Inference Configuration",
-    "Connection to a self hosted LLM using HuggingFace Text Generation Inference.",
+    "Connection to LLM hosted on a Text Generation Inference Server",
     huggingface_textGenInference_llm_port_type,
 )
 class HuggingfaceTextGenInferenceConnector:
     """
 
-    Connects to [Text Generation Inference] (https://github.com/huggingface/text-generation-inference), and uses a self hosted LLM by Hugging Face.
+    Connect to a dedicated TextGen Inference Server
+
+    [Text Generation Inference](https://github.com/huggingface/text-generation-inference) is a Rust,
+    Python and gRPC server for text generation inference. It is used in production at HuggingFace or
+    to self-host and power LLMs api-inference widgets.
+
+    Note, this does not connect to the Hubbing Face Hub, but to your own Text Generation Inference Server.
+
 
     See [LangChain documentation](https://python.langchain.com/docs/modules/model_io/models/llms/integrations/huggingface_textgen_inference) of the Hugging Face TextGen Inference for more details.
 
@@ -411,7 +442,18 @@ class HuggingfaceTextGenInferenceConnector:
 class HuggingFaceHubAuthenticator:
     """
 
-    Authenticates the Hugging Face Hub API Key.
+    Authenticates the Hugging Face API Key.
+
+    This node validates the provided Hugging Face API key by making a
+    request to the Hugging Face "whoami endpoint. The valid API key
+    is used with the Hub Connection node.
+
+    Use the
+    [Credentials Configuration Node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
+    to provide the API key in a credentials object.
+
+    If you dont have a Hugging Face API key yet, generate one at
+    [Hugging Face](https://huggingface.co/settings/tokens).
 
     """
 
@@ -429,6 +471,16 @@ class HuggingFaceHubAuthenticator:
         return self.create_spec()
 
     def execute(self, ctx: knext.ExecutionContext):
+
+        try:
+            huggingface_hub.whoami(
+                ctx.get_credentials(
+                    self.credentials_settings.credentials_param
+                ).password
+            )
+        except:
+            raise ValueError("Invalid API Key provided")
+
         return HuggingFaceAuthenticationPortObject(self.create_spec())
 
     def create_spec(self):
@@ -456,7 +508,7 @@ class HuggingFaceHubAuthenticator:
 class HuggingFaceHubConnector:
     """
 
-    Connects to a Hugging Face Large Language Model.
+    Connects to a Hugging Face Hub hosted Large Language Model.
 
     Given the successfull authentication through the Hugging Face Authenticator Node,
     input one of the available LLM repository names from [Hugging Face Hub](https://python.langchain.com/docs/modules/model_io/models/llms/integrations/huggingface_hub), and
@@ -474,6 +526,15 @@ class HuggingFaceHubConnector:
         ctx: knext.ConfigurationContext,
         huggingface_auth_spec: HuggingFaceAuthenticationPortObjectSpec,
     ) -> HuggingFaceHubLLMPortObjectSpec:
+
+        if not self.hub_settings.repo_id:
+            raise ValueError("Please enter a repo id")
+
+        try:
+            huggingface_hub.model_info(self.hub_settings.repo_id)
+        except:
+            raise ValueError("Please provide correct repo id")
+
         return self.create_spec(huggingface_auth_spec)
 
     def execute(

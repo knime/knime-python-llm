@@ -8,9 +8,6 @@ from models.base import (
     LLMPortObjectSpec,
     LLMPortObject,
     llm_port_type,
-    ChatModelPortObjectSpec,
-    ChatModelPortObject,
-    chat_model_port_type,
 )
 from indexes.base import (
     tool_list_port_type,
@@ -19,18 +16,22 @@ from indexes.base import (
 )
 import util
 
+from langchain import PromptTemplate
+
+
+from langchain.agents import (
+    ConversationalAgent,
+    AgentExecutor,
+)
+
 from langchain.prompts import MessagesPlaceholder
 from langchain.memory import (
     ConversationBufferMemory,
     ConversationBufferWindowMemory,
-    ConversationSummaryMemory,
-    ConversationSummaryBufferMemory,
 )
-from langchain.agents import initialize_agent, AgentType
-
+from langchain.agents import AgentType
 
 import pickle
-
 
 agent_icon = "icons/agent.png"
 agent_category = knext.category(
@@ -41,9 +42,12 @@ agent_category = knext.category(
     icon=agent_icon,
 )
 
-import logging
 
-LOGGER = logging.getLogger(__name__)
+# agents = {
+#     "CONVERSATIONAL_REACT_DESCRIPTION": AgentType.CONVERSATIONAL_REACT_DESCRIPTION,
+#     "REACT": AgentType.ZERO_SHOT_REACT_DESCRIPTION,
+#     "REACT_DOCUMENTSTORE": AgentType.REACT_DOCSTORE,
+# }
 
 
 # TODO: Add more agents that behave differently e.g. no tools, with specific tools, or have agent types in the config option
@@ -59,11 +63,11 @@ class CredentialsSettings:
 @knext.parameter_group(label="Chat History Settings")
 class ChatHistorySettings:
     type_column = knext.ColumnParameter(
-        "Message Type", "Specifies the sender of the messages", port_index=2
+        "Message Type", "Specifies the sender of the messages", port_index=1
     )
 
     message_column = knext.ColumnParameter(
-        "Messages", "Message sent to and from the agent", port_index=2
+        "Messages", "Message sent to and from the agent", port_index=1
     )
 
     history_length = knext.IntParameter(
@@ -87,136 +91,6 @@ class ChatMessageSettings:
         "Agent prompt prefix",
         "The prefix will be used for better control what its doing. Example: 'You are a friendly assisstant'",
     )
-
-
-# TODO: Better descriptions
-# TODO: Change name of node
-@knext.node(
-    "ChatBot Agent Executor",
-    knext.NodeType.PREDICTOR,
-    agent_icon,
-    category=agent_category,
-)
-@knext.input_port(
-    "Chat", "The large language model to chat with.", chat_model_port_type
-)
-@knext.input_port("Tool List", "Vectorstore input.", tool_list_port_type)
-@knext.input_table("Chat History", "Table containing the chat history for the agent.")
-@knext.output_table("Chat History", "Table containing the chat history for the agent.")
-class ChatBotAgentExecutor:
-    """
-
-    Executes a chat agent equipped with tools and memory
-
-    The memory table is expected to have at least two string columns and be
-    either empty or filled by a previous agent execution.
-
-    """
-
-    history_settings = ChatHistorySettings()
-    message_settings = ChatMessageSettings()
-
-    def load_messages_from_input_table(
-        self, memory: ConversationBufferMemory, chat_history_df: pd.DataFrame
-    ):
-        for index in range(0, len(chat_history_df), 2):
-            memory.save_context(
-                {"input": chat_history_df.loc[f"Row{index}"].at["Message"]},
-                {"output": chat_history_df.loc[f"Row{index+1}"].at["Message"]},
-            )
-
-    def configure(
-        self,
-        ctx: knext.ConfigurationContext,
-        chatmodel: ChatModelPortObjectSpec,
-        tool_list_spec: ToolListPortObjectSpec,
-        input_table_spec: knext.Schema,
-    ):
-        if len(input_table_spec.column_names) < 2:
-            raise ValueError("Please provide at least two string columns")
-
-        if self.history_settings.type_column == self.history_settings.message_column:
-            raise ValueError("Message Type and Messages columns can not be the same")
-
-        for c in input_table_spec:
-            if (
-                c.name == self.history_settings.type_column
-                or c.name == self.history_settings.message_column
-            ):
-                if not util.is_nominal(c):
-                    raise ValueError(f"{c.name} has to be a string column.")
-
-        return knext.Schema.from_columns(
-            [
-                knext.Column(knext.string(), self.history_settings.type_column),
-                knext.Column(knext.string(), self.history_settings.message_column),
-            ]
-        )
-
-    def execute(
-        self,
-        ctx: knext.ExecutionContext,
-        chatmodel_port: ChatModelPortObject,
-        tool_list_port: ToolListPortObject,
-        input_table: knext.Table,
-    ):
-        chat_history_df = input_table.to_pandas()
-
-        memory = ConversationBufferWindowMemory(
-            memory_key="chat_history",
-            return_messages=True,
-            k=self.history_settings.history_length,
-        )
-
-        memory.save_context(
-            {"system": self.message_settings.system_prefix}, {"outputs": ""}
-        )
-
-        if (
-            not chat_history_df[
-                [
-                    self.history_settings.type_column,
-                    self.history_settings.message_column,
-                ]
-            ]
-            .isna()
-            .any()
-            .any()
-        ):
-            self.load_messages_from_input_table(memory, chat_history_df)
-
-        tool_list = tool_list_port.tool_list
-        tools = [tool.create(ctx) for tool in tool_list]
-
-        chatmodel = chatmodel_port.create_model(ctx)
-        chat_history = MessagesPlaceholder(variable_name="chat_history")
-
-        agent_chain = initialize_agent(
-            tools,
-            chatmodel,
-            agent=AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION,
-            verbose=True,
-            memory=memory,
-            agent_kwargs={
-                "memory_prompts": [chat_history],
-                "input_variables": ["input", "agent_scratchpad", "chat_history"],
-            },
-            handle_parsing_errors="Check your output and make sure it conforms!",
-        )
-
-        answer = agent_chain.run(input=self.message_settings.chat_message)
-
-        new_df = chat_history_df[
-            [self.history_settings.type_column, self.history_settings.message_column]
-        ].copy()
-
-        user_input_row = ["input", self.message_settings.chat_message]
-        agent_output_row = ["output", answer]
-
-        new_df.loc[f"Row{len(new_df)}"] = user_input_row
-        new_df.loc[f"Row{len(new_df)}"] = agent_output_row
-
-        return knext.Table.from_pandas(new_df)
 
 
 @knext.parameter_group(label="LMM Agent Type Selection")
@@ -264,7 +138,7 @@ class MemoryTypeSettings:
             """TODO""",
         )
         CONVERSATION_BUFFER_WINDOW_MEMORY = (
-            "Conversatio Buffer Window Memory",
+            "Conversation Buffer Window Memory",
             """TODO""",
         )
 
@@ -277,25 +151,25 @@ class MemoryTypeSettings:
 
 
 class AgentPortObjectSpec(knext.PortObjectSpec):
-    def __init__(self, agent_type, memory_type) -> None:
+    def __init__(self, memory_type) -> None:
         super().__init__()
-        self._agent_type = agent_type
+        # self._agent_type = agent_type
         self._memory_type = memory_type
 
-    @property
-    def agent_type(self):
-        return self._agent_type
+    # @property
+    # def agent_type(self):
+    #     return self._agent_type
 
     @property
     def memory_type(self):
         return self._memory_type
 
     def serialize(self) -> dict:
-        return {"agent_type": self._agent_type, "memory_type": self._memory_type}
+        return {"memory_type": self._memory_type}
 
     @classmethod
     def deserialize(cls, data: dict):
-        return cls(data["agent_type"], data["memory_type"])
+        return cls(data["memory_type"])
 
 
 class AgentPortObject(knext.PortObject):
@@ -332,7 +206,7 @@ agent_port_type = knext.port_type("Agent", AgentPortObject, AgentPortObjectSpec)
 
 # TODO: Better descriptions
 @knext.node(
-    "LMM Agent Creator",
+    "LLM Agent Creator",
     knext.NodeType.SOURCE,
     agent_icon,
     category=agent_category,
@@ -341,13 +215,13 @@ agent_port_type = knext.port_type("Agent", AgentPortObject, AgentPortObjectSpec)
 @knext.input_port(
     "Tool List", "A list of tools for the agent to use.", tool_list_port_type
 )
-@knext.output_binary("Agent", "A configured agent", agent_port_type)
+@knext.output_port("Agent", "A configured agent", agent_port_type)
 class LLMAgentCreator:
     """
     Creates a llm based agent equipped with tools.
     """
 
-    agent_type = LLMAgentTypeSettings()
+    # agent_type = LLMAgentTypeSettings()
     memory_type = MemoryTypeSettings()
 
     def configure(
@@ -356,15 +230,9 @@ class LLMAgentCreator:
         llm_spec: LLMPortObjectSpec,
         tool_list_spec: ToolListPortObjectSpec,
     ):
-
-        spec = AgentPortObjectSpec(
-            self.agent_type.AgentOptions[self.agent_type.agent].label,
-            self.memory_type.MemoryOptions[self.memory_type.memory].label,
-        )
-
         return AgentPortObjectSpec(
-            self.agent_type.AgentOptions[self.agent_type.agent].label,
-            self.memory_type.MemoryOptions[self.memory_type.memory].label,
+            # self.agent_type.agent,
+            self.memory_type.memory,
         )
 
     def execute(
@@ -373,11 +241,154 @@ class LLMAgentCreator:
         lmm: LLMPortObject,
         tool_list: ToolListPortObject,
     ):
-
         return AgentPortObject(
             AgentPortObjectSpec(
-                self.agent_type.agent_type, self.memory_type.memory_type
+                # self.agent_type.agent,
+                self.memory_type.memory,
             ),
             lmm,
             tool_list,
         )
+
+
+# TODO: Better descriptions
+@knext.node(
+    "Agent Executor",
+    knext.NodeType.PREDICTOR,
+    agent_icon,
+    category=agent_category,
+)
+@knext.input_port("Agent", "Configured agent", agent_port_type)
+@knext.input_table("Chat History", "Table containing the chat history for the agent.")
+@knext.output_table("Chat History", "Table containing the chat history for the agent.")
+class AgentExecutor:
+    """
+    Executes a chat agent equipped with tools and memory
+
+    The memory table is expected to have at least two string columns and be
+    either empty or filled by a previous agent execution.
+    """
+
+    history_settings = ChatHistorySettings()
+    message_settings = ChatMessageSettings()
+
+    def load_messages_from_input_table(
+        self, memory: ConversationBufferMemory, chat_history_df: pd.DataFrame
+    ):
+        for index in range(0, len(chat_history_df), 2):
+            memory.save_context(
+                {"input": chat_history_df.loc[f"Row{index}"].at["Message"]},
+                {"output": chat_history_df.loc[f"Row{index+1}"].at["Message"]},
+            )
+
+    def configure(
+        self,
+        ctx: knext.ConfigurationContext,
+        agent_spec: AgentPortObjectSpec,
+        input_table_spec: knext.Schema,
+    ):
+        if len(input_table_spec.column_names) < 2:
+            raise ValueError("Please provide at least two string columns")
+
+        if self.history_settings.type_column == self.history_settings.message_column:
+            raise ValueError("Message Type and Messages columns can not be the same")
+
+        for c in input_table_spec:
+            if (
+                c.name == self.history_settings.type_column
+                or c.name == self.history_settings.message_column
+            ):
+                if not util.is_nominal(c):
+                    raise ValueError(f"{c.name} has to be a string column.")
+
+        return knext.Schema.from_columns(
+            [
+                knext.Column(knext.string(), self.history_settings.type_column),
+                knext.Column(knext.string(), self.history_settings.message_column),
+            ]
+        )
+
+    def execute(
+        self,
+        ctx: knext.ExecutionContext,
+        agent: AgentPortObject,
+        input_table: knext.Table,
+    ):
+        chat_history_df = input_table.to_pandas()
+
+        template = """ .
+        {chat_history}
+        Human: {input}
+        Agent:
+        {agent_scratchpad}"""
+
+        prefix = self.message_settings.system_prefix
+
+        prompt = PromptTemplate(
+            input_variables=["chat_history", "input", "agent_scratchpad"],
+            template=template,
+            prefix=prefix,
+        )
+
+        if agent.spec.memory_type == "CONVERSATION_BUFFER_MEMORY":
+            memory = ConversationBufferMemory(
+                memory_key="chat_history",
+                input_key="input",
+                return_messages=True,
+            )
+        else:
+            memory = ConversationBufferWindowMemory(
+                k=self.history_settings.history_length,
+                memory_key="chat_history",
+                input_key="input",
+                return_messages=True,
+            )
+
+        if (
+            not chat_history_df[
+                [
+                    self.history_settings.type_column,
+                    self.history_settings.message_column,
+                ]
+            ]
+            .isna()
+            .any()
+            .any()
+        ):
+            self.load_messages_from_input_table(memory, chat_history_df)
+
+        tool_list = agent.tool_list
+        tools = [tool.create(ctx) for tool in tool_list]
+
+        llm = agent.model.create_model(ctx)
+
+        chat_history = MessagesPlaceholder(variable_name="chat_history")
+
+        agent = ConversationalAgent.from_llm_and_tools(
+            llm=llm,
+            tools=tools,
+            prefix=prefix,
+            input_variables=["chat_history", "input", "agent_scratchpad"],
+        )
+
+        agent_exec = AgentExecutor(
+            memory=memory, agent=agent, tools=tools, verbose=True
+        )
+
+        response = agent_exec.run(
+            input=self.message_settings.chat_message,
+            chat_history=chat_history,
+            prompt=prompt,
+        )
+
+        new_df = chat_history_df[
+            [self.history_settings.type_column, self.history_settings.message_column]
+        ].copy()
+
+        user_input_row = ["input", self.message_settings.chat_message]
+        agent_output_row = ["output", response]
+
+        new_df.loc[f"Row{len(new_df)}"] = user_input_row
+        new_df.loc[f"Row{len(new_df)}"] = agent_output_row
+
+        return knext.Table.from_pandas(new_df)

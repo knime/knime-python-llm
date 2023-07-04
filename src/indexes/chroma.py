@@ -1,5 +1,5 @@
 import knime.extension as knext
-import pandas as pd
+from typing import Optional
 
 from models.base import (
     EmbeddingsPortObjectSpec,
@@ -8,8 +8,8 @@ from models.base import (
 )
 
 from .base import (
-    VectorStorePortObjectSpec,
-    VectorStorePortObject,
+    FilestoreVectorstorePortObjectSpec,
+    FilestoreVectorstorePortObject,
     store_category,
 )
 
@@ -21,43 +21,33 @@ chroma_category = knext.category(
     path=store_category,
     level_id="chroma",
     name="Chroma",
-    description="",
+    description="Contains nodes for working with Chroma vector stores.",
     icon=chroma_icon,
 )
 
 
-class ChromaVectorstorePortObjectSpec(VectorStorePortObjectSpec):
-    def __init__(self, persist_directory) -> None:
-        super().__init__()
-        self._persist_directory = persist_directory
-
-    @property
-    def persist_directory(self):
-        return self._persist_directory
-
-    def serialize(self) -> dict:
-        return {
-            "persist_directory": self._persist_directory,
-        }
-
-    @classmethod
-    def deserialize(cls, data: dict):
-        return cls(data["persist_directory"])
+class ChromaVectorstorePortObjectSpec(FilestoreVectorstorePortObjectSpec):
+    # placeholder to enable us to add Chroma specific stuff later on
+    pass
 
 
-class ChromaVectorstorePortObject(VectorStorePortObject):
+class ChromaVectorstorePortObject(FilestoreVectorstorePortObject):
     def __init__(
         self,
         spec: ChromaVectorstorePortObjectSpec,
         embeddings_port_object: EmbeddingsPortObject,
+        folder_path: Optional[str] = None,
+        vectorstore: Optional[Chroma] = None,
     ) -> None:
-        super().__init__(spec, embeddings_port_object)
-        self._embeddings_port_object = embeddings_port_object
+        super().__init__(spec, embeddings_port_object, folder_path, vectorstore)
 
-    def load_store(self, ctx):
-        return Chroma(
-            persist_directory=self.spec.persist_directory,
-        )
+    def save_vectorstore(self, vectorstore_folder: str, vectorstore: Chroma):
+        # HACK because Chroma doesn't allow to set the path in another way
+        vectorstore._persist_directory = vectorstore_folder
+        vectorstore.persist()
+
+    def load_vectorstore(self, embeddings, vectorstore_path) -> Chroma:
+        return Chroma(embedding_function=embeddings, persist_directory=vectorstore_path)
 
 
 chroma_vector_store_port_type = knext.port_type(
@@ -86,15 +76,12 @@ chroma_vector_store_port_type = knext.port_type(
     chroma_vector_store_port_type,
 )
 class ChromaVectorStoreCreator:
+    # TODO add node description
+
     document_column = knext.ColumnParameter(
         "Document column",
         """Selection of column used as the document column.""",
         port_index=1,
-    )
-
-    persist_directory = knext.StringParameter(
-        "Persist directory",
-        """Directory in which the vector store will be saved to.""",
     )
 
     def configure(
@@ -103,7 +90,8 @@ class ChromaVectorStoreCreator:
         embeddings_spec: EmbeddingsPortObjectSpec,
         input_table: knext.Schema,
     ) -> ChromaVectorstorePortObjectSpec:
-        return self.create_spec()
+        # TODO validate table
+        return ChromaVectorstorePortObjectSpec(embeddings_spec)
 
     def execute(
         self,
@@ -117,15 +105,9 @@ class ChromaVectorStoreCreator:
         db = Chroma.from_documents(
             documents=documents,
             embedding=embeddings.create_model(ctx),
-            persist_directory=self.persist_directory,
         )
 
-        db.persist()
-
-        return ChromaVectorstorePortObject(self.create_spec(), embeddings)
-
-    def create_spec(self):
-        return ChromaVectorstorePortObjectSpec(self.persist_directory)
+        return ChromaVectorstorePortObject(ChromaVectorstorePortObjectSpec(embeddings.spec), embeddings, vectorstore=db)
 
 
 @knext.node(
@@ -142,7 +124,9 @@ class ChromaVectorStoreCreator:
 @knext.output_port(
     "Chroma Vector Store", "The loaded vector store.", chroma_vector_store_port_type
 )
+# TODO rename to reader
 class ChromaVectorStoreLoader:
+    # TODO add node description
     persist_directory = knext.StringParameter(
         "Vectorstore directory",
         """Directory to store the vectordb.""",
@@ -153,17 +137,14 @@ class ChromaVectorStoreLoader:
         ctx: knext.ConfigurationContext,
         embeddings_spec: EmbeddingsPortObjectSpec,
     ) -> ChromaVectorstorePortObjectSpec:
-        return self.create_spec_content()
+        return ChromaVectorstorePortObjectSpec(embeddings_spec)
 
     def execute(
         self,
         ctx: knext.ExecutionContext,
         embeddings_port_object: EmbeddingsPortObject,
     ) -> ChromaVectorstorePortObject:
-        # TODO: Add check if Chroma files exist here
-        Chroma(self.persist_directory, embeddings_port_object.create_model(ctx))
+        # TODO: Add check if Chroma files are here instead of instantiation
+        chroma = Chroma(self.persist_directory, embeddings_port_object.create_model(ctx))
+        return ChromaVectorstorePortObject(ChromaVectorstorePortObjectSpec(embeddings_port_object.spec), embeddings_port_object, vectorstore=chroma)
 
-        return ChromaVectorstorePortObject(self.create_spec(), embeddings_port_object)
-
-    def create_spec(self):
-        return ChromaVectorstorePortObjectSpec(self.persist_directory)

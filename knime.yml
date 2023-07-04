@@ -1,5 +1,5 @@
 name: llm
-author: Seray Arsland, Alexander Jauch-Walser
+author: Alexander Jauch-Walser, Seray Arslan, Adrian Nembach
 env_yml_path: env.yml
 extension_module: src/knime_llm
 description: KNIME AI Extension

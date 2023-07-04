@@ -88,6 +88,18 @@ faiss_vector_store_port_type = knext.port_type(
     faiss_vector_store_port_type,
 )
 class FAISSVectorStoreCreator:
+    """
+    Creates a FAISS Vector Store
+
+    A vector store refers to a data structure or storage mechanism that holds
+    a collection of vectors. These vectors represent the embeddings or numerical
+    representations of objects such as documents, images, or other data points.
+    he vector store allows efficient storage, retrieval,
+    and similarity search operations on these vectors.FAISS provides indexing methods
+    and algorithms optimized for similarity search on large-scale vector collections.
+
+    """
+
     document_column = knext.ColumnParameter(
         "Document column",
         """Selection of column used as the document column.""",
@@ -144,6 +156,20 @@ class FAISSVectorStoreCreator:
     "FAISS Vector Store", "The loaded vector store.", faiss_vector_store_port_type
 )
 class FAISSVectorStoreLoader:
+    """
+    Loads a FAISS Vector Store
+
+    Loads the .fiass and .pkl file from a already
+    created vectore store into KNIME.
+
+    A vector store refers to a data structure or storage mechanism that holds
+    a collection of vectors. These vectors represent the embeddings or numerical
+    representations of objects such as documents, images, or other data points.
+    he vector store allows efficient storage, retrieval,
+    and similarity search operations on these vectors.FAISS provides indexing methods
+    and algorithms optimized for similarity search on large-scale vector collections.
+    """
+
     persist_directory = knext.StringParameter(
         "Vectorstore directory",
         """Directory to store the vectordb.""",

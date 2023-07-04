@@ -189,7 +189,13 @@ tool_list_port_type = knext.port_type(
 class VectorStoreRetriever:
     """
 
-    Performs a similarity search on the vectore store
+    Performs a similarity search on a vectore store
+
+    A vector store retriever is a component or module that
+    specializes in retrieving vectors from a vector store
+    based on user queries. It works in conjunction with a
+    vector store to facilitate efficient vector
+    retrieval and similarity search operations.
 
     """
 
@@ -202,6 +208,8 @@ class VectorStoreRetriever:
         "Number of top results to get from vector store search. Ranking from best to worst",
         default_value=3,
     )
+
+    # TODO: Add options to retrieve meta data from the store
 
     def configure(
         self,
@@ -248,23 +256,32 @@ class VectorStoreRetriever:
 
 # TODO: Add better descriptions
 @knext.node(
-    "Vector Store to Toollist",
+    "Vector Store to Agent Tool",
     knext.NodeType.SOURCE,
     icon_path="icons/store.png",
     category=store_category,
 )
 @knext.input_port("LLM Port", "A large language model.", llm_port_type)
 @knext.input_port("Vector Store Port", "A loaded vector store.", vector_store_port_type)
-@knext.output_port(
-    "Tool List", "A tool list object for an agent to use", tool_list_port_type
-)
+@knext.output_port("Agent Tool", "A tool for an agent to use", tool_list_port_type)
 class VectorStoreToTool:
     """
 
-    Creates a Tool out of a Vector Store
+    Turns a Vector Store into a agent tool
 
-    Provide a usefull name and description for an agent to know whether to use this Tool
-    to answer your question.
+    The power of an agent is, that it can decide whether it needs to
+    make use of an provided tool (e.g. looking for data in a vector store) to
+    answer questions.
+
+    An agent needs to be provided with the store and the information of it's content.
+    A meaningful description and name is very important:
+
+    Example:
+    KNIME Node Description QA System
+
+    Use this tool whenever you need information about what nodes a user would need in a given
+    situation to retrieve a list of possible nodes or if you need inforamtion
+    about nodes configuration options.
 
     """
 
@@ -314,35 +331,46 @@ class VectorStoreToTool:
 
 
 @knext.node(
-    "Tool List Combiner",
+    "Tool Concatinator",
     knext.NodeType.SOURCE,
     icon_path="icons/store.png",
     category=store_category,
 )
 @knext.input_port(
-    "Tool List", "A list of tools for an agent to use.", tool_list_port_type
+    "Agent Tool(s)", "One or more tools for an agent to use.", tool_list_port_type
 )
 @knext.input_port(
-    "Tool List", "A list of tools for an agent to use.", tool_list_port_type
+    "Agent Tool(s)", "One or more tools for an agent to use.", tool_list_port_type
 )
 @knext.output_port(
-    "Tool List", "The concatenated tools from both lists.", tool_list_port_type
+    "Agent Tools",
+    "The concatenated tool list for an agent to use.",
+    tool_list_port_type,
 )
 class ToolCombiner:
+    """
+    Concatinates two Tools
+
+    A agent can be provided with a list of tools to choose from. Use this
+    node to concatinate existing tools into a list and provide
+    a agent with the tool list.
+
+    """
+
     def configure(
         self,
         ctx: knext.ConfigurationContext,
-        tool_list_one: ToolListPortObjectSpec,
-        tool_list_twp: ToolListPortObjectSpec,
+        spec_one: ToolListPortObjectSpec,
+        spec_two: ToolListPortObjectSpec,
     ):
         return ToolListPortObjectSpec()
 
     def execute(
         self,
         ctx: knext.ExecutionContext,
-        tool_list_one: ToolListPortObject,
-        tool_list_two: ToolListPortObject,
+        object_one: ToolListPortObject,
+        object_two: ToolListPortObject,
     ):
-        tool_list_one._tool_list = tool_list_one._tool_list + tool_list_two.tool_list
+        object_one._tool_list = object_one._tool_list + object_two.tool_list
 
-        return tool_list_one
+        return object_one

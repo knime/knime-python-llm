@@ -146,11 +146,12 @@ embeddings_model_port_type = knext.port_type(
 )
 class LLMPrompter:
     """
+    Prompt a Large Language Model.
 
-    Prompts a given Large Language Model.
-
-    This node takes a string column of prompts and prompts the
-    provided Large Language Model with each of the prompts.
+    The LLM Prompter takes a statement (prompt) and creates a
+    response (e.g. generates text) for that single prompt. It has
+    no knowledge of the other prompts or any kind of conversation
+    memory.
 
     """
 

@@ -3,7 +3,6 @@
 import knime.extension as knext
 import pandas as pd
 
-
 from models.base import (
     LLMPortObjectSpec,
     LLMPortObject,
@@ -288,10 +287,14 @@ class AgentExecutor:
         input_table_spec: knext.Schema,
     ):
         if len(input_table_spec.column_names) < 2:
-            raise ValueError("Please provide at least two string columns")
+            raise knext.InvalidParametersError(
+                "Please provide at least two String columns."
+            )
 
         if self.history_settings.type_column == self.history_settings.message_column:
-            raise ValueError("Message Type and Messages columns can not be the same")
+            raise knext.InvalidParametersError(
+                "Type and Message columns cannot be the same"
+            )
 
         for c in input_table_spec:
             if (
@@ -299,7 +302,9 @@ class AgentExecutor:
                 or c.name == self.history_settings.message_column
             ):
                 if not util.is_nominal(c):
-                    raise ValueError(f"{c.name} has to be a string column.")
+                    raise knext.InvalidParametersError(
+                        f"{c.name} has to be a String column."
+                    )
 
         return knext.Schema.from_columns(
             [

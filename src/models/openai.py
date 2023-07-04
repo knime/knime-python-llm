@@ -54,7 +54,6 @@ class CredentialsSettings:
 
 # @knext.parameter_group(label="Model Settings") -- Imported
 class OpenAIGeneralSettings(GeneralSettings):
-
     max_tokens = knext.IntParameter(
         label="Max tokens",
         description="""
@@ -100,7 +99,7 @@ def get_model_list(ctx: knext.DialogCreationContext):
             auth_spec = spec
 
     if not auth_spec:
-        raise ValueError("No OpenAI Authentication provided")
+        raise knext.InvalidParametersError("OpenAI Authentication is not provided.")
 
     openai.api_key = ctx.get_credentials(auth_spec.credentials).password
 
@@ -480,10 +479,10 @@ class OpenAIAuthenticator:
         self, ctx: knext.ConfigurationContext
     ) -> OpenAIAuthenticationPortObjectSpec:
         if not ctx.get_credential_names():
-            raise ValueError("No credentials provided. Please ")
+            raise knext.InvalidParametersError("Credentials not provided.")
 
         if not self.credentials_settings.credentials_param:
-            raise ValueError("No credentials selected.")
+            raise knext.InvalidParametersError("Credentials not selected.")
 
         return self.create_spec()
 
@@ -495,7 +494,7 @@ class OpenAIAuthenticator:
 
             openai.Model.list()
         except:
-            raise ValueError("Wrong API key provided")
+            raise knext.InvalidParametersError("API key is not valid.")
 
         return OpenAIAuthenticationPortObject(self.create_spec())
 

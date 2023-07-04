@@ -1,5 +1,4 @@
 # TODO: Have the same naming standard for all specs and objects in general as well as in the configure and execute methods
-# TODO: Add Authenticator & LLM Connector Node similar to OpenAI nodes? Donezo
 
 # KNIME / own imports
 import knime.extension as knext
@@ -46,7 +45,6 @@ class CredentialsSettings:
 
 # @knext.parameter_group(label="Model Settings") -- Imported
 class HuggingFaceModelSettings(GeneralSettings):
-
     max_tokens = knext.IntParameter(
         label="Max tokens",
         description="""
@@ -142,7 +140,8 @@ class HFHubTask(knext.EnumParameterOptions):
 class HuggingFaceHubSettings:
     repo_id = knext.StringParameter(
         label="Repo ID",
-        description="Model name to use e.g 'Writer/camel-5b-hf'",
+        description="""Model name to use e.g 'Writer/camel-5b-hf'. The repo ID corresponds to '<organizetion_name>/<model_name>'. 
+        [Available model repositories](https://huggingface.co/models)""",
         default_value="",
     )
 
@@ -476,15 +475,14 @@ class HuggingFaceHubAuthenticator:
         self, ctx: knext.ConfigurationContext
     ) -> HuggingFaceAuthenticationPortObjectSpec:
         if not ctx.get_credential_names():
-            raise ValueError("No credentials provided to node.")
+            raise knext.InvalidParametersError("Credentials not provided.")
 
         if not self.credentials_settings.credentials_param:
-            raise ValueError("No credentials selected.")
+            raise knext.InvalidParametersError("Credentials not selected.")
 
         return self.create_spec()
 
     def execute(self, ctx: knext.ExecutionContext):
-
         try:
             huggingface_hub.whoami(
                 ctx.get_credentials(
@@ -492,7 +490,7 @@ class HuggingFaceHubAuthenticator:
                 ).password
             )
         except:
-            raise ValueError("Invalid API Key provided")
+            raise knext.InvalidParametersError("Invalid API Key.")
 
         return HuggingFaceAuthenticationPortObject(self.create_spec())
 
@@ -539,14 +537,13 @@ class HuggingFaceHubConnector:
         ctx: knext.ConfigurationContext,
         huggingface_auth_spec: HuggingFaceAuthenticationPortObjectSpec,
     ) -> HuggingFaceHubLLMPortObjectSpec:
-
         if not self.hub_settings.repo_id:
-            raise ValueError("Please enter a repo id")
+            raise knext.InvalidParametersError("Please enter a repo ID.")
 
         try:
             huggingface_hub.model_info(self.hub_settings.repo_id)
         except:
-            raise ValueError("Please provide correct repo id")
+            raise knext.InvalidParametersError("Please provide a valid repo ID.")
 
         return self.create_spec(huggingface_auth_spec)
 

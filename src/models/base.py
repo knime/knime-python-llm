@@ -202,7 +202,7 @@ class LLMPrompter:
             )
 
         if not self.prompt_column:
-            raise ValueError("No column selected")
+            raise knext.InvalidParametersError("No column selected.")
 
         # TODO: Append the column to the given table instead of creating a new one
         return knext.Schema.from_columns(

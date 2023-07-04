@@ -103,7 +103,7 @@ class ChromaVectorStoreCreator:
     """
     Creates a Chroma vector store from a string column and an embeddings model.
 
-    The FAISS Vector Store Creator creates a Chroma vector store from a string column containing documents and an embeddings model.
+    The Chroma Vector Store Creator creates a Chroma vector store from a string column containing documents and an embeddings model.
     For each document an embedding i.e. a numerical vector representing the document is extracted by the embeddings model and the embedding is
     stored together with the document in the vector store. Down-stream nodes such as the Vector Store Retriever use the vector store to find documents
     with similar semantic meaning given a query.

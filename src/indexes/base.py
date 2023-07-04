@@ -37,8 +37,6 @@ store_category = knext.category(
 
 
 class VectorStorePortObjectSpec(knext.PortObjectSpec):
-    def __init__(self) -> None:
-        super().__init__()
 
     def serialize(self) -> dict:
         return {}
@@ -61,19 +59,6 @@ class VectorStorePortObject(knext.PortObject):
 
     def load_store(self, ctx):
         raise NotImplementedError()
-
-    def serialize(self) -> bytes:
-        # TODO handle in subclasses and define only interface here
-        config = {"embeddings_model": self._embeddings_model}
-        return pickle.dumps(config)
-
-    @classmethod
-    def deserialize(
-        cls, spec: VectorStorePortObjectSpec, data
-    ) -> "VectorStorePortObject":
-        # TODO handle in subclasses
-        config = pickle.loads(data)
-        return cls(spec, config["embeddings_model"])
 
 
 vector_store_port_type = knext.port_type(
@@ -120,7 +105,6 @@ class FilestoreVectorstorePortObject(FilestorePortObject, VectorStorePortObject)
         folder_path: Optional[str] = None,
         vectorstore: Optional[Any] = None,
     ):
-        # TODO multiple inheritance
         super().__init__(spec, embeddings_port_object)
         self._folder_path = folder_path
         self._vectorstore = vectorstore

@@ -16,17 +16,6 @@ model_category = knext.category(
 )
 
 
-@knext.parameter_group(label="Credentials")
-class CredentialsSettings:
-    credentials_param = knext.StringParameter(
-        label="OpenAI API Key",
-        description="""
-        Credentials parameter for accessing the OpenAI API key
-        """,
-        choices=lambda a: knext.DialogCreationContext.get_credential_names(a),
-    )
-
-
 @knext.parameter_group(label="Model Settings")
 class GeneralSettings:
     temperature = knext.DoubleParameter(
@@ -58,19 +47,6 @@ class GeneralSettings:
         min_value=0.01,
         max_value=1.0,
         is_advanced=True,
-    )
-
-    max_tokens = knext.IntParameter(
-        label="Max tokens",
-        description="""
-        The maximum number of tokens to generate in the completion.
-
-        The token count of your prompt plus 
-        max_tokens cannot exceed the model's context length.
-        """,
-        default_value=50,
-        max_value=250,
-        min_value=0,
     )
 
 

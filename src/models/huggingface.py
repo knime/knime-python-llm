@@ -110,28 +110,34 @@ class HuggingFaceTextGenInferenceInputSettings:
 class HFHubTask(knext.EnumParameterOptions):
     TEXT_GENERATION = (
         "text-generation",
-        """A popular variant of Text Generation that predicts the next word given a bunch of words.
+        """
+        A popular variant of Text Generation that predicts the next word given a bunch of words.
         The most popular models for this task are GPT-based models (such as GPT-3).
         Note that model capability has to match the task.
 
         See available [models](https://huggingface.co/models?pipeline_tag=text-generation).
+
         """,
     )
     TEXT2TEXT_GENERATION = (
         "text2text-generation",
-        """Task that is used for mapping between a pair of texts 
+        """
+        Task that is used for mapping between a pair of texts 
         (e.g. translation from one language to another).
         Note that model capability has to match the task.
 
         See available [models](https://huggingface.co/models?pipeline_tag=text2text-generation).
+
         """,
     )
     SUMMARIZATION = (
         "summarization",
-        """Task that is used to summarize text.
+        """
+        Task that is used to summarize text.
         Note that model capability has to match the task.
 
         See available [models](https://huggingface.co/models?pipeline_tag=summarization).
+
         """,
     )
 
@@ -140,8 +146,9 @@ class HFHubTask(knext.EnumParameterOptions):
 class HuggingFaceHubSettings:
     repo_id = knext.StringParameter(
         label="Repo ID",
-        description="""Model name to use e.g 'Writer/camel-5b-hf'. The repo ID corresponds to '<organizetion_name>/<model_name>'. 
-        [Available model repositories](https://huggingface.co/models)""",
+        description="""Model name to use, e.g 'Writer/camel-5b-hf'. The repo ID corresponds to '<organizetion_name>/<model_name>'. 
+
+        [Available model repositories](https://huggingface.co/models).""",
         default_value="",
     )
 

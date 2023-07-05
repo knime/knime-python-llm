@@ -7,8 +7,8 @@ from knime.extension.nodes import (
     FilestorePortObject,
 )
 from .base import ToolPortObjectSpec, ToolPortObject
-from ..models.base import LLMPortObject, LLMPortObjectSpec, llm_port_type
-from ..indexes.base import (
+from models.base import LLMPortObject, LLMPortObjectSpec, llm_port_type
+from indexes.base import (
     VectorStorePortObject,
     VectorStorePortObjectSpec,
     FilestoreVectorstorePortObjectSpec,
@@ -29,7 +29,7 @@ class VectorToolPortObjectSpec(ToolPortObjectSpec):
 
     @property
     def top_k(self):
-        return self.top_k
+        return self._top_k
 
     def serialize(self) -> dict:
         return {
@@ -47,12 +47,12 @@ class VectorToolPortObject(ToolPortObject):
     def __init__(
         self,
         spec: VectorToolPortObjectSpec,
-        llm_port: LLMPortObject,
-        vectorstore_port: VectorStorePortObject,
+        llm: LLMPortObject,
+        vectorstore: VectorStorePortObject,
     ) -> None:
         super().__init__(spec)
-        self._llm = llm_port
-        self._vectorstore = vectorstore_port
+        self._llm = llm
+        self._vectorstore = vectorstore
 
     @property
     def spec(self) -> VectorToolPortObjectSpec:
@@ -66,9 +66,9 @@ class VectorToolPortObject(ToolPortObject):
     def vectorstore(self) -> VectorStorePortObject:
         return self._vectorstore
 
-    def _create_function(self, ctx):
+    def _create_function(self, ctx) -> RetrievalQA:
         llm = self._llm.create_model(ctx)
-        vectorstore = self._vectorestore_port.load_store(ctx)
+        vectorstore = self._vectorstore.load_store(ctx)
 
         return RetrievalQA.from_chain_type(
             llm=llm,
@@ -76,7 +76,7 @@ class VectorToolPortObject(ToolPortObject):
             retriever=vectorstore.as_retriever(search_kwargs={"k": self.spec.top_k}),
         )
 
-    def create(self, ctx):
+    def create(self, ctx) -> Tool:
         return Tool(
             name=self.spec.serialize()["name"],
             func=self._create_function(ctx).run,
@@ -95,9 +95,9 @@ class FilestoreVectorToolPortObjectSpec(VectorToolPortObjectSpec):
     ) -> None:
         super().__init__(name, description, top_k)
         self._llm_spec = llm_spec
-        self._llm_type = get_port_type_for_spec_type(llm_spec)
+        self._llm_type = get_port_type_for_spec_type(type(llm_spec))
         self._vectorstore_spec = vectorstore_spec
-        self._vectorstore_type = get_port_type_for_spec_type(vectorstore_spec)
+        self._vectorstore_type = get_port_type_for_spec_type(type(vectorstore_spec))
 
     @property
     def llm_spec(self) -> LLMPortObjectSpec:
@@ -139,7 +139,16 @@ class FilestoreVectorToolPortObjectSpec(VectorToolPortObjectSpec):
 
 
 class FilestoreVectorToolPortObject(VectorToolPortObject, FilestorePortObject):
+    def __init__(
+        self,
+        spec: VectorToolPortObjectSpec,
+        llm: LLMPortObject,
+        vectorstore: VectorStorePortObject,
+    ) -> None:
+        super().__init__(spec, llm, vectorstore)
+
     def write_to(self, file_path: str) -> None:
+        os.makedirs(file_path)
         llm_path = os.path.join(file_path, "llm")
         save_port_object(self.llm, llm_path)
         vectorstore_path = os.path.join(file_path, "vectorstore")
@@ -150,10 +159,10 @@ class FilestoreVectorToolPortObject(VectorToolPortObject, FilestorePortObject):
         cls, spec: FilestoreVectorToolPortObjectSpec, file_path: str
     ) -> "FilestoreVectorToolPortObject":
         llm_path = os.path.join(file_path, "llm")
-        llm = load_port_object(spec.llm_port_type, spec.llm_spec, llm_path)
+        llm = load_port_object(spec.llm_type.object_class, spec.llm_spec, llm_path)
         vectorstore_path = os.path.join(file_path, "vectorstore")
         vectorstore = load_port_object(
-            spec.vectorstore_port_type, spec.vectorstore_spec, vectorstore_path
+            spec.vectorstore_type.object_class, spec.vectorstore_spec, vectorstore_path
         )
         return cls(spec, llm, vectorstore)
 
@@ -162,8 +171,8 @@ class FilestoreVectorToolPortObject(VectorToolPortObject, FilestorePortObject):
 # such that the ToolListPortObject can load FilestoreVectorstorePortObjects via load_port_object
 _filestore_vector_tool_port_type = knext.port_type(
     "Filestore Vector Store Tool",
-    FilestoreVectorstorePortObject,
-    FilestoreVectorstorePortObjectSpec,
+    FilestoreVectorToolPortObject,
+    FilestoreVectorToolPortObjectSpec,
 )
 
 

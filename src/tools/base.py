@@ -8,7 +8,7 @@ from knime.extension.nodes import (
 )
 from typing import List
 import os
-from ..indexes.base import store_category  # TODO add separate tool category?
+from indexes.base import store_category  # TODO add separate tool category?
 
 
 class ToolPortObjectSpec(knext.PortObjectSpec):
@@ -62,7 +62,7 @@ class ToolListPortObjectSpec(knext.PortObjectSpec):
             get_port_type_for_id(spec_data["port_type"]).spec_class.deserialize(
                 spec_data["spec"]
             )
-            for spec_data in data[tool_specs]
+            for spec_data in data["tool_specs"]
         ]
         return cls(tool_specs)
 
@@ -85,7 +85,7 @@ class ToolListPortObject(FilestorePortObject):
     def write_to(self, file_path):
         os.makedirs(file_path)
         for i, tool in enumerate(self.tools):
-            tool_path = os.path.join(file_path, i)
+            tool_path = os.path.join(file_path, str(i))
             save_port_object(tool, tool_path)
 
     @classmethod
@@ -94,9 +94,9 @@ class ToolListPortObject(FilestorePortObject):
     ) -> "ToolListPortObject":
         tools = [
             load_port_object(
-                port_type.object_class, tool_spec, os.path.join(file_path, i)
+                port_type.object_class, tool_spec, os.path.join(file_path, str(i))
             )
-            for i, port_type, tool_spec in enumerate(
+            for i, (port_type, tool_spec) in enumerate(
                 zip(spec.tool_types, spec.tool_specs)
             )
         ]

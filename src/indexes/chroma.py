@@ -33,6 +33,7 @@ class ChromaVectorstorePortObjectSpec(FilestoreVectorstorePortObjectSpec):
     pass
 
 
+# TODO consider abstracting the chroma vectorstore because it is also possible to connect to a cloud hosted chroma instance
 class ChromaVectorstorePortObject(FilestoreVectorstorePortObject):
     def __init__(
         self,

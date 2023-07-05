@@ -21,9 +21,8 @@ from langchain.chains import RetrievalQA
 from langchain.tools import Tool
 
 import pandas as pd
-import pickle
 import util
-from typing import Optional, Any
+from typing import Optional, Any, List
 import os
 
 store_icon = "icons/store.png"
@@ -200,6 +199,10 @@ class VectorToolPortObjectSpec(ToolPortObjectSpec):
         super().__init__(name, description)
         self._top_k = top_k
 
+    @property
+    def top_k(self):
+        return self.top_k
+
     def serialize(self) -> dict:
         return {
             "name": self._name,
@@ -215,32 +218,35 @@ class VectorToolPortObjectSpec(ToolPortObjectSpec):
 class VectorToolPortObject(ToolPortObject):
     def __init__(
         self,
-        spec: ToolPortObjectSpec,
+        spec: VectorToolPortObjectSpec,
         llm_port: LLMPortObject,
         vectorstore_port: VectorStorePortObject,
     ) -> None:
         super().__init__(spec)
-        self._lmm_port = llm_port
-        self._vectorestore_port = vectorstore_port
+        self._llm = llm_port
+        self._vectorstore = vectorstore_port
 
-    def serialize(self) -> bytes:
-        port_objects = {"llm": self._lmm_port, "vectorstore": self._vectorestore_port}
-        return pickle.dumps(port_objects)
+    @property
+    def spec(self) -> VectorToolPortObjectSpec:
+        return super().spec
 
-    @classmethod
-    def deserialize(cls, spec: knext.PortObjectSpec, data):
-        port_objects = pickle.loads(data)
-        return cls(spec, port_objects["llm"], port_objects["vectorstore"])
+    @property
+    def llm(self) -> LLMPortObject:
+        return self._llm
+    
+    @property
+    def vectorstore(self) -> VectorStorePortObject:
+        return self._vectorstore
 
     def _create_function(self, ctx):
-        llm = self._lmm_port.create_model(ctx)
+        llm = self._llm.create_model(ctx)
         vectorstore = self._vectorestore_port.load_store(ctx)
 
         return RetrievalQA.from_chain_type(
             llm=llm,
             chain_type="stuff",
             retriever=vectorstore.as_retriever(
-                search_kwargs={"k": self.spec.serialize()["top_k"]}
+                search_kwargs={"k": self.spec.top_k}
             ),
         )
 
@@ -250,34 +256,127 @@ class VectorToolPortObject(ToolPortObject):
             func=self._create_function(ctx).run,
             description=self.spec.serialize()["description"],
         )
-
-
-class ToolListPortObjectSpec(knext.PortObjectSpec):
-    def serialize(self) -> dict:
-        return {}
-
-    @classmethod
-    def deserialize(cls, data):
-        return cls()
-
-
-class ToolListPortObject(knext.PortObject):
-    def __init__(self, spec: ToolListPortObjectSpec, tool_list) -> None:
-        super().__init__(spec)
-        self._tool_list = tool_list
+    
+class FilestoreVectorToolPortObjectSpec(VectorToolPortObjectSpec):
+    def __init__(self, name, description, top_k, llm_spec: LLMPortObjectSpec, vectorstore_spec: VectorStorePortObjectSpec) -> None:
+        super().__init__(name, description, top_k)
+        self._llm_spec = llm_spec
+        self._llm_type = get_port_type_for_spec_type(llm_spec)
+        self._vectorstore_spec = vectorstore_spec
+        self._vectorstore_type = get_port_type_for_spec_type(vectorstore_spec)
 
     @property
-    def tool_list(self):
-        return self._tool_list
+    def llm_spec(self) -> LLMPortObjectSpec:
+        return self._llm_spec
+    
+    @property
+    def llm_type(self) -> PortType:
+        return self._llm_type
+    
+    @property
+    def vectorstore_spec(self) -> VectorStorePortObjectSpec:
+        return self._vectorstore_spec
+    
+    @property
+    def vectorstore_type(self) -> PortType:
+        return self._vectorstore_type
+    
+    def serialize(self) -> dict:
+        data = super().serialize()
+        data["llm_spec"] = self.llm_spec.serialize()
+        data["llm_type"] = self.llm_type.id
+        data["vectorstore_spec"] = self.vectorstore_spec.serialize()
+        data["vectorstore_type"] = self.vectorstore_type.id
+        return data
+    
+    @classmethod
+    def deserialize(cls, data: dict) -> FilestoreVectorstorePortObject:
+        llm_type : PortType = get_port_type_for_id(data["llm_type"])
+        llm_spec = llm_type.spec_class.deserialize(data["llm_spec"])
+        vectorstore_type : PortType = get_port_type_for_id(data["vectorstore_type"])
+        vectorstore_spec = vectorstore_type.spec_class.deserialize(data["vectorstore_spec"])
+        return cls(data["name"], data["description"], data["top_k"], llm_spec, vectorstore_spec)
+    
+class FilestoreVectorToolPortObject(VectorToolPortObject, FilestorePortObject):
 
-    def serialize(self) -> bytes:
-        tool_list = {"tool_list": self._tool_list}
-        return pickle.dumps(tool_list)
+    def write_to(self, file_path: str) -> None:
+        llm_path = os.path.join(file_path, "llm")
+        save_port_object(self.llm, llm_path)
+        vectorstore_path = os.path.join(file_path, "vectorstore")
+        save_port_object(self._vectorstore, vectorstore_path)
 
     @classmethod
-    def deserialize(cls, spec: ToolListPortObjectSpec, data):
-        tool_list = pickle.loads(data)
-        return cls(spec, tool_list["tool_list"])
+    def read_from(cls, spec: FilestoreVectorToolPortObjectSpec, file_path: str) -> "FilestoreVectorToolPortObject":
+        llm_path = os.path.join(file_path, "llm")
+        llm = load_port_object(spec.llm_port_type, spec.llm_spec, llm_path)
+        vectorstore_path = os.path.join(file_path, "vectorstore")
+        vectorstore = load_port_object(spec.vectorstore_port_type, spec.vectorstore_spec, vectorstore_path)
+        return cls(spec, llm, vectorstore)
+
+# not actually output by any node but needs to be registered in the framework,
+# such that the ToolListPortObject can load FilestoreVectorstorePortObjects via load_port_object
+_filestore_vector_tool_port_type = knext.port_type("Filestore Vector Store Tool", FilestoreVectorstorePortObject, FilestoreVectorstorePortObjectSpec)
+
+class ToolListPortObjectSpec(knext.PortObjectSpec):
+
+    def __init__(self, tool_specs: List[ToolPortObjectSpec]) -> None:
+        self._tool_specs = tool_specs
+        self._tool_types = [get_port_type_for_spec_type(type(spec)) for spec in tool_specs]
+
+    @property
+    def tool_types(self) -> List[PortType]:
+        return self._tool_types
+    
+    @property
+    def tool_specs(self) -> List[ToolPortObjectSpec]:
+        return self._tool_specs
+
+    def serialize(self) -> dict:
+        return {
+            "tool_specs": [
+                {
+                    "port_type": port_type.id,
+                    "spec": spec.serialize()
+                }
+                for port_type, spec in zip(self.tool_types, self.tool_specs)
+            ]
+        }
+
+    @classmethod
+    def deserialize(cls, data) -> "ToolListPortObjectSpec":
+        tool_specs = [
+            get_port_type_for_id(spec_data["port_type"]).spec_class.deserialize(spec_data["spec"]) 
+            for spec_data in data[tool_specs]
+        ]
+        return cls(tool_specs)
+
+
+class ToolListPortObject(FilestorePortObject):
+    def __init__(self, spec: ToolListPortObjectSpec, tools: List[ToolPortObject]) -> None:
+        super().__init__(spec)
+        self._tool_list = tools
+
+    @property
+    def spec(self) -> ToolListPortObjectSpec:
+        return super().spec
+
+    @property
+    def tools(self) -> List[ToolPortObject]:
+        return self._tool_list
+    
+    def write_to(self, file_path):
+        os.makedirs(file_path)
+        for i, tool in enumerate(self.tools):
+            tool_path = os.path.join(file_path, i)
+            save_port_object(tool, tool_path)
+
+    @classmethod
+    def read_from(cls, spec: ToolListPortObjectSpec, file_path:str) -> "ToolListPortObject":
+        tools = [
+            load_port_object(port_type.object_class, tool_spec, os.path.join(file_path, i))
+            for i, port_type, tool_spec in enumerate(zip(spec.tool_types, spec.tool_specs))
+        ]
+        return cls(spec, tools)
 
 
 tool_list_port_type = knext.port_type(
@@ -371,7 +470,7 @@ class VectorStoreRetriever:
 # TODO: Add better descriptions
 @knext.node(
     "Vector Store to Agent Tool",
-    knext.NodeType.SOURCE,
+    knext.NodeType.MANIPULATOR,
     icon_path="icons/store.png",
     category=store_category,
 )
@@ -419,31 +518,29 @@ class VectorStoreToTool:
         ctx: knext.ConfigurationContext,
         llm_spec: LLMPortObjectSpec,
         vectorstore_spec: VectorStorePortObjectSpec,
-    ):
-        return ToolListPortObjectSpec()
+    ) -> ToolListPortObjectSpec:
+        tool_spec = self._create_tool_spec(llm_spec, vectorstore_spec)
+        return ToolListPortObjectSpec([tool_spec])
+    
+    def _create_tool_spec(self, llm_spec: LLMPortObjectSpec, vectorstore_spec: VectorStorePortObjectSpec) -> FilestoreVectorstorePortObjectSpec:
+        return FilestoreVectorToolPortObjectSpec(self.tool_name, self.tool_description, self.top_k, llm_spec, vectorstore_spec)
 
     def execute(
         self,
         ctx: knext.ExecutionContext,
-        llm_port: LLMPortObject,
+        llm: LLMPortObject,
         vectorstore: VectorStorePortObject,
-    ):
-        tool_list = []
-        tool_list.append(
-            VectorToolPortObject(
-                spec=VectorToolPortObjectSpec(
-                    self.tool_name, self.tool_description, self.top_k
-                ),
-                llm_port=llm_port,
-                vectorstore_port=vectorstore,
+    ) -> ToolListPortObject:
+        tool = FilestoreVectorToolPortObject(
+                spec=self._create_tool_spec(llm.spec, vectorstore.spec),
+                llm=llm,
+                vectorstore=vectorstore,
             )
-        )
-
-        return ToolListPortObject(ToolListPortObjectSpec(), tool_list)
+        return ToolListPortObject(ToolListPortObjectSpec([tool.spec]), [tool])
 
 
 @knext.node(
-    "Tool Concatinator",
+    "Tool Concatenator",
     knext.NodeType.SOURCE,
     icon_path="icons/store.png",
     category=store_category,
@@ -473,7 +570,7 @@ class ToolCombiner:
         spec_one: ToolListPortObjectSpec,
         spec_two: ToolListPortObjectSpec,
     ):
-        return ToolListPortObjectSpec()
+        return ToolListPortObjectSpec([spec_one, spec_two])
 
     def execute(
         self,
@@ -481,6 +578,5 @@ class ToolCombiner:
         object_one: ToolListPortObject,
         object_two: ToolListPortObject,
     ):
-        object_one._tool_list = object_one._tool_list + object_two.tool_list
-
-        return object_one
+        tools = object_one.tools + object_two.tools
+        return ToolListPortObject(ToolListPortObjectSpec([object_one.spec, object_two.spec]), tools)

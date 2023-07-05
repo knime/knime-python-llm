@@ -8,7 +8,7 @@ from models.base import (
     LLMPortObject,
     llm_port_type,
 )
-from ..tools.base import (
+from tools.base import (
     tool_list_port_type,
     ToolListPortObject,
     ToolListPortObjectSpec,
@@ -27,10 +27,7 @@ import os
 from langchain import PromptTemplate
 
 
-from langchain.agents import (
-    ConversationalAgent,
-    AgentExecutor,
-)
+import langchain.agents
 
 from langchain.prompts import MessagesPlaceholder
 from langchain.memory import (
@@ -92,6 +89,7 @@ class ChatMessageSettings:
         "Chat message", "Message to send to the agent."
     )
 
+    # TODO this should be in the agent creator
     system_prefix = knext.StringParameter(
         "Agent prompt prefix",
         """The prefix that will be added to the agent prompt to guide its behavior. 
@@ -182,7 +180,7 @@ class AgentPortObjectSpec(knext.PortObjectSpec):
         self._llm_spec = llm_spec
         self._llm_type = get_port_type_for_spec_type(type(llm_spec))
         self._tools_spec = tools_spec
-        self._tools_type = get_port_type_for_id(type(tools_spec))
+        self._tools_type = get_port_type_for_spec_type(type(tools_spec))
 
     @property
     def llm_spec(self) -> LLMPortObjectSpec:
@@ -421,21 +419,21 @@ class AgentExecutor:
         ):
             self.load_messages_from_input_table(memory, chat_history_df)
 
-        tool_list = agent.tool_list
+        tool_list = agent.tools.tools
         tools = [tool.create(ctx) for tool in tool_list]
 
-        llm = agent.model.create_model(ctx)
+        llm = agent.llm.create_model(ctx)
 
         chat_history = MessagesPlaceholder(variable_name="chat_history")
 
-        agent = ConversationalAgent.from_llm_and_tools(
+        agent = langchain.agents.ConversationalAgent.from_llm_and_tools(
             llm=llm,
             tools=tools,
             prefix=prefix,
             input_variables=["chat_history", "input", "agent_scratchpad"],
         )
 
-        agent_exec = AgentExecutor(
+        agent_exec = langchain.agents.AgentExecutor(
             memory=memory, agent=agent, tools=tools, verbose=True
         )
 
@@ -449,8 +447,8 @@ class AgentExecutor:
             [self.history_settings.type_column, self.history_settings.message_column]
         ].copy()
 
-        user_input_row = ["input", self.message_settings.chat_message]
-        agent_output_row = ["output", response]
+        user_input_row = ["Human", self.message_settings.chat_message]
+        agent_output_row = ["AI", response]
 
         new_df.loc[f"Row{len(new_df)}"] = user_input_row
         new_df.loc[f"Row{len(new_df)}"] = agent_output_row

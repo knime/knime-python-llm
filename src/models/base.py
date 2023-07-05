@@ -59,7 +59,6 @@ class ChatConversationSettings:
 
 @knext.parameter_group(label="Credentials")
 class CredentialsSettings:
-
     def __init__(self, label, description):
         def _get_default_credentials(identifier):
             result = knext.DialogCreationContext.get_credential_names(identifier)
@@ -224,11 +223,12 @@ class LLMPrompter:
         llm_port: LLMPortObject,
         input_table: knext.Table,
     ):
+
         llm = llm_port.create_model(ctx)
 
         prompts = input_table.to_pandas()
 
-        answers = [llm(prompt) for prompt in prompts[self.prompt_column]]
+        answers = [llm.predict(prompt) for prompt in prompts[self.prompt_column]]
 
         prompts["Prompt Result"] = answers
 
@@ -240,11 +240,9 @@ class LLMPrompter:
 @knext.node("Chat Model Prompter", knext.NodeType.PREDICTOR, "", model_category)
 @knext.input_port("Chat Model Port", "A chat model model.", chat_model_port_type)
 @knext.input_table(
-    "Conversation Table", "A table containing an empty or filled conversation."
+    "Conversation", "A table containing an empty or filled conversation."
 )
-@knext.output_table(
-    "Conversation Table", "A table containing the conversation history."
-)
+@knext.output_table("Conversation", "A table containing the conversation history.")
 class ChatModelPrompter:
     """
 

@@ -9,3 +9,6 @@ import models.openai
 import models.gpt4all
 
 import agents.base
+
+import tools.base
+import tools.vectorstore

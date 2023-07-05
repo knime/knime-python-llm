@@ -9,7 +9,7 @@ from models.base import (
     LLMPortObject,
     llm_port_type,
 )
-from indexes.base import (
+from ..tools.base import (
     tool_list_port_type,
     ToolListPortObject,
     ToolListPortObjectSpec,

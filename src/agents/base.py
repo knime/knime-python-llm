@@ -6,7 +6,6 @@ import util
 from models.base import (
     LLMPortObjectSpec,
     LLMPortObject,
-    llm_port_type,
 )
 from tools.base import (
     tool_list_port_type,
@@ -23,6 +22,8 @@ from knime.extension.nodes import (
 )
 
 import os
+
+import langchain
 
 from langchain import PromptTemplate
 
@@ -61,41 +62,25 @@ class CredentialsSettings:
     )
 
 
-@knext.parameter_group(label="Chat History Settings")
-class ChatHistorySettings:
-    type_column = knext.ColumnParameter(
-        "Message Type", "Specifies the sender of the messages.", port_index=1
+@knext.parameter_group(label="Conversation Settings")
+class ConversationSettings:
+    role_column = knext.ColumnParameter(
+        "Message role", "Specifies the role of messages in the conversation. The contained values should be either Human or AI.", port_index=2
     )
 
-    message_column = knext.ColumnParameter(
-        "Messages",
-        "Represents the chat messages exchanged between the agent and the user.",
-        port_index=1,
-    )
-
-    history_length = knext.IntParameter(
-        "History length",
-        """Specifies the number of chat messages to be considered as history in the next prompt.
-        It is recommended to keep this value relatively low to manage token usage efficiently.
-        A higher value will consume more memory and tokens.""",
-        default_value=5,
-        is_advanced=True,
+    content_column = knext.ColumnParameter(
+        "Message content",
+        "Contains the content of the messages in the conversation.",
+        port_index=2,
     )
 
 
-@knext.parameter_group(label="Chat Message Settings")
+@knext.parameter_group(label="Prompt Settings")
 class ChatMessageSettings:
-    chat_message = knext.StringParameter(
-        "Chat message", "Message to send to the agent."
+    user_prompt = knext.StringParameter(
+        "Prompt", "Message to send to the agent."
     )
 
-    # TODO this should be in the agent creator
-    system_prefix = knext.StringParameter(
-        "Agent prompt prefix",
-        """The prefix that will be added to the agent prompt to guide its behavior. 
-        For example, you can set it to 'You are a friendly KNIME assistant' to shape 
-        the agent's response accordingly.""",
-    )
 
 
 # TODO: Currently not used
@@ -167,20 +152,22 @@ class MemoryTypeSettings:
         MemoryOptions,
     )
 
+    memory_window_size = knext.IntParameter(
+        "Memory window size",
+        """Specifies the number chat messages the Conversation Buffer Window Memory includes. Only active for Conersation Buffer Window Memory.""",
+        default_value=5,
+        is_advanced=True,
+    )
+
 
 # TODO: Add agent type in the future?
 class AgentPortObjectSpec(knext.PortObjectSpec):
     def __init__(
         self,
-        memory_type,
         llm_spec: LLMPortObjectSpec,
-        tools_spec: ToolListPortObjectSpec,
     ) -> None:
-        self._memory_type = memory_type
         self._llm_spec = llm_spec
         self._llm_type = get_port_type_for_spec_type(type(llm_spec))
-        self._tools_spec = tools_spec
-        self._tools_type = get_port_type_for_spec_type(type(tools_spec))
 
     @property
     def llm_spec(self) -> LLMPortObjectSpec:
@@ -190,89 +177,66 @@ class AgentPortObjectSpec(knext.PortObjectSpec):
     def llm_type(self) -> knext.PortType:
         return self._llm_type
 
-    @property
-    def tools_spec(self) -> ToolListPortObjectSpec:
-        return self._tools_spec
-
-    @property
-    def tools_type(self) -> knext.PortType:
-        return self._tools_type
-
-    @property
-    def memory_type(self):
-        return self._memory_type
-
     def serialize(self) -> dict:
         return {
-            "memory_type": self._memory_type,
             "llm": {"type": self.llm_type.id, "spec": self.llm_spec.serialize()},
-            "tools": {"type": self.tools_type.id, "spec": self.tools_spec.serialize()},
         }
+    
+    @classmethod
+    def deserialize_llm_spec(cls, data: dict):
+        llm_data = data["llm"]
+        return get_port_type_for_id(llm_data["type"]).spec_class.deserialize(
+            llm_data["spec"]
+        )
 
     @classmethod
     def deserialize(cls, data: dict) -> "AgentPortObjectSpec":
-        llm_data = data["llm"]
-        llm_spec = get_port_type_for_id(llm_data["type"]).spec_class.deserialize(
-            llm_data["spec"]
-        )
-        tools_data = data["tools"]
-        tools_spec = get_port_type_for_id(tools_data["type"]).spec_class.deserialize(
-            tools_data["spec"]
-        )
-        return cls(data["memory_type"], llm_spec, tools_spec)
+        return cls(cls.deserialize_llm_spec(data))
 
 
 class AgentPortObject(FilestorePortObject):
     def __init__(
         self,
         spec: AgentPortObjectSpec,
-        llm: LLMPortObject,
-        tools: ToolListPortObject,
+        llm: LLMPortObject
     ) -> None:
         super().__init__(spec)
         self._llm = llm
-        self._tools = tools
 
     @property
     def llm(self) -> LLMPortObject:
         return self._llm
 
-    @property
-    def tools(self) -> ToolListPortObject:
-        return self._tools
+    
+    def create_agent(self, ctx, tools):
+        raise NotImplementedError()
 
     def write_to(self, file_path):
         os.makedirs(file_path)
         llm_path = os.path.join(file_path, "llm")
         save_port_object(self.llm, llm_path)
-        tools_path = os.path.join(file_path, "tools")
-        save_port_object(self.tools, tools_path)
 
     @classmethod
     def read_from(cls, spec: AgentPortObjectSpec, file_path: str) -> "AgentPortObject":
         llm_path = os.path.join(file_path, "llm")
         llm = load_port_object(spec.llm_type.object_class, spec.llm_spec, llm_path)
-        tools_path = os.path.join(file_path, "tools")
-        tools = load_port_object(
-            spec.tools_type.object_class, spec.tools_spec, tools_path
-        )
-        return cls(spec, llm, tools)
+        return cls(spec, llm)
 
 
 agent_port_type = knext.port_type("Agent", AgentPortObject, AgentPortObjectSpec)
 
 
-@knext.node(
-    "LLM Agent Creator",
-    knext.NodeType.SOURCE,
-    agent_icon,
-    category=agent_category,
-)
-@knext.input_port("LLM", "A large language model.", llm_port_type)
-@knext.input_port(
-    "Tool List", "A list of tools for the agent to use.", tool_list_port_type
-)
-@knext.output_port("Agent", "A configured agent.", agent_port_type)
+# @knext.node(
+#     "LLM Agent Creator",
+#     knext.NodeType.SOURCE,
+#     agent_icon,
+#     category=agent_category,
+# )
+# @knext.input_port("LLM", "A large language model.", llm_port_type)
+# @knext.input_port(
+#     "Tool List", "A list of tools for the agent to use.", tool_list_port_type
+# )
+# @knext.output_port("Agent", "A configured agent.", agent_port_type)
 class LLMAgentCreator:
     """
     Creates an LLM-based agent equipped with the provided tools.
@@ -307,15 +271,15 @@ class LLMAgentCreator:
         )
 
 
-@knext.node(
-    "Agent Executor",
-    knext.NodeType.PREDICTOR,
-    agent_icon,
-    category=agent_category,
-)
-@knext.input_port("Agent", "Configured agent.", agent_port_type)
-@knext.input_table("Chat History", "Table containing the chat history for the agent.")
-@knext.output_table("Chat History", "Table containing the chat history for the agent.")
+# @knext.node(
+#     "Agent Executor",
+#     knext.NodeType.PREDICTOR,
+#     agent_icon,
+#     category=agent_category,
+# )
+# @knext.input_port("Agent", "Configured agent.", agent_port_type)
+# @knext.input_table("Chat History", "Table containing the chat history for the agent.")
+# @knext.output_table("Chat History", "Table containing the chat history for the agent.")
 class AgentExecutor:
     """
     Executes a chat agent equipped with tools and memory.
@@ -325,7 +289,7 @@ class AgentExecutor:
 
     """
 
-    history_settings = ChatHistorySettings()
+    history_settings = ConversationSettings()
     message_settings = ChatMessageSettings()
 
     def load_messages_from_input_table(
@@ -365,8 +329,8 @@ class AgentExecutor:
 
         return knext.Schema.from_columns(
             [
-                knext.Column(knext.string(), self.history_settings.type_column),
-                knext.Column(knext.string(), self.history_settings.message_column),
+                knext.Column(knext.string(), self.history_settings.role_column),
+                knext.Column(knext.string(), self.history_settings.content_column),
             ]
         )
 
@@ -438,7 +402,7 @@ class AgentExecutor:
         )
 
         response = agent_exec.run(
-            input=self.message_settings.chat_message,
+            input=self.message_settings.user_prompt,
             chat_history=chat_history,
             prompt=prompt,
         )
@@ -447,7 +411,145 @@ class AgentExecutor:
             [self.history_settings.type_column, self.history_settings.message_column]
         ].copy()
 
-        user_input_row = ["Human", self.message_settings.chat_message]
+        user_input_row = ["Human", self.message_settings.user_prompt]
+        agent_output_row = ["AI", response]
+
+        new_df.loc[f"Row{len(new_df)}"] = user_input_row
+        new_df.loc[f"Row{len(new_df)}"] = agent_output_row
+
+        return knext.Table.from_pandas(new_df)
+
+
+@knext.node(
+    "Agent Prompter",
+    knext.NodeType.PREDICTOR,
+    agent_icon,
+    category=agent_category,
+)
+@knext.input_port("Agent", "The agent to prompt.", agent_port_type)
+@knext.input_port("Tools", "The tools the agent can use.", tool_list_port_type)
+@knext.input_table("Conversation",
+                    """Table containing the conversation that was held so far with the agent. 
+                    Has to contain at least two string columns.
+                    A content column containing the content of previous messages and a role column specifying who the message is from (values hould be either AI or Human).
+                    """)
+@knext.output_table("Continued conversation", 
+                    """The conversation table extended by two rows.
+                    One row for the user's prompt and one row for the agent's response.
+                    Can be used as input in subsequent Agent Prompter executions to continue the conversation further.
+                    """)
+class AgentPrompter:
+    """
+    Combines an agent with a set of tools and prompts it with a user provided prompt.
+
+    The chat history table is expected to have at least two string columns and be
+    either empty or filled by a previous agent execution.
+    The agent always receives the full conversation table as context which can slow down
+    agent execution for long conversations or even lead to execution failures if the context becomes
+    too large for the underlying large language model.
+    If you experience such issues, you can just truncate the conversation table by only keeping the last
+    few messages, or even use a large language model to create a summary of the conversation held so far.
+    """
+
+    history_settings = ConversationSettings()
+    message_settings = ChatMessageSettings()
+
+    def load_messages_from_input_table(
+        self, memory: ConversationBufferMemory, chat_history_df: pd.DataFrame
+    ):
+        for index in range(0, len(chat_history_df), 2):
+            memory.save_context(
+                {"input": chat_history_df.loc[f"Row{index}"].at["Message"]},
+                {"output": chat_history_df.loc[f"Row{index+1}"].at["Message"]},
+            )
+
+    def configure(
+        self,
+        ctx: knext.ConfigurationContext,
+        agent_spec: AgentPortObjectSpec,
+        tools_spec: ToolListPortObjectSpec,
+        input_table_spec: knext.Schema,
+    ):
+        if len(input_table_spec.column_names) < 2:
+            raise knext.InvalidParametersError(
+                "Please provide at least two String columns."
+            )
+
+        if self.history_settings.role_column == self.history_settings.content_column:
+            raise knext.InvalidParametersError(
+                "Type and Message columns cannot be the same."
+            )
+
+        for c in input_table_spec:
+            if (
+                c.name == self.history_settings.role_column
+                or c.name == self.history_settings.content_column
+            ):
+                if not util.is_nominal(c):
+                    raise knext.InvalidParametersError(
+                        f"{c.name} has to be a String column."
+                    )
+
+        return knext.Schema.from_columns(
+            [
+                knext.Column(knext.string(), self.history_settings.role_column),
+                knext.Column(knext.string(), self.history_settings.content_column),
+            ]
+        )
+
+    def execute(
+        self,
+        ctx: knext.ExecutionContext,
+        agent_obj: AgentPortObject,
+        tools_obj: ToolListPortObject,
+        input_table: knext.Table,
+    ):
+        chat_history_df = input_table.to_pandas()
+
+        # if agent.spec.memory_type == "CONVERSATION_BUFFER_MEMORY":
+        #     memory = ConversationBufferMemory(
+        #         memory_key="chat_history",
+        #         input_key="input",
+        #         return_messages=True,
+        #     )
+        # else:
+        #     memory = ConversationBufferWindowMemory(
+        #         k=self.history_settings.history_length,
+        #         memory_key="chat_history",
+        #         input_key="input",
+        #         return_messages=True,
+        #     )
+        
+        # TODO more memory variants
+        # TODO return messages might depend on the type of model (i.e. chat needs it llm doesn't)?
+        memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+
+        roles = chat_history_df[self.history_settings.role_column]
+        contents = chat_history_df[self.history_settings.content_column]
+        for index in range(0, len(chat_history_df), 2):
+            memory.save_context(
+                {roles[index]: contents[index]},
+                {roles[index + 1]: contents[index + 1]},
+            )
+
+        tools = tools_obj.create_tools(ctx)
+        agent = agent_obj.create_agent(ctx, tools)
+
+        langchain.debug = True
+
+        agent_exec = langchain.agents.AgentExecutor(
+            memory=memory, agent=agent, tools=tools, verbose=True
+        )
+
+        response = agent_exec.run(
+            input=self.message_settings.user_prompt
+        )
+
+        new_df = chat_history_df[
+            [self.history_settings.role_column, self.history_settings.content_column]
+        ].copy()
+
+        user_input_row = ["Human", self.message_settings.user_prompt]
         agent_output_row = ["AI", response]
 
         new_df.loc[f"Row{len(new_df)}"] = user_input_row

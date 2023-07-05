@@ -9,6 +9,7 @@ from knime.extension.nodes import (
 from typing import List
 import os
 from indexes.base import store_category  # TODO add separate tool category?
+from langchain.tools import Tool
 
 
 class ToolPortObjectSpec(knext.PortObjectSpec):
@@ -29,7 +30,7 @@ class ToolPortObject(knext.PortObject):
     def __init__(self, spec: ToolPortObjectSpec) -> None:
         super().__init__(spec)
 
-    def create(self):
+    def create(self, ctx):
         raise NotImplementedError()
 
 
@@ -81,6 +82,10 @@ class ToolListPortObject(FilestorePortObject):
     @property
     def tools(self) -> List[ToolPortObject]:
         return self._tool_list
+    
+    def create_tools(self, ctx) -> List[Tool]:
+        return [tool.create(ctx) for tool in self.tools]
+
 
     def write_to(self, file_path):
         os.makedirs(file_path)

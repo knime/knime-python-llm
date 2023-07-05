@@ -102,7 +102,7 @@ class LLMPortObject(knext.PortObject):
 llm_port_type = knext.port_type("LLM Port", LLMPortObject, LLMPortObjectSpec)
 
 
-class ChatModelPortObjectSpec(knext.PortObjectSpec):
+class ChatModelPortObjectSpec(LLMPortObjectSpec):
     def serialize(self):
         return {}
 
@@ -111,7 +111,7 @@ class ChatModelPortObjectSpec(knext.PortObjectSpec):
         return cls()
 
 
-class ChatModelPortObject(knext.PortObject):
+class ChatModelPortObject(LLMPortObject):
     def __init__(self, spec: ChatModelPortObjectSpec) -> None:
         super().__init__(spec)
 

@@ -128,7 +128,7 @@ class FilestoreVectorstorePortObject(FilestorePortObject, VectorStorePortObject)
             # copy the folder structures if we have a folder path from read_from
             shutil.copytree(self._vectorstore_path, os.path.join(file_path, "vectorstore"))
         else:
-            self.save_vectorstore(self._vectorstore_path, self._vectorstore)
+            self.save_vectorstore(os.path.join(file_path, "vectorstore"), self._vectorstore)
 
     def save_vectorstore(self, vectorstore_folder, vectorstore):
         raise NotImplementedError()

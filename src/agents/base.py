@@ -62,15 +62,14 @@ class ChatHistorySettings:
     )
 
     message_column = knext.ColumnParameter(
-        "Messages", "Message sent to and from the agent.", port_index=1
+        "Messages", "Represents the chat messages exchanged between the agent and the user.", port_index=1
     )
 
     history_length = knext.IntParameter(
         "History length",
-        """How many chat messages will be considered as history in the next prompt.
-        It is recommended to keep this fairly low, as more memory will increase the token
-        usage.
-        """,
+        """Specifies the number of chat messages to be considered as history in the next prompt.
+        It is recommended to keep this value relatively low to manage token usage efficiently.
+        A higher value will consume more memory and tokens.""",
         default_value=5,
         is_advanced=True,
     )
@@ -79,13 +78,14 @@ class ChatHistorySettings:
 @knext.parameter_group(label="Chat Message Settings")
 class ChatMessageSettings:
     chat_message = knext.StringParameter(
-        "Chat message", "Message to send to the Chat Agent."
+        "Chat message", "Message to send to the agent."
     )
 
     system_prefix = knext.StringParameter(
         "Agent prompt prefix",
-        """The prefix will be used for a better control on Agent's behaviour. Example: 
-        'You are a friendly KNIME assisstant'.""",
+        """The prefix that will be added to the agent prompt to guide its behavior. 
+        For example, you can set it to 'You are a friendly KNIME assistant' to shape 
+        the agent's response accordingly.""",
     )
 
 
@@ -132,13 +132,23 @@ class MemoryTypeSettings:
     class MemoryOptions(knext.EnumParameterOptions):
         CONVERSATION_BUFFER_MEMORY = (
             "Conversation Buffer Memory",
-            """ This memory allows for storing of messages and then extracts the messages in a variable.""",
+            """Simple yet effective method of storing and recalling past conversations
+            between a human and an AI. It retains the entire history of the conversation,
+            allowing the AI to access and reference previous exchanges with each new
+            message. This ensures that the context of the ongoing conversation is
+            preserved and readily available. However, it's important to note that
+            using this method may lead to a rapid increase in token usage as the
+            conversation progresses.""",
         )
         CONVERSATION_BUFFER_WINDOW_MEMORY = (
             "Conversation Buffer Window Memory",
-            """It keeps a list of the interactions of the conversation over time. It only uses the last K 
-            interactions. This can be useful for keeping a sliding window of the most recent interactions, 
-            so the buffer does not get too large.""",
+            """A more optimized approach to storing and accessing past conversations
+            between a human and an AI. While it retains the input of the entire conversation,
+            it only sends a specified number of recent messages (the "history length") with each
+            new message. This controlled window of conversation history helps manage token
+            usage more efficiently, ensuring that the growth of tokens remains predictable
+            and within a predetermined limit. By limiting the number of messages sent, this
+            method strikes a balance between preserving context and controlling resource consumption.""",
         )
 
     memory = knext.EnumParameter(
@@ -212,15 +222,12 @@ agent_port_type = knext.port_type("Agent", AgentPortObject, AgentPortObjectSpec)
 @knext.output_port("Agent", "A configured agent.", agent_port_type)
 class LLMAgentCreator:
     """
+    Creates an LLM-based agent equipped with the provided tools.
 
-    Creates a LLM based agent equipped with tools provided.
-    Currently only ConversationalAgent is available and selected by default.
+    Currently, only the **Conversational** agent type is available.
 
-    [Conversational Agent](https://python.langchain.com/docs/modules/agents/agent_types/chat_conversation_agent)
-    is optimized for conversation. It expects to be used with a memory component.
-
-    Available memory options are: Conversation Buffer Memory and Conversation Buffer Window Memory.
-    See parameter settings for more details on memory types.
+    [Conversational agents](https://python.langchain.com/docs/modules/agents/agent_types/chat_conversation_agent)
+    are optimized for conversation. They expect to be used with a memory component.
 
     """
 
@@ -257,12 +264,11 @@ class LLMAgentCreator:
     agent_icon,
     category=agent_category,
 )
-@knext.input_port("Agent", "Configured agent", agent_port_type)
+@knext.input_port("Agent", "Configured agent.", agent_port_type)
 @knext.input_table("Chat History", "Table containing the chat history for the agent.")
 @knext.output_table("Chat History", "Table containing the chat history for the agent.")
 class AgentExecutor:
     """
-
     Executes a chat agent equipped with tools and memory.
 
     The memory table is expected to have at least two string columns and be

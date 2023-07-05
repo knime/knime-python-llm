@@ -9,6 +9,7 @@ from .base import (
     EmbeddingsPortObject,
     model_category,
     GeneralSettings,
+    CredentialsSettings
 )
 
 # Langchain imports
@@ -36,18 +37,6 @@ LOGGER = logging.getLogger(__name__)
 
 
 # == SETTINGS ==
-
-
-@knext.parameter_group(label="Credentials")
-class CredentialsSettings:
-    credentials_param = knext.StringParameter(
-        label="OpenAI API Key",
-        description="""
-        Credentials parameter for accessing the provided OpenAI API key.
-        """,
-        choices=lambda a: knext.DialogCreationContext.get_credential_names(a),
-    )
-
 
 # @knext.parameter_group(label="Model Settings") -- Imported
 class OpenAIGeneralSettings(GeneralSettings):
@@ -147,7 +136,7 @@ class LLMLoaderInputSettings:
 
     default_model_name = knext.EnumParameter(
         "Model ID",
-        "GPT-3 (Ada, Babbage, Curie) and GPT-3.5 (Davinci) models.",
+        "Select the OpenAI model ID to be used.",
         OpenAIModelCompletionsOptions.Ada.name,
         OpenAIModelCompletionsOptions,
     )
@@ -160,8 +149,7 @@ class ChatModelLoaderInputSettings:
     class OpenAIModelCompletionsOptions(knext.EnumParameterOptions):
         Turbo = (
             "gpt-3.5-turbo",
-            """Most capable GPT-3.5 model and optimized for chat at 1/10th the cost of text-davinci-003. 
-            Will be updated with our latest model iteration 2 weeks after it is released.""",
+            """Most capable GPT-3.5 model and optimized for chat at 1/10th the cost of text-davinci-003.""",
         )
         Turbo_16k = (
             "gpt-3.5-turbo-16k",
@@ -169,18 +157,16 @@ class ChatModelLoaderInputSettings:
         )
         GPT_4 = (
             "gpt-4",
-            """More capable than any GPT-3.5 model, able to do more complex tasks, and optimized for chat. 
-            Will be updated with our latest model iteration 2 weeks after it is released.""",
+            """More capable than any GPT-3.5 model, able to do more complex tasks, and optimized for chat.""",
         )
         GPT_4_32k = (
             "gpt-4-32k",
-            """Same capabilities as the base gpt-4 mode but with 4x the context length. Will be updated 
-            with our latest model iteration.""",
+            """Same capabilities as the base gpt-4 mode but with 4x the context length.""",
         )
 
     model_name = knext.EnumParameter(
         "Model ID",
-        "GPT-3.5 turbo, GPT-3.5 turbo 16k, GPT-4, GPT-4 32k",
+        "Select the chat-optimized OpenAI model ID to be used.",
         OpenAIModelCompletionsOptions.Turbo.name,
         OpenAIModelCompletionsOptions,
     )
@@ -202,7 +188,7 @@ class EmbeddingsLoaderInputSettings:
 
     model_name = knext.EnumParameter(
         "Model ID",
-        "Ada text embedding models",
+        "Select the Ada text embedding model to be used.",
         OpenAIEmbeddingsOptions.Ada1.name,
         OpenAIEmbeddingsOptions,
     )
@@ -444,7 +430,6 @@ openai_embeddings_port_type = knext.port_type(
 # == Nodes ==
 
 
-# TODO: Better node description text
 @knext.node(
     "OpenAI Authenticator",
     knext.NodeType.SOURCE,
@@ -453,27 +438,29 @@ openai_embeddings_port_type = knext.port_type(
 )
 @knext.output_port(
     "OpenAI Authentication",
-    "Successful authentication to OpenAI.",
+    "Validated authentication for OpenAI.",
     openai_authentication_port_type,
 )
 class OpenAIAuthenticator:
     """
-
-    Authenticates the OpenAI API Key.
+    Authenticates the OpenAI API key.
 
     This node validates the provided OpenAI API key by making a
     request to the https://api.openai.com/v1/models endpoint.
 
-    Use the
-    [Credentials Configuration Node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
-    to provide the API key in a credentials object.
+    The node expects the OpenAI API key to be provided via the *password* field of the [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory).
 
-    If you dont have a OpenAI API key yet, generate one at
+    If you don't have an OpenAI API key yet, you can generate one at
     [OpenAI](https://platform.openai.com/account/api-keys).
 
     """
 
-    credentials_settings = CredentialsSettings()
+    credentials_settings = CredentialsSettings(
+        label="OpenAI API Key",
+        description="""
+        The OpenAI API key provided via the *password* field of the Credentials Configuration node.
+        """,
+    )
 
     def configure(
         self, ctx: knext.ConfigurationContext
@@ -514,24 +501,21 @@ class OpenAIAuthenticator:
 )
 @knext.input_port(
     "OpenAI Authentication",
-    "OpenAI Connection",
+    "Validated authentication for OpenAI.",
     openai_authentication_port_type,
 )
 @knext.output_port(
     "OpenAI LLM",
-    "Configured OpenAI LLM connection",
+    "Configured OpenAI LLM connection.",
     openai_llm_port_type,
 )
 class OpenAILLMConnector:
     """
-
     Connects to an OpenAI Large Language Model.
 
-    Given the successful authentication through the OpenAI Authenticator Node,
-    choose one of the available LLMs from either a predefined list or through
-    the advanced options from all available models that are available and fit
-    the task downstream.
-
+    This node establishes a connection with an OpenAI Large Language Model (LLM). After successfully authenticating
+    using the **OpenAI Authenticator node**, you can select an LLM from a predefined list
+    or explore advanced options to find the most suitable model for your downstream task.
     """
 
     input_settings = LLMLoaderInputSettings()
@@ -581,24 +565,21 @@ class OpenAILLMConnector:
 )
 @knext.input_port(
     "OpenAI Authentication",
-    "OpenAI Connection",
+    "Validated authentication for OpenAI.",
     openai_authentication_port_type,
 )
 @knext.output_port(
     "OpenAI Chat Model",
-    "Configured OpenAI Chat Model connection",
+    "Configured OpenAI Chat Model connection.",
     openai_chat_port_type,
 )
 class OpenAIChatModelConnector:
     """
-
     Connects to an OpenAI Chat Model.
 
-    Given the successful authentication through the OpenAI Authenticator Node,
-    choose one of the available chat models from either a predefined list or through
-    the advanced options from all available models that are availableand fit
-    the task downstream.
-
+    This node establishes a connection with an OpenAI Chat Model. After successfully authenticating
+    using the **OpenAI Authenticator node**, you can select a chat model from a predefined list
+    or explore advanced options to find the most suitable model for your downstream task.
     """
 
     input_settings = ChatModelLoaderInputSettings()
@@ -648,24 +629,21 @@ class OpenAIChatModelConnector:
 )
 @knext.input_port(
     "OpenAI Authentication",
-    "OpenAI Connection",
+    "Validated authentication for OpenAI.",
     openai_authentication_port_type,
 )
 @knext.output_port(
     "OpenAI Embeddings Model",
-    "Configured OpenAI Embeddings Model connection",
+    "Configured OpenAI Embeddings Model connection.",
     openai_embeddings_port_type,
 )
 class OpenAIEmbeddingsConnector:
     """
-
     Connects to an OpenAI Embedding Model.
 
-    Given the successfull authentication through the OpenAI Authenticator Node,
-    choose one of the available embedding models from either a predefined list or through
-    the advanced options from all available models that are availableand fit
-    the task downstream.
-
+    This node establishes a connection with an OpenAI Embeddings Model. After successfully authenticating
+    using the **OpenAI Authenticator node**, you can select an embedding model from a predefined list
+    or explore advanced options to find the most suitable model for your downstream task.
     """
 
     input_settings = EmbeddingsLoaderInputSettings()

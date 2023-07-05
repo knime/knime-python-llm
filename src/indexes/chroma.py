@@ -103,15 +103,16 @@ class ChromaVectorStoreCreator:
     """
     Creates a Chroma vector store from a string column and an embeddings model.
 
-    The Chroma Vector Store Creator creates a Chroma vector store from a string column containing documents and an embeddings model.
-    For each document an embedding i.e. a numerical vector representing the document is extracted by the embeddings model and the embedding is
-    stored together with the document in the vector store. Down-stream nodes such as the Vector Store Retriever use the vector store to find documents
-    with similar semantic meaning given a query.
+    The node generates a Chroma vector store by processing a string column containing documents
+    with the provided embeddings model. For each document, the embeddings model extracts a numerical vector that represents
+    the semantic meaning of the document. These embeddings are then stored in the vector store, along with their corresponding
+    documents. Downstream nodes, such as the **Vector Store Retriever node**, utilize the vector store to find documents with similar
+    semantic meaning when given a query.
     """
 
     document_column = knext.ColumnParameter(
         "Document column",
-        """Selection of column used as the document column.""",
+        """Select the column containing the documents to be embedded.""",
         port_index=1,
     )
 
@@ -164,9 +165,10 @@ class ChromaVectorStoreReader:
     """
     Reads a Chroma vector store from a local path.
 
-    This node allows to read a Chroma vector store from a local path and combines it with an embeddings model that
-    is used in down-stream nodes (e.g. the Vector Store Retriever) to embed documents such that the vector store
-    can find documents with similar embeddings.
+    This node allows you to read a Chroma vector store from a local path. It combines the Chroma vector store with
+    an input embeddings model that is used in downstream nodes, such as the **Vector Store Retriever node**. The embeddings
+    model is responsible for embedding documents, enabling the vector store to retrieve documents that share similar embeddings,
+    facilitating tasks like document clustering or recommendation systems.
     """
 
     persist_directory = knext.StringParameter(

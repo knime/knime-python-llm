@@ -291,7 +291,7 @@ tool_list_port_type = knext.port_type(
     store_icon,
     category=store_category,
 )
-@knext.input_port("Vector Store", "A vector store port object.", vector_store_port_type)
+@knext.input_port("Vector Store", "A vector store containing document embeddings.", vector_store_port_type)
 @knext.input_table(
     "Queries", "Table containing a string column with the queries for the vector store."
 )
@@ -300,7 +300,6 @@ tool_list_port_type = knext.port_type(
 )
 class VectorStoreRetriever:
     """
-
     Performs a similarity search on a vector store.
 
     A vector store retriever is a component or module that
@@ -308,7 +307,6 @@ class VectorStoreRetriever:
     based on user queries. It works in conjunction with a
     vector store to facilitate efficient vector
     retrieval and similarity search operations.
-
     """
 
     query_column = knext.ColumnParameter(
@@ -379,10 +377,9 @@ class VectorStoreRetriever:
 )
 @knext.input_port("LLM Port", "A large language model.", llm_port_type)
 @knext.input_port("Vector Store Port", "A loaded vector store.", vector_store_port_type)
-@knext.output_port("Agent Tool", "A tool for an agent to use", tool_list_port_type)
+@knext.output_port("Agent Tool", "A tool for an agent to use.", tool_list_port_type)
 class VectorStoreToTool:
     """
-
     Creates an agent tool from a vector store.
 
     The power of an agent is that it can decide whether it needs to
@@ -398,7 +395,6 @@ class VectorStoreToTool:
 
     Description: Use this tool whenever you need information about which nodes a user would need in a given
     situation or if you need information about nodes' configuration options.
-
     """
 
     tool_name = knext.StringParameter(
@@ -465,12 +461,10 @@ class VectorStoreToTool:
 )
 class ToolCombiner:
     """
-
     Concatinates two Tools.
 
     A agent can be provided with a list of tools to choose from. Use this
     node to concatinate existing tools into a list and provide an agent with the tool list.
-
     """
 
     def configure(

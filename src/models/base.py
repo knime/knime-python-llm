@@ -57,6 +57,24 @@ class ChatConversationSettings:
     )
 
 
+@knext.parameter_group(label="Credentials")
+class CredentialsSettings:
+
+    def __init__(self, label, description):
+        def _get_default_credentials(identifier):
+            result = knext.DialogCreationContext.get_credential_names(identifier)
+            if not result:
+                # single choice with an empty string to still render the configuration dialogue if no credentials are provided
+                return [""]
+            return result
+
+        self.credentials_param = knext.StringParameter(
+            label=label,
+            description=description,
+            choices=lambda a: _get_default_credentials(a),
+        )
+
+
 class LLMPortObjectSpec(knext.PortObjectSpec):
     def serialize(self) -> dict:
         return {}

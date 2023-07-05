@@ -62,7 +62,6 @@ gpt4all_llm_port_type = knext.port_type(
 )
 
 
-# TODO: Extend node descriptions
 @knext.node(
     "GPT4All LLM Configurator",
     knext.NodeType.SOURCE,
@@ -76,12 +75,13 @@ gpt4all_llm_port_type = knext.port_type(
 )
 class GPT4AllLLMConfigurator:
     """
-
     Configuration for a local GPT4All LLM.
 
-    Configures a local GPT4All LLM. Use the installer from [GPT4All](https://gpt4all.io/index.html) to download
-    a specific model and enter its path in the 'Model path' setting to use it.
+    This configurator allows you to set up and use a local instance of the GPT4All Language Model. To get started, 
+    you need to download a specific model from [GPT4All](https://gpt4all.io/index.html) using their installer. 
+    Once you have downloaded the model, specify its file path in the 'Model path' setting to use it.
 
+    For more information and detailed instructions on downloading compatible models, please visit the [GPT4All GitHub repository](https://github.com/nomic-ai/gpt4all).
     """
 
     settings = GPT4AllInputSettings()

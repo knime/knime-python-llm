@@ -81,17 +81,16 @@ class FAISSVectorStoreCreator:
     """
     Creates a FAISS vector store from a string column and an embeddings model.
 
-    A vector store refers to a data structure or storage mechanism that holds
-    a collection of vectors paired with documents.
-    The vector store allows efficient storage, retrieval,
-    and similarity search operations on these vectors.FAISS provides indexing methods
-    and algorithms optimized for similarity search on large-scale vector collections.
-
+    The node generates a FAISS vector store by processing a string column containing documents
+    with the provided embeddings model. For each document, the embeddings model extracts a numerical vector that represents
+    the semantic meaning of the document. These embeddings are then stored in the vector store, along with their corresponding
+    documents. Downstream nodes, such as the **Vector Store Retriever node**, utilize the vector store to find documents with similar
+    semantic meaning when given a query.
     """
 
     document_column = knext.ColumnParameter(
         "Document column",
-        """Selection of column used as the document column.""",
+        """Select the column containing the documents to be embedded.""",
         port_index=1,
     )
 
@@ -143,17 +142,16 @@ class FAISSVectorStoreCreator:
 )    
 class FAISSVectorStoreReader:
     """
-    Reads a FAISS Vector Store from a local path.
-
     Reads a FAISS vector store from a local path.
 
-    A vector store refers to a data structure or storage mechanism that holds
-    a collection of numerical vectors paired with documents.
-    The vector store allows efficient storage, retrieval,
-    and similarity search operations on these vectors. FAISS provides indexing methods
-    and algorithms optimized for similarity search on large-scale vector collections.
+    FAISS is a library that provides indexing methods and algorithms optimized
+    for performing similarity search on large-scale vector collections.
 
+    A vector store is a data structure or storage mechanism that stores a collection of numerical vectors
+    along with their corresponding documents. The vector store enables efficient storage, retrieval, and similarity
+    search operations on these vectors.
     """
+
     persist_directory = knext.StringParameter(
         "Vectorstore directory",
         """Directory to store the vectordb.""",

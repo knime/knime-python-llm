@@ -1,7 +1,6 @@
 import knime.extension as knext
 import pandas as pd
 import util
-import pickle
 
 
 from models.base import (
@@ -14,6 +13,16 @@ from ..tools.base import (
     ToolListPortObject,
     ToolListPortObjectSpec,
 )
+
+from knime.extension.nodes import (
+    get_port_type_for_id,
+    get_port_type_for_spec_type,
+    load_port_object,
+    save_port_object,
+    FilestorePortObject,
+)
+
+import os
 
 from langchain import PromptTemplate
 
@@ -62,7 +71,9 @@ class ChatHistorySettings:
     )
 
     message_column = knext.ColumnParameter(
-        "Messages", "Represents the chat messages exchanged between the agent and the user.", port_index=1
+        "Messages",
+        "Represents the chat messages exchanged between the agent and the user.",
+        port_index=1,
     )
 
     history_length = knext.IntParameter(
@@ -161,49 +172,93 @@ class MemoryTypeSettings:
 
 # TODO: Add agent type in the future?
 class AgentPortObjectSpec(knext.PortObjectSpec):
-    def __init__(self, memory_type) -> None:
-        super().__init__()
+    def __init__(
+        self,
+        memory_type,
+        llm_spec: LLMPortObjectSpec,
+        tools_spec: ToolListPortObjectSpec,
+    ) -> None:
         self._memory_type = memory_type
+        self._llm_spec = llm_spec
+        self._llm_type = get_port_type_for_spec_type(type(llm_spec))
+        self._tools_spec = tools_spec
+        self._tools_type = get_port_type_for_id(type(tools_spec))
+
+    @property
+    def llm_spec(self) -> LLMPortObjectSpec:
+        return self._llm_spec
+
+    @property
+    def llm_type(self) -> knext.PortType:
+        return self._llm_type
+
+    @property
+    def tools_spec(self) -> ToolListPortObjectSpec:
+        return self._tools_spec
+
+    @property
+    def tools_type(self) -> knext.PortType:
+        return self._tools_type
 
     @property
     def memory_type(self):
         return self._memory_type
 
     def serialize(self) -> dict:
-        return {"memory_type": self._memory_type}
+        return {
+            "memory_type": self._memory_type,
+            "llm": {"type": self.llm_type.id, "spec": self.llm_spec.serialize()},
+            "tools": {"type": self.tools_type.id, "spec": self.tools_spec.serialize()},
+        }
 
     @classmethod
-    def deserialize(cls, data: dict):
-        return cls(data["memory_type"])
+    def deserialize(cls, data: dict) -> "AgentPortObjectSpec":
+        llm_data = data["llm"]
+        llm_spec = get_port_type_for_id(llm_data["type"]).spec_class.deserialize(
+            llm_data["spec"]
+        )
+        tools_data = data["tools"]
+        tools_spec = get_port_type_for_id(tools_data["type"]).spec_class.deserialize(
+            tools_data["spec"]
+        )
+        return cls(data["memory_type"], llm_spec, tools_spec)
 
 
-class AgentPortObject(knext.PortObject):
+class AgentPortObject(FilestorePortObject):
     def __init__(
         self,
         spec: AgentPortObjectSpec,
-        model: LLMPortObject,
-        tool_list: ToolListPortObject,
+        llm: LLMPortObject,
+        tools: ToolListPortObject,
     ) -> None:
         super().__init__(spec)
-        self._model = model
-        self._tool_list = tool_list
+        self._llm = llm
+        self._tools = tools
 
     @property
-    def model(self):
-        return self._model
+    def llm(self) -> LLMPortObject:
+        return self._llm
 
     @property
-    def tool_list(self):
-        return self._tool_list.tool_list
+    def tools(self) -> ToolListPortObject:
+        return self._tools
 
-    def serialize(self):
-        config = {"model": self._model, "tool_list": self._tool_list}
-        return pickle.dumps(config)
+    def write_to(self, file_path):
+        os.makedirs(file_path)
+        llm_path = os.path.join(file_path, "llm")
+        save_port_object(self.llm, llm_path)
+        tools_path = os.path.join(file_path, "tools")
+        save_port_object(self.tools, tools_path)
 
     @classmethod
-    def deserialize(cls, spec: AgentPortObjectSpec, data):
-        config = pickle.loads(data)
-        return cls(spec, config["model"], config["tool_list"])
+    def read_from(cls, spec: AgentPortObjectSpec, file_path: str) -> "AgentPortObject":
+        llm_path = os.path.join(file_path, "llm")
+        llm = load_port_object(spec.llm_type.object_class, spec.llm_spec, llm_path)
+        tools_path = os.path.join(file_path, "tools")
+        tools = load_port_object(
+            spec.tools_type.object_class, spec.tools_spec, tools_path
+        )
+        return cls(spec, llm, tools)
 
 
 agent_port_type = knext.port_type("Agent", AgentPortObject, AgentPortObjectSpec)
@@ -237,24 +292,20 @@ class LLMAgentCreator:
         self,
         ctx: knext.ConfigurationContext,
         llm_spec: LLMPortObjectSpec,
-        tool_list_spec: ToolListPortObjectSpec,
+        tools_spec: ToolListPortObjectSpec,
     ):
-        return AgentPortObjectSpec(
-            self.memory_type.memory,
-        )
+        return AgentPortObjectSpec(self.memory_type.memory, llm_spec, tools_spec)
 
     def execute(
         self,
         ctx: knext.ExecutionContext,
-        lmm: LLMPortObject,
-        tool_list: ToolListPortObject,
+        llm: LLMPortObject,
+        tools: ToolListPortObject,
     ):
         return AgentPortObject(
-            AgentPortObjectSpec(
-                self.memory_type.memory,
-            ),
-            lmm,
-            tool_list,
+            AgentPortObjectSpec(self.memory_type.memory, llm.spec, tools.spec),
+            llm,
+            tools,
         )
 
 

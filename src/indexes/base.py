@@ -13,14 +13,11 @@ from models.base import (
     EmbeddingsPortObjectSpec,
 )
 
-# Langchain imports
-from langchain.chains import RetrievalQA
-from langchain.tools import Tool
-
 import pandas as pd
 import util
-from typing import Optional, Any, List
+from typing import Optional, Any
 import os
+import shutil
 
 store_icon = "icons/store.png"
 store_category = knext.category(
@@ -126,9 +123,12 @@ class FilestoreVectorstorePortObject(FilestorePortObject, VectorStorePortObject)
 
     def write_to(self, file_path):
         os.makedirs(file_path)
-        self._folder_path = file_path
         save_port_object(self.embeddings_model, self._embeddings_path(file_path))
-        self.save_vectorstore(self._vectorstore_path, self._vectorstore)
+        if self._folder_path is not None and not self._folder_path == file_path:
+            # copy the folder structures if we have a folder path from read_from
+            shutil.copytree(self._vectorstore_path, os.path.join(file_path, "vectorstore"))
+        else:
+            self.save_vectorstore(self._vectorstore_path, self._vectorstore)
 
     def save_vectorstore(self, vectorstore_folder, vectorstore):
         raise NotImplementedError()

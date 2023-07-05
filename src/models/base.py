@@ -166,7 +166,7 @@ embeddings_model_port_type = knext.port_type(
 
 
 # TODO: Add configuration dialog to enable templates, e.g. https://python.langchain.com/docs/modules/model_io/models/llms/integrations/openai
-@knext.node("LLM Prompter", knext.NodeType.PREDICTOR, "", model_category)
+@knext.node("LLM Prompter", knext.NodeType.PREDICTOR, "icons/ml.png", model_category)
 @knext.input_port("LLM Port", "A large language model.", llm_port_type)
 @knext.input_table("Prompt Table", "A table containing a string column with prompts.")
 @knext.output_table(
@@ -237,7 +237,9 @@ class LLMPrompter:
 
 # TODO: Add configuration dialog to more general options to configure how LLM is prompted
 # TODO: Write better text
-@knext.node("Chat Model Prompter", knext.NodeType.PREDICTOR, "", model_category)
+@knext.node(
+    "Chat Model Prompter", knext.NodeType.PREDICTOR, "icons/ml.png", model_category
+)
 @knext.input_port("Chat Model Port", "A chat model model.", chat_model_port_type)
 @knext.input_table(
     "Conversation", "A table containing an empty or filled conversation."

@@ -65,7 +65,9 @@ class CredentialsSettings:
 @knext.parameter_group(label="Conversation Settings")
 class ConversationSettings:
     role_column = knext.ColumnParameter(
-        "Message role", "Specifies the role of messages in the conversation. The contained values should be either Human or AI.", port_index=2
+        "Message role",
+        "Specifies the role of messages in the conversation. The contained values should be either Human or AI.",
+        port_index=2,
     )
 
     content_column = knext.ColumnParameter(
@@ -80,7 +82,6 @@ class ChatMessageSettings:
     message = knext.StringParameter(
         "Message", "The (next) message to send to the agent."
     )
-
 
 
 # TODO: Currently not used
@@ -181,7 +182,7 @@ class AgentPortObjectSpec(knext.PortObjectSpec):
         return {
             "llm": {"type": self.llm_type.id, "spec": self.llm_spec.serialize()},
         }
-    
+
     @classmethod
     def deserialize_llm_spec(cls, data: dict):
         llm_data = data["llm"]
@@ -195,11 +196,7 @@ class AgentPortObjectSpec(knext.PortObjectSpec):
 
 
 class AgentPortObject(FilestorePortObject):
-    def __init__(
-        self,
-        spec: AgentPortObjectSpec,
-        llm: LLMPortObject
-    ) -> None:
+    def __init__(self, spec: AgentPortObjectSpec, llm: LLMPortObject) -> None:
         super().__init__(spec)
         self._llm = llm
 
@@ -207,7 +204,6 @@ class AgentPortObject(FilestorePortObject):
     def llm(self) -> LLMPortObject:
         return self._llm
 
-    
     def create_agent(self, ctx, tools):
         raise NotImplementedError()
 
@@ -428,16 +424,20 @@ class AgentExecutor:
 )
 @knext.input_port("Agent", "The agent to prompt.", agent_port_type)
 @knext.input_port("Tools", "The tools the agent can use.", tool_list_port_type)
-@knext.input_table("Conversation",
-                    """Table containing the conversation that was held so far with the agent. 
+@knext.input_table(
+    "Conversation",
+    """Table containing the conversation that was held so far with the agent. 
                     Has to contain at least two string columns.
                     A content column containing the content of previous messages and a role column specifying who the message is from (values hould be either AI or Human).
-                    """)
-@knext.output_table("Continued conversation", 
-                    """The conversation table extended by two rows.
+                    """,
+)
+@knext.output_table(
+    "Continued conversation",
+    """The conversation table extended by two rows.
                     One row for the user's prompt and one row for the agent's response.
                     Can be used as input in subsequent Agent Prompter executions to continue the conversation further.
-                    """)
+                    """,
+)
 class AgentPrompter:
     """
     Combines an agent with a set of tools and prompts it with a user provided prompt.
@@ -466,15 +466,18 @@ class AgentPrompter:
                 "Please provide at least two String columns."
             )
 
-        if self.history_settings.role_column == self.history_settings.content_column:
+        if (
+            self.conversation_settings.role_column
+            == self.conversation_settings.content_column
+        ):
             raise knext.InvalidParametersError(
                 "Type and Message columns cannot be the same."
             )
 
         for c in input_table_spec:
             if (
-                c.name == self.history_settings.role_column
-                or c.name == self.history_settings.content_column
+                c.name == self.conversation_settings.role_column
+                or c.name == self.conversation_settings.content_column
             ):
                 if not util.is_nominal(c):
                     raise knext.InvalidParametersError(
@@ -483,8 +486,8 @@ class AgentPrompter:
 
         return knext.Schema.from_columns(
             [
-                knext.Column(knext.string(), self.history_settings.role_column),
-                knext.Column(knext.string(), self.history_settings.content_column),
+                knext.Column(knext.string(), self.conversation_settings.role_column),
+                knext.Column(knext.string(), self.conversation_settings.content_column),
             ]
         )
 
@@ -510,10 +513,12 @@ class AgentPrompter:
         #         input_key="input",
         #         return_messages=True,
         #     )
-        
+
         # TODO more memory variants
         # TODO return messages might depend on the type of model (i.e. chat needs it llm doesn't)?
-        memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+        memory = ConversationBufferMemory(
+            memory_key="chat_history", return_messages=True
+        )
 
         roles = chat_history_df[self.history_settings.role_column]
         contents = chat_history_df[self.history_settings.content_column]
@@ -532,9 +537,7 @@ class AgentPrompter:
             memory=memory, agent=agent, tools=tools, verbose=True
         )
 
-        response = agent_exec.run(
-            input=self.message_settings.user_prompt
-        )
+        response = agent_exec.run(input=self.message_settings.user_prompt)
 
         new_df = chat_history_df[
             [self.history_settings.role_column, self.history_settings.content_column]

@@ -11,7 +11,7 @@ from .base import (
     FilestoreVectorstorePortObjectSpec,
     FilestoreVectorstorePortObject,
     store_category,
-    validate_creator_document_column
+    validate_creator_document_column,
 )
 
 import util
@@ -140,7 +140,7 @@ class FAISSVectorStoreCreator:
 )
 @knext.output_port(
     "FAISS Vector Store", "The loaded FAISS vector store.", faiss_vector_store_port_type
-)    
+)
 class FAISSVectorStoreReader:
     """
     Reads a FAISS vector store from a local path.
@@ -151,6 +151,8 @@ class FAISSVectorStoreReader:
     A vector store is a data structure or storage mechanism that stores a collection of numerical vectors
     along with their corresponding documents. The vector store enables efficient storage, retrieval, and similarity
     search operations on these vectors.
+
+    If the vector store was created with another tool i.e. outside of KNIME, the embeddings model is not stored with the vectorstore, so it has to be provided separately (<Provider> Embeddings Connector Node).
     """
 
     persist_directory = knext.StringParameter(

@@ -46,8 +46,11 @@ class ChromaVectorstorePortObject(FilestoreVectorstorePortObject):
         super().__init__(spec, embeddings_port_object, folder_path, vectorstore)
 
     def save_vectorstore(self, vectorstore_folder: str, vectorstore: Chroma):
-        if vectorstore._persist_directory is None or not vectorstore._persist_directory == vectorstore_folder:
-            # HACK because Chroma doesn't allow to add or change a persist directory after the fact  
+        if (
+            vectorstore._persist_directory is None
+            or not vectorstore._persist_directory == vectorstore_folder
+        ):
+            # HACK because Chroma doesn't allow to add or change a persist directory after the fact
             import chromadb
             import chromadb.config
 
@@ -171,6 +174,8 @@ class ChromaVectorStoreReader:
     an input embeddings model that is used in downstream nodes, such as the **Vector Store Retriever node**. The embeddings
     model is responsible for embedding documents, enabling the vector store to retrieve documents that share similar embeddings,
     facilitating tasks like document clustering or recommendation systems.
+
+    If the vector store was created with another tool i.e. outside of KNIME, the embeddings model is not stored with the vectorstore, so it has to be provided separately (<Provider> Embeddings Connector Node).
     """
 
     persist_directory = knext.StringParameter(

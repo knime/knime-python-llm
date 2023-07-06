@@ -9,13 +9,13 @@ from .base import (
     EmbeddingsPortObject,
     model_category,
     GeneralSettings,
-    CredentialsSettings
+    CredentialsSettings,
 )
 
 # Langchain imports
 from langchain import HuggingFaceHub
 from langchain.llms import HuggingFaceTextGenInference
-from langchain.embeddings import HuggingFaceEmbeddings
+from langchain.embeddings import HuggingFaceHubEmbeddings
 
 # Other imports
 import huggingface_hub
@@ -39,9 +39,9 @@ huggingface_hub_category = knext.category(
 
 # == SETTINGS ==
 
+
 # @knext.parameter_group(label="Model Settings") -- Imported
 class HuggingFaceModelSettings(GeneralSettings):
-
     top_k = knext.IntParameter(
         label="Top k",
         description="The number of top-k tokens to consider when generating text.",
@@ -108,14 +108,18 @@ class HFHubTask(knext.EnumParameterOptions):
     )
 
 
-@knext.parameter_group(label="Hugging Face Hub Settings")
-class HuggingFaceHubSettings:
-    repo_id = knext.StringParameter(
+def _create_repo_id_parameter():
+    return knext.StringParameter(
         label="Repo ID",
         description="""The model name to be used, in the format `<organization_name>/<model_name>`. For example, `Writer/camel-5b-hf`.
                     You can find available models at the [Hugging Face Models repository](https://huggingface.co/models).""",
         default_value="",
     )
+
+
+@knext.parameter_group(label="Hugging Face Hub Settings")
+class HuggingFaceHubSettings:
+    repo_id = _create_repo_id_parameter()
 
     task = knext.EnumParameter(
         "Model Task",
@@ -296,13 +300,23 @@ huggingface_hub_llm_port_type = knext.port_type(
 
 
 class HuggingFaceAuthenticationPortObjectSpec(knext.PortObjectSpec):
-    def __init__(self, credentials) -> None:
+    def __init__(self, credentials: str) -> None:
         super().__init__()
         self._credentials = credentials
 
     @property
-    def credentials(self):
+    def credentials(self) -> str:
         return self._credentials
+
+    def validate_context(self, ctx: knext.ConfigurationContext):
+        if not self.credentials in ctx.get_credential_names():
+            raise knext.InvalidParametersError(
+                f"The selected credentials '{self.credentials}' holding the Hugging Face Hub API token are not present."
+            )
+        # TODO validate that the api token is actually there not only the credentials that shoud contain it
+        # hub_token = ctx.get_credentials(self.credentials)
+        # if not hub_token.password:
+        #     raise knext.InvalidParametersError(f"The Hugging Face Hub token in the credentials '{self.credentials}' is not present.")
 
     def serialize(self) -> dict:
         return {"credentials": self._credentials}
@@ -331,37 +345,55 @@ huggingface_authentication_port_type = knext.port_type(
 )
 
 
-class HuggingFaceEmbeddingsPortObjectSpec(EmbeddingsPortObjectSpec):
-    def __init__(self) -> None:
+class HFHubEmbeddingsPortObjectSpec(EmbeddingsPortObjectSpec):
+    def __init__(
+        self, hub_credentials: HuggingFaceAuthenticationPortObjectSpec, repo_id: str
+    ) -> None:
         super().__init__()
+        self._repo_id = repo_id
+        self._hub_credentials = hub_credentials
+
+    @property
+    def repo_id(self) -> str:
+        return self._repo_id
+
+    @property
+    def hub_credentials_name(self) -> str:
+        return self._hub_credentials.credentials
+
+    def validate_context(self, ctx: knext.ConfigurationContext):
+        self._hub_credentials.validate_context(ctx)
 
     def serialize(self) -> dict:
-        return {}
+        return {
+            "hub_credentials_name": self.hub_credentials_name,
+            "repo_id": self.repo_id,
+        }
 
     @classmethod
     def deserialize(cls, data: dict):
-        return cls()
+        hub_authentication = HuggingFaceAuthenticationPortObjectSpec(
+            data["hub_credentials_name"]
+        )
+        return cls(hub_authentication, data["repo_id"])
 
 
-class HuggingFacePortObject(EmbeddingsPortObject):
-    def __init__(self, spec: HuggingFaceEmbeddingsPortObjectSpec):
-        super().__init__(spec)
+class HFHubEmbeddingsPortObject(EmbeddingsPortObject):
+    @property
+    def spec(self) -> HFHubEmbeddingsPortObjectSpec:
+        return super().spec
 
-    def serialize(self) -> bytes:
-        return b""
-
-    @classmethod
-    def deserialize(cls, spec):
-        return cls(spec)
-
-    def create_model(self, ctx):
-        return HuggingFaceEmbeddings()
+    def create_model(self, ctx) -> HuggingFaceHubEmbeddings:
+        hub_api_token = ctx.get_credentials(self.spec.hub_credentials_name).password
+        return HuggingFaceHubEmbeddings(
+            repo_id=self.spec.repo_id, huggingfacehub_api_token=hub_api_token
+        )
 
 
 huggingface_embeddings_port_type = knext.port_type(
-    "Hugging Face Embeddings Port Type",
-    HuggingFacePortObject,
-    HuggingFaceEmbeddingsPortObjectSpec,
+    "Hugging Face Hub Embeddings",
+    HFHubEmbeddingsPortObject,
+    HFHubEmbeddingsPortObjectSpec,
 )
 
 
@@ -391,8 +423,7 @@ class HuggingfaceTextGenInferenceConnector:
 
     For more details and information about integrating with the Hugging Face TextGen Inference and setting up a local server, refer to the
     [LangChain documentation](https://python.langchain.com/docs/modules/model_io/models/llms/integrations/huggingface_textgen_inference).
-"""
-
+    """
 
     settings = HuggingFaceTextGenInferenceInputSettings()
     model_settings = HuggingFaceModelSettings()
@@ -430,7 +461,7 @@ class HuggingFaceHubAuthenticator:
     """
     Authenticates the Hugging Face API key.
 
-    This node is responsible for validating the provided Hugging Face API key. Once validated, the API key can be used 
+    This node is responsible for validating the provided Hugging Face API key. Once validated, the API key can be used
     with the **HF Hub LLM Connector node** to establish a connection.
 
     The node expects the Hugging Face API key to be provided via the *password* field of the [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory).
@@ -438,7 +469,6 @@ class HuggingFaceHubAuthenticator:
     If you don't have a Hugging Face API key yet, you can generate one by visiting [Hugging Face](https://huggingface.co/settings/tokens).
     Follow the instructions provided to generate your API key.
     """
-
 
     credentials_settings = CredentialsSettings(
         label="Hugging Face API Key",
@@ -457,7 +487,9 @@ class HuggingFaceHubAuthenticator:
         if not self.credentials_settings.credentials_param:
             raise knext.InvalidParametersError("Credentials not selected.")
 
-        return self.create_spec()
+        spec = self.create_spec()
+        spec.validate_context(ctx)
+        return spec
 
     def execute(self, ctx: knext.ExecutionContext):
         try:
@@ -506,7 +538,6 @@ class HuggingFaceHubConnector:
     For more details and information about integrating LLMs from the Hugging Face Hub, refer to the [LangChain documentation](https://python.langchain.com/docs/modules/model_io/models/llms/integrations/huggingface_hub).
     """
 
-
     hub_settings = HuggingFaceHubSettings()
     model_settings = HuggingFaceModelSettings()
 
@@ -518,11 +549,7 @@ class HuggingFaceHubConnector:
         if not self.hub_settings.repo_id:
             raise knext.InvalidParametersError("Please enter a repo ID.")
 
-        try:
-            huggingface_hub.model_info(self.hub_settings.repo_id)
-        except:
-            raise knext.InvalidParametersError("Please provide a valid repo ID.")
-
+        _validate_repo_id(self.hub_settings.repo_id)
         return self.create_spec(huggingface_auth_spec)
 
     def execute(
@@ -550,20 +577,54 @@ class HuggingFaceHubConnector:
         )
 
 
+def _validate_repo_id(repo_id):
+    try:
+        huggingface_hub.model_info(repo_id)
+    except:
+        raise knext.InvalidParametersError("Please provide a valid repo ID.")
+
+
 @knext.node(
     "HF Hub Embeddings Connector",
     knext.NodeType.SOURCE,
     huggingface_icon,
-    category=huggingface_hub,
+    category=huggingface_hub_category,
+)
+@knext.input_port(
+    "Hugging Face Hub Authentication",
+    "The authentication for the Hugging Face Hub.",
+    huggingface_authentication_port_type,
 )
 @knext.output_port(
-    "Hugging Face Embeddings",
-    "An embeddings model configuration from Hugging Face Hub.",
+    "Hugging Face Hub Embeddings",
+    "An embeddings model connected to Hugging Face Hub.",
     huggingface_embeddings_port_type,
 )
-class HuggingFaceEmbeddingsConfigurator:
-    def configure(self, ctx: knext.ConfigurationContext):
-        return HuggingFaceEmbeddingsPortObjectSpec()
+class HFHubEmbeddingsConnector:
+    repo_id = _create_repo_id_parameter()
 
-    def execute(self, ctx: knext.ExecutionContext):
-        return HuggingFacePortObject(HuggingFaceEmbeddingsPortObjectSpec())
+    def configure(
+        self,
+        ctx: knext.ConfigurationContext,
+        authentication_spec: HuggingFaceAuthenticationPortObjectSpec,
+    ):
+        if not self.repo_id:
+            raise knext.InvalidParametersError("Please enter a repo ID.")
+        _validate_repo_id(self.repo_id)
+        authentication_spec.validate_context(ctx)
+        return self.create_spec(authentication_spec)
+
+    def create_spec(
+        self, authentication_spec: HuggingFaceAuthenticationPortObjectSpec
+    ) -> HFHubEmbeddingsPortObjectSpec:
+        return HFHubEmbeddingsPortObjectSpec(authentication_spec, self.repo_id)
+
+    def execute(
+        self,
+        ctx: knext.ExecutionContext,
+        authentication: HuggingFaceAuthenticationPortObject,
+    ):
+        output = HFHubEmbeddingsPortObject(self.create_spec(authentication.spec))
+        # TODO validate that repo does supports what we want to do
+        output.create_model(ctx)
+        return output

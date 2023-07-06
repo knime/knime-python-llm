@@ -1,9 +1,9 @@
 # KNIME / own imports
 import knime.extension as knext
 import util
-import pandas as pd
 
 from langchain.schema import AIMessage, HumanMessage, SystemMessage
+from langchain.embeddings.base import Embeddings
 
 model_category = knext.category(
     path=util.main_category,
@@ -138,6 +138,12 @@ class EmbeddingsPortObjectSpec(knext.PortObjectSpec):
     @classmethod
     def deserialize(cls, data: dict):
         return cls()
+    
+    def validate_context(self, ctx: knext.ConfigurationContext):
+        """
+        Deriving classes should overwrite this method to check if the current context allows to run the model.
+        """
+        pass
 
 
 class EmbeddingsPortObject(knext.PortObject):
@@ -151,7 +157,7 @@ class EmbeddingsPortObject(knext.PortObject):
     def deserialize(cls, spec, data: dict):
         return cls(spec)
 
-    def create_model(self, ctx):
+    def create_model(self, ctx: knext.ExecutionContext) -> Embeddings:
         raise NotImplementedError()
 
 
@@ -345,3 +351,55 @@ class ChatModelPrompter:
         table.loc[f"Row{len(table)}"] = ["AIMessage", answer.content]
 
         return knext.Table.from_pandas(table)
+
+def _string_col_filter(column: knext.Column):
+    return column.ktype == knext.string()
+
+@knext.node(
+    "Text Embedder",
+    knext.NodeType.PREDICTOR,
+    util.ai_icon,
+    model_category
+)
+@knext.input_port("Embeddings Model", "Used to embed the texts from the input table into numerical vectors.", embeddings_model_port_type)
+@knext.input_table("Input Table", "Input table containing a text column to embed.")
+@knext.output_table("Output Table", "The input table with the appended embeddings column.")
+class TextEmbedder:
+    """
+    Embeds text in a string column using an embedding model.
+
+    This node applies the provided embeddings model to create embeddings for the texts contained in a string column of the input table.
+    At its core, a text embedding is a dense vector of floating point values capturing the semantic meaning of the text.
+    Thus these embeddings are often used to find semantically similar documents.
+    How exactly the embeddings are derived depends on the used embeddings model but typically the embeddings are the internal representations
+    used by deep language models e.g. transformers or GPTs.
+    """
+
+    text_column = knext.ColumnParameter("Text column", "The string column containing the texts to embed.", port_index=1, column_filter=_string_col_filter)
+
+    embeddings_column_name = knext.StringParameter("Embeddings column name", "Name for output column that will hold the embeddings.", "embeddings")
+    
+    def configure(self, ctx: knext.ConfigurationContext, embeddings_spec: EmbeddingsPortObjectSpec, table_spec: knext.Schema) -> knext.Schema:
+        if self.text_column is None:
+            self.text_column = util.pick_default_column(table_spec, knext.string())
+        else:
+            util.check_column(table_spec, self.text_column, knext.string(), "text column")
+        
+        embeddings_spec.validate_context(ctx)
+        return table_spec.append(self._create_output_column())
+
+    def _create_output_column(self) -> knext.Column:
+        return knext.Column(knext.list_(knext.double()), self.embeddings_column_name)
+
+    def execute(self, ctx: knext.ExecutionContext, embeddings_obj: EmbeddingsPortObject, table: knext.Table) -> knext.Table:
+        embeddings_model = embeddings_obj.create_model(ctx)
+        output_table = knext.BatchOutputTable.create()
+        for batch in table.batches():
+            if ctx.is_canceled():
+                raise RuntimeError("Execution was canceled.")
+            data_frame = batch.to_pandas()
+            texts = data_frame[self.text_column]
+            embeddings = embeddings_model.embed_documents(texts)
+            data_frame[self.embeddings_column_name] = embeddings
+            output_table.append(knext.Table.from_pandas(data_frame))
+        return output_table

@@ -12,8 +12,9 @@ from .base import (
     FilestoreVectorstorePortObject,
     store_category,
     validate_creator_document_column,
-    pick_default_column,
 )
+
+import util
 
 from langchain.vectorstores import Chroma
 from langchain.docstore.document import Document
@@ -124,7 +125,7 @@ class ChromaVectorStoreCreator:
         input_table: knext.Schema,
     ) -> ChromaVectorstorePortObjectSpec:
         if self.document_column is None:
-            self.document_column = pick_default_column(input_table, knext.string())
+            self.document_column = util.pick_default_column(input_table, knext.string())
         else:
             validate_creator_document_column(input_table, self.document_column)
         return ChromaVectorstorePortObjectSpec(embeddings_spec)

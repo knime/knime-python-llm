@@ -148,26 +148,8 @@ class FilestoreVectorstorePortObject(FilestorePortObject, VectorStorePortObject)
         embeddings_obj = cls._read_embeddings(spec, file_path)
         return cls(spec, embeddings_obj, file_path)
 
-def pick_default_column(input_table: knext.Schema, ktype: knext.KnimeType):
-    string_type = knext.string()
-    for column in input_table:
-        if column.ktype == string_type:
-            return column.name
-    raise knext.InvalidParametersError(f"The input table does not contain any columns of type '{str(ktype)}'.")
-
 def validate_creator_document_column(input_table: knext.Schema, column: str):
-    check_column(input_table, column, knext.string(), "document")
-    
-def check_column(input_table: knext.Schema, column: str, expected_type:knext.KnimeType, column_purpose: str):
-    if not column in input_table.column_names:
-        raise knext.InvalidParametersError(
-            f"The {column_purpose} column '{column}' is missing in the input table."
-        )
-    ktype = input_table[column].ktype
-    if ktype != expected_type:
-        raise knext.InvalidParametersError(
-            f"The {column_purpose} column '{column}' is of type {str(ktype)} but should be of type {str(expected_type)}."
-        )
+    util.check_column(input_table, column, knext.string(), "document")
 
 
 @knext.node(
@@ -212,9 +194,9 @@ class VectorStoreRetriever:
         table_spec: knext.Schema,
     ):
         if self.query_column is None:
-            self.query_column = pick_default_column(table_spec, knext.string())
+            self.query_column = util.pick_default_column(table_spec, knext.string())
         else:
-            check_column(table_spec, self.query_column, knext.string(), "queries")
+            util.check_column(table_spec, self.query_column, knext.string(), "queries")
             
         return knext.Schema.from_columns(
             [

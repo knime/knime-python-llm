@@ -264,11 +264,11 @@ class ChatModelPrompter:
     conversation_settings = ChatConversationSettings()
 
     system_message = knext.StringParameter(
-        "System Prefix",
+        "System Message",
         """
         The first message given to the model describing how it should behave.
 
-        Example: You are a helpful assissant that has to answer questions truthfully, and
+        Example: You are a helpful assistant that has to answer questions truthfully, and
         if you do not know an answer to a question, you should state that.
         """,
     )

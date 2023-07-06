@@ -77,8 +77,8 @@ class ConversationSettings:
 
 @knext.parameter_group(label="Prompt Settings")
 class ChatMessageSettings:
-    user_prompt = knext.StringParameter(
-        "Prompt", "Message to send to the agent."
+    message = knext.StringParameter(
+        "Message", "The (next) message to send to the agent."
     )
 
 
@@ -451,17 +451,8 @@ class AgentPrompter:
     few messages, or even use a large language model to create a summary of the conversation held so far.
     """
 
-    history_settings = ConversationSettings()
+    conversation_settings = ConversationSettings()
     message_settings = ChatMessageSettings()
-
-    def load_messages_from_input_table(
-        self, memory: ConversationBufferMemory, chat_history_df: pd.DataFrame
-    ):
-        for index in range(0, len(chat_history_df), 2):
-            memory.save_context(
-                {"input": chat_history_df.loc[f"Row{index}"].at["Message"]},
-                {"output": chat_history_df.loc[f"Row{index+1}"].at["Message"]},
-            )
 
     def configure(
         self,

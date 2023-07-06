@@ -520,8 +520,8 @@ class AgentPrompter:
             memory_key="chat_history", return_messages=True
         )
 
-        roles = chat_history_df[self.history_settings.role_column]
-        contents = chat_history_df[self.history_settings.content_column]
+        roles = chat_history_df[self.conversation_settings.role_column]
+        contents = chat_history_df[self.conversation_settings.content_column]
         for index in range(0, len(chat_history_df), 2):
             memory.save_context(
                 {roles[index]: contents[index]},
@@ -540,7 +540,10 @@ class AgentPrompter:
         response = agent_exec.run(input=self.message_settings.user_prompt)
 
         new_df = chat_history_df[
-            [self.history_settings.role_column, self.history_settings.content_column]
+            [
+                self.conversation_settings.role_column,
+                self.conversation_settings.content_column,
+            ]
         ].copy()
 
         user_input_row = ["Human", self.message_settings.user_prompt]

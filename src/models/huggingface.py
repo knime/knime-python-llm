@@ -36,6 +36,7 @@ huggingface_hub_category = knext.category(
     description="Contains nodes that connect to Hugging Face Hub.",
     icon=huggingface_icon,
 )
+
 # == SETTINGS ==
 
 # @knext.parameter_group(label="Model Settings") -- Imported
@@ -550,10 +551,10 @@ class HuggingFaceHubConnector:
 
 
 @knext.node(
-    "HF Embeddings Configurator",
+    "HF Hub Embeddings Connector",
     knext.NodeType.SOURCE,
     huggingface_icon,
-    category=huggingface,
+    category=huggingface_hub,
 )
 @knext.output_port(
     "Hugging Face Embeddings",

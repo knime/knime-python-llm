@@ -369,7 +369,7 @@ huggingface_embeddings_port_type = knext.port_type(
 
 
 @knext.node(
-    "HF TextGen Inference Connector",
+    "HF TextGen LLM Connector",
     knext.NodeType.SOURCE,
     huggingface_icon,
     category=huggingface_category,
@@ -381,13 +381,13 @@ huggingface_embeddings_port_type = knext.port_type(
 )
 class HuggingfaceTextGenInferenceConnector:
     """
-    Connects to a dedicated TextGen Inference Server.
+    Connects to a dedicated Text Generation Inference Server.
 
     The [Text Generation Inference](https://github.com/huggingface/text-generation-inference) is a Rust, Python, and gRPC server
     specifically designed for text generation inference. It can be self-hosted to
     power LLM APIs and inference widgets.
 
-    Please note that this node does not connect to the Hugging Face Hub, but to a local Text Generation Inference Server.
+    Please note that this node does not connect to the Hugging Face Hub, but to a Text Generation Inference Server that can be hosted both locally and remotely.
 
     For more details and information about integrating with the Hugging Face TextGen Inference and setting up a local server, refer to the
     [LangChain documentation](https://python.langchain.com/docs/modules/model_io/models/llms/integrations/huggingface_textgen_inference).

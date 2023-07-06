@@ -9,7 +9,7 @@ from .base import (
     EmbeddingsPortObject,
     model_category,
     GeneralSettings,
-    CredentialsSettings
+    CredentialsSettings,
 )
 
 # Langchain imports
@@ -189,7 +189,7 @@ class EmbeddingsLoaderInputSettings:
     model_name = knext.EnumParameter(
         "Model ID",
         "Select the Ada text embedding model to be used.",
-        OpenAIEmbeddingsOptions.Ada1.name,
+        OpenAIEmbeddingsOptions.Ada2.name,
         OpenAIEmbeddingsOptions,
     )
 

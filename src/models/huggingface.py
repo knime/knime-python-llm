@@ -21,7 +21,7 @@ from langchain.embeddings import HuggingFaceEmbeddings
 import huggingface_hub
 
 huggingface_icon = "icons/huggingface.png"
-huggingface = knext.category(
+huggingface_category = knext.category(
     path=model_category,
     level_id="hugging",
     name="Hugging Face",
@@ -29,6 +29,13 @@ huggingface = knext.category(
     icon=huggingface_icon,
 )
 
+huggingface_hub_category = knext.category(
+    path=huggingface_category,
+    level_id="hub",
+    name="Hub",
+    description="Contains nodes that connect to Hugging Face Hub.",
+    icon=huggingface_icon,
+)
 # == SETTINGS ==
 
 # @knext.parameter_group(label="Model Settings") -- Imported
@@ -364,7 +371,7 @@ huggingface_embeddings_port_type = knext.port_type(
     "HF TextGen Inference Connector",
     knext.NodeType.SOURCE,
     huggingface_icon,
-    category=huggingface,
+    category=huggingface_category,
 )
 @knext.output_port(
     "Huggingface TextGen Inference Configuration",
@@ -411,7 +418,7 @@ class HuggingfaceTextGenInferenceConnector:
     "HF Hub Authenticator",
     knext.NodeType.SOURCE,
     huggingface_icon,
-    category=huggingface,
+    category=huggingface_hub_category,
 )
 @knext.output_port(
     "Hugging Face Hub Authentication",
@@ -473,7 +480,7 @@ class HuggingFaceHubAuthenticator:
     "HF Hub LLM Connector",
     knext.NodeType.SOURCE,
     huggingface_icon,
-    category=huggingface,
+    category=huggingface_hub_category,
 )
 @knext.input_port(
     "Hugging Face Authentication",

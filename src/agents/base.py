@@ -537,7 +537,7 @@ class AgentPrompter:
             memory=memory, agent=agent, tools=tools, verbose=True
         )
 
-        response = agent_exec.run(input=self.message_settings.user_prompt)
+        response = agent_exec.run(input=self.message_settings.message)
 
         new_df = chat_history_df[
             [
@@ -546,7 +546,7 @@ class AgentPrompter:
             ]
         ].copy()
 
-        user_input_row = ["Human", self.message_settings.user_prompt]
+        user_input_row = ["Human", self.message_settings.message]
         agent_output_row = ["AI", response]
 
         new_df.loc[f"Row{len(new_df)}"] = user_input_row

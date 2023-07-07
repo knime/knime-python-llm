@@ -73,8 +73,7 @@ class HuggingFaceModelSettings(GeneralSettings):
         description="""
         The maximum number of tokens to generate in the completion.
 
-        The token count of your prompt plus 
-        max_tokens cannot exceed the model's context length.
+        The token count of your prompt plus *max new tokens* cannot exceed the model's context length.
         """,
         default_value=50,
         max_value=256,
@@ -459,12 +458,13 @@ class HuggingfaceTextGenInferenceConnector:
 )
 class HuggingFaceHubAuthenticator:
     """
-    Authenticates the Hugging Face API key.
+    Authenticates the Hugging Face Hub API key.
 
-    This node is responsible for validating the provided Hugging Face API key. Once validated, the API key can be used
-    with the **HF Hub LLM Connector node** to establish a connection.
+    This node provides the authentication for all Hugging Face Hub models.
 
-    The node expects the Hugging Face API key to be provided via the *password* field of the [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory).
+    It allows you to select the credentials that contain a valid OpenAI API key in their *password* field (the *username* is ignored).
+    Credentials can be set on the workflow level or created inside the workflow e.g. with the [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
+    and fed into this node via flow variable.
 
     If you don't have a Hugging Face API key yet, you can generate one by visiting [Hugging Face](https://huggingface.co/settings/tokens).
     Follow the instructions provided to generate your API key.
@@ -473,7 +473,7 @@ class HuggingFaceHubAuthenticator:
     credentials_settings = CredentialsSettings(
         label="Hugging Face API Key",
         description="""
-            The Hugging Face API key provided via the *password* field of the Credentials Configuration node.
+            The credentials containing the Hugging Face Hub API key in its *password* field (the *username* is ignored).
             """,
     )
 
@@ -529,11 +529,10 @@ class HuggingFaceHubConnector:
     """
     Connects to an LLM hosted on the Hugging Face Hub.
 
-    This node establishes a connection to a specific LLM hosted on the Hugging Face Hub. To use this node,
-    you need to successfully authenticate with the Hugging Face Hub using the **HF Hub Authenticator node**.
+    This node establishes a connection to a specific LLM hosted on the Hugging Face Hub.
+    To use this node, you need to successfully authenticate with the Hugging Face Hub using the **HF Hub Authenticator node**.
 
     Provide the name of the desired LLM repository available on the [Hugging Face Hub](https://python.langchain.com/docs/modules/model_io/models/llms/integrations/huggingface_hub) as an input.
-    You can also specify any additional keyword arguments required for the connection.
 
     For more details and information about integrating LLMs from the Hugging Face Hub, refer to the [LangChain documentation](https://python.langchain.com/docs/modules/model_io/models/llms/integrations/huggingface_hub).
     """
@@ -601,6 +600,16 @@ def _validate_repo_id(repo_id):
     huggingface_embeddings_port_type,
 )
 class HFHubEmbeddingsConnector:
+    """
+    Connects to an Embeddings model hosted on the Hugging Face Hub.
+
+    This node establishes a connection to a specific Embeddings model hosted on the Hugging Face Hub.
+    To use this node, you need to successfully authenticate with the Hugging Face Hub using the **HF Hub Authenticator node**.
+
+    Provide the name of the desired Embeddings repository available on the [Hugging Face Hub](https://huggingface.co/) as an input.
+
+    """
+
     repo_id = _create_repo_id_parameter()
 
     def configure(

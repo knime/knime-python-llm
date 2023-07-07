@@ -75,7 +75,7 @@ gpt4all_llm_port_type = knext.port_type(
 )
 class GPT4AllLLMConnector:
     """
-    Configuration for a local GPT4All LLM.
+    Connects to a locally installed GPT4ALL LLM.
 
     This connector allows you to connect to a LLM that was installed locally with GPT4ALL. To get started, 
     you need to download a specific model from [GPT4All](https://gpt4all.io/index.html) using the installer. 

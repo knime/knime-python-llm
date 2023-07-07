@@ -101,6 +101,7 @@ class FAISSVectorStoreCreator:
         embeddings_spec: EmbeddingsPortObjectSpec,
         input_table: knext.Schema,
     ) -> FAISSVectorstorePortObjectSpec:
+        embeddings_spec.validate_context(ctx)
         if self.document_column is None:
             self.document_column = util.pick_default_column(input_table, knext.string())
         else:
@@ -145,19 +146,19 @@ class FAISSVectorStoreReader:
     """
     Reads a FAISS vector store from a local path.
 
-    FAISS is a library that provides indexing methods and algorithms optimized
-    for performing similarity search on large-scale vector collections.
+    This node reads a FAISS vector store create with another tool (e.g. Python) from a local path.
+    If you want to create a new vector store, use the FAISS Vector Store Creator instead.
 
     A vector store is a data structure or storage mechanism that stores a collection of numerical vectors
     along with their corresponding documents. The vector store enables efficient storage, retrieval, and similarity
-    search operations on these vectors.
+    search operations on these vectors and their associated data.
 
     If the vector store was created with another tool i.e. outside of KNIME, the embeddings model is not stored with the vectorstore, so it has to be provided separately (<Provider> Embeddings Connector Node).
     """
 
     persist_directory = knext.StringParameter(
         "Vectorstore directory",
-        """Directory to store the vectordb.""",
+        "The local directory in which the vector store is stored.",
     )
 
     def configure(
@@ -165,6 +166,7 @@ class FAISSVectorStoreReader:
         ctx: knext.ConfigurationContext,
         embeddings_spec: EmbeddingsPortObjectSpec,
     ) -> FAISSVectorstorePortObjectSpec:
+        embeddings_spec.validate_context(ctx)
         return FAISSVectorstorePortObjectSpec(embeddings_spec)
 
     def execute(

@@ -190,19 +190,21 @@ class VectorStoreToTool:
     """
     Creates an agent tool from a vector store.
 
-    The power of an agent is that it can decide whether it needs to
-    make use of an provided tool (e.g. looking for data in a vector store) to
-    answer questions.
+    Turns a vector store into a tool by providing it with a name and a description.
+    This tool can then be used by an agent during the execution of the **Agent Prompter** node to dynamically
+    retrieve relevant documents from the underlying vector store.
 
-    An agent needs to be provided with the store and the information of its content.
     A meaningful name and description are very important:
 
     Example:
 
-    Name: KNIME Node Description QA System
+    Name: KNIME_Node_Description_QA_System
 
     Description: Use this tool whenever you need information about which nodes a user would need in a given
     situation or if you need information about nodes' configuration options.
+
+    Note that *OpenAI Functions Agents* require the name to contain no whitespaces while other kinds
+    of agents may not have this restriction.
     """
 
     tool_name = knext.StringParameter(

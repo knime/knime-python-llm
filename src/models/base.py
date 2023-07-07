@@ -174,13 +174,10 @@ embeddings_model_port_type = knext.port_type(
 )
 class LLMPrompter:
     """
-
     Prompts a Large Language Model.
-
-    The LLM Prompter takes a statement (prompt) and creates a
-    response (i.e. generates text) for that single prompt. It does not have the
-    knowledge of the other prompts or any kind of conversation memory.
-
+    
+    For each row in the input table, the LLM Prompter sends one prompt to the LLM and receives a corresponding response.
+    Rows are treated independently i.e. the LLM can not *remember* the content of previous rows or how it responded to them.
     """
 
     prompt_column = knext.ColumnParameter(
@@ -247,17 +244,15 @@ class LLMPrompter:
 @knext.output_table("Conversation", "A table containing the conversation history.")
 class ChatModelPrompter:
     """
-
     Prompts a Chat Model.
 
     The Chat Model Prompter takes a statement (prompt) and the conversation
-    history with user, ai and system messages. It then can generate a response
-    (i.e. generates text) for the prompt with the knowledge of the previous
+    history with human and AI messages. It then generates a response for the prompt with the knowledge of the previous
     conversation.
 
-    If you want to reduce the amount of tokens being used, consider reducing the
+    If you want to reduce the amount of tokens being used, consider reducing
     the conversation table length to a reasonable (e.g. 5 conversation steps) length
-    before re-providing it to the Chat Model Prompter.
+    before feeding it into the Chat Model Prompter.
 
     """
 
@@ -370,9 +365,9 @@ class TextEmbedder:
 
     This node applies the provided embeddings model to create embeddings for the texts contained in a string column of the input table.
     At its core, a text embedding is a dense vector of floating point values capturing the semantic meaning of the text.
-    Thus these embeddings are often used to find semantically similar documents.
+    Thus these embeddings are often used to find semantically similar documents e.g. in vector stores.
     How exactly the embeddings are derived depends on the used embeddings model but typically the embeddings are the internal representations
-    used by deep language models e.g. transformers or GPTs.
+    used by deep language models e.g. GPTs.
     """
 
     text_column = knext.ColumnParameter("Text column", "The string column containing the texts to embed.", port_index=1, column_filter=_string_col_filter)

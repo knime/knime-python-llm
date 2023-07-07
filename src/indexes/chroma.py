@@ -180,7 +180,7 @@ class ChromaVectorStoreReader:
 
     persist_directory = knext.StringParameter(
         "Vectorstore directory",
-        """Directory to store the vectordb.""",
+        """The local directory in which the vector store is stored.""",
     )
 
     def configure(

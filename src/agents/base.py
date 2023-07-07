@@ -442,12 +442,16 @@ class AgentPrompter:
     """
     Combines an agent with a set of tools and prompts it with a user provided prompt.
 
-    The chat history table is expected to have at least two string columns and be
-    either empty or filled by a previous agent execution.
+    This node combines an agent with a set of tools and prompts it with a user provided prompt 
+    and the conversation history in the input table.
+    
+    The conversation table is expected to have at least two string columns that define previous conversation.
+    It can be empty if this is the start of the conversation.
+
     The agent always receives the full conversation table as context which can slow down
     agent execution for long conversations or even lead to execution failures if the context becomes
-    too large for the underlying large language model.
-    If you experience such issues, you can just truncate the conversation table by only keeping the last
+    too large for the underlying LLM.
+    If you experience such issues, you can truncate the conversation table by only keeping the last
     few messages, or even use a large language model to create a summary of the conversation held so far.
     """
 

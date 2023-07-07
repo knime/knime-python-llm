@@ -76,9 +76,11 @@ class OpenAIFunctionsAgentCreator:
     """
     Creates an agent that uses the function calling feature of OpenAI chat models.
 
-    In general an agent is an LLM that is configured to use set of tools that it can use to answer user prompts.
-    This particular type of agent is specialized on OpenAI chat models that support function calling and can be primed with a custom system message.
-    To prompt the agent, use the Agent Prompter node.
+    This node creates an agent that is based on OpenAI chat models that support function calling and can be primed with a custom system message.
+
+    In general an agent is an LLM that is configured to dynamically pick a tool from a set of tools to best answer the user prompts.
+    
+    Note that these agents do not support tools with whitespaces in their names.
     """
     system_message = knext.StringParameter(
         "System message",

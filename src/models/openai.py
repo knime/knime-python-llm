@@ -80,16 +80,24 @@ class OpenAIGeneralSettings(GeneralSettings):
 
 
 def get_model_list(ctx: knext.DialogCreationContext):
-    for spec in ctx.get_input_specs():
-        if isinstance(spec, OpenAIAuthenticationPortObjectSpec):
-            auth_spec = spec
-
-    if not auth_spec:
-        raise knext.InvalidParametersError("OpenAI Authentication is not provided.")
-
-    openai.api_key = ctx.get_credentials(auth_spec.credentials).password
+    def get_key(specs):
+        auth_spec = specs[0] if specs else None
+        if (
+            auth_spec is not None
+            and auth_spec.credentials in ctx.get_credential_names()
+        ):
+            return ctx.get_credentials(auth_spec.credentials).password
+        return None
 
     model_list = ["unselected"]
+
+    specs = ctx.get_input_specs()
+    key = get_key(specs)
+
+    if not key:
+        return model_list
+    openai.api_key = key
+
     for model in openai.Model.list()["data"]:
         # If model has '-<number>' string or is not owned_by openai
         if re.search(r"-\d", model["id"]) or "openai" not in model["owned_by"]:

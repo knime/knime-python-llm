@@ -99,15 +99,16 @@ def get_model_list(ctx: knext.DialogCreationContext):
     return model_list
 
 
-specific_model_name = knext.StringParameter(
-    label="Specific Model ID",
-    description="""Select from a list of all available OpenAI models.
-        The model chosen has to match the node's output to ensure the best behaviour.
-        """,
-    choices=lambda c: get_model_list(c),
-    default_value="unselected",
-    is_advanced=True,
-)
+def _create_specific_model_name(api_name:str ) -> knext.StringParameter:
+    return knext.StringParameter(
+        label="Specific Model ID",
+        description=f"""Select from a list of all available OpenAI models.
+            The model chosen has to be compatible with OpenAI's {api_name} API.
+            """,
+        choices=lambda c: get_model_list(c),
+        default_value="unselected",
+        is_advanced=True,
+    )
 
 
 @knext.parameter_group(label="OpenAI Model Selection")
@@ -141,7 +142,7 @@ class LLMLoaderInputSettings:
         OpenAIModelCompletionsOptions,
     )
 
-    specific_model_name = specific_model_name
+    specific_model_name = _create_specific_model_name("Completions")
 
 
 @knext.parameter_group(label="OpenAI Chat Model Selection")
@@ -171,7 +172,7 @@ class ChatModelLoaderInputSettings:
         OpenAIModelCompletionsOptions,
     )
 
-    specific_model_name = specific_model_name
+    specific_model_name = _create_specific_model_name("Chat")
 
 
 @knext.parameter_group(label="OpenAI Embeddings Selection")
@@ -193,7 +194,7 @@ class EmbeddingsLoaderInputSettings:
         OpenAIEmbeddingsOptions,
     )
 
-    specific_model_name = specific_model_name
+    specific_model_name = _create_specific_model_name("Embeddings")
 
 
 # == Port Objects ==
@@ -445,10 +446,13 @@ class OpenAIAuthenticator:
     """
     Authenticates the OpenAI API key.
 
-    This node validates the provided OpenAI API key by making a
-    request to the https://api.openai.com/v1/models endpoint.
+    This node provides the authentication for all OpenAI models.
+    It allows you to select the credentials that contain a valid OpenAI API key in their *password* field (the *username* is ignored).
+    Credentials can be set on the workflow level or created inside the workflow e.g. with the [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
+    and fed into this node via flow variable.
 
-    The node expects the OpenAI API key to be provided via the *password* field of the [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory).
+    When this node is run, it validates the OpenAI key by sending a request to the https://api.openai.com/v1/models endpoint.
+    This request does not take up any tokens.
 
     If you don't have an OpenAI API key yet, you can generate one at
     [OpenAI](https://platform.openai.com/account/api-keys).
@@ -458,7 +462,7 @@ class OpenAIAuthenticator:
     credentials_settings = CredentialsSettings(
         label="OpenAI API Key",
         description="""
-        The OpenAI API key provided via the *password* field of the Credentials Configuration node.
+        The credentials containing the OpenAI API key in its *password* field (the *username* is ignored).
         """,
     )
 
@@ -513,9 +517,12 @@ class OpenAILLMConnector:
     """
     Connects to an OpenAI Large Language Model.
 
-    This node establishes a connection with an OpenAI Large Language Model (LLM). After successfully authenticating
-    using the **OpenAI Authenticator node**, you can select an LLM from a predefined list
-    or explore advanced options to find the most suitable model for your downstream task.
+    This node establishes a connection with an OpenAI Large Language Model (LLM).
+    After successfully authenticating using the **OpenAI Authenticator node**, you can select an LLM from a predefined list
+    or explore advanced options to get a list of all models available for your API key (including fine-tunes).
+    Note that only models compatible with OpenAI's Completions API will work with this node (unfortunately this information is not available programmatically).
+
+    If you a looking for gpt-3.5-turbo (the model behind ChatGPT) or gpt-4, check out the **OpenAI Chat Model Connector** node.   
     """
 
     input_settings = LLMLoaderInputSettings()
@@ -578,8 +585,13 @@ class OpenAIChatModelConnector:
     Connects to an OpenAI Chat Model.
 
     This node establishes a connection with an OpenAI Chat Model. After successfully authenticating
-    using the **OpenAI Authenticator node**, you can select a chat model from a predefined list
-    or explore advanced options to find the most suitable model for your downstream task.
+    using the **OpenAI Authenticator node**, you can select a chat model from a predefined list.
+
+    If OpenAI releases a new model that is not among the listed models, you can also select from a list
+    of all available OpenAI models but you have to ensure that selected model is compatible with the OpenAI Chat API.
+
+    Note that chat models can also be used as LLMs because they are actually a subcategory of LLMs that are optimized
+    for chat-like applications.
     """
 
     input_settings = ChatModelLoaderInputSettings()
@@ -642,8 +654,10 @@ class OpenAIEmbeddingsConnector:
     Connects to an OpenAI Embedding Model.
 
     This node establishes a connection with an OpenAI Embeddings Model. After successfully authenticating
-    using the **OpenAI Authenticator node**, you can select an embedding model from a predefined list
-    or explore advanced options to find the most suitable model for your downstream task.
+    using the **OpenAI Authenticator node**, you can select an embedding model from a predefined list.
+
+    If OpenAI releases a new embeddings model that is not contained in the predefined list, you can select it from
+    the list in the advanced settings which contains all OpenAI models available for your OpenAI API key.
     """
 
     input_settings = EmbeddingsLoaderInputSettings()

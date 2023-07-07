@@ -450,9 +450,9 @@ class AgentPrompter:
     """
     Combines an agent with a set of tools and prompts it with a user provided prompt.
 
-    This node combines an agent with a set of tools and prompts it with a user provided prompt 
+    This node combines an agent with a set of tools and prompts it with a user provided prompt
     and the conversation history in the input table.
-    
+
     The conversation table is expected to have at least two string columns that define previous conversation.
     It can be empty if this is the start of the conversation.
 
@@ -465,6 +465,12 @@ class AgentPrompter:
 
     conversation_settings = ConversationSettings()
     message_settings = ChatMessageSettings()
+    enable_debug_output = knext.BoolParameter(
+        "Enable debug output",
+        "If checked activates prints the output of LangChain's debug mode to the console.",
+        False,
+        is_advanced=True,
+    )
 
     def configure(
         self,
@@ -530,6 +536,8 @@ class AgentPrompter:
 
         # TODO more memory variants
         # TODO return messages might depend on the type of model (i.e. chat needs it llm doesn't)?
+
+        langchain.debug = self.enable_debug_output
         memory = ConversationBufferMemory(
             memory_key="chat_history", return_messages=True
         )
@@ -544,8 +552,6 @@ class AgentPrompter:
 
         tools = tools_obj.create_tools(ctx)
         agent = agent_obj.create_agent(ctx, tools)
-
-        langchain.debug = True
 
         agent_exec = langchain.agents.AgentExecutor(
             memory=memory, agent=agent, tools=tools, verbose=True

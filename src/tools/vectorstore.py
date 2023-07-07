@@ -114,6 +114,10 @@ class FilestoreVectorToolPortObjectSpec(VectorToolPortObjectSpec):
     @property
     def vectorstore_type(self) -> knext.PortType:
         return self._vectorstore_type
+    
+    def validate_context(self, ctx: knext.ConfigurationContext):
+        self.llm_spec.validate_context(ctx)
+        self.vectorstore_spec.validate_context(ctx)
 
     def serialize(self) -> dict:
         data = super().serialize()
@@ -176,7 +180,6 @@ _filestore_vector_tool_port_type = knext.port_type(
 )
 
 
-# TODO: Add better descriptions
 @knext.node(
     "Vector Store to Agent Tool",
     knext.NodeType.MANIPULATOR,
@@ -231,6 +234,7 @@ class VectorStoreToTool:
         vectorstore_spec: VectorStorePortObjectSpec,
     ) -> ToolListPortObjectSpec:
         tool_spec = self._create_tool_spec(llm_spec, vectorstore_spec)
+        tool_spec.validate_context(ctx)
         return ToolListPortObjectSpec([tool_spec])
 
     def _create_tool_spec(

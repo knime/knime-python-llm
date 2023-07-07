@@ -6,7 +6,6 @@ from models.openai import (
     openai_icon
 )
 import knime.extension as knext
-from tools.base import tool_list_port_type, ToolListPortObjectSpec, ToolListPortObject
 from .base import AgentPortObject, AgentPortObjectSpec
 from .base import agent_category
 
@@ -89,6 +88,7 @@ class OpenAIFunctionsAgentCreator:
     )
 
     def configure(self, ctx, chat_model_spec: OpenAIChatModelPortObjectSpec):
+        chat_model_spec.validate_context(ctx)
         return OpenAIFunctionsAgentPortObjectSpec(chat_model_spec, self.system_message)
 
     def execute(self, ctx, chat_model: OpenAIChatModelPortObject):

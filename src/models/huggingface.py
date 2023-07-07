@@ -11,6 +11,7 @@ from .base import (
     GeneralSettings,
     CredentialsSettings,
 )
+from base import AIPortObjectSpec
 
 # Langchain imports
 from langchain import HuggingFaceHub
@@ -135,6 +136,7 @@ class HuggingFaceHubSettings:
 # == Port Objects ==
 
 
+
 class HuggingFaceTextGenInfLLMPortObjectSpec(LLMPortObjectSpec):
     def __init__(
         self,
@@ -229,11 +231,53 @@ huggingface_textGenInference_llm_port_type = knext.port_type(
     HuggingFaceTextGenInfLLMPortObjectSpec,
 )
 
+class HuggingFaceAuthenticationPortObjectSpec(AIPortObjectSpec):
+    def __init__(self, credentials: str) -> None:
+        super().__init__()
+        self._credentials = credentials
+
+    @property
+    def credentials(self) -> str:
+        return self._credentials
+
+    def validate_context(self, ctx: knext.ConfigurationContext):
+        if not self.credentials in ctx.get_credential_names():
+            raise knext.InvalidParametersError(
+                f"The selected credentials '{self.credentials}' holding the Hugging Face Hub API token are not present."
+            )
+        hub_token = ctx.get_credentials(self.credentials)
+        if not hub_token.password:
+            raise knext.InvalidParametersError(f"The Hugging Face Hub token in the credentials '{self.credentials}' is not present.")
+
+    def serialize(self) -> dict:
+        return {"credentials": self._credentials}
+
+    @classmethod
+    def deserialize(cls, data: dict):
+        return cls(data["credentials"])
+
+class HuggingFaceAuthenticationPortObject(knext.PortObject):
+    def __init__(self, spec: HuggingFaceAuthenticationPortObjectSpec) -> None:
+        super().__init__(spec)
+
+    def serialize(self) -> bytes:
+        return b""
+
+    @classmethod
+    def deserialize(cls, spec: HuggingFaceAuthenticationPortObjectSpec, storage: bytes):
+        return cls(spec)
+
+
+huggingface_authentication_port_type = knext.port_type(
+    "Hugging Face Hub Authentication",
+    HuggingFaceAuthenticationPortObject,
+    HuggingFaceAuthenticationPortObjectSpec,
+)
 
 class HuggingFaceHubLLMPortObjectSpec(LLMPortObjectSpec):
     def __init__(
         self,
-        credentials,
+        credentials: HuggingFaceAuthenticationPortObjectSpec,
         repo_id,
         task,
         model_kwargs,
@@ -245,8 +289,8 @@ class HuggingFaceHubLLMPortObjectSpec(LLMPortObjectSpec):
         self._model_kwargs = model_kwargs
 
     @property
-    def credentials(self):
-        return self._credentials
+    def credentials(self) -> str:
+        return self._credentials.credentials
 
     @property
     def repo_id(self):
@@ -262,7 +306,7 @@ class HuggingFaceHubLLMPortObjectSpec(LLMPortObjectSpec):
 
     def serialize(self) -> dict:
         return {
-            "credentials": self._credentials,
+            **self._credentials.serialize,
             "repo_id": self._repo_id,
             "task": self._task,
             "model_kwargs": self._model_kwargs,
@@ -271,7 +315,7 @@ class HuggingFaceHubLLMPortObjectSpec(LLMPortObjectSpec):
     @classmethod
     def deserialize(cls, data: dict):
         return cls(
-            data["credentials"],
+            HuggingFaceAuthenticationPortObjectSpec.deserialize(data),
             data["repo_id"],
             data["task"],
             data["model_kwargs"],
@@ -298,52 +342,6 @@ huggingface_hub_llm_port_type = knext.port_type(
 )
 
 
-class HuggingFaceAuthenticationPortObjectSpec(knext.PortObjectSpec):
-    def __init__(self, credentials: str) -> None:
-        super().__init__()
-        self._credentials = credentials
-
-    @property
-    def credentials(self) -> str:
-        return self._credentials
-
-    def validate_context(self, ctx: knext.ConfigurationContext):
-        if not self.credentials in ctx.get_credential_names():
-            raise knext.InvalidParametersError(
-                f"The selected credentials '{self.credentials}' holding the Hugging Face Hub API token are not present."
-            )
-        # TODO validate that the api token is actually there not only the credentials that shoud contain it
-        # hub_token = ctx.get_credentials(self.credentials)
-        # if not hub_token.password:
-        #     raise knext.InvalidParametersError(f"The Hugging Face Hub token in the credentials '{self.credentials}' is not present.")
-
-    def serialize(self) -> dict:
-        return {"credentials": self._credentials}
-
-    @classmethod
-    def deserialize(cls, data: dict):
-        return cls(data["credentials"])
-
-
-class HuggingFaceAuthenticationPortObject(knext.PortObject):
-    def __init__(self, spec: HuggingFaceAuthenticationPortObjectSpec) -> None:
-        super().__init__(spec)
-
-    def serialize(self) -> bytes:
-        return b""
-
-    @classmethod
-    def deserialize(cls, spec: HuggingFaceAuthenticationPortObjectSpec, storage: bytes):
-        return cls(spec)
-
-
-huggingface_authentication_port_type = knext.port_type(
-    "Hugging Face Hub Authentication",
-    HuggingFaceAuthenticationPortObject,
-    HuggingFaceAuthenticationPortObjectSpec,
-)
-
-
 class HFHubEmbeddingsPortObjectSpec(EmbeddingsPortObjectSpec):
     def __init__(
         self, hub_credentials: HuggingFaceAuthenticationPortObjectSpec, repo_id: str
@@ -365,16 +363,13 @@ class HFHubEmbeddingsPortObjectSpec(EmbeddingsPortObjectSpec):
 
     def serialize(self) -> dict:
         return {
-            "hub_credentials_name": self.hub_credentials_name,
+            **self._hub_credentials.serialize(),
             "repo_id": self.repo_id,
         }
 
     @classmethod
     def deserialize(cls, data: dict):
-        hub_authentication = HuggingFaceAuthenticationPortObjectSpec(
-            data["hub_credentials_name"]
-        )
-        return cls(hub_authentication, data["repo_id"])
+        return cls(HuggingFaceAuthenticationPortObjectSpec.deserialize(data), data["repo_id"])
 
 
 class HFHubEmbeddingsPortObject(EmbeddingsPortObject):
@@ -569,7 +564,7 @@ class HuggingFaceHubConnector:
         }
 
         return HuggingFaceHubLLMPortObjectSpec(
-            huggingface_auth_spec.credentials,
+            huggingface_auth_spec,
             self.hub_settings.repo_id,
             HFHubTask[self.hub_settings.task].label,
             model_kwargs,

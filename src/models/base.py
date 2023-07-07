@@ -4,6 +4,7 @@ import util
 
 from langchain.schema import AIMessage, HumanMessage, SystemMessage
 from langchain.embeddings.base import Embeddings
+from base import AIPortObjectSpec
 
 model_category = knext.category(
     path=util.main_category,
@@ -74,13 +75,8 @@ class CredentialsSettings:
         )
 
 
-class LLMPortObjectSpec(knext.PortObjectSpec):
-    def serialize(self) -> dict:
-        return {}
-
-    @classmethod
-    def deserialize(cls, data: dict):
-        return cls()
+class LLMPortObjectSpec(AIPortObjectSpec):
+    """Most generic spec of LLMs. Used to define the most generic LLM PortType"""
 
 
 class LLMPortObject(knext.PortObject):
@@ -102,12 +98,7 @@ llm_port_type = knext.port_type("LLM Port", LLMPortObject, LLMPortObjectSpec)
 
 
 class ChatModelPortObjectSpec(LLMPortObjectSpec):
-    def serialize(self):
-        return {}
-
-    @classmethod
-    def deserialize(cls, data: dict):
-        return cls()
+    """Most generic chat model spec. Used to define the most generic chat model PortType."""
 
 
 class ChatModelPortObject(LLMPortObject):
@@ -130,20 +121,8 @@ chat_model_port_type = knext.port_type(
 )
 
 
-class EmbeddingsPortObjectSpec(knext.PortObjectSpec):
-    def serialize(self):
-        return {}
-
-    @classmethod
-    def deserialize(cls, data: dict):
-        return cls()
-    
-    def validate_context(self, ctx: knext.ConfigurationContext):
-        """
-        Deriving classes should overwrite this method to check if the current context allows to run the model.
-        """
-        pass
-
+class EmbeddingsPortObjectSpec(AIPortObjectSpec):
+    """Most generic embeddings model spec. Used to define the most generic embeddings model PortType."""
 
 class EmbeddingsPortObject(knext.PortObject):
     def __init__(self, spec: EmbeddingsPortObjectSpec) -> None:
@@ -206,6 +185,8 @@ class LLMPrompter:
 
         if not self.prompt_column:
             raise knext.InvalidParametersError("No column selected.")
+        
+        llm_spec.validate_context(ctx)
 
         return knext.Schema.from_columns(
             [
@@ -291,6 +272,7 @@ class ChatModelPrompter:
                 """
             )
 
+        chat_model_spec.validate_context(ctx)
         return knext.Schema.from_columns(
             [
                 knext.Column(knext.string(), "Type"),

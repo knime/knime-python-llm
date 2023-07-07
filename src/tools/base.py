@@ -6,13 +6,14 @@ from knime.extension.nodes import (
     save_port_object,
     load_port_object,
 )
+from base import AIPortObjectSpec
 from typing import List
 import os
 from indexes.base import store_category  # TODO add separate tool category?
 from langchain.tools import Tool
 
 
-class ToolPortObjectSpec(knext.PortObjectSpec):
+class ToolPortObjectSpec(AIPortObjectSpec):
     def __init__(self, name, description) -> None:
         super().__init__()
         self._name = name
@@ -34,7 +35,7 @@ class ToolPortObject(knext.PortObject):
         raise NotImplementedError()
 
 
-class ToolListPortObjectSpec(knext.PortObjectSpec):
+class ToolListPortObjectSpec(AIPortObjectSpec):
     def __init__(self, tool_specs: List[ToolPortObjectSpec]) -> None:
         self._tool_specs = tool_specs
         self._tool_types = [
@@ -48,6 +49,10 @@ class ToolListPortObjectSpec(knext.PortObjectSpec):
     @property
     def tool_specs(self) -> List[ToolPortObjectSpec]:
         return self._tool_specs
+    
+    def validate_context(self, ctx: knext.ConfigurationContext):
+        for tool_spec in self._tool_specs:
+            tool_spec.validate_context(ctx)
 
     def serialize(self) -> dict:
         return {

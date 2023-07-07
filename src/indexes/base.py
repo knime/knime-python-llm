@@ -12,6 +12,7 @@ from models.base import (
     EmbeddingsPortObject,
     EmbeddingsPortObjectSpec,
 )
+from base import AIPortObjectSpec
 
 import pandas as pd
 import util
@@ -29,14 +30,8 @@ store_category = knext.category(
 )
 
 
-class VectorStorePortObjectSpec(knext.PortObjectSpec):
-
-    def serialize(self) -> dict:
-        return {}
-
-    @classmethod
-    def deserialize(cls, data: dict):
-        return cls()
+class VectorStorePortObjectSpec(AIPortObjectSpec):
+    """Marker interface for vector store specs. Used to define the most generic vector store PortType."""
 
 
 class VectorStorePortObject(knext.PortObject):
@@ -74,6 +69,9 @@ class FilestoreVectorstorePortObjectSpec(VectorStorePortObjectSpec):
     @property
     def embeddings_spec(self) -> EmbeddingsPortObjectSpec:
         return self._embeddings_spec
+    
+    def validate_context(self, ctx: knext.ConfigurationContext):
+        self._embeddings_spec.validate_context(ctx)
 
     def serialize(self) -> dict:
         return {
@@ -197,7 +195,8 @@ class VectorStoreRetriever:
             self.query_column = util.pick_default_column(table_spec, knext.string())
         else:
             util.check_column(table_spec, self.query_column, knext.string(), "queries")
-            
+        
+        vectorstore_spec.validate_context(ctx)
         return knext.Schema.from_columns(
             [
                 knext.Column(knext.string(), "Queries"),

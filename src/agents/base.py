@@ -20,6 +20,7 @@ from knime.extension.nodes import (
     save_port_object,
     FilestorePortObject,
 )
+from base import AIPortObjectSpec
 
 import os
 
@@ -162,7 +163,7 @@ class MemoryTypeSettings:
 
 
 # TODO: Add agent type in the future?
-class AgentPortObjectSpec(knext.PortObjectSpec):
+class AgentPortObjectSpec(AIPortObjectSpec):
     def __init__(
         self,
         llm_spec: LLMPortObjectSpec,
@@ -177,6 +178,9 @@ class AgentPortObjectSpec(knext.PortObjectSpec):
     @property
     def llm_type(self) -> knext.PortType:
         return self._llm_type
+
+    def validate_context(self, ctx: knext.ConfigurationContext):
+        self._llm_spec.validate_context(ctx)
 
     def serialize(self) -> dict:
         return {
@@ -252,6 +256,8 @@ class LLMAgentCreator:
         llm_spec: LLMPortObjectSpec,
         tools_spec: ToolListPortObjectSpec,
     ):
+        llm_spec.validate_context(ctx)
+        tools_spec.validate_context(ctx)
         return AgentPortObjectSpec(self.memory_type.memory, llm_spec, tools_spec)
 
     def execute(
@@ -322,6 +328,8 @@ class AgentExecutor:
                     raise knext.InvalidParametersError(
                         f"{c.name} has to be a String column."
                     )
+
+        agent_spec.validate_context(ctx)
 
         return knext.Schema.from_columns(
             [
@@ -488,6 +496,8 @@ class AgentPrompter:
                         f"{c.name} has to be a String column."
                     )
 
+        agent_spec.validate_context(ctx)
+        tools_spec.validate_context(ctx)
         return knext.Schema.from_columns(
             [
                 knext.Column(knext.string(), self.conversation_settings.role_column),

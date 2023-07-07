@@ -11,6 +11,7 @@ from .base import (
     GeneralSettings,
     CredentialsSettings,
 )
+from base import AIPortObjectSpec
 
 # Langchain imports
 from langchain.llms import OpenAI
@@ -207,15 +208,23 @@ class EmbeddingsLoaderInputSettings:
 
 # == Port Objects ==
 
-
-class OpenAIAuthenticationPortObjectSpec(knext.PortObjectSpec):
-    def __init__(self, credentials) -> None:
+class OpenAIAuthenticationPortObjectSpec(AIPortObjectSpec):
+    def __init__(self, credentials: str) -> None:
         super().__init__()
         self._credentials = credentials
 
     @property
-    def credentials(self):
+    def credentials(self) -> str:
         return self._credentials
+    
+    def validate_context(self, ctx: knext.ConfigurationContext):
+        if not self.credentials in ctx.get_credential_names():
+            raise knext.InvalidParametersError(
+                f"The selected credentials '{self.credentials}' holding the OpenAI API token are not present."
+            )
+        hub_token = ctx.get_credentials(self.credentials)
+        if not hub_token.password:
+            raise knext.InvalidParametersError(f"The OpenAI API token in the credentials '{self.credentials}' is not present.")
 
     def serialize(self) -> dict:
         return {"credentials": self._credentials}
@@ -243,22 +252,34 @@ openai_authentication_port_type = knext.port_type(
     OpenAIAuthenticationPortObjectSpec,
 )
 
-
-class OpenAILLMPortObjectSpec(LLMPortObjectSpec):
-    def __init__(
-        self, credentials, model_name, temperature, top_p, max_tokens, n
-    ) -> None:
-        super().__init__()
+class OpenAIModelPortObjectSpec(AIPortObjectSpec):
+    def __init__(self, credentials=OpenAIAuthenticationPortObjectSpec) -> None:
         self._credentials = credentials
+
+    @property
+    def credentials(self) -> str:
+        return self._credentials.credentials
+    
+    def validate_context(self, ctx: knext.ConfigurationContext):
+        self._credentials.validate_context(ctx)
+    
+    def serialize(self) -> dict:
+        return {"credentials": self.credentials}
+    
+    @classmethod
+    def deserialize_credentials_spec(cls, data: dict) -> OpenAIAuthenticationPortObjectSpec:
+        return OpenAIAuthenticationPortObjectSpec(data["credentials"])
+
+class OpenAILLMPortObjectSpec(OpenAIModelPortObjectSpec, LLMPortObjectSpec):
+    def __init__(
+        self, credentials: OpenAIAuthenticationPortObjectSpec, model_name, temperature, top_p, max_tokens, n
+    ) -> None:
+        super().__init__(credentials)
         self._model = model_name
         self._temperature = temperature
         self._top_p = top_p
         self._max_tokens = max_tokens
         self._n = n
-
-    @property
-    def credentials(self):
-        return self._credentials
 
     @property
     def model(self):
@@ -282,7 +303,7 @@ class OpenAILLMPortObjectSpec(LLMPortObjectSpec):
 
     def serialize(self) -> dict:
         return {
-            "credentials": self._credentials,
+            **super().serialize(),
             "model": self._model,
             "temperature": self._temperature,
             "top_p": self._top_p,
@@ -293,7 +314,7 @@ class OpenAILLMPortObjectSpec(LLMPortObjectSpec):
     @classmethod
     def deserialize(cls, data: dict):
         return cls(
-            data["credentials"],
+            cls.deserialize_credentials_spec(data),
             data["model"],
             data["temperature"],
             data["top_p"],
@@ -322,21 +343,16 @@ openai_llm_port_type = knext.port_type(
 )
 
 
-class OpenAIChatModelPortObjectSpec(ChatModelPortObjectSpec):
+class OpenAIChatModelPortObjectSpec(OpenAIModelPortObjectSpec, ChatModelPortObjectSpec):
     def __init__(
-        self, credentials, model_name, temperature, top_p, max_tokens, n
+        self, credentials: OpenAIAuthenticationPortObjectSpec, model_name, temperature, top_p, max_tokens, n
     ) -> None:
-        super().__init__()
-        self._credentials = credentials
+        super().__init__(credentials)
         self._model = model_name
         self._temperature = temperature
         self._top_p = top_p
         self._max_tokens = max_tokens
         self._n = n
-
-    @property
-    def credentials(self):
-        return self._credentials
 
     @property
     def model(self):
@@ -360,7 +376,7 @@ class OpenAIChatModelPortObjectSpec(ChatModelPortObjectSpec):
 
     def serialize(self) -> dict:
         return {
-            "credentials": self._credentials,
+            **super().serialize(),
             "model": self._model,
             "temperature": self._temperature,
             "top_p": self._top_p,
@@ -371,7 +387,7 @@ class OpenAIChatModelPortObjectSpec(ChatModelPortObjectSpec):
     @classmethod
     def deserialize(cls, data: dict):
         return cls(
-            data["credentials"],
+            cls.deserialize_credentials_spec(data),
             data["model"],
             data["temperature"],
             data["top_p"],
@@ -396,26 +412,21 @@ openai_chat_port_type = knext.port_type(
 )
 
 
-class OpenAIEmbeddingsPortObjectSpec(EmbeddingsPortObjectSpec):
-    def __init__(self, credentials, model_name) -> None:
-        super().__init__()
-        self._credentials = credentials
+class OpenAIEmbeddingsPortObjectSpec(OpenAIModelPortObjectSpec, EmbeddingsPortObjectSpec):
+    def __init__(self, credentials: OpenAIAuthenticationPortObjectSpec, model_name) -> None:
+        super().__init__(credentials)
         self._model = model_name
-
-    @property
-    def credentials(self):
-        return self._credentials
 
     @property
     def model(self):
         return self._model
-
+    
     def serialize(self) -> dict:
-        return {"credentials": self._credentials, "model": self._model}
+        return {**super().serialize(), "model": self._model}
 
     @classmethod
     def deserialize(cls, data: dict):
-        return cls(data["credentials"], data["model"])
+        return cls(cls.deserialize_credentials_spec(data), data["model"])
 
 
 class OpenAIEmbeddingsPortObject(EmbeddingsPortObject):
@@ -483,7 +494,9 @@ class OpenAIAuthenticator:
         if not self.credentials_settings.credentials_param:
             raise knext.InvalidParametersError("Credentials not selected.")
 
-        return self.create_spec()
+        spec = self.create_spec()
+        spec.validate_context(ctx)
+        return spec
 
     def execute(self, ctx: knext.ExecutionContext) -> OpenAIAuthenticationPortObject:
         try:
@@ -497,7 +510,7 @@ class OpenAIAuthenticator:
 
         return OpenAIAuthenticationPortObject(self.create_spec())
 
-    def create_spec(self):
+    def create_spec(self) -> OpenAIAuthenticationPortObjectSpec:
         return OpenAIAuthenticationPortObjectSpec(
             self.credentials_settings.credentials_param
         )
@@ -541,6 +554,7 @@ class OpenAILLMConnector:
         ctx: knext.ConfigurationContext,
         openai_auth_spec: OpenAIAuthenticationPortObjectSpec,
     ) -> OpenAILLMPortObjectSpec:
+        openai_auth_spec.validate_context(ctx)
         return self.create_spec(openai_auth_spec)
 
     def execute(
@@ -563,7 +577,7 @@ class OpenAILLMConnector:
         LOGGER.info(f"Connecting to {model_name}...")
 
         return OpenAILLMPortObjectSpec(
-            openai_auth_spec.credentials,
+            openai_auth_spec,
             model_name,
             self.model_settings.temperature,
             self.model_settings.top_p,
@@ -610,6 +624,7 @@ class OpenAIChatModelConnector:
         ctx: knext.ConfigurationContext,
         openai_auth_spec: OpenAIAuthenticationPortObjectSpec,
     ) -> OpenAIChatModelPortObjectSpec:
+        openai_auth_spec.validate_context(ctx)
         return self.create_spec(openai_auth_spec)
 
     def execute(
@@ -632,7 +647,7 @@ class OpenAIChatModelConnector:
         LOGGER.info(f"Connecting to {model_name}...")
 
         return OpenAIChatModelPortObjectSpec(
-            openai_auth_spec.credentials,
+            openai_auth_spec,
             model_name,
             self.model_settings.temperature,
             self.model_settings.top_p,
@@ -675,6 +690,7 @@ class OpenAIEmbeddingsConnector:
         ctx: knext.ConfigurationContext,
         openai_auth_spec: OpenAIAuthenticationPortObjectSpec,
     ) -> OpenAIEmbeddingsPortObjectSpec:
+        openai_auth_spec.validate_context(ctx)
         return self.create_spec(openai_auth_spec)
 
     def execute(
@@ -696,4 +712,4 @@ class OpenAIEmbeddingsConnector:
 
         LOGGER.info(f"Connecting to {model_name}...")
 
-        return OpenAIEmbeddingsPortObjectSpec(openai_auth_spec.credentials, model_name)
+        return OpenAIEmbeddingsPortObjectSpec(openai_auth_spec, model_name)

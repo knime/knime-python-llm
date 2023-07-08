@@ -213,7 +213,7 @@ class LLMPrompter:
         input_table: knext.Table,
     ):
         llm = llm_port.create_model(ctx)
-        num_rows = len(input_table)
+        num_rows = input_table.num_rows
 
         output_table: knext.BatchOutputTable = knext.BatchOutputTable.create()
         i = 0
@@ -426,7 +426,7 @@ class TextEmbedder:
     embeddings_column_name = knext.StringParameter(
         "Embeddings column name",
         "Name for output column that will hold the embeddings.",
-        "embeddings",
+        "Embeddings",
     )
 
     def configure(
@@ -456,12 +456,15 @@ class TextEmbedder:
     ) -> knext.Table:
         embeddings_model = embeddings_obj.create_model(ctx)
         output_table = knext.BatchOutputTable.create()
+        num_rows = table.num_rows
+        i = 0
         for batch in table.batches():
-            if ctx.is_canceled():
-                raise RuntimeError("Execution was canceled.")
+            util.check_canceled(ctx)
             data_frame = batch.to_pandas()
             texts = data_frame[self.text_column]
             embeddings = embeddings_model.embed_documents(texts)
             data_frame[self.embeddings_column_name] = embeddings
             output_table.append(knext.Table.from_pandas(data_frame))
+            i += batch.num_rows
+            ctx.set_progress(i / num_rows)
         return output_table

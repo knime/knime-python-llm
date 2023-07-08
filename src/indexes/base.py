@@ -184,13 +184,22 @@ class VectorStoreRetriever:
     """
 
     query_column = knext.ColumnParameter(
-        "Queries", "Column containing the queries.", port_index=1
+        "Queries",
+        "Column containing the queries.",
+        port_index=1,
+        column_filter=util.create_type_filer(knext.string()),
     )
 
     top_k = knext.IntParameter(
         "Number of results",
         "Number of top results to get from vector store search. Ranking from best to worst.",
         default_value=3,
+    )
+
+    retrieved_docs_column_name = knext.StringParameter(
+        "Retrieved document column name",
+        "The name for the appended column containing the retrieved documents.",
+        "Retrieved documents",
     )
 
     # TODO: Add options to retrieve meta data from the store
@@ -200,17 +209,21 @@ class VectorStoreRetriever:
         vectorstore_spec: VectorstorePortObjectSpec,
         table_spec: knext.Schema,
     ):
-        if self.query_column is None:
-            self.query_column = util.pick_default_column(table_spec, knext.string())
-        else:
-            util.check_column(table_spec, self.query_column, knext.string(), "queries")
-
         vectorstore_spec.validate_context(ctx)
-        return knext.Schema.from_columns(
-            [
-                knext.Column(knext.string(), "Queries"),
-                knext.Column(knext.ListType(knext.string()), "Documents"),
-            ]
+        if self.query_column:
+            util.check_column(table_spec, self.query_column, knext.string(), "queries")
+        else:
+            self.query_column = util.pick_default_column(table_spec, knext.string())
+
+        if not self.retrieved_docs_column_name:
+            raise knext.InvalidParametersError(
+                "No name for the column holding the retrieved documents is provided."
+            )
+
+        return table_spec.append(
+            knext.Column(
+                knext.ListType(knext.string()), self.retrieved_docs_column_name
+            )
         )
 
     def execute(
@@ -220,24 +233,24 @@ class VectorStoreRetriever:
         input_table: knext.Table,
     ):
         db = vectorstore.load_store(ctx)
+        num_rows = input_table.num_rows
+        i = 0
+        output_table: knext.BatchOutputTable = knext.BatchOutputTable()
 
-        queries = input_table.to_pandas()
-        df = pd.DataFrame(queries)
+        for batch in input_table:
+            doc_collection = []
+            df = batch.to_pandas()
+            for query in df[self.query_column]:
+                util.check_canceled(ctx)
+                doc_collection.append(self._retrieve_documents(db, query))
+                i += 1
+                ctx.set_progress(i / num_rows)
 
-        doc_collection = []
+            df[self.retrieved_docs_column_name] = doc_collection
+            output_table.append(df)
 
-        for query in df[self.query_column]:
-            similar_documents = db.similarity_search(query, k=self.top_k)
+        return output_table
 
-            relevant_documents = []
-
-            for document in similar_documents:
-                relevant_documents.append(document.page_content)
-
-            doc_collection.append(relevant_documents)
-
-        result_table = pd.DataFrame()
-        result_table["Queries"] = queries
-        result_table["Documents"] = doc_collection
-
-        return knext.Table.from_pandas(result_table)
+    def _retrieve_documents(self, db, query):
+        similar_documents = db.similarity_search(query, k=self.top_k)
+        return [document.page_content for document in similar_documents]

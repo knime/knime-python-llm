@@ -8,6 +8,8 @@ from models.base import (
 )
 
 from .base import (
+    VectorstorePortObjectSpec,
+    VectorstorePortObject,
     FilestoreVectorstorePortObjectSpec,
     FilestoreVectorstorePortObject,
     store_category,
@@ -29,13 +31,28 @@ chroma_category = knext.category(
 )
 
 
-class ChromaVectorstorePortObjectSpec(FilestoreVectorstorePortObjectSpec):
-    # placeholder to enable us to add Chroma specific stuff later on
-    pass
+class ChromaVectorstorePortObjectSpec(VectorstorePortObjectSpec):
+    """Super type of the spec of local and remote Chroma vector stores."""
 
 
-# TODO consider abstracting the chroma vectorstore because it is also possible to connect to a cloud hosted chroma instance
-class ChromaVectorstorePortObject(FilestoreVectorstorePortObject):
+class LocalChromaVectorstorePortObjectSpec(
+    ChromaVectorstorePortObjectSpec, FilestoreVectorstorePortObjectSpec
+):
+    """Spec for local chroma instances run within this process."""
+
+
+class ChromaVectorstorePortObject(VectorstorePortObject):
+    """Super type of Chroma vector stores"""
+
+
+chroma_vector_store_port_type = knext.port_type(
+    "Chroma Vector Store", ChromaVectorstorePortObject, ChromaVectorstorePortObjectSpec
+)
+
+
+class LocalChromaVectorstorePortObject(
+    ChromaVectorstorePortObject, FilestoreVectorstorePortObject
+):
     def __init__(
         self,
         spec: ChromaVectorstorePortObjectSpec,
@@ -79,8 +96,10 @@ class ChromaVectorstorePortObject(FilestoreVectorstorePortObject):
         return Chroma(embedding_function=embeddings, persist_directory=vectorstore_path)
 
 
-chroma_vector_store_port_type = knext.port_type(
-    "Chroma Vector Store", ChromaVectorstorePortObject, ChromaVectorstorePortObjectSpec
+local_chroma_vector_store_port_type = knext.port_type(
+    "Chroma Vector Store",
+    LocalChromaVectorstorePortObject,
+    LocalChromaVectorstorePortObjectSpec,
 )
 
 
@@ -102,7 +121,7 @@ chroma_vector_store_port_type = knext.port_type(
 @knext.output_port(
     "Chroma Vector Store",
     "The created Chroma vector store.",
-    chroma_vector_store_port_type,
+    local_chroma_vector_store_port_type,
 )
 class ChromaVectorStoreCreator:
     """
@@ -119,6 +138,7 @@ class ChromaVectorStoreCreator:
         "Document column",
         """Select the column containing the documents to be embedded.""",
         port_index=1,
+        column_filter=util.create_type_filer(knext.string()),
     )
 
     def configure(
@@ -126,12 +146,13 @@ class ChromaVectorStoreCreator:
         ctx: knext.ConfigurationContext,
         embeddings_spec: EmbeddingsPortObjectSpec,
         input_table: knext.Schema,
-    ) -> ChromaVectorstorePortObjectSpec:
-        if self.document_column is None:
-            self.document_column = util.pick_default_column(input_table, knext.string())
-        else:
+    ) -> LocalChromaVectorstorePortObjectSpec:
+        embeddings_spec.validate_context(ctx)
+        if self.document_column:
             validate_creator_document_column(input_table, self.document_column)
-        return ChromaVectorstorePortObjectSpec(embeddings_spec)
+        else:
+            self.document_column = util.pick_default_column(input_table, knext.string())
+        return LocalChromaVectorstorePortObjectSpec(embeddings_spec)
 
     def execute(
         self,
@@ -147,8 +168,10 @@ class ChromaVectorStoreCreator:
             embedding=embeddings.create_model(ctx),
         )
 
-        return ChromaVectorstorePortObject(
-            ChromaVectorstorePortObjectSpec(embeddings.spec), embeddings, vectorstore=db
+        return LocalChromaVectorstorePortObject(
+            LocalChromaVectorstorePortObjectSpec(embeddings.spec),
+            embeddings,
+            vectorstore=db,
         )
 
 
@@ -164,7 +187,9 @@ class ChromaVectorStoreCreator:
     embeddings_model_port_type,
 )
 @knext.output_port(
-    "Chroma Vector Store", "The loaded vector store.", chroma_vector_store_port_type
+    "Chroma Vector Store",
+    "The loaded vector store.",
+    local_chroma_vector_store_port_type,
 )
 class ChromaVectorStoreReader:
     """
@@ -175,11 +200,12 @@ class ChromaVectorStoreReader:
     model is responsible for embedding documents, enabling the vector store to retrieve documents that share similar embeddings,
     facilitating tasks like document clustering or recommendation systems.
 
-    If the vector store was created with another tool i.e. outside of KNIME, the embeddings model is not stored with the vectorstore, so it has to be provided separately (<Provider> Embeddings Connector Node).
+    If the vector store was created with another tool i.e. outside of KNIME, the embeddings model is not stored with the vectorstore,
+    so it has to be provided separately (<Provider> Embeddings Connector Node).
     """
 
     persist_directory = knext.StringParameter(
-        "Vectorstore directory",
+        "Vector store directory",
         """The local directory in which the vector store is stored.""",
     )
 
@@ -187,20 +213,22 @@ class ChromaVectorStoreReader:
         self,
         ctx: knext.ConfigurationContext,
         embeddings_spec: EmbeddingsPortObjectSpec,
-    ) -> ChromaVectorstorePortObjectSpec:
-        return ChromaVectorstorePortObjectSpec(embeddings_spec)
+    ) -> LocalChromaVectorstorePortObjectSpec:
+        embeddings_spec.validate_context(ctx)
+        if not self.persist_directory:
+            raise knext.InvalidParametersError("No vector store directory specified.")
+        return LocalChromaVectorstorePortObjectSpec(embeddings_spec)
 
     def execute(
         self,
         ctx: knext.ExecutionContext,
         embeddings_port_object: EmbeddingsPortObject,
     ) -> ChromaVectorstorePortObject:
-        # TODO: Add check if Chroma files are here instead of instantiation
         chroma = Chroma(
             self.persist_directory, embeddings_port_object.create_model(ctx)
         )
-        return ChromaVectorstorePortObject(
-            ChromaVectorstorePortObjectSpec(embeddings_port_object.spec),
+        return LocalChromaVectorstorePortObject(
+            LocalChromaVectorstorePortObjectSpec(embeddings_port_object.spec),
             embeddings_port_object,
             vectorstore=chroma,
         )

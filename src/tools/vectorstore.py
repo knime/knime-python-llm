@@ -9,8 +9,8 @@ from knime.extension.nodes import (
 from .base import ToolPortObjectSpec, ToolPortObject
 from models.base import LLMPortObject, LLMPortObjectSpec, llm_port_type
 from indexes.base import (
-    VectorStorePortObject,
-    VectorStorePortObjectSpec,
+    VectorstorePortObject,
+    VectorstorePortObjectSpec,
     FilestoreVectorstorePortObjectSpec,
     FilestoreVectorstorePortObject,
     store_category,
@@ -48,7 +48,7 @@ class VectorToolPortObject(ToolPortObject):
         self,
         spec: VectorToolPortObjectSpec,
         llm: LLMPortObject,
-        vectorstore: VectorStorePortObject,
+        vectorstore: VectorstorePortObject,
     ) -> None:
         super().__init__(spec)
         self._llm = llm
@@ -63,7 +63,7 @@ class VectorToolPortObject(ToolPortObject):
         return self._llm
 
     @property
-    def vectorstore(self) -> VectorStorePortObject:
+    def vectorstore(self) -> VectorstorePortObject:
         return self._vectorstore
 
     def _create_function(self, ctx) -> RetrievalQA:
@@ -91,7 +91,7 @@ class FilestoreVectorToolPortObjectSpec(VectorToolPortObjectSpec):
         description,
         top_k,
         llm_spec: LLMPortObjectSpec,
-        vectorstore_spec: VectorStorePortObjectSpec,
+        vectorstore_spec: VectorstorePortObjectSpec,
     ) -> None:
         super().__init__(name, description, top_k)
         self._llm_spec = llm_spec
@@ -108,13 +108,13 @@ class FilestoreVectorToolPortObjectSpec(VectorToolPortObjectSpec):
         return self._llm_type
 
     @property
-    def vectorstore_spec(self) -> VectorStorePortObjectSpec:
+    def vectorstore_spec(self) -> VectorstorePortObjectSpec:
         return self._vectorstore_spec
 
     @property
     def vectorstore_type(self) -> knext.PortType:
         return self._vectorstore_type
-    
+
     def validate_context(self, ctx: knext.ConfigurationContext):
         self.llm_spec.validate_context(ctx)
         self.vectorstore_spec.validate_context(ctx)
@@ -147,7 +147,7 @@ class FilestoreVectorToolPortObject(VectorToolPortObject, FilestorePortObject):
         self,
         spec: VectorToolPortObjectSpec,
         llm: LLMPortObject,
-        vectorstore: VectorStorePortObject,
+        vectorstore: VectorstorePortObject,
     ) -> None:
         super().__init__(spec, llm, vectorstore)
 
@@ -231,14 +231,14 @@ class VectorStoreToTool:
         self,
         ctx: knext.ConfigurationContext,
         llm_spec: LLMPortObjectSpec,
-        vectorstore_spec: VectorStorePortObjectSpec,
+        vectorstore_spec: VectorstorePortObjectSpec,
     ) -> ToolListPortObjectSpec:
         tool_spec = self._create_tool_spec(llm_spec, vectorstore_spec)
         tool_spec.validate_context(ctx)
         return ToolListPortObjectSpec([tool_spec])
 
     def _create_tool_spec(
-        self, llm_spec: LLMPortObjectSpec, vectorstore_spec: VectorStorePortObjectSpec
+        self, llm_spec: LLMPortObjectSpec, vectorstore_spec: VectorstorePortObjectSpec
     ) -> FilestoreVectorstorePortObjectSpec:
         return FilestoreVectorToolPortObjectSpec(
             self.tool_name,
@@ -252,7 +252,7 @@ class VectorStoreToTool:
         self,
         ctx: knext.ExecutionContext,
         llm: LLMPortObject,
-        vectorstore: VectorStorePortObject,
+        vectorstore: VectorstorePortObject,
     ) -> ToolListPortObject:
         tool = FilestoreVectorToolPortObject(
             spec=self._create_tool_spec(llm.spec, vectorstore.spec),

@@ -6,7 +6,7 @@ from knime.extension.nodes import (
     save_port_object,
     PortType,
     get_port_type_for_spec_type,
-    get_port_type_for_id
+    get_port_type_for_id,
 )
 from models.base import (
     EmbeddingsPortObject,
@@ -30,13 +30,13 @@ store_category = knext.category(
 )
 
 
-class VectorStorePortObjectSpec(AIPortObjectSpec):
+class VectorstorePortObjectSpec(AIPortObjectSpec):
     """Marker interface for vector store specs. Used to define the most generic vector store PortType."""
 
 
-class VectorStorePortObject(knext.PortObject):
+class VectorstorePortObject(knext.PortObject):
     def __init__(
-        self, spec: VectorStorePortObjectSpec, embeddings_model: EmbeddingsPortObject
+        self, spec: VectorstorePortObjectSpec, embeddings_model: EmbeddingsPortObject
     ) -> None:
         super().__init__(spec)
         self._embeddings_model = embeddings_model
@@ -50,14 +50,12 @@ class VectorStorePortObject(knext.PortObject):
 
 
 vector_store_port_type = knext.port_type(
-    "Vectorstore", VectorStorePortObject, VectorStorePortObjectSpec
+    "Vectorstore", VectorstorePortObject, VectorstorePortObjectSpec
 )
 
 
-class FilestoreVectorstorePortObjectSpec(VectorStorePortObjectSpec):
-    def __init__(
-        self, embeddings_spec: EmbeddingsPortObjectSpec
-    ) -> None:
+class FilestoreVectorstorePortObjectSpec(VectorstorePortObjectSpec):
+    def __init__(self, embeddings_spec: EmbeddingsPortObjectSpec) -> None:
         super().__init__()
         self._embeddings_port_type = get_port_type_for_spec_type(type(embeddings_spec))
         self._embeddings_spec = embeddings_spec
@@ -69,7 +67,7 @@ class FilestoreVectorstorePortObjectSpec(VectorStorePortObjectSpec):
     @property
     def embeddings_spec(self) -> EmbeddingsPortObjectSpec:
         return self._embeddings_spec
-    
+
     def validate_context(self, ctx: knext.ConfigurationContext):
         self._embeddings_spec.validate_context(ctx)
 
@@ -81,14 +79,16 @@ class FilestoreVectorstorePortObjectSpec(VectorStorePortObjectSpec):
 
     @classmethod
     def deserialize(cls, data: dict):
-        embeddings_port_type: PortType = get_port_type_for_id(data["embeddings_port_type"])
+        embeddings_port_type: PortType = get_port_type_for_id(
+            data["embeddings_port_type"]
+        )
         embeddings_spec = embeddings_port_type.spec_class.deserialize(
             data["embeddings_spec"]
         )
         return cls(embeddings_spec)
 
 
-class FilestoreVectorstorePortObject(FilestorePortObject, VectorStorePortObject):
+class FilestoreVectorstorePortObject(FilestorePortObject, VectorstorePortObject):
     def __init__(
         self,
         spec: FilestoreVectorstorePortObjectSpec,
@@ -124,9 +124,13 @@ class FilestoreVectorstorePortObject(FilestorePortObject, VectorStorePortObject)
         save_port_object(self.embeddings_model, self._embeddings_path(file_path))
         if self._folder_path is not None and not self._folder_path == file_path:
             # copy the folder structures if we have a folder path from read_from
-            shutil.copytree(self._vectorstore_path, os.path.join(file_path, "vectorstore"))
+            shutil.copytree(
+                self._vectorstore_path, os.path.join(file_path, "vectorstore")
+            )
         else:
-            self.save_vectorstore(os.path.join(file_path, "vectorstore"), self._vectorstore)
+            self.save_vectorstore(
+                os.path.join(file_path, "vectorstore"), self._vectorstore
+            )
 
     def save_vectorstore(self, vectorstore_folder, vectorstore):
         raise NotImplementedError()
@@ -146,6 +150,7 @@ class FilestoreVectorstorePortObject(FilestorePortObject, VectorStorePortObject)
         embeddings_obj = cls._read_embeddings(spec, file_path)
         return cls(spec, embeddings_obj, file_path)
 
+
 def validate_creator_document_column(input_table: knext.Schema, column: str):
     util.check_column(input_table, column, knext.string(), "document")
 
@@ -156,7 +161,11 @@ def validate_creator_document_column(input_table: knext.Schema, column: str):
     store_icon,
     category=store_category,
 )
-@knext.input_port("Vector Store", "A vector store containing document embeddings.", vector_store_port_type)
+@knext.input_port(
+    "Vector Store",
+    "A vector store containing document embeddings.",
+    vector_store_port_type,
+)
 @knext.input_table(
     "Queries", "Table containing a string column with the queries for the vector store."
 )
@@ -188,14 +197,14 @@ class VectorStoreRetriever:
     def configure(
         self,
         ctx: knext.ConfigurationContext,
-        vectorstore_spec: VectorStorePortObjectSpec,
+        vectorstore_spec: VectorstorePortObjectSpec,
         table_spec: knext.Schema,
     ):
         if self.query_column is None:
             self.query_column = util.pick_default_column(table_spec, knext.string())
         else:
             util.check_column(table_spec, self.query_column, knext.string(), "queries")
-        
+
         vectorstore_spec.validate_context(ctx)
         return knext.Schema.from_columns(
             [
@@ -207,7 +216,7 @@ class VectorStoreRetriever:
     def execute(
         self,
         ctx: knext.ExecutionContext,
-        vectorstore: VectorStorePortObject,
+        vectorstore: VectorstorePortObject,
         input_table: knext.Table,
     ):
         db = vectorstore.load_store(ctx)
@@ -232,4 +241,3 @@ class VectorStoreRetriever:
         result_table["Documents"] = doc_collection
 
         return knext.Table.from_pandas(result_table)
-

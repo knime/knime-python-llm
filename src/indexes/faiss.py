@@ -65,7 +65,7 @@ faiss_vector_store_port_type = knext.port_type(
     category=faiss_category,
 )
 @knext.input_port(
-    "Embeddings",
+    "Embeddings Model",
     "The embeddings model to use for the vector store.",
     embeddings_model_port_type,
 )
@@ -93,6 +93,7 @@ class FAISSVectorStoreCreator:
         "Document column",
         """Select the column containing the documents to be embedded.""",
         port_index=1,
+        column_filter=util.create_type_filer(knext.string()),
     )
 
     def configure(
@@ -102,10 +103,10 @@ class FAISSVectorStoreCreator:
         input_table: knext.Schema,
     ) -> FAISSVectorstorePortObjectSpec:
         embeddings_spec.validate_context(ctx)
-        if self.document_column is None:
-            self.document_column = util.pick_default_column(input_table, knext.string())
-        else:
+        if self.document_column:
             validate_creator_document_column(input_table, self.document_column)
+        else:
+            self.document_column = util.pick_default_column(input_table, knext.string())
         return FAISSVectorstorePortObjectSpec(embeddings_spec=embeddings_spec)
 
     def execute(
@@ -157,7 +158,7 @@ class FAISSVectorStoreReader:
     """
 
     persist_directory = knext.StringParameter(
-        "Vectorstore directory",
+        "Vector store directory",
         "The local directory in which the vector store is stored.",
     )
 
@@ -167,6 +168,8 @@ class FAISSVectorStoreReader:
         embeddings_spec: EmbeddingsPortObjectSpec,
     ) -> FAISSVectorstorePortObjectSpec:
         embeddings_spec.validate_context(ctx)
+        if not self.persist_directory:
+            raise knext.InvalidParametersError("Select the vector store directory.")
         return FAISSVectorstorePortObjectSpec(embeddings_spec)
 
     def execute(

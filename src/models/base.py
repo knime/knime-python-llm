@@ -2,7 +2,7 @@
 import knime.extension as knext
 import util
 
-from langchain.schema import AIMessage, HumanMessage, SystemMessage
+from langchain.schema import HumanMessage, SystemMessage, ChatMessage, AIMessage
 from langchain.embeddings.base import Embeddings
 from base import AIPortObjectSpec
 
@@ -47,14 +47,18 @@ class GeneralSettings:
 
 @knext.parameter_group(label="Conversation Settings")
 class ChatConversationSettings:
-    type_column = knext.ColumnParameter(
-        "Type", "Column that specifies the sender type of the messages", port_index=1
+    role_column = knext.ColumnParameter(
+        "Message role",
+        "Column that specifies the sender role of the messages. The usual values are Human and AI.",
+        port_index=1,
+        column_filter=util.create_type_filer(knext.string()),
     )
 
-    message_column = knext.ColumnParameter(
+    content_column = knext.ColumnParameter(
         "Messages",
-        "Column containing the messages that have been sent to and from the model.",
+        "Column containing the message contents that have been sent to and from the model.",
         port_index=1,
+        column_filter=util.create_type_filer(knext.string()),
     )
 
 
@@ -124,6 +128,7 @@ chat_model_port_type = knext.port_type(
 class EmbeddingsPortObjectSpec(AIPortObjectSpec):
     """Most generic embeddings model spec. Used to define the most generic embeddings model PortType."""
 
+
 class EmbeddingsPortObject(knext.PortObject):
     def __init__(self, spec: EmbeddingsPortObjectSpec) -> None:
         super().__init__(spec)
@@ -154,7 +159,7 @@ embeddings_model_port_type = knext.port_type(
 class LLMPrompter:
     """
     Prompts a Large Language Model.
-    
+
     For each row in the input table, the LLM Prompter sends one prompt to the LLM and receives a corresponding response.
     Rows are treated independently i.e. the LLM can not *remember* the content of previous rows or how it responded to them.
     """
@@ -185,7 +190,7 @@ class LLMPrompter:
 
         if not self.prompt_column:
             raise knext.InvalidParametersError("No column selected.")
-        
+
         llm_spec.validate_context(ctx)
 
         return knext.Schema.from_columns(
@@ -201,7 +206,6 @@ class LLMPrompter:
         llm_port: LLMPortObject,
         input_table: knext.Table,
     ):
-
         llm = llm_port.create_model(ctx)
 
         prompts = input_table.to_pandas()
@@ -237,8 +241,6 @@ class ChatModelPrompter:
 
     """
 
-    conversation_settings = ChatConversationSettings()
-
     system_message = knext.StringParameter(
         "System Message",
         """
@@ -247,6 +249,7 @@ class ChatModelPrompter:
         Example: You are a helpful assistant that has to answer questions truthfully, and
         if you do not know an answer to a question, you should state that.
         """,
+        default_value="",
     )
 
     chat_message = knext.StringParameter(
@@ -255,30 +258,86 @@ class ChatModelPrompter:
         default_value="",
     )
 
+    conversation_settings = ChatConversationSettings()
+
+    _role_to_message_type = {
+        "ai": AIMessage,
+        "assistant": AIMessage,
+        "user": HumanMessage,
+        "human": HumanMessage,
+    }
+
     def configure(
         self,
         ctx: knext.ConfigurationContext,
         chat_model_spec: ChatModelPortObjectSpec,
         input_table_spec: knext.Schema,
     ):
-        nominal_columns = [
-            (c.name, c.ktype) for c in input_table_spec if util.is_nominal(c)
-        ]
-
-        if len(nominal_columns) < 2:
-            raise knext.InvalidParametersError(
-                """
-                At least two nominal columns have to provided ('Type', 'Message').
-                """
-            )
+        self._configure_conversation(input_table_spec)
 
         chat_model_spec.validate_context(ctx)
         return knext.Schema.from_columns(
             [
-                knext.Column(knext.string(), "Type"),
-                knext.Column(knext.string(), "Message"),
+                knext.Column(knext.string(), self.conversation_settings.role_column),
+                knext.Column(knext.string(), self.conversation_settings.content_column),
             ]
         )
+
+    def _configure_conversation(self, input_table_spec):
+        if self.conversation_settings.role_column:
+            util.check_column(
+                input_table_spec,
+                self.conversation_settings.role_column,
+                knext.string(),
+                "role",
+            )
+        else:
+            self.conversation_settings.role_column = util.pick_default_column(
+                input_table_spec, knext.string()
+            )
+
+        if self.conversation_settings.content_column:
+            util.check_column(
+                input_table_spec,
+                self.conversation_settings.content_column,
+                knext.string(),
+                "content",
+            )
+        else:
+            spec_without_role = knext.Schema.from_columns(
+                [
+                    c
+                    for c in input_table_spec
+                    if c.name != self.conversation_settings.role_column
+                ]
+            )
+            try:
+                self.conversation_settings.content_column = util.pick_default_column(
+                    spec_without_role, knext.string()
+                )
+            except:
+                raise knext.InvalidParametersError(
+                    "The conversation table must contain at least two string columns. One for the message roles and one for the message contents."
+                )
+
+        if (
+            self.conversation_settings.role_column
+            == self.conversation_settings.content_column
+        ):
+            raise knext.InvalidParametersError(
+                "The role and content column can not be the same."
+            )
+
+    def _create_message(self, role: str, content: str):
+        if not role:
+            raise ValueError("No role provided.")
+        message_type = self._role_to_message_type.get(role, None)
+        if message_type:
+            return message_type(content=content)
+        else:
+            # fallback to be used if the user provides other roles
+            # which may or may not work in subsequent calls
+            return ChatMessage(content=content, role=role)
 
     def execute(
         self,
@@ -286,61 +345,53 @@ class ChatModelPrompter:
         chat_model: ChatModelPortObject,
         input_table: knext.Table,
     ):
-        table = input_table.to_pandas()
+        data_frame = input_table[
+            [
+                self.conversation_settings.role_column,
+                self.conversation_settings.content_column,
+            ]
+        ].to_pandas()
 
+        roles = data_frame[self.conversation_settings.role_column]
+        contents = data_frame[self.conversation_settings.content_column]
         conversation_messages = []
-
-        if len(table.index) == 0:
-            if self.system_message:
-                conversation_messages.append(SystemMessage(content=self.system_message))
-                table.loc[f"Row{len(table)}"] = ["SystemMessage", self.system_message]
-
-        else:
-            for index, row in table.iterrows():
-                match row[self.conversation_settings.type_column]:
-                    case "AIMessage":
-                        conversation_messages.append(
-                            AIMessage(
-                                content=row[self.conversation_settings.message_column]
-                            )
-                        )
-                    case "HumanMessage":
-                        conversation_messages.append(
-                            HumanMessage(
-                                content=row[self.conversation_settings.message_column]
-                            )
-                        )
-                    case "SystemMessage":
-                        conversation_messages.append(
-                            SystemMessage(
-                                content=row[self.conversation_settings.message_column]
-                            )
-                        )
-
+        if self.system_message:
+            conversation_messages.append(SystemMessage(content=self.system_message))
+        conversation_messages += [
+            self._create_message(role, content)
+            for role, content in zip(roles.values, contents.values)
+        ]
         if self.chat_message:
-            table.loc[f"Row{len(table)}"] = ["HumanMessage", self.chat_message]
-            conversation_messages.append(HumanMessage(content=self.chat_message))
+            human_message = HumanMessage(content=self.chat_message)
+            conversation_messages.append(human_message)
+            data_frame.loc[f"Row{len(data_frame)}"] = [
+                human_message.type,
+                human_message.content,
+            ]
 
         chat = chat_model.create_model(ctx)
 
         answer = chat(conversation_messages)
 
-        table.loc[f"Row{len(table)}"] = ["AIMessage", answer.content]
+        data_frame.loc[f"Row{len(data_frame)}"] = [answer.type, answer.content]
 
-        return knext.Table.from_pandas(table)
+        return knext.Table.from_pandas(data_frame)
+
 
 def _string_col_filter(column: knext.Column):
     return column.ktype == knext.string()
 
-@knext.node(
-    "Text Embedder",
-    knext.NodeType.PREDICTOR,
-    util.ai_icon,
-    model_category
+
+@knext.node("Text Embedder", knext.NodeType.PREDICTOR, util.ai_icon, model_category)
+@knext.input_port(
+    "Embeddings Model",
+    "Used to embed the texts from the input table into numerical vectors.",
+    embeddings_model_port_type,
 )
-@knext.input_port("Embeddings Model", "Used to embed the texts from the input table into numerical vectors.", embeddings_model_port_type)
 @knext.input_table("Input Table", "Input table containing a text column to embed.")
-@knext.output_table("Output Table", "The input table with the appended embeddings column.")
+@knext.output_table(
+    "Output Table", "The input table with the appended embeddings column."
+)
 class TextEmbedder:
     """
     Embeds text in a string column using an embedding model.
@@ -352,23 +403,44 @@ class TextEmbedder:
     used by deep language models e.g. GPTs.
     """
 
-    text_column = knext.ColumnParameter("Text column", "The string column containing the texts to embed.", port_index=1, column_filter=_string_col_filter)
+    text_column = knext.ColumnParameter(
+        "Text column",
+        "The string column containing the texts to embed.",
+        port_index=1,
+        column_filter=_string_col_filter,
+    )
 
-    embeddings_column_name = knext.StringParameter("Embeddings column name", "Name for output column that will hold the embeddings.", "embeddings")
-    
-    def configure(self, ctx: knext.ConfigurationContext, embeddings_spec: EmbeddingsPortObjectSpec, table_spec: knext.Schema) -> knext.Schema:
+    embeddings_column_name = knext.StringParameter(
+        "Embeddings column name",
+        "Name for output column that will hold the embeddings.",
+        "embeddings",
+    )
+
+    def configure(
+        self,
+        ctx: knext.ConfigurationContext,
+        embeddings_spec: EmbeddingsPortObjectSpec,
+        table_spec: knext.Schema,
+    ) -> knext.Schema:
         if self.text_column is None:
             self.text_column = util.pick_default_column(table_spec, knext.string())
         else:
-            util.check_column(table_spec, self.text_column, knext.string(), "text column")
-        
+            util.check_column(
+                table_spec, self.text_column, knext.string(), "text column"
+            )
+
         embeddings_spec.validate_context(ctx)
         return table_spec.append(self._create_output_column())
 
     def _create_output_column(self) -> knext.Column:
         return knext.Column(knext.list_(knext.double()), self.embeddings_column_name)
 
-    def execute(self, ctx: knext.ExecutionContext, embeddings_obj: EmbeddingsPortObject, table: knext.Table) -> knext.Table:
+    def execute(
+        self,
+        ctx: knext.ExecutionContext,
+        embeddings_obj: EmbeddingsPortObject,
+        table: knext.Table,
+    ) -> knext.Table:
         embeddings_model = embeddings_obj.create_model(ctx)
         output_table = knext.BatchOutputTable.create()
         for batch in table.batches():

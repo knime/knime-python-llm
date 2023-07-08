@@ -4,6 +4,8 @@ import util
 
 from langchain.schema import HumanMessage, SystemMessage, ChatMessage, AIMessage
 from langchain.embeddings.base import Embeddings
+from langchain.chat_models.base import BaseChatModel
+from langchain.base_language import BaseLanguageModel
 from base import AIPortObjectSpec
 
 model_category = knext.category(
@@ -94,7 +96,7 @@ class LLMPortObject(knext.PortObject):
     def deserialize(cls, spec: LLMPortObjectSpec, storage: bytes):
         return cls(spec)
 
-    def create_model(self, ctx):
+    def create_model(self, ctx: knext.ExecutionContext) -> BaseLanguageModel:
         raise NotImplementedError()
 
 
@@ -116,7 +118,7 @@ class ChatModelPortObject(LLMPortObject):
     def deserialize(cls, spec, data: dict):
         return cls(spec)
 
-    def create_model(self, ctx):
+    def create_model(self, ctx: knext.ExecutionContext) -> BaseChatModel:
         raise NotImplementedError()
 
 
@@ -149,9 +151,10 @@ embeddings_model_port_type = knext.port_type(
 )
 
 
-# TODO: Add configuration dialog to enable templates, e.g. https://python.langchain.com/docs/modules/model_io/models/llms/integrations/openai
 @knext.node("LLM Prompter", knext.NodeType.PREDICTOR, "icons/ml.png", model_category)
-@knext.input_port("LLM Port", "A large language model.", llm_port_type)
+@knext.input_port(
+    "LLM or chat model", "A large language model or chat model.", llm_port_type
+)
 @knext.input_table("Prompt Table", "A table containing a string column with prompts.")
 @knext.output_table(
     "Result Table", "A table containing prompts and their respective answer."
@@ -166,8 +169,15 @@ class LLMPrompter:
 
     prompt_column = knext.ColumnParameter(
         "Prompt column",
-        "Column that contains prompts for the LLM.",
+        "Column containing prompts for the LLM.",
         port_index=1,
+        column_filter=util.create_type_filer(knext.string()),
+    )
+
+    response_column_name = knext.StringParameter(
+        "Response column name",
+        "Name for the column holding the LLM's responses.",
+        default_value="Response",
     )
 
     def configure(
@@ -176,28 +186,24 @@ class LLMPrompter:
         llm_spec: LLMPortObjectSpec,
         input_table_spec: knext.Schema,
     ):
-        nominal_columns = [
-            (c.name, c.ktype) for c in input_table_spec if util.is_nominal(c)
-        ]
-
-        if len(nominal_columns) == 0:
-            raise knext.InvalidParametersError(
-                """
-                The number of nominal columns are 0. Expected at least 
-                one nominal column for prompts.
-                """
+        if self.prompt_column:
+            util.check_column(
+                input_table_spec, self.prompt_column, knext.string(), "prompt"
             )
-
-        if not self.prompt_column:
-            raise knext.InvalidParametersError("No column selected.")
+        else:
+            self.prompt_column = util.pick_default_column(
+                input_table_spec, knext.string()
+            )
 
         llm_spec.validate_context(ctx)
 
-        return knext.Schema.from_columns(
-            [
-                knext.Column(knext.string(), self.prompt_column),
-                knext.Column(knext.string(), "Prompt Result"),
-            ]
+        if not self.response_column_name:
+            raise knext.InvalidParametersError(
+                "The response column name must not be empty."
+            )
+
+        return input_table_spec.append(
+            knext.Column(ktype=knext.string(), name=self.response_column_name)
         )
 
     def execute(
@@ -207,18 +213,25 @@ class LLMPrompter:
         input_table: knext.Table,
     ):
         llm = llm_port.create_model(ctx)
+        num_rows = len(input_table)
 
-        prompts = input_table.to_pandas()
+        output_table: knext.BatchOutputTable = knext.BatchOutputTable.create()
+        i = 0
+        for batch in input_table.batches():
+            data_frame = batch.to_pandas()
+            responses = []
+            for prompt in data_frame[self.prompt_column]:
+                util.check_canceled(ctx)
+                responses.append(llm.predict(prompt))
+                ctx.set_progress(i / num_rows)
+                i += 1
 
-        answers = [llm.predict(prompt) for prompt in prompts[self.prompt_column]]
+            data_frame[self.response_column_name] = responses
+            output_table.append(data_frame)
 
-        prompts["Prompt Result"] = answers
-
-        return knext.Table.from_pandas(prompts)
+        return output_table
 
 
-# TODO: Add configuration dialog to more general options to configure how LLM is prompted
-# TODO: Write better text
 @knext.node(
     "Chat Model Prompter", knext.NodeType.PREDICTOR, "icons/ml.png", model_category
 )

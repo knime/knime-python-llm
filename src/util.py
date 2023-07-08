@@ -22,8 +22,13 @@ main_category = knext.category(
 )
 
 
+def check_canceled(ctx: knext.ExecutionContext):
+    if ctx.is_canceled():
+        raise RuntimeError("Execution canceled.")
+
+
 def pick_default_column(input_table: knext.Schema, ktype: knext.KnimeType) -> str:
-    column = next((c for c in input_table if c.ktype == ktype))
+    column = next((c for c in input_table if c.ktype == ktype), None)
     if column:
         return column.name
     raise knext.InvalidParametersError(

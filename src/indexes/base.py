@@ -235,7 +235,7 @@ class VectorStoreRetriever:
         db = vectorstore.load_store(ctx)
         num_rows = input_table.num_rows
         i = 0
-        output_table: knext.BatchOutputTable = knext.BatchOutputTable()
+        output_table: knext.BatchOutputTable = knext.BatchOutputTable.create()
 
         for batch in input_table:
             doc_collection = []

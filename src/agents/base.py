@@ -1,5 +1,4 @@
 import knime.extension as knext
-import pandas as pd
 import util
 
 
@@ -23,16 +22,11 @@ import os
 
 import langchain
 
-from langchain import PromptTemplate
-
 
 import langchain.agents
 
-from langchain.prompts import MessagesPlaceholder
-from langchain.memory import (
-    ConversationBufferMemory,
-    ConversationBufferWindowMemory,
-)
+from langchain.memory import ConversationBufferMemory
+
 
 agent_icon = "icons/agent.png"
 agent_category = knext.category(
@@ -253,157 +247,6 @@ class LLMAgentCreator:
             llm,
             tools,
         )
-
-
-# @knext.node(
-#     "Agent Executor",
-#     knext.NodeType.PREDICTOR,
-#     agent_icon,
-#     category=agent_category,
-# )
-# @knext.input_port("Agent", "Configured agent.", agent_port_type)
-# @knext.input_table("Chat History", "Table containing the chat history for the agent.")
-# @knext.output_table("Chat History", "Table containing the chat history for the agent.")
-class AgentExecutor:
-    """
-    Executes a chat agent equipped with tools and memory.
-
-    The memory table is expected to have at least two string columns and be
-    either empty or filled by a previous agent execution.
-
-    """
-
-    history_settings = ChatConversationSettings(1)
-    message_settings = ChatMessageSettings()
-
-    def load_messages_from_input_table(
-        self, memory: ConversationBufferMemory, chat_history_df: pd.DataFrame
-    ):
-        for index in range(0, len(chat_history_df), 2):
-            memory.save_context(
-                {"input": chat_history_df.loc[f"Row{index}"].at["Message"]},
-                {"output": chat_history_df.loc[f"Row{index+1}"].at["Message"]},
-            )
-
-    def configure(
-        self,
-        ctx: knext.ConfigurationContext,
-        agent_spec: AgentPortObjectSpec,
-        input_table_spec: knext.Schema,
-    ):
-        if len(input_table_spec.column_names) < 2:
-            raise knext.InvalidParametersError(
-                "Please provide at least two String columns."
-            )
-
-        if self.history_settings.type_column == self.history_settings.message_column:
-            raise knext.InvalidParametersError(
-                "Type and Message columns cannot be the same."
-            )
-
-        for c in input_table_spec:
-            if (
-                c.name == self.history_settings.type_column
-                or c.name == self.history_settings.message_column
-            ):
-                if not util.is_nominal(c):
-                    raise knext.InvalidParametersError(
-                        f"{c.name} has to be a String column."
-                    )
-
-        agent_spec.validate_context(ctx)
-
-        return knext.Schema.from_columns(
-            [
-                knext.Column(knext.string(), self.history_settings.role_column),
-                knext.Column(knext.string(), self.history_settings.content_column),
-            ]
-        )
-
-    def execute(
-        self,
-        ctx: knext.ExecutionContext,
-        agent: AgentPortObject,
-        input_table: knext.Table,
-    ):
-        chat_history_df = input_table.to_pandas()
-
-        template = """
-        {chat_history}
-        Human: {input}
-        Agent:
-        {agent_scratchpad}"""
-
-        prefix = self.message_settings.system_prefix
-
-        prompt = PromptTemplate(
-            input_variables=["chat_history", "input", "agent_scratchpad"],
-            template=template,
-            prefix=prefix,
-        )
-
-        if agent.spec.memory_type == "CONVERSATION_BUFFER_MEMORY":
-            memory = ConversationBufferMemory(
-                memory_key="chat_history",
-                input_key="input",
-                return_messages=True,
-            )
-        else:
-            memory = ConversationBufferWindowMemory(
-                k=self.history_settings.history_length,
-                memory_key="chat_history",
-                input_key="input",
-                return_messages=True,
-            )
-
-        if (
-            not chat_history_df[
-                [
-                    self.history_settings.type_column,
-                    self.history_settings.message_column,
-                ]
-            ]
-            .isna()
-            .any()
-            .any()
-        ):
-            self.load_messages_from_input_table(memory, chat_history_df)
-
-        tool_list = agent.tools.tools
-        tools = [tool.create(ctx) for tool in tool_list]
-
-        llm = agent.llm.create_model(ctx)
-
-        chat_history = MessagesPlaceholder(variable_name="chat_history")
-
-        agent = langchain.agents.ConversationalAgent.from_llm_and_tools(
-            llm=llm,
-            tools=tools,
-            prefix=prefix,
-            input_variables=["chat_history", "input", "agent_scratchpad"],
-        )
-
-        agent_exec = langchain.agents.AgentExecutor(
-            memory=memory, agent=agent, tools=tools, verbose=True
-        )
-
-        response = agent_exec.run(
-            input=self.message_settings.user_prompt,
-            chat_history=chat_history,
-            prompt=prompt,
-        )
-
-        new_df = chat_history_df[
-            [self.history_settings.type_column, self.history_settings.message_column]
-        ].copy()
-
-        user_input_row = ["Human", self.message_settings.user_prompt]
-        agent_output_row = ["AI", response]
-
-        new_df.loc[f"Row{len(new_df)}"] = user_input_row
-        new_df.loc[f"Row{len(new_df)}"] = agent_output_row
-
-        return knext.Table.from_pandas(new_df)
 
 
 @knext.node(

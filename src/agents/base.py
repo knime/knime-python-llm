@@ -3,10 +3,7 @@ import pandas as pd
 import util
 
 
-from models.base import (
-    LLMPortObjectSpec,
-    LLMPortObject,
-)
+from models.base import LLMPortObjectSpec, LLMPortObject, ChatConversationSettings
 from tools.base import (
     tool_list_port_type,
     ToolListPortObject,
@@ -60,21 +57,6 @@ class CredentialsSettings:
         label="Credentials parameter",
         description="Credentials parameter name for accessing Google Search API key.",
         choices=lambda a: knext.DialogCreationContext.get_credential_names(a),
-    )
-
-
-@knext.parameter_group(label="Conversation Settings")
-class ConversationSettings:
-    role_column = knext.ColumnParameter(
-        "Message role",
-        "Specifies the role of messages in the conversation. The contained values should be either Human or AI.",
-        port_index=2,
-    )
-
-    content_column = knext.ColumnParameter(
-        "Message content",
-        "Contains the content of the messages in the conversation.",
-        port_index=2,
     )
 
 
@@ -291,7 +273,7 @@ class AgentExecutor:
 
     """
 
-    history_settings = ConversationSettings()
+    history_settings = ChatConversationSettings(1)
     message_settings = ChatMessageSettings()
 
     def load_messages_from_input_table(
@@ -463,7 +445,7 @@ class AgentPrompter:
     few messages, or even use a large language model to create a summary of the conversation held so far.
     """
 
-    conversation_settings = ConversationSettings()
+    conversation_settings = ChatConversationSettings(port_index=2)
     message_settings = ChatMessageSettings()
     enable_debug_output = knext.BoolParameter(
         "Enable debug output",
@@ -479,31 +461,9 @@ class AgentPrompter:
         tools_spec: ToolListPortObjectSpec,
         input_table_spec: knext.Schema,
     ):
-        if len(input_table_spec.column_names) < 2:
-            raise knext.InvalidParametersError(
-                "Please provide at least two String columns."
-            )
-
-        if (
-            self.conversation_settings.role_column
-            == self.conversation_settings.content_column
-        ):
-            raise knext.InvalidParametersError(
-                "Type and Message columns cannot be the same."
-            )
-
-        for c in input_table_spec:
-            if (
-                c.name == self.conversation_settings.role_column
-                or c.name == self.conversation_settings.content_column
-            ):
-                if not util.is_nominal(c):
-                    raise knext.InvalidParametersError(
-                        f"{c.name} has to be a String column."
-                    )
-
         agent_spec.validate_context(ctx)
         tools_spec.validate_context(ctx)
+        self.conversation_settings.configure(input_table_spec)
         return knext.Schema.from_columns(
             [
                 knext.Column(knext.string(), self.conversation_settings.role_column),
@@ -518,7 +478,12 @@ class AgentPrompter:
         tools_obj: ToolListPortObject,
         input_table: knext.Table,
     ):
-        chat_history_df = input_table.to_pandas()
+        chat_history_df = input_table[
+            [
+                self.conversation_settings.role_column,
+                self.conversation_settings.content_column,
+            ]
+        ].to_pandas()
 
         # if agent.spec.memory_type == "CONVERSATION_BUFFER_MEMORY":
         #     memory = ConversationBufferMemory(
@@ -542,34 +507,24 @@ class AgentPrompter:
             memory_key="chat_history", return_messages=True
         )
 
-        roles = chat_history_df[self.conversation_settings.role_column]
-        contents = chat_history_df[self.conversation_settings.content_column]
-        for index in range(0, len(chat_history_df), 2):
-            memory.save_context(
-                {roles[index]: contents[index]},
-                {roles[index + 1]: contents[index + 1]},
-            )
+        messages = self.conversation_settings.create_messages(chat_history_df)
+
+        for message in messages:
+            memory.chat_memory.add_message(message)
 
         tools = tools_obj.create_tools(ctx)
         agent = agent_obj.create_agent(ctx, tools)
 
         agent_exec = langchain.agents.AgentExecutor(
-            memory=memory, agent=agent, tools=tools, verbose=True
+            memory=memory, agent=agent, tools=tools
         )
 
         response = agent_exec.run(input=self.message_settings.message)
 
-        new_df = chat_history_df[
-            [
-                self.conversation_settings.role_column,
-                self.conversation_settings.content_column,
-            ]
-        ].copy()
-
         user_input_row = ["Human", self.message_settings.message]
         agent_output_row = ["AI", response]
 
-        new_df.loc[f"Row{len(new_df)}"] = user_input_row
-        new_df.loc[f"Row{len(new_df)}"] = agent_output_row
+        chat_history_df.loc[f"Row{len(chat_history_df)}"] = user_input_row
+        chat_history_df.loc[f"Row{len(chat_history_df)}"] = agent_output_row
 
-        return knext.Table.from_pandas(new_df)
+        return knext.Table.from_pandas(chat_history_df)

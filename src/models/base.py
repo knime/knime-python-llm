@@ -1,6 +1,7 @@
 # KNIME / own imports
 import knime.extension as knext
 import util
+import pandas as pd
 
 from langchain.schema import HumanMessage, SystemMessage, ChatMessage, AIMessage
 from langchain.embeddings.base import Embeddings
@@ -49,19 +50,85 @@ class GeneralSettings:
 
 @knext.parameter_group(label="Conversation Settings")
 class ChatConversationSettings:
-    role_column = knext.ColumnParameter(
-        "Message role",
-        "Column that specifies the sender role of the messages. The usual values are Human and AI.",
-        port_index=1,
-        column_filter=util.create_type_filer(knext.string()),
-    )
+    def __init__(self, port_index=1) -> None:
+        self.role_column = knext.ColumnParameter(
+            "Message role",
+            "Column that specifies the sender role of the messages. The usual values are Human and AI.",
+            port_index=port_index,
+            column_filter=util.create_type_filer(knext.string()),
+        )
 
-    content_column = knext.ColumnParameter(
-        "Messages",
-        "Column containing the message contents that have been sent to and from the model.",
-        port_index=1,
-        column_filter=util.create_type_filer(knext.string()),
-    )
+        self.content_column = knext.ColumnParameter(
+            "Messages",
+            "Column containing the message contents that have been sent to and from the model.",
+            port_index=port_index,
+            column_filter=util.create_type_filer(knext.string()),
+        )
+
+    def configure(self, input_table_spec: knext.Schema):
+        if self.role_column:
+            util.check_column(
+                input_table_spec,
+                self.role_column,
+                knext.string(),
+                "role",
+            )
+        else:
+            self.role_column = util.pick_default_column(
+                input_table_spec, knext.string()
+            )
+
+        if self.content_column:
+            util.check_column(
+                input_table_spec,
+                self.content_column,
+                knext.string(),
+                "content",
+            )
+        else:
+            spec_without_role = knext.Schema.from_columns(
+                [c for c in input_table_spec if c.name != self.role_column]
+            )
+            try:
+                self.content_column = util.pick_default_column(
+                    spec_without_role, knext.string()
+                )
+            except:
+                raise knext.InvalidParametersError(
+                    "The conversation table must contain at least two string columns. "
+                    "One for the message roles and one for the message contents."
+                )
+
+        if self.role_column == self.content_column:
+            raise knext.InvalidParametersError(
+                "The role and content column can not be the same."
+            )
+
+    _role_to_message_type = {
+        "ai": AIMessage,
+        "assistant": AIMessage,
+        "user": HumanMessage,
+        "human": HumanMessage,
+    }
+
+    def _create_message(self, role: str, content: str):
+        if not role:
+            raise ValueError("No role provided.")
+        message_type = self._role_to_message_type.get(role, None)
+        if message_type:
+            return message_type(content=content)
+        else:
+            # fallback to be used if the user provides other roles
+            # which may or may not work in subsequent calls
+            return ChatMessage(content=content, role=role)
+
+    def create_messages(self, data_frame: pd.DataFrame):
+        role_column = data_frame[self.role_column]
+        content_column = data_frame[self.content_column]
+        return [
+            self._create_message(role, content)
+            for role, content in zip(role_column.values, content_column.values)
+        ]
 
 
 @knext.parameter_group(label="Credentials")
@@ -273,20 +340,13 @@ class ChatModelPrompter:
 
     conversation_settings = ChatConversationSettings()
 
-    _role_to_message_type = {
-        "ai": AIMessage,
-        "assistant": AIMessage,
-        "user": HumanMessage,
-        "human": HumanMessage,
-    }
-
     def configure(
         self,
         ctx: knext.ConfigurationContext,
         chat_model_spec: ChatModelPortObjectSpec,
         input_table_spec: knext.Schema,
     ):
-        self._configure_conversation(input_table_spec)
+        self.conversation_settings.configure(input_table_spec)
 
         chat_model_spec.validate_context(ctx)
         return knext.Schema.from_columns(
@@ -295,62 +355,6 @@ class ChatModelPrompter:
                 knext.Column(knext.string(), self.conversation_settings.content_column),
             ]
         )
-
-    def _configure_conversation(self, input_table_spec):
-        if self.conversation_settings.role_column:
-            util.check_column(
-                input_table_spec,
-                self.conversation_settings.role_column,
-                knext.string(),
-                "role",
-            )
-        else:
-            self.conversation_settings.role_column = util.pick_default_column(
-                input_table_spec, knext.string()
-            )
-
-        if self.conversation_settings.content_column:
-            util.check_column(
-                input_table_spec,
-                self.conversation_settings.content_column,
-                knext.string(),
-                "content",
-            )
-        else:
-            spec_without_role = knext.Schema.from_columns(
-                [
-                    c
-                    for c in input_table_spec
-                    if c.name != self.conversation_settings.role_column
-                ]
-            )
-            try:
-                self.conversation_settings.content_column = util.pick_default_column(
-                    spec_without_role, knext.string()
-                )
-            except:
-                raise knext.InvalidParametersError(
-                    "The conversation table must contain at least two string columns. One for the message roles and one for the message contents."
-                )
-
-        if (
-            self.conversation_settings.role_column
-            == self.conversation_settings.content_column
-        ):
-            raise knext.InvalidParametersError(
-                "The role and content column can not be the same."
-            )
-
-    def _create_message(self, role: str, content: str):
-        if not role:
-            raise ValueError("No role provided.")
-        message_type = self._role_to_message_type.get(role, None)
-        if message_type:
-            return message_type(content=content)
-        else:
-            # fallback to be used if the user provides other roles
-            # which may or may not work in subsequent calls
-            return ChatMessage(content=content, role=role)
 
     def execute(
         self,
@@ -365,15 +369,10 @@ class ChatModelPrompter:
             ]
         ].to_pandas()
 
-        roles = data_frame[self.conversation_settings.role_column]
-        contents = data_frame[self.conversation_settings.content_column]
         conversation_messages = []
         if self.system_message:
             conversation_messages.append(SystemMessage(content=self.system_message))
-        conversation_messages += [
-            self._create_message(role, content)
-            for role, content in zip(roles.values, contents.values)
-        ]
+        conversation_messages += self.conversation_settings.create_messages(data_frame)
         if self.chat_message:
             human_message = HumanMessage(content=self.chat_message)
             conversation_messages.append(human_message)

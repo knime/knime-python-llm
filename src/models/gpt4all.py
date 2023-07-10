@@ -15,7 +15,7 @@ gpt4all = knext.category(
     path=model_category,
     level_id="gpt4all",
     name="GPT4All",
-    description="",
+    description="Contains nodes for connecting to GPT4ALL models.",
     icon=gpt4all_icon,
 )
 
@@ -54,7 +54,7 @@ class GPT4AllLLMPortObject(LLMPortObject):
         super().__init__(spec)
 
     def create_model(self, ctx):
-        return GPT4All(model=self.spec._local_path, verbose=True)
+        return GPT4All(model=self.spec._local_path)
 
 
 gpt4all_llm_port_type = knext.port_type(
@@ -77,8 +77,8 @@ class GPT4AllLLMConnector:
     """
     Connects to a locally installed GPT4ALL LLM.
 
-    This connector allows you to connect to a LLM that was installed locally with GPT4ALL. To get started, 
-    you need to download a specific model from [GPT4All](https://gpt4all.io/index.html) using the installer. 
+    This connector allows you to connect to a LLM that was installed locally with GPT4ALL. To get started,
+    you need to download a specific model from [GPT4All](https://gpt4all.io/index.html) using the installer.
     Once you have downloaded the model, specify its file path in the 'Model path' setting to use it.
 
     For more information and detailed instructions on downloading compatible models, please visit the [GPT4All GitHub repository](https://github.com/nomic-ai/gpt4all).

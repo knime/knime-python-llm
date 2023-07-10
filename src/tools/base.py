@@ -49,7 +49,7 @@ class ToolListPortObjectSpec(AIPortObjectSpec):
     @property
     def tool_specs(self) -> List[ToolPortObjectSpec]:
         return self._tool_specs
-    
+
     def validate_context(self, ctx: knext.ConfigurationContext):
         for tool_spec in self._tool_specs:
             tool_spec.validate_context(ctx)
@@ -87,10 +87,9 @@ class ToolListPortObject(FilestorePortObject):
     @property
     def tools(self) -> List[ToolPortObject]:
         return self._tool_list
-    
+
     def create_tools(self, ctx) -> List[Tool]:
         return [tool.create(ctx) for tool in self.tools]
-
 
     def write_to(self, file_path):
         os.makedirs(file_path)
@@ -149,7 +148,14 @@ class ToolCombiner:
         spec_one: ToolListPortObjectSpec,
         spec_two: ToolListPortObjectSpec,
     ):
-        return ToolListPortObjectSpec([spec_one, spec_two])
+        spec_one.validate_context(ctx)
+        spec_two.validate_context(ctx)
+        return self._create_spec(spec_one, spec_two)
+
+    def _create_spec(
+        self, spec_one: ToolListPortObjectSpec, spec_two: ToolListPortObjectSpec
+    ):
+        return ToolListPortObjectSpec(spec_one.tool_specs + spec_two.tool_specs)
 
     def execute(
         self,
@@ -159,5 +165,5 @@ class ToolCombiner:
     ):
         tools = object_one.tools + object_two.tools
         return ToolListPortObject(
-            ToolListPortObjectSpec([object_one.spec, object_two.spec]), tools
+            self._create_spec(object_one.spec, object_two.spec), tools
         )

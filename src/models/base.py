@@ -114,7 +114,7 @@ class ChatConversationSettings:
     def _create_message(self, role: str, content: str):
         if not role:
             raise ValueError("No role provided.")
-        message_type = self._role_to_message_type.get(role, None)
+        message_type = self._role_to_message_type.get(role.lower(), None)
         if message_type:
             return message_type(content=content)
         else:

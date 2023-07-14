@@ -167,7 +167,7 @@ class LLMPortObject(knext.PortObject):
         raise NotImplementedError()
 
 
-llm_port_type = knext.port_type("LLM Port", LLMPortObject, LLMPortObjectSpec)
+llm_port_type = knext.port_type("LLM", LLMPortObject, LLMPortObjectSpec)
 
 
 class ChatModelPortObjectSpec(LLMPortObjectSpec):

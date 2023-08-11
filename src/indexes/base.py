@@ -224,7 +224,13 @@ class VectorStoreRetriever:
         "Retrieved documents",
     )
 
-    # TODO: Add options to retrieve meta data from the store
+    retrieve_metadata = knext.BoolParameter(
+        "Retrieve metadata from documents",
+        "Whether or not to retrieve document metadata if provided.",
+        default_value=False,
+        since_version="5.1.1",
+    )
+
     def configure(
         self,
         ctx: knext.ConfigurationContext,
@@ -232,6 +238,7 @@ class VectorStoreRetriever:
         table_spec: knext.Schema,
     ):
         vectorstore_spec.validate_context(ctx)
+
         if self.query_column:
             util.check_column(table_spec, self.query_column, knext.string(), "queries")
         else:
@@ -242,11 +249,7 @@ class VectorStoreRetriever:
                 "No name for the column holding the retrieved documents is provided."
             )
 
-        return table_spec.append(
-            knext.Column(
-                knext.ListType(knext.string()), self.retrieved_docs_column_name
-            )
-        )
+        return table_spec.append(self._create_column_list(vectorstore_spec))
 
     def execute(
         self,
@@ -261,18 +264,54 @@ class VectorStoreRetriever:
 
         for batch in input_table.batches():
             doc_collection = []
+            metadata_dict = {}
+
             df = batch.to_pandas()
+
             for query in df[self.query_column]:
                 util.check_canceled(ctx)
-                doc_collection.append(self._retrieve_documents(db, query))
+
+                documents = db.similarity_search(query, k=self.top_k)
+
+                doc_collection.append([document.page_content for document in documents])
+
+                if self.retrieve_metadata:
+
+                    def to_str_or_none(metadata):
+                        return str(metadata) if metadata is not None else None
+
+                    for key in vectorstore.spec.metadata_column_names:
+                        if key not in metadata_dict:
+                            metadata_dict[key] = []
+                        metadata_dict[key].append(
+                            [
+                                to_str_or_none(document.metadata.get(key))
+                                for document in documents
+                            ]
+                        )
+
                 i += 1
                 ctx.set_progress(i / num_rows)
 
             df[self.retrieved_docs_column_name] = doc_collection
+
+            for key in metadata_dict.keys():
+                df[key] = metadata_dict[key]
+
             output_table.append(df)
 
         return output_table
 
-    def _retrieve_documents(self, db, query):
-        similar_documents = db.similarity_search(query, k=self.top_k)
-        return [document.page_content for document in similar_documents]
+    def _create_column_list(self, vectorstore_spec) -> list[knext.Column]:
+        result_columns = [
+            knext.Column(
+                knext.ListType(knext.string()), self.retrieved_docs_column_name
+            )
+        ]
+
+        if self.retrieve_metadata:
+            for column_name in vectorstore_spec.metadata_column_names:
+                result_columns.append(
+                    knext.Column(knext.ListType(knext.string()), column_name)
+                )
+        return result_columns

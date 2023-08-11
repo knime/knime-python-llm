@@ -33,6 +33,23 @@ store_category = knext.category(
 class VectorstorePortObjectSpec(AIPortObjectSpec):
     """Marker interface for vector store specs. Used to define the most generic vector store PortType."""
 
+    def __init__(self, metadata_column_names: Optional[list[str]] = None) -> None:
+        super().__init__()
+        self._metadata_column_names = (
+            metadata_column_names if metadata_column_names is not None else []
+        )
+
+    @property
+    def metadata_column_names(self) -> list[str]:
+        return self._metadata_column_names
+
+    def serialize(self) -> dict:
+        return {"metadata_column_names": self.metadata_column_names}
+
+    @classmethod
+    def deserialize(cls, data: dict):
+        return cls(data.get("metadata_column_names"))
+
 
 class VectorstorePortObject(knext.PortObject):
     def __init__(
@@ -55,8 +72,12 @@ vector_store_port_type = knext.port_type(
 
 
 class FilestoreVectorstorePortObjectSpec(VectorstorePortObjectSpec):
-    def __init__(self, embeddings_spec: EmbeddingsPortObjectSpec) -> None:
-        super().__init__()
+    def __init__(
+        self,
+        embeddings_spec: EmbeddingsPortObjectSpec,
+        metadata_column_names: Optional[list[str]] = None,
+    ) -> None:
+        super().__init__(metadata_column_names)
         self._embeddings_port_type = get_port_type_for_spec_type(type(embeddings_spec))
         self._embeddings_spec = embeddings_spec
 
@@ -75,6 +96,7 @@ class FilestoreVectorstorePortObjectSpec(VectorstorePortObjectSpec):
         return {
             "embeddings_port_type": self.embeddings_port_type.id,
             "embeddings_spec": self.embeddings_spec.serialize(),
+            **super().serialize(),
         }
 
     @classmethod
@@ -85,7 +107,7 @@ class FilestoreVectorstorePortObjectSpec(VectorstorePortObjectSpec):
         embeddings_spec = embeddings_port_type.spec_class.deserialize(
             data["embeddings_spec"]
         )
-        return cls(embeddings_spec)
+        return cls(embeddings_spec, data.get("metadata_column_names"))
 
 
 class FilestoreVectorstorePortObject(FilestorePortObject, VectorstorePortObject):

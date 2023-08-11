@@ -96,6 +96,8 @@ class FAISSVectorStoreCreator:
         column_filter=util.create_type_filer(knext.string()),
     )
 
+    metadata_settings = MetadataSettings(since_version="5.1.1")
+
     def configure(
         self,
         ctx: knext.ConfigurationContext,
@@ -103,11 +105,32 @@ class FAISSVectorStoreCreator:
         input_table: knext.Schema,
     ) -> FAISSVectorstorePortObjectSpec:
         embeddings_spec.validate_context(ctx)
+
         if self.document_column:
             validate_creator_document_column(input_table, self.document_column)
         else:
             self.document_column = util.pick_default_column(input_table, knext.string())
-        return FAISSVectorstorePortObjectSpec(embeddings_spec=embeddings_spec)
+
+        metadata_cols = self._metadata_columns(input_table)
+
+        return FAISSVectorstorePortObjectSpec(
+            embeddings_spec=embeddings_spec,
+            metadata_column_names=metadata_cols,
+        )
+
+    def _metadata_columns(self, schema: knext.Schema) -> list[str]:
+        # metadata was introduced in 5.1.1 and the parameter is None for older versions
+        if not self.metadata_settings.metadata_columns:
+            return []
+        metadata_columns = [
+            column.name
+            for column in self.metadata_settings.metadata_columns.apply(schema)
+        ]
+        try:
+            metadata_columns.remove(self.document_column)
+        except:
+            pass
+        return metadata_columns
 
     def execute(
         self,
@@ -115,9 +138,16 @@ class FAISSVectorStoreCreator:
         embeddings: EmbeddingsPortObject,
         input_table: knext.Table,
     ) -> FAISSVectorstorePortObject:
-        df = input_table.to_pandas()
+        meta_data_columns = self._metadata_columns(input_table.schema)
+        document_column = self.document_column
 
-        documents = [Document(page_content=text) for text in df[self.document_column]]
+        df = input_table[[self.document_column] + meta_data_columns].to_pandas()
+
+        def to_document(row) -> Document:
+            metadata = {name: row[name] for name in meta_data_columns}
+            return Document(page_content=row[document_column], metadata=metadata)
+
+        documents = df.apply(to_document, axis=1).tolist()
 
         db = FAISS.from_documents(
             documents=documents,
@@ -125,7 +155,9 @@ class FAISSVectorStoreCreator:
         )
 
         return FAISSVectorstorePortObject(
-            FAISSVectorstorePortObjectSpec(embeddings.spec), embeddings, vectorstore=db
+            FAISSVectorstorePortObjectSpec(embeddings.spec, meta_data_columns),
+            embeddings,
+            vectorstore=db,
         )
 
 

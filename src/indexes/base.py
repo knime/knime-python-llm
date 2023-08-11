@@ -20,6 +20,10 @@ from typing import Optional, Any
 import os
 import shutil
 
+import logging
+
+LOGGER = logging.getLogger(__name__)
+
 store_icon = "icons/store.png"
 store_category = knext.category(
     path=util.main_category,
@@ -175,6 +179,16 @@ class FilestoreVectorstorePortObject(FilestorePortObject, VectorstorePortObject)
 
 def validate_creator_document_column(input_table: knext.Schema, column: str):
     util.check_column(input_table, column, knext.string(), "document")
+
+
+@knext.parameter_group(label="Metadata")
+class MetadataSettings:
+    metadata_columns = knext.ColumnFilterParameter(
+        "Metadata columns",
+        """Selection of columns used as metadata for each document. The documents column will be ignored.""",
+        port_index=1,
+        column_filter=util.create_type_filer(knext.string()),  # TODO fix typo
+    )
 
 
 @knext.node(

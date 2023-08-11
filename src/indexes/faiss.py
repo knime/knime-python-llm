@@ -10,6 +10,7 @@ from models.base import (
 from .base import (
     FilestoreVectorstorePortObjectSpec,
     FilestoreVectorstorePortObject,
+    MetadataSettings,
     store_category,
     validate_creator_document_column,
 )
@@ -187,6 +188,9 @@ class FAISSVectorStoreReader:
     search operations on these vectors and their associated data.
 
     If the vector store was created with another tool i.e. outside of KNIME, the embeddings model is not stored with the vectorstore, so it has to be provided separately (<Provider> Embeddings Connector Node).
+
+    On execution the node will extract a document from the store to obtain information about the document's metadata. This means
+    it will be assumend, that each document of the vector store has the same kind of metadata attached to it.
     """
 
     persist_directory = knext.StringParameter(
@@ -210,11 +214,17 @@ class FAISSVectorStoreReader:
         embeddings_port_object: EmbeddingsPortObject,
     ) -> FAISSVectorstorePortObject:
         # TODO: Add check if .fiass and .pkl files are in the directory instead of instatiating as check
-        faiss = FAISS.load_local(
+        db = FAISS.load_local(
             self.persist_directory, embeddings_port_object.create_model(ctx)
         )
+
+        document_list = db.similarity_search("a", k=1)
+        metadata_keys = (
+            [key for key in document_list[0].metadata] if len(document_list) > 0 else []
+        )
+
         return FAISSVectorstorePortObject(
-            FAISSVectorstorePortObjectSpec(embeddings_port_object.spec),
+            FAISSVectorstorePortObjectSpec(embeddings_port_object.spec, metadata_keys),
             embeddings_port_object,
-            vectorstore=faiss,
+            vectorstore=db,
         )

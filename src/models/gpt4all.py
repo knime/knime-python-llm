@@ -1,17 +1,28 @@
 # KNIME / own imports
 import knime.extension as knext
+from knime.extension.nodes import FilestorePortObject
+from models.base import EmbeddingsPortObjectSpec
 from .base import (
     LLMPortObjectSpec,
     LLMPortObject,
     model_category,
+    EmbeddingsPortObjectSpec,
+    EmbeddingsPortObject,
 )
 
 # Langchain imports
 from langchain.llms import GPT4All
+from langchain.embeddings.base import Embeddings
+from pydantic import root_validator, BaseModel
+from gpt4all import GPT4All as _GPT4All
+import shutil
+import os
+
+from typing import Optional, Any, Dict, List
 
 
 gpt4all_icon = "icons/gpt4all.png"
-gpt4all = knext.category(
+gpt4all_category = knext.category(
     path=model_category,
     level_id="gpt4all",
     name="GPT4All",
@@ -66,7 +77,7 @@ gpt4all_llm_port_type = knext.port_type(
     "GPT4All LLM Connector",
     knext.NodeType.SOURCE,
     gpt4all_icon,
-    category=gpt4all,
+    category=gpt4all_category,
 )
 @knext.output_port(
     "GPT4All LLM",
@@ -92,4 +103,107 @@ class GPT4AllLLMConnector:
     def execute(self, ctx: knext.ExecutionContext) -> GPT4AllLLMPortObject:
         return GPT4AllLLMPortObject(
             GPT4AllLLMPortObjectSpec(local_path=self.settings.local_path)
+        )
+
+
+_embeddings4all_model_name = "ggml-all-MiniLM-L6-v2-f16.bin"
+
+
+class _Embeddings4All(BaseModel, Embeddings):
+    model_name: str
+    model_path: str
+    client: Any  #: :meta private:
+
+    @root_validator()
+    def validate_environment(cls, values: Dict) -> Dict:
+        values["client"] = _GPT4All(
+            values["model_name"], model_path=values["model_path"]
+        )
+        return values
+
+    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        embeddings = [self.client.model.generate_embedding(text) for text in texts]
+        return [list(map(float, e)) for e in embeddings]
+
+    def embed_query(self, text: str) -> List[float]:
+        return self.embed_documents([text])[0]
+
+
+class Embeddings4AllPortObjectSpec(EmbeddingsPortObjectSpec):
+    """The Embeddings4All port object spec."""
+
+
+class Embeddings4AllPortObject(EmbeddingsPortObject, FilestorePortObject):
+    """
+    The Embeddings4All port object.
+
+    The port object copies the Embeddings4All model into a filestore in order
+    to make workflows containing such models portable.
+    """
+
+    def __init__(
+        self,
+        spec: EmbeddingsPortObjectSpec,
+        model_name=_embeddings4all_model_name,
+        model_path: Optional[str] = None,
+    ) -> None:
+        super().__init__(spec)
+        self._model_name = model_name
+        self._model_path = model_path
+
+    def create_model(self, ctx) -> Embeddings:
+        return _Embeddings4All(model_name=self._model_name, model_path=self._model_path)
+
+    @property
+    def full_model_path(self):
+        return
+
+    def write_to(self, file_path: str) -> None:
+        os.makedirs(file_path)
+        if self._model_path:
+            # should be verified in the connector
+            shutil.copy(
+                os.path.join(self._model_path, self._model_name),
+                os.path.join(file_path, self._model_path),
+            )
+        else:
+            _Embeddings4All(model_path=file_path, model_name=_embeddings4all_model_name)
+
+    @classmethod
+    def read_from(
+        cls, spec: Embeddings4AllPortObjectSpec, file_path: str
+    ) -> "Embeddings4AllPortObject":
+        model_name = os.listdir(file_path)[0]
+        return cls(spec, model_name, file_path)
+
+
+embeddings4all_port_type = knext.port_type(
+    "Embeddings4All", Embeddings4AllPortObject, Embeddings4AllPortObjectSpec
+)
+
+
+@knext.node(
+    "Embeddings4All Connector", knext.NodeType.SOURCE, gpt4all_icon, gpt4all_category
+)
+@knext.output_port(
+    "Embeddings4All model",
+    "An Embeddings4All model that calculates embeddings on the local machine.",
+    embeddings4all_port_type,
+)
+class Embeddings4AllConnector:
+    """
+    Connects to an embeddings model that runs on the local machine.
+    """
+
+    # TODO add advanced threads option
+
+    # TODO allow to point to an already downloaded model
+
+    def configure(self, ctx):
+        return Embeddings4AllPortObjectSpec()
+
+    def execute(self, ctx):
+        # TODO add parameter to allow selecting a model
+        return Embeddings4AllPortObject(
+            Embeddings4AllPortObjectSpec(), _embeddings4all_model_name
         )

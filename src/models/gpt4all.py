@@ -122,11 +122,15 @@ class _Embeddings4All(BaseModel, Embeddings):
         return values
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        embeddings = [self.client.model.generate_embedding(text) for text in texts]
+        embeddings = [self.embed_query(text) for text in texts]
         return [list(map(float, e)) for e in embeddings]
 
     def embed_query(self, text: str) -> List[float]:
-        return self.embed_documents([text])[0]
+        if text is None:
+            raise ValueError("None values are not supported.")
+        elif not text.strip():
+            raise ValueError("Empty documents are not supported.")
+        return self.client.model.generate_embedding(text)
 
 
 class Embeddings4AllPortObjectSpec(EmbeddingsPortObjectSpec):
@@ -193,6 +197,11 @@ embeddings4all_port_type = knext.port_type(
 class Embeddings4AllConnector:
     """
     Connects to an embeddings model that runs on the local machine.
+
+    Connect to an embeddings model that runs on the local machine via GPT4All.
+    The default model is for English text and ignores special characters like 'ß' i.e. the embeddings for 'Schloß' are the same as for 'Schlo'.
+    If downstream nodes fail with 'Execute failed: Error while sending a command.', then this is likely caused by an input that
+    consists entirely of characters the model doesn't support.
     """
 
     # TODO add advanced threads option

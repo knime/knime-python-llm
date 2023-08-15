@@ -413,6 +413,8 @@ class TextEmbedder:
     Thus these embeddings are often used to find semantically similar documents e.g. in vector stores.
     How exactly the embeddings are derived depends on the used embeddings model but typically the embeddings are the internal representations
     used by deep language models e.g. GPTs.
+    If this node fails to execute and gives an unhelpful error message such as 'Execute failed: Error while sending a command.', then refer to the
+    description of the node that provided the embeddings model.
     """
 
     text_column = knext.ColumnParameter(
@@ -460,7 +462,7 @@ class TextEmbedder:
         for batch in table.batches():
             util.check_canceled(ctx)
             data_frame = batch.to_pandas()
-            texts = data_frame[self.text_column]
+            texts = data_frame[self.text_column].tolist()
             embeddings = embeddings_model.embed_documents(texts)
             data_frame[self.embeddings_column_name] = embeddings
             output_table.append(knext.Table.from_pandas(data_frame))

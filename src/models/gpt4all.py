@@ -168,7 +168,7 @@ class Embeddings4AllPortObject(EmbeddingsPortObject, FilestorePortObject):
             # should be verified in the connector
             shutil.copy(
                 os.path.join(self._model_path, self._model_name),
-                os.path.join(file_path, self._model_path),
+                os.path.join(file_path, self._model_name),
             )
         else:
             _Embeddings4All(model_path=file_path, model_name=_embeddings4all_model_name)
@@ -184,6 +184,14 @@ class Embeddings4AllPortObject(EmbeddingsPortObject, FilestorePortObject):
 embeddings4all_port_type = knext.port_type(
     "Embeddings4All", Embeddings4AllPortObject, Embeddings4AllPortObjectSpec
 )
+
+
+class ModelRetrievalOptions(knext.EnumParameterOptions):
+    DOWNLOAD = (
+        "Download",
+        "Downloads the model from GPT4All during execution. Requires an internet connection.",
+    )
+    READ = ("Read", "Reads the model from the local file system.")
 
 
 @knext.node(
@@ -206,13 +214,40 @@ class Embeddings4AllConnector:
 
     # TODO add advanced threads option
 
-    # TODO allow to point to an already downloaded model
+    model_retrieval = knext.EnumParameter(
+        "Model retrieval",
+        "Defines how the model is retrieved during execution.",
+        ModelRetrievalOptions.DOWNLOAD.name,
+        ModelRetrievalOptions,
+        style=knext.EnumParameter.Style.VALUE_SWITCH,
+    )
+
+    model_path = knext.StringParameter(
+        "Path to model", "The local file system path to the model."
+    ).rule(
+        knext.OneOf(model_retrieval, [ModelRetrievalOptions.READ.name]),
+        knext.Effect.SHOW,
+    )
 
     def configure(self, ctx):
         return Embeddings4AllPortObjectSpec()
 
     def execute(self, ctx):
-        # TODO add parameter to allow selecting a model
+        model_retrieval = self.model_retrieval
+        if model_retrieval == ModelRetrievalOptions.DOWNLOAD.name:
+            model_path = None
+            model_name = _embeddings4all_model_name
+        else:
+            if not os.path.exists(self.model_path):
+                raise ValueError(
+                    f"The provided model path {self.model_path} does not exist."
+                )
+            model_path, model_name = os.path.split(self.model_path)
+            try:
+                _Embeddings4All(model_name=model_name, model_path=model_path)
+            except:
+                raise ValueError(f"The model at path {self.model_path} is not valid.")
+
         return Embeddings4AllPortObject(
-            Embeddings4AllPortObjectSpec(), _embeddings4all_model_name
+            Embeddings4AllPortObjectSpec(), model_name=model_name, model_path=model_path
         )

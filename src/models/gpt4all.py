@@ -112,12 +112,15 @@ _embeddings4all_model_name = "ggml-all-MiniLM-L6-v2-f16.bin"
 class _Embeddings4All(BaseModel, Embeddings):
     model_name: str
     model_path: str
+    num_threads: int = 1
     client: Any  #: :meta private:
 
     @root_validator()
     def validate_environment(cls, values: Dict) -> Dict:
         values["client"] = _GPT4All(
-            values["model_name"], model_path=values["model_path"]
+            values["model_name"],
+            model_path=values["model_path"],
+            n_threads=values["num_threads"],
         )
         return values
 
@@ -135,6 +138,21 @@ class _Embeddings4All(BaseModel, Embeddings):
 
 class Embeddings4AllPortObjectSpec(EmbeddingsPortObjectSpec):
     """The Embeddings4All port object spec."""
+
+    def __init__(self, num_threads: int = 1) -> None:
+        super().__init__()
+        self._num_threads = num_threads
+
+    @property
+    def num_threads(self) -> int:
+        return self._num_threads
+
+    def serialize(self) -> dict:
+        return {"num_threads": self.num_threads}
+
+    @classmethod
+    def deserialize(cls, data: dict):
+        return cls(data["num_threads"])
 
 
 class Embeddings4AllPortObject(EmbeddingsPortObject, FilestorePortObject):
@@ -155,12 +173,16 @@ class Embeddings4AllPortObject(EmbeddingsPortObject, FilestorePortObject):
         self._model_name = model_name
         self._model_path = model_path
 
-    def create_model(self, ctx) -> Embeddings:
-        return _Embeddings4All(model_name=self._model_name, model_path=self._model_path)
-
     @property
-    def full_model_path(self):
-        return
+    def spec(self) -> Embeddings4AllPortObjectSpec:
+        return super().spec
+
+    def create_model(self, ctx) -> Embeddings:
+        return _Embeddings4All(
+            model_name=self._model_name,
+            model_path=self._model_path,
+            num_threads=self.spec.num_threads,
+        )
 
     def write_to(self, file_path: str) -> None:
         os.makedirs(file_path)
@@ -207,12 +229,11 @@ class Embeddings4AllConnector:
     Connects to an embeddings model that runs on the local machine.
 
     Connect to an embeddings model that runs on the local machine via GPT4All.
-    The default model is for English text and ignores special characters like 'ß' i.e. the embeddings for 'Schloß' are the same as for 'Schlo'.
+    The default model was trained on sentences and short paragrpahs of English text.
+    It ignores special characters like 'ß' i.e. the embeddings for 'Schloß' are the same as for 'Schlo'.
     If downstream nodes fail with 'Execute failed: Error while sending a command.', then this is likely caused by an input that
     consists entirely of characters the model doesn't support.
     """
-
-    # TODO add advanced threads option
 
     model_retrieval = knext.EnumParameter(
         "Model retrieval",
@@ -229,12 +250,20 @@ class Embeddings4AllConnector:
         knext.Effect.SHOW,
     )
 
+    num_threads = knext.IntParameter(
+        "Number of threads",
+        """The number of threads the model uses. 
+        More threads may reduce the runtime of queries to the model.""",
+        1,
+        min_value=1,
+        is_advanced=True,
+    )
+
     def configure(self, ctx):
-        return Embeddings4AllPortObjectSpec()
+        return Embeddings4AllPortObjectSpec(self.num_threads)
 
     def execute(self, ctx):
-        model_retrieval = self.model_retrieval
-        if model_retrieval == ModelRetrievalOptions.DOWNLOAD.name:
+        if self.model_retrieval == ModelRetrievalOptions.DOWNLOAD.name:
             model_path = None
             model_name = _embeddings4all_model_name
         else:
@@ -244,10 +273,16 @@ class Embeddings4AllConnector:
                 )
             model_path, model_name = os.path.split(self.model_path)
             try:
-                _Embeddings4All(model_name=model_name, model_path=model_path)
+                _Embeddings4All(
+                    model_name=model_name,
+                    model_path=model_path,
+                    num_threads=self.num_threads,
+                )
             except:
                 raise ValueError(f"The model at path {self.model_path} is not valid.")
 
         return Embeddings4AllPortObject(
-            Embeddings4AllPortObjectSpec(), model_name=model_name, model_path=model_path
+            Embeddings4AllPortObjectSpec(self.num_threads),
+            model_name=model_name,
+            model_path=model_path,
         )

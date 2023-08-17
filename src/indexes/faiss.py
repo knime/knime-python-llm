@@ -178,16 +178,16 @@ class FAISSVectorStoreCreator:
 )
 class FAISSVectorStoreReader:
     """
-    Reads a FAISS vector store from a local path.
+    Reads a FAISS vector store created with LangChain from a local path.
 
-    This node reads a FAISS vector store create with another tool (e.g. Python) from a local path.
+    This node reads a FAISS vector store create with [LangChain](https://python.langchain.com/docs/integrations/vectorstores/faiss#saving-and-loading) from a local path.
     If you want to create a new vector store, use the FAISS Vector Store Creator instead.
 
     A vector store is a data structure or storage mechanism that stores a collection of numerical vectors
     along with their corresponding documents. The vector store enables efficient storage, retrieval, and similarity
     search operations on these vectors and their associated data.
 
-    If the vector store was created with another tool i.e. outside of KNIME, the embeddings model is not stored with the vectorstore, so it has to be provided separately (<Provider> Embeddings Connector Node).
+    If the vector store was created with LangChain in Python, the embeddings model is not stored with the vectorstore, so it has to be provided separately via the matching Embeddings Model Connector node.
 
     On execution the node will extract a document from the store to obtain information about the document's metadata. This means
     it will be assumend, that each document of the vector store has the same kind of metadata attached to it.

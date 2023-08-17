@@ -193,14 +193,14 @@ class ChromaVectorStoreCreator:
 )
 class ChromaVectorStoreReader:
     """
-    Reads a Chroma vector store from a local path.
+    Reads a Chroma vector store created with LangChain from a local path.
 
-    This node allows you to read a Chroma vector store from a local path. It combines the Chroma vector store with
+    This node allows you to read a Chroma vector store created with [LangChain](https://python.langchain.com/docs/integrations/vectorstores/chroma) from a local path. It combines the Chroma vector store with
     an input embeddings model that is used in downstream nodes, such as the **Vector Store Retriever node**. The embeddings
     model is responsible for embedding documents, enabling the vector store to retrieve documents that share similar embeddings,
     facilitating tasks like document clustering or recommendation systems.
 
-    If the vector store was created with another tool i.e. outside of KNIME, the embeddings model is not stored with the vectorstore,
+    If the vector store was created with LangChain outside of KNIME, the embeddings model is not stored with the vectorstore,
     so it has to be provided separately (<Provider> Embeddings Connector Node).
     """
 

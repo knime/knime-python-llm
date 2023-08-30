@@ -97,7 +97,7 @@ class FAISSVectorStoreCreator:
         column_filter=util.create_type_filer(knext.string()),
     )
 
-    metadata_settings = MetadataSettings(since_version="5.1.1")
+    metadata_settings = MetadataSettings(since_version="5.2.0")
 
     def configure(
         self,

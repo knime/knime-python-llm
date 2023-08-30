@@ -8,6 +8,7 @@ from knime.extension.nodes import (
     get_port_type_for_spec_type,
     get_port_type_for_id,
 )
+from knime.extension.parameter import ManualFilterConfig
 from models.base import (
     EmbeddingsPortObject,
     EmbeddingsPortObjectSpec,
@@ -188,6 +189,11 @@ class MetadataSettings:
         """Selection of columns used as metadata for each document. The documents column will be ignored.""",
         port_index=1,
         column_filter=util.create_type_filer(knext.string()),  # TODO fix typo
+        default_value=lambda v: knext.ColumnFilterConfig(
+            manual_filter=ManualFilterConfig(include_unknown_columns=False)
+        )
+        if v < knext.Version(5, 2, 0)
+        else knext.ColumnFilterConfig(),
     )
 
 

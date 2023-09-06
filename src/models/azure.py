@@ -1,0 +1,707 @@
+# KNIME / own imports
+import knime.extension as knext
+from .base import (
+    model_category,
+    CredentialsSettings,
+    AIPortObjectSpec,
+    LLMPortObjectSpec,
+    LLMPortObject,
+    ChatModelPortObjectSpec,
+    ChatModelPortObject,
+    EmbeddingsPortObjectSpec,
+    EmbeddingsPortObject,
+)
+
+from models.openai import (
+    OpenAIGeneralSettings,
+    OpenAIAuthenticationPortObjectSpec,
+    OpenAIAuthenticationPortObject,
+    openai_authentication_port_type,
+    OpenAILLMPortObjectSpec,
+    OpenAILLMPortObject,
+    OpenAIChatModelPortObjectSpec,
+    OpenAIChatModelPortObject,
+    openai_chat_port_type,
+    OpenAIEmbeddingsPortObjectSpec,
+    OpenAIEmbeddingsPortObject,
+    openai_embeddings_port_type,
+)
+
+# Langchain imports
+from langchain.llms import AzureOpenAI
+from langchain.chat_models import AzureChatOpenAI
+from langchain.embeddings.openai import OpenAIEmbeddings
+
+
+# Other imports
+import openai
+from socket import gaierror
+
+openai_icon = "icons/azure_logo.png"
+azure_openai_category = knext.category(
+    path=model_category,
+    level_id="openai",
+    name="Azure OpenAI",
+    description="",
+    icon=openai_icon,
+)
+
+# This logger is necessary
+import logging
+
+LOGGER = logging.getLogger(__name__)
+
+# == Port Objects ==
+
+
+class AzureOpenAIAuthenticationPortObjectSpec(OpenAIAuthenticationPortObjectSpec):
+    def __init__(
+        self,
+        credentials: str,
+        api_base: str,
+        api_version: str,
+        api_type: str,
+    ) -> None:
+        super().__init__(credentials)
+        self._api_base = api_base
+        self._api_version = api_version
+        self._api_type = api_type
+
+    @property
+    def api_base(self) -> str:
+        return self._api_base
+
+    @property
+    def api_version(self) -> str:
+        return self._api_version
+
+    @property
+    def api_type(self) -> str:
+        return self._api_type
+
+    def serialize(self) -> dict:
+        return {
+            "credentials": super().serialize,
+            "api_base": self.api_base,
+            "api_version": self.api_version,
+            "api_type": self.api_type,
+        }
+
+    @classmethod
+    def deserialize(cls, data: dict):
+        return cls(
+            data["credentials"], data["api_base"], data["api_version"], data["api_type"]
+        )
+
+
+class AzureOpenAIAuthenticationPortObject(OpenAIAuthenticationPortObject):
+    def __init__(self, spec: AzureOpenAIAuthenticationPortObjectSpec) -> None:
+        super().__init__(spec)
+
+    def serialize(self) -> bytes:
+        return b""
+
+    @classmethod
+    def deserialize(cls, spec: AzureOpenAIAuthenticationPortObjectSpec, storage: bytes):
+        return cls(spec)
+
+
+azure_openai_authentication_port_type = knext.port_type(
+    "Azure OpenAI Authentication",
+    AzureOpenAIAuthenticationPortObject,
+    AzureOpenAIAuthenticationPortObjectSpec,
+)
+
+
+class AzureOpenAIModelPortObjectSpec(AIPortObjectSpec):
+    def __init__(self, azure_auth_spec=AzureOpenAIAuthenticationPortObjectSpec) -> None:
+        self._azure_auth_spec = azure_auth_spec
+
+    @property
+    def credentials(self) -> str:
+        return self._azure_auth_spec.credentials
+
+    @property
+    def api_base(self) -> str:
+        return self._azure_auth_spec._api_base
+
+    @property
+    def api_version(self) -> str:
+        return self._azure_auth_spec._api_version
+
+    @property
+    def api_type(self) -> str:
+        return self._azure_auth_spec._api_type
+
+    def validate_context(self, ctx: knext.ConfigurationContext):
+        self._azure_auth_spec.validate_context(ctx)
+
+    def serialize(self) -> dict:
+        return {
+            "credentials": self._azure_auth_spec.credentials,
+            "api_base": self._azure_auth_spec._api_base,
+            "api_version": self._azure_auth_spec._api_version,
+            "api_type": self._azure_auth_spec._api_type,
+        }
+
+    @classmethod
+    def deserialize_credentials_spec(
+        cls, data: dict
+    ) -> AzureOpenAIAuthenticationPortObjectSpec:
+        return AzureOpenAIAuthenticationPortObjectSpec(
+            data["credentials"],
+            data["api_base"],
+            data["api_version"],
+            data["api_type"],
+        )
+
+
+class AzureOpenAILLMPortObjectSpec(AzureOpenAIModelPortObjectSpec, LLMPortObjectSpec):
+    def __init__(
+        self,
+        credentials: AzureOpenAIAuthenticationPortObjectSpec,
+        model_name,
+        temperature,
+        top_p,
+        max_tokens,
+        n,
+    ) -> None:
+        super().__init__(credentials)
+        self._model = model_name
+        self._temperature = temperature
+        self._top_p = top_p
+        self._max_tokens = max_tokens
+        self._n = n
+
+    @property
+    def model(self):
+        return self._model
+
+    @property
+    def temperature(self):
+        return self._temperature
+
+    @property
+    def top_p(self):
+        return self._top_p
+
+    @property
+    def max_tokens(self):
+        return self._max_tokens
+
+    @property
+    def n(self):
+        return self._n
+
+    def serialize(self) -> dict:
+        return {
+            **super().serialize(),
+            "model": self._model,
+            "temperature": self._temperature,
+            "top_p": self._top_p,
+            "max_tokens": self._max_tokens,
+            "n": self._n,
+        }
+
+    @classmethod
+    def deserialize(cls, data: dict):
+        return cls(
+            cls.deserialize_credentials_spec(data),
+            data["model"],
+            data["temperature"],
+            data["top_p"],
+            data["max_tokens"],
+            data["n"],
+        )
+
+
+class AzureOpenAILLMPortObject(LLMPortObject):
+    def __init__(self, spec: AzureOpenAILLMPortObjectSpec):
+        super().__init__(spec)
+
+    def create_model(self, ctx):
+
+        return AzureOpenAI(
+            openai_api_key=ctx.get_credentials(self.spec.credentials).password,
+            openai_api_version=self.spec.api_version,
+            openai_api_base=self.spec.api_base,
+            openai_api_type=self.spec.api_type,
+            deployment_name=self.spec.deployment_name,
+            temperature=self.spec.temperature,
+            top_p=self.spec.top_p,
+            max_tokens=self.spec.max_tokens,
+            n=self.spec.n,
+        )
+
+
+azure_openai_llm_port_type = knext.port_type(
+    "Azure OpenAI LLM", AzureOpenAILLMPortObject, AzureOpenAILLMPortObjectSpec
+)
+
+
+class AzureOpenAIChatModelPortObjectSpec(
+    AzureOpenAIModelPortObjectSpec, ChatModelPortObjectSpec
+):
+    def __init__(
+        self,
+        credentials: AzureOpenAIAuthenticationPortObjectSpec,
+        deployment_name: str,
+        temperature,
+        top_p,
+        max_tokens,
+        n,
+    ) -> None:
+        super().__init__(credentials)
+        self._deployment_name = deployment_name
+        self._temperature = temperature
+        self._top_p = top_p
+        self._max_tokens = max_tokens
+        self._n = n
+
+    @property
+    def deployment_name(self):
+        return self._deployment_name
+
+    @property
+    def temperature(self):
+        return self._temperature
+
+    @property
+    def top_p(self):
+        return self._top_p
+
+    @property
+    def max_tokens(self):
+        return self._max_tokens
+
+    @property
+    def n(self):
+        return self._n
+
+    def serialize(self) -> dict:
+        return {
+            **super().serialize(),
+            "deployment_name": self._deployment_name,
+            "temperature": self._temperature,
+            "top_p": self._top_p,
+            "max_tokens": self._max_tokens,
+            "n": self._n,
+        }
+
+    @classmethod
+    def deserialize(cls, data: dict):
+        return cls(
+            cls.deserialize_credentials_spec(data),
+            data["deployment_name"],
+            data["temperature"],
+            data["top_p"],
+            data["max_tokens"],
+            data["n"],
+        )
+
+
+class AzureOpenAIChatModelPortObject(ChatModelPortObject):
+    def __init__(self, spec: AzureOpenAIChatModelPortObjectSpec):
+        super().__init__(spec)
+
+    def create_model(self, ctx):
+        return AzureChatOpenAI(
+            openai_api_key=ctx.get_credentials(self.spec.credentials).password,
+            openai_api_version=self.spec.api_version,
+            openai_api_base=self.spec.api_base,
+            openai_api_type=self.spec.api_type,
+            deployment_name=self.spec.deployment_name,
+            temperature=self.spec.temperature,
+            top_p=self.spec.top_p,
+            max_tokens=self.spec.max_tokens,
+            n=self.spec.n,
+        )
+
+
+azure_openai_chat_port_type = knext.port_type(
+    "Azure OpenAI Chat Model",
+    AzureOpenAIChatModelPortObject,
+    AzureOpenAIChatModelPortObjectSpec,
+)
+
+
+class AzureOpenAIEmbeddingsPortObjectSpec(
+    AzureOpenAIModelPortObjectSpec, EmbeddingsPortObjectSpec
+):
+    def __init__(
+        self, credentials: AzureOpenAIAuthenticationPortObjectSpec, deployment_name: str
+    ) -> None:
+        super().__init__(credentials)
+        self._deployment_name = deployment_name
+
+    @property
+    def deployment_name(self):
+        return self._deployment_name
+
+    def serialize(self) -> dict:
+        return {**super().serialize(), "deployment_name": self._deployment_name}
+
+    @classmethod
+    def deserialize(cls, data: dict):
+        return cls(cls.deserialize_credentials_spec(data), data["deployment_name"])
+
+
+class AzureOpenAIEmbeddingsPortObject(EmbeddingsPortObject):
+    def __init__(self, spec: EmbeddingsPortObjectSpec):
+        super().__init__(spec)
+
+    def create_model(self, ctx):
+        return OpenAIEmbeddings(
+            openai_api_key=ctx.get_credentials(self.spec.credentials).password,
+            openai_api_base=self.spec.api_base,
+            openai_api_version=self.spec.api_version,
+            openai_api_type=self.spec.api_type,
+            deployment=self.spec.model,
+            chunk_size=16,  # Azure only supports 16 docs per request
+        )
+
+
+azure_openai_embeddings_port_type = knext.port_type(
+    "Azure OpenAI Embeddings Model",
+    AzureOpenAIEmbeddingsPortObject,
+    AzureOpenAIEmbeddingsPortObjectSpec,
+)
+
+# == Nodes ==
+
+
+@knext.node(
+    "Azure OpenAI Authenticator",
+    knext.NodeType.SOURCE,
+    openai_icon,
+    category=azure_openai_category,
+)
+@knext.output_port(
+    "Azure OpenAI Authentication",
+    "Validated authentication for Azure OpenAI.",
+    azure_openai_authentication_port_type,
+)
+class AzureOpenAIAuthenticator:
+    """
+    Authenticates the Azure OpenAI API key against the the Cognitive Services account.
+
+    This node provides the authentication for all Azure OpenAI models.
+    It allows you to select the credentials that contain a valid Azure OpenAI API key in their *password* field (the *username* is ignored).
+    Credentials can be set on the workflow level or created inside the workflow e.g. with the [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
+    and fed into this node via flow variable.
+
+    When this node is run, it validates the Azure OpenAI key by sending a request to get your active model deployments.
+
+    You can your API key on the [Azure Portal](https://portal.azure.com) under 'Resource Management - Keys and Endpoints'.
+
+    The Azure Subscription ID and Endpoint can be found on the [Azure Portal](https://portal.azure.com) at 'Overview'
+
+    """
+
+    credentials_settings = CredentialsSettings(
+        label="Azure OpenAI API Key",
+        description="""
+        The credentials containing the OpenAI API key in its *password* field (the *username* is ignored).
+        """,
+    )
+
+    api_base = knext.StringParameter(
+        label="Azure Resource Endpoint",
+        description="""The Azure OpenAi endpoint: https://<myResource>.openai.azure.com/.
+        """,
+        default_value="https://knime-ai-assistant.openai.azure.com/",
+    )
+
+    api_version = knext.StringParameter(
+        label="Azure API Version",
+        description="""The API version you want to use. Note that the latest API versions can support newer models.
+        Find the avilable api versions here:
+        [API versions](https://learn.microsoft.com/en-us/azure/ai-services/openai/reference#completions)""",
+        default_value="2023-07-01-preview",
+    )
+
+    def configure(
+        self, ctx: knext.ConfigurationContext
+    ) -> AzureOpenAIAuthenticationPortObjectSpec:
+        if not ctx.get_credential_names():
+            raise knext.InvalidParametersError("Credentials not provided.")
+
+        if not self.credentials_settings.credentials_param:
+            raise knext.InvalidParametersError("Credentials not selected.")
+
+        if not self.api_base:
+            raise knext.InvalidParametersError("API endpoint not provided.")
+
+        spec = self.create_spec()
+        spec.validate_context(ctx)
+        return spec
+
+    def execute(
+        self, ctx: knext.ExecutionContext
+    ) -> AzureOpenAIAuthenticationPortObject:
+        try:
+            openai.Model.list(
+                api_key=ctx.get_credentials(
+                    self.credentials_settings.credentials_param
+                ).password,
+                api_version=self.api_version,
+                api_base=self.api_base,
+                api_type="azure",
+            )
+
+        except gaierror:
+            raise knext.InvalidParametersError("API endpoint not valid.")
+        except openai.error.InvalidRequestError:
+            raise knext.InvalidParametersError(
+                "Wrong resource endpoint or API version provided."
+            )
+        except openai.error.AuthenticationError:
+            raise knext.InvalidParametersError("Access denied, wrong API key.")
+
+        return AzureOpenAIAuthenticationPortObject(self.create_spec())
+
+    def create_spec(self) -> AzureOpenAIAuthenticationPortObjectSpec:
+        return AzureOpenAIAuthenticationPortObjectSpec(
+            self.credentials_settings.credentials_param,
+            self.api_base,
+            self.api_version,
+            "azure",
+        )
+
+
+@knext.node(
+    "Azure OpenAI LLM Connector",
+    knext.NodeType.SOURCE,
+    openai_icon,
+    category=azure_openai_category,
+)
+@knext.input_port(
+    "Azure OpenAI Authentication",
+    "Validated authentication for OpenAI.",
+    azure_openai_authentication_port_type,
+)
+@knext.output_port(
+    "Azure OpenAI LLM",
+    "Configured OpenAI LLM connection.",
+    azure_openai_llm_port_type,
+)
+class AzureOpenAILLMConnector:
+    """
+    Connects to an Azure OpenAI Large Language Model.
+
+    This node establishes a connection with an Azure OpenAI Large Language Model (LLM).
+    After successfully authenticating using the **Azure OpenAI Authenticator node**, you can select an LLM from a predefined list
+    or explore advanced options to get a list of all models available for your API key (including fine-tunes).
+    Note that only models compatible with Azure OpenAI's Completions API will work with this node (unfortunately this information is not available programmatically).
+
+    If you a looking for gpt-3.5-turbo (the model behind ChatGPT) or gpt-4, check out the **Azure / OpenAI Chat Model Connector** node.
+    """
+
+    deployment_name = knext.StringParameter(
+        label="Deployment name",
+        description="""The name of the deployed model to use.""",
+    )
+
+    model_settings = OpenAIGeneralSettings()
+
+    def configure(
+        self,
+        ctx: knext.ConfigurationContext,
+        azure_auth_spec: AzureOpenAIAuthenticationPortObjectSpec,
+    ) -> AzureOpenAILLMPortObjectSpec:
+        azure_auth_spec.validate_context(ctx)
+
+        if azure_auth_spec.api_type != "azure":
+            raise knext.InvalidParametersError(
+                "OpenAI Authentication provided. Please use the OpenAI LLM Connector instead of Azure OpenAI LLM Connector"
+            )
+
+        if not self.deployment_name:
+            raise knext.InvalidParametersError("No deployment name provided")
+
+        return self.create_spec(azure_auth_spec, self.deployment_name)
+
+    def execute(
+        self,
+        ctx: knext.ExecutionContext,
+        azure_auth_port: AzureOpenAIAuthenticationPortObject,
+    ) -> OpenAILLMPortObject:
+
+        # We know that the API key is correct from the authenticator, but a call to
+        # AzureOpenAI() does not verify the deployment_name unless it is prompted
+        # Could be done with an AD Bearer token
+
+        return AzureOpenAILLMPortObject(
+            self.create_spec(azure_auth_port.spec, self.deployment_name)
+        )
+
+    def create_spec(
+        self,
+        azure_auth_spec: AzureOpenAIAuthenticationPortObjectSpec,
+        deployment_name: str,
+    ) -> OpenAILLMPortObjectSpec:
+
+        LOGGER.info(f"Connecting to {deployment_name}...")
+
+        return AzureOpenAILLMPortObjectSpec(
+            azure_auth_spec,
+            deployment_name,
+            self.model_settings.temperature,
+            self.model_settings.top_p,
+            self.model_settings.max_tokens,
+            self.model_settings.n,
+        )
+
+
+@knext.node(
+    "Azure OpenAI Chat Model Connector",
+    knext.NodeType.SOURCE,
+    openai_icon,
+    category=azure_openai_category,
+)
+@knext.input_port(
+    "Azure OpenAI Authentication",
+    "Validated authentication for Azure OpenAI.",
+    openai_authentication_port_type,
+)
+@knext.output_port(
+    "Azure OpenAI Chat Model",
+    "Configured Azure OpenAI Chat Model connection.",
+    openai_chat_port_type,
+)
+class AzureOpenAIChatModelConnector:
+    """
+    Connects to an Azure OpenAI Chat Model.
+
+    This node establishes a connection with an Azure OpenAI Large Language Model (LLM).
+    After successfully authenticating using the **Azure OpenAI Authenticator node**, you can select an LLM from a predefined list
+    or explore advanced options to get a list of all models available for your API key (including fine-tunes).
+    Note that only models compatible with Azure OpenAI's Completions API will work with this node (unfortunately this information is not available programmatically).
+
+    If you a looking for gpt-3.5-turbo (the model behind ChatGPT) or gpt-4, check out the **Azure / OpenAI Chat Model Connector** node.
+    """
+
+    deployment_name = knext.StringParameter(
+        label="Model deployment name",
+        description="""The name of the deployed model to use.""",
+    )
+
+    model_settings = OpenAIGeneralSettings()
+
+    def configure(
+        self,
+        ctx: knext.ConfigurationContext,
+        openai_auth_spec: OpenAIAuthenticationPortObjectSpec,
+    ) -> OpenAIChatModelPortObjectSpec:
+
+        LOGGER.info(openai_auth_spec.api_type)
+
+        if openai_auth_spec.api_type != "azure":
+            raise knext.InvalidParametersError(
+                "OpenAI Authentication provided. Please use the OpenAI Chat Model Connector"
+            )
+        if not self.deployment_name:
+            raise knext.InvalidParametersError("No model name provided.")
+
+        openai_auth_spec.validate_context(ctx)
+
+        return self.create_spec(openai_auth_spec, self.deployment_name)
+
+    def execute(
+        self,
+        ctx: knext.ExecutionContext,
+        azure_openai_auth_port: OpenAIAuthenticationPortObject,
+    ) -> OpenAIChatModelPortObject:
+
+        # We know that the API key is correct from the authenticator, but a call to
+        # AzureChatOpenAI() does not verify the deployment_name until it is prompted
+
+        return OpenAIChatModelPortObject(
+            self.create_spec(azure_openai_auth_port.spec, self.deployment_name)
+        )
+
+    def create_spec(
+        self,
+        azure_openai_auth_spec: OpenAIAuthenticationPortObjectSpec,
+        deployment_name: str,
+    ) -> OpenAIChatModelPortObjectSpec:
+
+        LOGGER.info(f"Connecting to {deployment_name}...")
+
+        return OpenAIChatModelPortObjectSpec(
+            azure_openai_auth_spec,
+            deployment_name,
+            self.model_settings.temperature,
+            self.model_settings.top_p,
+            self.model_settings.max_tokens,
+            self.model_settings.n,
+        )
+
+
+@knext.node(
+    "Azure OpenAI Embeddings Connector",
+    knext.NodeType.SOURCE,
+    openai_icon,
+    category=azure_openai_category,
+)
+@knext.input_port(
+    "Azure OpenAI Authentication",
+    "Validated authentication for Azure OpenAI.",
+    openai_authentication_port_type,
+)
+@knext.output_port(
+    "Azure OpenAI Embeddings Model",
+    "Configured Azure OpenAI Embeddings Model connection.",
+    openai_embeddings_port_type,
+)
+class AzureOpenAIEmbeddingsConnector:
+    """
+    Connects to an Azure OpenAI Embedding Model.
+
+    This node establishes a connection with an Azure OpenAI Embeddings Model. After successfully authenticating
+    using the **Azure OpenAI Authenticator node**, you need to provide the name of a deployed embeddings model.
+    """
+
+    deployment_name = knext.StringParameter(
+        label="Model deployment name",
+        description="""The name of the deployed model to use.""",
+    )
+
+    def configure(
+        self,
+        ctx: knext.ConfigurationContext,
+        openai_auth_spec: OpenAIAuthenticationPortObjectSpec,
+    ) -> OpenAIEmbeddingsPortObjectSpec:
+
+        if openai_auth_spec.api_type != "azure":
+            raise knext.InvalidParametersError("Use Azure Chat Model Connector.")
+
+        if not self.deployment_name:
+            raise knext.InvalidParametersError("No deployment name provided")
+
+        openai_auth_spec.validate_context(ctx)
+
+        return self.create_spec(openai_auth_spec, self.deployment_name)
+
+    def execute(
+        self,
+        ctx: knext.ExecutionContext,
+        openai_auth_port: OpenAIAuthenticationPortObject,
+    ) -> OpenAIEmbeddingsPortObject:
+
+        # We know that the API key is correct from the authenticator, but a call to
+        # OpenAIEmeddings() does not verify the deployment_name unless it is prompted
+
+        return OpenAIEmbeddingsPortObject(
+            self.create_spec(openai_auth_port.spec, self.deployment_name)
+        )
+
+    def create_spec(
+        self,
+        azure_openai_auth_spec: OpenAIAuthenticationPortObjectSpec,
+        deployment_name: str,
+    ) -> OpenAIEmbeddingsPortObjectSpec:
+
+        LOGGER.info(f"Connecting to {deployment_name}...")
+
+        return OpenAIEmbeddingsPortObjectSpec(azure_openai_auth_spec, deployment_name)

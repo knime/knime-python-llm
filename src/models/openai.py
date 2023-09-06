@@ -1,6 +1,7 @@
 # KNIME / own imports
 import knime.extension as knext
 from .base import (
+    AIPortObjectSpec,
     LLMPortObjectSpec,
     LLMPortObject,
     ChatModelPortObjectSpec,
@@ -11,7 +12,6 @@ from .base import (
     GeneralSettings,
     CredentialsSettings,
 )
-from base import AIPortObjectSpec
 
 # Langchain imports
 from langchain.llms import OpenAI
@@ -108,7 +108,7 @@ def get_model_list(ctx: knext.DialogCreationContext):
     return model_list
 
 
-def _create_specific_model_name(api_name:str ) -> knext.StringParameter:
+def _create_specific_model_name(api_name: str) -> knext.StringParameter:
     return knext.StringParameter(
         label="Specific Model ID",
         description=f"""Select from a list of all available OpenAI models.
@@ -208,26 +208,34 @@ class EmbeddingsLoaderInputSettings:
 
 # == Port Objects ==
 
+
 class OpenAIAuthenticationPortObjectSpec(AIPortObjectSpec):
-    def __init__(self, credentials: str) -> None:
+    def __init__(
+        self,
+        credentials: str,
+    ) -> None:
         super().__init__()
         self._credentials = credentials
 
     @property
     def credentials(self) -> str:
         return self._credentials
-    
+
     def validate_context(self, ctx: knext.ConfigurationContext):
         if not self.credentials in ctx.get_credential_names():
             raise knext.InvalidParametersError(
                 f"The selected credentials '{self.credentials}' holding the OpenAI API token are not present."
             )
-        hub_token = ctx.get_credentials(self.credentials)
-        if not hub_token.password:
-            raise knext.InvalidParametersError(f"The OpenAI API token in the credentials '{self.credentials}' is not present.")
+        api_token = ctx.get_credentials(self.credentials)
+        if not api_token.password:
+            raise knext.InvalidParametersError(
+                f"The OpenAI API token in the credentials '{self.credentials}' is not present."
+            )
 
     def serialize(self) -> dict:
-        return {"credentials": self._credentials}
+        return {
+            "credentials": self._credentials,
+        }
 
     @classmethod
     def deserialize(cls, data: dict):
@@ -252,6 +260,7 @@ openai_authentication_port_type = knext.port_type(
     OpenAIAuthenticationPortObjectSpec,
 )
 
+
 class OpenAIModelPortObjectSpec(AIPortObjectSpec):
     def __init__(self, credentials=OpenAIAuthenticationPortObjectSpec) -> None:
         self._credentials = credentials
@@ -259,20 +268,33 @@ class OpenAIModelPortObjectSpec(AIPortObjectSpec):
     @property
     def credentials(self) -> str:
         return self._credentials.credentials
-    
+
     def validate_context(self, ctx: knext.ConfigurationContext):
         self._credentials.validate_context(ctx)
-    
+
     def serialize(self) -> dict:
-        return {"credentials": self.credentials}
-    
+        return {
+            "credentials": self._credentials.credentials,
+        }
+
     @classmethod
-    def deserialize_credentials_spec(cls, data: dict) -> OpenAIAuthenticationPortObjectSpec:
-        return OpenAIAuthenticationPortObjectSpec(data["credentials"])
+    def deserialize_credentials_spec(
+        cls, data: dict
+    ) -> OpenAIAuthenticationPortObjectSpec:
+        return OpenAIAuthenticationPortObjectSpec(
+            data["credentials"],
+        )
+
 
 class OpenAILLMPortObjectSpec(OpenAIModelPortObjectSpec, LLMPortObjectSpec):
     def __init__(
-        self, credentials: OpenAIAuthenticationPortObjectSpec, model_name, temperature, top_p, max_tokens, n
+        self,
+        credentials: OpenAIAuthenticationPortObjectSpec,
+        model_name,
+        temperature,
+        top_p,
+        max_tokens,
+        n,
     ) -> None:
         super().__init__(credentials)
         self._model = model_name
@@ -345,7 +367,13 @@ openai_llm_port_type = knext.port_type(
 
 class OpenAIChatModelPortObjectSpec(OpenAIModelPortObjectSpec, ChatModelPortObjectSpec):
     def __init__(
-        self, credentials: OpenAIAuthenticationPortObjectSpec, model_name, temperature, top_p, max_tokens, n
+        self,
+        credentials: OpenAIAuthenticationPortObjectSpec,
+        model_name,
+        temperature,
+        top_p,
+        max_tokens,
+        n,
     ) -> None:
         super().__init__(credentials)
         self._model = model_name
@@ -404,6 +432,9 @@ class OpenAIChatModelPortObject(ChatModelPortObject):
         return ChatOpenAI(
             openai_api_key=ctx.get_credentials(self.spec.credentials).password,
             model=self.spec.model,
+            temperature=self.spec.temperature,
+            max_tokens=self.spec.max_tokens,
+            n=self.spec.n,
         )
 
 
@@ -412,15 +443,19 @@ openai_chat_port_type = knext.port_type(
 )
 
 
-class OpenAIEmbeddingsPortObjectSpec(OpenAIModelPortObjectSpec, EmbeddingsPortObjectSpec):
-    def __init__(self, credentials: OpenAIAuthenticationPortObjectSpec, model_name) -> None:
+class OpenAIEmbeddingsPortObjectSpec(
+    OpenAIModelPortObjectSpec, EmbeddingsPortObjectSpec
+):
+    def __init__(
+        self, credentials: OpenAIAuthenticationPortObjectSpec, model_name
+    ) -> None:
         super().__init__(credentials)
         self._model = model_name
 
     @property
     def model(self):
         return self._model
-    
+
     def serialize(self) -> dict:
         return {**super().serialize(), "model": self._model}
 
@@ -543,7 +578,7 @@ class OpenAILLMConnector:
     or explore advanced options to get a list of all models available for your API key (including fine-tunes).
     Note that only models compatible with OpenAI's Completions API will work with this node (unfortunately this information is not available programmatically).
 
-    If you a looking for gpt-3.5-turbo (the model behind ChatGPT) or gpt-4, check out the **OpenAI Chat Model Connector** node.   
+    If you a looking for gpt-3.5-turbo (the model behind ChatGPT) or gpt-4, check out the **OpenAI Chat Model Connector** node.
     """
 
     input_settings = LLMLoaderInputSettings()

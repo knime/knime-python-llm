@@ -12,6 +12,8 @@ from .base import (
     VectorstorePortObject,
     FilestoreVectorstorePortObjectSpec,
     FilestoreVectorstorePortObject,
+    MissingValueHandlingOptions,
+    handle_missing_values,
     store_category,
     validate_creator_document_column,
 )
@@ -141,6 +143,14 @@ class ChromaVectorStoreCreator:
         column_filter=util.create_type_filer(knext.string()),
     )
 
+    missing_value_handling = knext.EnumParameter(
+        "Handle missing values in the document column",
+        """Define whether missing values in the document column should be skipped or whether the 
+        node execution should fail on missing values.""",
+        MissingValueHandlingOptions.SkipRow.name,
+        MissingValueHandlingOptions,
+    )
+
     def configure(
         self,
         ctx: knext.ConfigurationContext,
@@ -161,6 +171,19 @@ class ChromaVectorStoreCreator:
         input_table: knext.Table,
     ) -> ChromaVectorstorePortObject:
         df = input_table.to_pandas()
+
+
+        # Skip rows with missing values if "SkipRow" option is selected
+        # or fail execution if "Fail" is selected and there are missing documents
+        missing_value_handling_setting = MissingValueHandlingOptions[
+            self.missing_value_handling
+        ]
+
+        df = handle_missing_values(
+            df,
+            self.document_column,
+            missing_value_handling_setting,
+        )
 
         documents = [Document(page_content=text) for text in df[self.document_column]]
         db = Chroma.from_documents(

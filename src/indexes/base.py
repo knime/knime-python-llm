@@ -35,6 +35,55 @@ store_category = knext.category(
 )
 
 
+class MissingValueHandlingOptions(knext.EnumParameterOptions):
+    SkipRow = (
+        "Skip rows",
+        "Rows with missing values will be ignored.",
+    )
+    Fail = (
+        "Fail",
+        "This node will fail during the execution.",
+    )
+
+def skip_missing_values(df: pd.DataFrame, col_name: str):
+    # Drops rows with missing values
+    df_cleaned = df.dropna(subset=[col_name], how="any")
+    n_skipped_rows = len(df) - len(df_cleaned)
+
+    if n_skipped_rows > 0:
+        LOGGER.info(
+            f"{n_skipped_rows} / {len(df)} rows are skipped."
+        )
+
+    return df_cleaned
+
+def handle_missing_values(
+    df: pd.DataFrame,
+    document_column: str,
+    missing_value_handling_setting: MissingValueHandlingOptions,
+):
+    # Drops rows if SkipRow option is selected, otherwise fails
+    # if there are any missing documents in the document column (=Fail option is selected)
+    if (
+        missing_value_handling_setting == MissingValueHandlingOptions.SkipRow
+        and df.isna().any().any()
+    ):
+        df = skip_missing_values(df, document_column)
+    else:
+        if df.isna().any().any():
+            raise knext.InvalidParametersError(
+                f"""There are missing documents in the document column. See row ID 
+                <{df[df[document_column].isnull()].index.tolist()[0]}> for the 
+                first row that contains a missing document."""
+            )
+
+    if df.empty:
+        raise knext.InvalidParametersError(
+            f"""All rows are skipped due to missing documents."""
+        )
+
+    return df
+
 class VectorstorePortObjectSpec(AIPortObjectSpec):
     """Marker interface for vector store specs. Used to define the most generic vector store PortType."""
 
@@ -321,7 +370,7 @@ class VectorStoreRetriever:
             output_table.append(df)
 
         return output_table
-
+    
     def _create_column_list(self, vectorstore_spec) -> list[knext.Column]:
         result_columns = [
             knext.Column(

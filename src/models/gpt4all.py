@@ -31,33 +31,135 @@ gpt4all_category = knext.category(
 )
 
 
-# TODO: Add more configuration options https://python.langchain.com/docs/modules/model_io/models/llms/integrations/gpt4all
-@knext.parameter_group(label="GPT4All Settings")
+@knext.parameter_group(label="Model Usage")
 class GPT4AllInputSettings:
+
     local_path = knext.StringParameter(
         label="Model path",
         description="Path to the pre-trained GPT4All model file eg. my/path/model.bin.",
         default_value="",
     )
 
+    n_threads = knext.IntParameter(
+        label="Thread Count",
+        description="""Number of CPU threads used by GPT4All. Default is 0, then the number of threads 
+        are determined automatically. 
+        """,
+        default_value=0,
+        min_value=0,
+        max_value=64,
+        is_advanced=True,
+    )
+
+
+@knext.parameter_group(label="Model Parameters")
+class GPT4AllModelParameterSettings:
+
+    temperature = knext.DoubleParameter(
+        label="Temperature",
+        description="""
+        Adjust the temperature parameter to control the randomness of generated text. 
+        Higher values (e.g., 0.8) make the output more diverse but potentially less coherent, while lower values (e.g., 0.2) 
+        make it more focused and deterministic..
+        """,
+        default_value=0.2,
+        min_value=0.1,
+        max_value=1.0,
+    )
+
+    max_token = knext.IntParameter(
+        label="Maximum Response Length (token)",
+        description="""Sets the maximum number of tokens the model will generate.""",
+        default_value=256,
+        min_value=1,
+        max_value=1024,
+    )
+
+    top_k = knext.IntParameter(
+        label="Top-k sampling",
+        description="""
+        Set the "k" value to limit the vocabulary used during text generation. Smaller values (e.g., 10) restrict the choices 
+        to the most probable words, while larger values (e.g., 50) allow for more variety.
+        """,
+        default_value=20,
+        min_value=1,
+        is_advanced=True,
+    )
+
+    top_p = knext.DoubleParameter(
+        label="Top-p sampling",
+        description="""When you set a high 'top-p' value, like 0.9, it means the model can choose words from the top 90% most
+        likely words in the list. This makes the response more focused and deterministic because it's selecting from a smaller 
+        pool of very likely words.""",
+        default_value=0.8,
+        min_value=0.1,
+        max_value=1,
+        is_advanced=True,
+    )
+
 
 class GPT4AllLLMPortObjectSpec(LLMPortObjectSpec):
-    def __init__(self, local_path) -> None:
+    def __init__(
+        self,
+        local_path,
+        n_threads,
+        temperature,
+        top_k,
+        top_p,
+        max_token,
+    ) -> None:
         super().__init__()
         self._local_path = local_path
+        self._n_threads = n_threads
+        self._temperature = temperature
+        self._top_k = top_k
+        self._top_p = top_p
+        self._max_token = max_token
 
     @property
     def local_path(self):
         return self._local_path
 
+    @property
+    def n_threads(self):
+        return self._n_threads
+
+    @property
+    def temperature(self):
+        return self._temperature
+
+    @property
+    def top_p(self):
+        return self._top_p
+
+    @property
+    def top_k(self):
+        return self._top_k
+
+    @property
+    def max_token(self):
+        return self._max_token
+
     def serialize(self) -> dict:
         return {
             "local_path": self._local_path,
+            "n_threads": self._n_threads,
+            "temperature": self._temperature,
+            "top_p": self._top_p,
+            "top_k": self._top_p,
+            "max_token": self._max_token,
         }
 
     @classmethod
     def deserialize(cls, data: dict):
-        return cls(data["local_path"])
+        return cls(
+            data["local_path"],
+            data["n_threads"],
+            data["temperature"],
+            data["top_p"],
+            data["top_k"],
+            data["max_token"],
+        )
 
 
 class GPT4AllLLMPortObject(LLMPortObject):
@@ -65,7 +167,14 @@ class GPT4AllLLMPortObject(LLMPortObject):
         super().__init__(spec)
 
     def create_model(self, ctx):
-        return GPT4All(model=self.spec._local_path)
+        return GPT4All(
+            model=self.spec._local_path,
+            n_threads=None,
+            temp=self.spec.temperature,
+            top_p=self.spec.top_p,
+            top_k=self.spec.top_k,
+            n_predict=self.spec.max_token,
+        )
 
 
 gpt4all_llm_port_type = knext.port_type(
@@ -96,13 +205,29 @@ class GPT4AllLLMConnector:
     """
 
     settings = GPT4AllInputSettings()
+    params = GPT4AllModelParameterSettings()
 
     def configure(self, ctx: knext.ConfigurationContext) -> GPT4AllLLMPortObjectSpec:
-        return GPT4AllLLMPortObjectSpec(self.settings.local_path)
+
+        if not self.settings.local_path:
+            raise knext.InvalidParametersError("Path to local model is missing")
+
+        return self.create_spec()
 
     def execute(self, ctx: knext.ExecutionContext) -> GPT4AllLLMPortObject:
-        return GPT4AllLLMPortObject(
-            GPT4AllLLMPortObjectSpec(local_path=self.settings.local_path)
+        return GPT4AllLLMPortObject(self.create_spec())
+
+    def create_spec(self) -> GPT4AllLLMPortObjectSpec:
+
+        n_threads = None if self.settings.n_threads == 0 else self.settings.n_threads
+
+        return GPT4AllLLMPortObjectSpec(
+            local_path=self.settings.local_path,
+            n_threads=n_threads,
+            temperature=self.params.temperature,
+            top_p=self.params.top_p,
+            top_k=self.params.top_k,
+            max_token=self.params.max_token,
         )
 
 

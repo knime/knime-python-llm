@@ -18,7 +18,7 @@ model_category = knext.category(
 )
 
 
-@knext.parameter_group(label="Model Settings")
+@knext.parameter_group(label="Model Parameters")
 class GeneralSettings:
     temperature = knext.DoubleParameter(
         label="Temperature",

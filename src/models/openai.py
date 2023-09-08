@@ -589,6 +589,10 @@ class OpenAILLMConnector:
         ctx: knext.ConfigurationContext,
         openai_auth_spec: OpenAIAuthenticationPortObjectSpec,
     ) -> OpenAILLMPortObjectSpec:
+
+        if hasattr(openai_auth_spec, "api_type"):
+            raise knext.InvalidParametersError("Use Azure Model Connectors")
+
         openai_auth_spec.validate_context(ctx)
         return self.create_spec(openai_auth_spec)
 
@@ -659,6 +663,10 @@ class OpenAIChatModelConnector:
         ctx: knext.ConfigurationContext,
         openai_auth_spec: OpenAIAuthenticationPortObjectSpec,
     ) -> OpenAIChatModelPortObjectSpec:
+
+        if hasattr(openai_auth_spec, "api_type"):
+            raise knext.InvalidParametersError("Use Azure Model Connectors")
+
         openai_auth_spec.validate_context(ctx)
         return self.create_spec(openai_auth_spec)
 
@@ -725,6 +733,10 @@ class OpenAIEmbeddingsConnector:
         ctx: knext.ConfigurationContext,
         openai_auth_spec: OpenAIAuthenticationPortObjectSpec,
     ) -> OpenAIEmbeddingsPortObjectSpec:
+
+        if hasattr(openai_auth_spec, "api_type"):
+            raise knext.InvalidParametersError("Use Azure Model Connectors")
+
         openai_auth_spec.validate_context(ctx)
         return self.create_spec(openai_auth_spec)
 

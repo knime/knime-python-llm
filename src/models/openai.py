@@ -42,15 +42,29 @@ LOGGER = logging.getLogger(__name__)
 # @knext.parameter_group(label="Model Settings") -- Imported
 class OpenAIGeneralSettings(GeneralSettings):
     max_tokens = knext.IntParameter(
-        label="Max tokens",
+        label="Maximum Response Length (token)",
         description="""
         The maximum number of tokens to generate.
 
         The token count of your prompt plus 
         max_tokens cannot exceed the model's context length.
         """,
-        default_value=50,
+        default_value=200,
         min_value=1,
+    )
+
+    # Altered from GeneralSettings because OpenAI has temperatures going up to 2
+    temperature = knext.DoubleParameter(
+        label="Temperature",
+        description="""
+        Sampling temperature to use, between 0.0 and 2.0. 
+        Higher values means the model will take more risks. 
+        Try 0.9 for more creative applications, and 0 for ones with a well-defined answer.
+        It is generally recommend altering this or top_p but not both.
+        """,
+        default_value=0.2,
+        min_value=0.0,
+        max_value=2.0,
     )
 
     n = knext.IntParameter(
@@ -63,20 +77,6 @@ class OpenAIGeneralSettings(GeneralSettings):
         default_value=1,
         min_value=1,
         is_advanced=True,
-    )
-
-    max_tokens = knext.IntParameter(
-        label="Max tokens",
-        description="""
-        The maximum number of tokens to generate in the completion.
-
-        The token count of your prompt plus 
-        max_tokens cannot exceed the model's context length.
-
-        Max token limits per models can be found [here](https://platform.openai.com/docs/models/overview).
-        """,
-        default_value=50,
-        min_value=0,
     )
 
 

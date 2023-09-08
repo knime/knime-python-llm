@@ -374,6 +374,34 @@ azure_openai_embeddings_port_type = knext.port_type(
     AzureOpenAIEmbeddingsPortObjectSpec,
 )
 
+
+@knext.parameter_group(label="Azure Connection")
+class AzureSettings:
+    api_base = knext.StringParameter(
+        label="Azure Resource Endpoint",
+        description="""The Azure OpenAi endpoint: https://<myResource>.openai.azure.com/.
+        """,
+        default_value="",
+    )
+
+    api_version = knext.StringParameter(
+        label="Azure API Version",
+        description="""The API version you want to use. Note that the latest API versions could support more functionality such
+        as function calling. Find the avilable api versions here:
+        [API versions](https://learn.microsoft.com/en-us/azure/ai-services/openai/reference#completions)""",
+        default_value="2023-07-01-preview",
+    )
+
+
+@knext.parameter_group(label="Azure Deployment")
+class AzureDeploymentSettings:
+    deployment_name = knext.StringParameter(
+        label="Deployment name",
+        description="""The name of the deployed model to use. Find the deployed models on the [Azure AI Studio](https://oai.azure.com).""",
+        default_value="",
+    )
+
+
 # == Nodes ==
 
 
@@ -393,17 +421,15 @@ class AzureOpenAIAuthenticator:
     Authenticates the Azure OpenAI API key against the the Cognitive Services account.
 
     This node provides the authentication for all Azure OpenAI models.
-    It allows you to select the credentials that contain a valid Azure OpenAI API key in their *password* field (the *username* is ignored).
-    Credentials can be set on the workflow level or created inside the workflow e.g. with the [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
+    It allows you to select the credentials that contain a valid Azure OpenAI API keys in their *password* field (the *username* is ignored).
+    Credentials can be set on the workflow level or created inside the workflow e.g. with the 
+    [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
     and fed into this node via flow variable.
 
-    When this node is run, it validates the Azure OpenAI key by sending a request to get your active model deployments.
+    To find your Azure OpenAI API key, navigate to your Azure OpenAI Resource on the [Azure Portal](https://portal.azure.com/) and copy the key and endpoint from
+    'Resource Management - Keys and Endpoints'.
 
-    You can your API key on the [Azure Portal](https://portal.azure.com) under 'Resource Management - Keys and Endpoints'.
-
-    The Azure Subscription ID and Endpoint can be found on the [Azure Portal](https://portal.azure.com) at 'Overview'
-
-    """
+    [Available API versions](https://learn.microsoft.com/en-us/azure/ai-services/openai/reference#completions)""",
 
     credentials_settings = CredentialsSettings(
         label="Azure OpenAI API Key",
@@ -412,20 +438,7 @@ class AzureOpenAIAuthenticator:
         """,
     )
 
-    api_base = knext.StringParameter(
-        label="Azure Resource Endpoint",
-        description="""The Azure OpenAi endpoint: https://<myResource>.openai.azure.com/.
-        """,
-        default_value="https://knime-ai-assistant.openai.azure.com/",
-    )
-
-    api_version = knext.StringParameter(
-        label="Azure API Version",
-        description="""The API version you want to use. Note that the latest API versions can support newer models.
-        Find the avilable api versions here:
-        [API versions](https://learn.microsoft.com/en-us/azure/ai-services/openai/reference#completions)""",
-        default_value="2023-07-01-preview",
-    )
+    azure_connection = AzureSettings()
 
     def configure(
         self, ctx: knext.ConfigurationContext
@@ -436,7 +449,7 @@ class AzureOpenAIAuthenticator:
         if not self.credentials_settings.credentials_param:
             raise knext.InvalidParametersError("Credentials not selected.")
 
-        if not self.api_base:
+        if not self.azure_connection.api_base:
             raise knext.InvalidParametersError("API endpoint not provided.")
 
         spec = self.create_spec()
@@ -451,8 +464,8 @@ class AzureOpenAIAuthenticator:
                 api_key=ctx.get_credentials(
                     self.credentials_settings.credentials_param
                 ).password,
-                api_version=self.api_version,
-                api_base=self.api_base,
+                api_version=self.azure_connection.api_version,
+                api_base=self.azure_connection.api_base,
                 api_type="azure",
             )
 
@@ -470,8 +483,8 @@ class AzureOpenAIAuthenticator:
     def create_spec(self) -> AzureOpenAIAuthenticationPortObjectSpec:
         return AzureOpenAIAuthenticationPortObjectSpec(
             self.credentials_settings.credentials_param,
-            self.api_base,
-            self.api_version,
+            self.azure_connection.api_base,
+            self.azure_connection.api_version,
             "azure",
         )
 
@@ -497,19 +510,14 @@ class AzureOpenAILLMConnector:
     Connects to an Azure OpenAI Large Language Model.
 
     This node establishes a connection with an Azure OpenAI Large Language Model (LLM).
-    After successfully authenticating using the **Azure OpenAI Authenticator node**, you can select an LLM from a predefined list
-    or explore advanced options to get a list of all models available for your API key (including fine-tunes).
-    Note that only models compatible with Azure OpenAI's Completions API will work with this node (unfortunately this information is not available programmatically).
+    After successfully authenticating using the **Azure OpenAI Authenticator node**, enter the deployment name of
+    the model you want to use. You can find the models on the [Azure AI Studio](https://oai.azure.com) at
+    'Management - Deployments'. Note that only models compatible with Azure OpenAI's Completions API will work with this node.
 
-    If you a looking for gpt-3.5-turbo (the model behind ChatGPT) or gpt-4, check out the **Azure / OpenAI Chat Model Connector** node.
+    If you a looking for gpt-3.5-turbo (the model behind ChatGPT) or gpt-4, check out the **Azure OpenAI Chat Model Connector** node.
     """
 
-    deployment_name = knext.StringParameter(
-        label="Deployment name",
-        description="""The name of the deployed model to use.""",
-        default_value="",
-    )
-
+    deployment = AzureDeploymentSettings()
     model_settings = OpenAIGeneralSettings()
 
     def configure(
@@ -521,12 +529,12 @@ class AzureOpenAILLMConnector:
         if not hasattr(azure_auth_spec, "api_type"):
             raise knext.InvalidParametersError("Use OpenAI Model Connectors")
 
-        if not self.deployment_name:
+        if not self.deployment.deployment_name:
             raise knext.InvalidParametersError("No deployment name provided")
 
         azure_auth_spec.validate_context(ctx)
 
-        return self.create_spec(azure_auth_spec, self.deployment_name)
+        return self.create_spec(azure_auth_spec, self.deployment.deployment_name)
 
     def execute(
         self,
@@ -539,7 +547,7 @@ class AzureOpenAILLMConnector:
         # Could be done with an AD Bearer token
 
         return AzureOpenAILLMPortObject(
-            self.create_spec(azure_auth_port.spec, self.deployment_name)
+            self.create_spec(azure_auth_port.spec, self.deployment.deployment_name)
         )
 
     def create_spec(
@@ -580,19 +588,16 @@ class AzureOpenAIChatModelConnector:
     """
     Connects to an Azure OpenAI Chat Model.
 
-    This node establishes a connection with an Azure OpenAI Large Language Model (LLM).
-    After successfully authenticating using the **Azure OpenAI Authenticator node**, you can select an LLM from a predefined list
-    or explore advanced options to get a list of all models available for your API key (including fine-tunes).
-    Note that only models compatible with Azure OpenAI's Completions API will work with this node (unfortunately this information is not available programmatically).
+    This node establishes a connection with an Azure OpenAI Chat Model.
+    After successfully authenticating using the **Azure OpenAI Authenticator node**, enter the deployment name of
+    the model you want to use. You can find the models on the [Azure AI Studio](https://oai.azure.com) at
+    'Management - Deployments'.
 
-    If you a looking for gpt-3.5-turbo (the model behind ChatGPT) or gpt-4, check out the **Azure / OpenAI Chat Model Connector** node.
+    Note that chat models can also be used as LLMs because they are actually a subcategory of LLMs that are optimized
+    for chat-like applications.
     """
 
-    deployment_name = knext.StringParameter(
-        label="Model deployment name",
-        description="""The name of the deployed model to use.""",
-    )
-
+    deployment = AzureDeploymentSettings()
     model_settings = OpenAIGeneralSettings()
 
     def configure(
@@ -604,12 +609,12 @@ class AzureOpenAIChatModelConnector:
         if not hasattr(azure_openai_auth_spec, "api_type"):
             raise knext.InvalidParametersError("Use OpenAI Model Connectors")
 
-        if not self.deployment_name:
+        if not self.deployment.deployment_name:
             raise knext.InvalidParametersError("No model name provided.")
 
         azure_openai_auth_spec.validate_context(ctx)
 
-        return self.create_spec(azure_openai_auth_spec, self.deployment_name)
+        return self.create_spec(azure_openai_auth_spec, self.deployment.deployment_name)
 
     def execute(
         self,
@@ -621,7 +626,9 @@ class AzureOpenAIChatModelConnector:
         # AzureChatOpenAI() does not verify the deployment_name until it is prompted
 
         return AzureOpenAIChatModelPortObject(
-            self.create_spec(azure_openai_auth_port.spec, self.deployment_name)
+            self.create_spec(
+                azure_openai_auth_port.spec, self.deployment.deployment_name
+            )
         )
 
     def create_spec(
@@ -663,13 +670,11 @@ class AzureOpenAIEmbeddingsConnector:
     Connects to an Azure OpenAI Embedding Model.
 
     This node establishes a connection with an Azure OpenAI Embeddings Model. After successfully authenticating
-    using the **Azure OpenAI Authenticator node**, you need to provide the name of a deployed embeddings model.
+    using the **Azure OpenAI Authenticator node**, you need to provide the name of a deployed embeddings model
+    found on the [Azure AI Studio](https://oai.azure.com).
     """
 
-    deployment_name = knext.StringParameter(
-        label="Model deployment name",
-        description="""The name of the deployed model to use.""",
-    )
+    deployment = AzureDeploymentSettings()
 
     def configure(
         self,
@@ -680,12 +685,12 @@ class AzureOpenAIEmbeddingsConnector:
         if not hasattr(azure_openai_auth_spec, "api_type"):
             raise knext.InvalidParametersError("Use OpenAI Model Connectors")
 
-        if not self.deployment_name:
+        if not self.deployment.deployment_name:
             raise knext.InvalidParametersError("No deployment name provided")
 
         azure_openai_auth_spec.validate_context(ctx)
 
-        return self.create_spec(azure_openai_auth_spec, self.deployment_name)
+        return self.create_spec(azure_openai_auth_spec, self.deployment.deployment_name)
 
     def execute(
         self,
@@ -697,7 +702,9 @@ class AzureOpenAIEmbeddingsConnector:
         # OpenAIEmeddings() does not verify the deployment_name unless it is prompted
 
         return AzureOpenAIEmbeddingsPortObject(
-            self.create_spec(azure_openai_auth_port.spec, self.deployment_name)
+            self.create_spec(
+                azure_openai_auth_port.spec, self.deployment.deployment_name
+            )
         )
 
     def create_spec(

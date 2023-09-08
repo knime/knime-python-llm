@@ -37,7 +37,8 @@ class GPT4AllInputSettings:
 
     local_path = knext.StringParameter(
         label="Model path",
-        description="Path to the pre-trained GPT4All model file eg. my/path/model.bin.",
+        description="""Path to the pre-trained GPT4All model file eg. my/path/model.bin.
+        You can find the folder through seetings -> application in the gpt4all desktop application""",
         default_value="",
     )
 
@@ -57,10 +58,14 @@ class GPT4AllModelParameterSettings(GeneralSettings):
 
     max_token = knext.IntParameter(
         label="Maximum Response Length (token)",
-        description="""Sets the maximum number of tokens the model will generate.""",
-        default_value=256,
+        description="""
+        The maximum number of tokens to generate.
+
+        The token count of your prompt plus 
+        max_tokens cannot exceed the model's context length.
+        """,
+        default_value=250,
         min_value=1,
-        max_value=1024,
     )
 
     temperature = knext.DoubleParameter(

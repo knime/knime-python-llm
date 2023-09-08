@@ -34,7 +34,7 @@ class GeneralSettings:
     )
 
     top_p = knext.DoubleParameter(
-        label="top_p",
+        label="Top-p sampling",
         description="""
         An alternative to sampling with temperature, 
         where the model considers the results of the tokens (words) 

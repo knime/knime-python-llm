@@ -8,6 +8,7 @@ from .base import (
     model_category,
     EmbeddingsPortObjectSpec,
     EmbeddingsPortObject,
+    GeneralSettings,
 )
 
 # Langchain imports
@@ -52,20 +53,7 @@ class GPT4AllInputSettings:
     )
 
 
-@knext.parameter_group(label="Model Parameters")
-class GPT4AllModelParameterSettings:
-
-    temperature = knext.DoubleParameter(
-        label="Temperature",
-        description="""
-        Adjust the temperature parameter to control the randomness of generated text. 
-        Higher values (e.g., 0.8) make the output more diverse but potentially less coherent, while lower values (e.g., 0.2) 
-        make it more focused and deterministic..
-        """,
-        default_value=0.2,
-        min_value=0.1,
-        max_value=1.0,
-    )
+class GPT4AllModelParameterSettings(GeneralSettings):
 
     max_token = knext.IntParameter(
         label="Maximum Response Length (token)",
@@ -73,6 +61,19 @@ class GPT4AllModelParameterSettings:
         default_value=256,
         min_value=1,
         max_value=1024,
+    )
+
+    temperature = knext.DoubleParameter(
+        label="Temperature",
+        description="""
+        Sampling temperature to use, between 0.0 and 1.0. 
+        Higher values means the model will take more risks. 
+        Try 0.9 for more creative applications, and 0 for ones with a well-defined answer.
+        It is generally recommend altering this or top_p but not both.
+        """,
+        default_value=0.2,
+        min_value=0.0,
+        max_value=1.0,
     )
 
     top_k = knext.IntParameter(
@@ -83,17 +84,6 @@ class GPT4AllModelParameterSettings:
         """,
         default_value=20,
         min_value=1,
-        is_advanced=True,
-    )
-
-    top_p = knext.DoubleParameter(
-        label="Top-p sampling",
-        description="""When you set a high 'top-p' value, like 0.9, it means the model can choose words from the top 90% most
-        likely words in the list. This makes the response more focused and deterministic because it's selecting from a smaller 
-        pool of very likely words.""",
-        default_value=0.8,
-        min_value=0.1,
-        max_value=1,
         is_advanced=True,
     )
 

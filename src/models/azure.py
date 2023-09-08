@@ -68,6 +68,10 @@ class AzureOpenAIAuthenticationPortObjectSpec(OpenAIAuthenticationPortObjectSpec
         self._api_type = api_type
 
     @property
+    def credentials(self) -> str:
+        return super().credentials
+
+    @property
     def api_base(self) -> str:
         return self._api_base
 
@@ -81,10 +85,10 @@ class AzureOpenAIAuthenticationPortObjectSpec(OpenAIAuthenticationPortObjectSpec
 
     def serialize(self) -> dict:
         return {
-            "credentials": super().serialize,
-            "api_base": self.api_base,
-            "api_version": self.api_version,
-            "api_type": self.api_type,
+            **super().serialize(),
+            "api_base": self._api_base,
+            "api_version": self._api_version,
+            "api_type": self._api_type,
         }
 
     @classmethod
@@ -134,7 +138,7 @@ class AzureOpenAIModelPortObjectSpec(AIPortObjectSpec):
         return self._azure_auth_spec._api_type
 
     def validate_context(self, ctx: knext.ConfigurationContext):
-        self._azure_auth_spec.validate_context(ctx)
+        super().validate_context(ctx)
 
     def serialize(self) -> dict:
         return {
@@ -226,7 +230,7 @@ class AzureOpenAILLMPortObject(LLMPortObject):
             openai_api_version=self.spec.api_version,
             openai_api_base=self.spec.api_base,
             openai_api_type=self.spec.api_type,
-            deployment_name=self.spec.deployment_name,
+            deployment_name=self.spec.model,
             temperature=self.spec.temperature,
             top_p=self.spec.top_p,
             max_tokens=self.spec.max_tokens,
@@ -305,6 +309,9 @@ class AzureOpenAIChatModelPortObject(ChatModelPortObject):
         super().__init__(spec)
 
     def create_model(self, ctx):
+
+        model_kwargs = {"top_p": self.spec.top_p}
+
         return AzureChatOpenAI(
             openai_api_key=ctx.get_credentials(self.spec.credentials).password,
             openai_api_version=self.spec.api_version,
@@ -312,7 +319,7 @@ class AzureOpenAIChatModelPortObject(ChatModelPortObject):
             openai_api_type=self.spec.api_type,
             deployment_name=self.spec.deployment_name,
             temperature=self.spec.temperature,
-            top_p=self.spec.top_p,
+            model_kwargs=model_kwargs,
             max_tokens=self.spec.max_tokens,
             n=self.spec.n,
         )
@@ -356,7 +363,7 @@ class AzureOpenAIEmbeddingsPortObject(EmbeddingsPortObject):
             openai_api_base=self.spec.api_base,
             openai_api_version=self.spec.api_version,
             openai_api_type=self.spec.api_type,
-            deployment=self.spec.model,
+            deployment=self.spec.deployment_name,
             chunk_size=16,  # Azure only supports 16 docs per request
         )
 
@@ -500,6 +507,7 @@ class AzureOpenAILLMConnector:
     deployment_name = knext.StringParameter(
         label="Deployment name",
         description="""The name of the deployed model to use.""",
+        default_value="",
     )
 
     model_settings = OpenAIGeneralSettings()
@@ -509,15 +517,14 @@ class AzureOpenAILLMConnector:
         ctx: knext.ConfigurationContext,
         azure_auth_spec: AzureOpenAIAuthenticationPortObjectSpec,
     ) -> AzureOpenAILLMPortObjectSpec:
-        azure_auth_spec.validate_context(ctx)
 
-        if azure_auth_spec.api_type != "azure":
-            raise knext.InvalidParametersError(
-                "OpenAI Authentication provided. Please use the OpenAI LLM Connector instead of Azure OpenAI LLM Connector"
-            )
+        if not hasattr(azure_auth_spec, "api_type"):
+            raise knext.InvalidParametersError("Use OpenAI Model Connectors")
 
         if not self.deployment_name:
             raise knext.InvalidParametersError("No deployment name provided")
+
+        azure_auth_spec.validate_context(ctx)
 
         return self.create_spec(azure_auth_spec, self.deployment_name)
 
@@ -525,7 +532,7 @@ class AzureOpenAILLMConnector:
         self,
         ctx: knext.ExecutionContext,
         azure_auth_port: AzureOpenAIAuthenticationPortObject,
-    ) -> OpenAILLMPortObject:
+    ) -> AzureOpenAILLMPortObject:
 
         # We know that the API key is correct from the authenticator, but a call to
         # AzureOpenAI() does not verify the deployment_name unless it is prompted
@@ -539,7 +546,7 @@ class AzureOpenAILLMConnector:
         self,
         azure_auth_spec: AzureOpenAIAuthenticationPortObjectSpec,
         deployment_name: str,
-    ) -> OpenAILLMPortObjectSpec:
+    ) -> AzureOpenAILLMPortObjectSpec:
 
         LOGGER.info(f"Connecting to {deployment_name}...")
 
@@ -562,12 +569,12 @@ class AzureOpenAILLMConnector:
 @knext.input_port(
     "Azure OpenAI Authentication",
     "Validated authentication for Azure OpenAI.",
-    openai_authentication_port_type,
+    azure_openai_authentication_port_type,
 )
 @knext.output_port(
     "Azure OpenAI Chat Model",
     "Configured Azure OpenAI Chat Model connection.",
-    openai_chat_port_type,
+    azure_openai_chat_port_type,
 )
 class AzureOpenAIChatModelConnector:
     """
@@ -591,44 +598,41 @@ class AzureOpenAIChatModelConnector:
     def configure(
         self,
         ctx: knext.ConfigurationContext,
-        openai_auth_spec: OpenAIAuthenticationPortObjectSpec,
-    ) -> OpenAIChatModelPortObjectSpec:
+        azure_openai_auth_spec: AzureOpenAIAuthenticationPortObjectSpec,
+    ) -> AzureOpenAIChatModelPortObjectSpec:
 
-        LOGGER.info(openai_auth_spec.api_type)
+        if not hasattr(azure_openai_auth_spec, "api_type"):
+            raise knext.InvalidParametersError("Use OpenAI Model Connectors")
 
-        if openai_auth_spec.api_type != "azure":
-            raise knext.InvalidParametersError(
-                "OpenAI Authentication provided. Please use the OpenAI Chat Model Connector"
-            )
         if not self.deployment_name:
             raise knext.InvalidParametersError("No model name provided.")
 
-        openai_auth_spec.validate_context(ctx)
+        azure_openai_auth_spec.validate_context(ctx)
 
-        return self.create_spec(openai_auth_spec, self.deployment_name)
+        return self.create_spec(azure_openai_auth_spec, self.deployment_name)
 
     def execute(
         self,
         ctx: knext.ExecutionContext,
-        azure_openai_auth_port: OpenAIAuthenticationPortObject,
-    ) -> OpenAIChatModelPortObject:
+        azure_openai_auth_port: AzureOpenAIAuthenticationPortObject,
+    ) -> AzureOpenAIChatModelPortObject:
 
         # We know that the API key is correct from the authenticator, but a call to
         # AzureChatOpenAI() does not verify the deployment_name until it is prompted
 
-        return OpenAIChatModelPortObject(
+        return AzureOpenAIChatModelPortObject(
             self.create_spec(azure_openai_auth_port.spec, self.deployment_name)
         )
 
     def create_spec(
         self,
-        azure_openai_auth_spec: OpenAIAuthenticationPortObjectSpec,
+        azure_openai_auth_spec: AzureOpenAIAuthenticationPortObjectSpec,
         deployment_name: str,
-    ) -> OpenAIChatModelPortObjectSpec:
+    ) -> AzureOpenAIChatModelPortObjectSpec:
 
         LOGGER.info(f"Connecting to {deployment_name}...")
 
-        return OpenAIChatModelPortObjectSpec(
+        return AzureOpenAIChatModelPortObjectSpec(
             azure_openai_auth_spec,
             deployment_name,
             self.model_settings.temperature,
@@ -647,12 +651,12 @@ class AzureOpenAIChatModelConnector:
 @knext.input_port(
     "Azure OpenAI Authentication",
     "Validated authentication for Azure OpenAI.",
-    openai_authentication_port_type,
+    azure_openai_authentication_port_type,
 )
 @knext.output_port(
     "Azure OpenAI Embeddings Model",
     "Configured Azure OpenAI Embeddings Model connection.",
-    openai_embeddings_port_type,
+    azure_openai_embeddings_port_type,
 )
 class AzureOpenAIEmbeddingsConnector:
     """
@@ -670,38 +674,40 @@ class AzureOpenAIEmbeddingsConnector:
     def configure(
         self,
         ctx: knext.ConfigurationContext,
-        openai_auth_spec: OpenAIAuthenticationPortObjectSpec,
-    ) -> OpenAIEmbeddingsPortObjectSpec:
+        azure_openai_auth_spec: AzureOpenAIAuthenticationPortObjectSpec,
+    ) -> AzureOpenAIEmbeddingsPortObjectSpec:
 
-        if openai_auth_spec.api_type != "azure":
-            raise knext.InvalidParametersError("Use Azure Chat Model Connector.")
+        if not hasattr(azure_openai_auth_spec, "api_type"):
+            raise knext.InvalidParametersError("Use OpenAI Model Connectors")
 
         if not self.deployment_name:
             raise knext.InvalidParametersError("No deployment name provided")
 
-        openai_auth_spec.validate_context(ctx)
+        azure_openai_auth_spec.validate_context(ctx)
 
-        return self.create_spec(openai_auth_spec, self.deployment_name)
+        return self.create_spec(azure_openai_auth_spec, self.deployment_name)
 
     def execute(
         self,
         ctx: knext.ExecutionContext,
-        openai_auth_port: OpenAIAuthenticationPortObject,
-    ) -> OpenAIEmbeddingsPortObject:
+        azure_openai_auth_port: AzureOpenAIAuthenticationPortObject,
+    ) -> AzureOpenAIEmbeddingsPortObject:
 
         # We know that the API key is correct from the authenticator, but a call to
         # OpenAIEmeddings() does not verify the deployment_name unless it is prompted
 
-        return OpenAIEmbeddingsPortObject(
-            self.create_spec(openai_auth_port.spec, self.deployment_name)
+        return AzureOpenAIEmbeddingsPortObject(
+            self.create_spec(azure_openai_auth_port.spec, self.deployment_name)
         )
 
     def create_spec(
         self,
-        azure_openai_auth_spec: OpenAIAuthenticationPortObjectSpec,
+        azure_openai_auth_spec: AzureOpenAIAuthenticationPortObjectSpec,
         deployment_name: str,
-    ) -> OpenAIEmbeddingsPortObjectSpec:
+    ) -> AzureOpenAIEmbeddingsPortObjectSpec:
 
         LOGGER.info(f"Connecting to {deployment_name}...")
 
-        return OpenAIEmbeddingsPortObjectSpec(azure_openai_auth_spec, deployment_name)
+        return AzureOpenAIEmbeddingsPortObjectSpec(
+            azure_openai_auth_spec, deployment_name
+        )

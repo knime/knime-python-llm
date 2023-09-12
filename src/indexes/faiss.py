@@ -103,11 +103,12 @@ class FAISSVectorStoreCreator:
         "Handle missing values in the document column",
         """Define whether missing values in the document column should be skipped or whether the 
         node execution should fail on missing values.""",
-        MissingValueHandlingOptions.SkipRow.name,
-        MissingValueHandlingOptions,
-        since_version="5.2.0"
+        default_value=lambda v: MissingValueHandlingOptions.Fail.name
+        if v < knext.Version(5, 2, 0)
+        else MissingValueHandlingOptions.SkipRow.name,
+        enum=MissingValueHandlingOptions,
+        since_version="5.2.0",
     )
-
 
     metadata_settings = MetadataSettings(since_version="5.2.0")
 

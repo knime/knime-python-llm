@@ -147,9 +147,11 @@ class ChromaVectorStoreCreator:
         "Handle missing values in the document column",
         """Define whether missing values in the document column should be skipped or whether the 
         node execution should fail on missing values.""",
-        MissingValueHandlingOptions.SkipRow.name,
-        MissingValueHandlingOptions,
-        since_version="5.2.0"
+        default_value=lambda v: MissingValueHandlingOptions.Fail.name
+        if v < knext.Version(5, 2, 0)
+        else MissingValueHandlingOptions.SkipRow.name,
+        enum=MissingValueHandlingOptions,
+        since_version="5.2.0",
     )
 
     def configure(
@@ -172,7 +174,6 @@ class ChromaVectorStoreCreator:
         input_table: knext.Table,
     ) -> ChromaVectorstorePortObject:
         df = input_table.to_pandas()
-
 
         # Skip rows with missing values if "SkipRow" option is selected
         # or fail execution if "Fail" is selected and there are missing documents

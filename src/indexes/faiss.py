@@ -105,6 +105,7 @@ class FAISSVectorStoreCreator:
         node execution should fail on missing values.""",
         MissingValueHandlingOptions.SkipRow.name,
         MissingValueHandlingOptions,
+        since_version="5.2.0"
     )
 
 

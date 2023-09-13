@@ -273,17 +273,13 @@ class OpenAIModelPortObjectSpec(AIPortObjectSpec):
         self._credentials.validate_context(ctx)
 
     def serialize(self) -> dict:
-        return {
-            "credentials": self._credentials.credentials,
-        }
+        return self._credentials.serialize()
 
     @classmethod
     def deserialize_credentials_spec(
         cls, data: dict
     ) -> OpenAIAuthenticationPortObjectSpec:
-        return OpenAIAuthenticationPortObjectSpec(
-            data["credentials"],
-        )
+        return OpenAIAuthenticationPortObjectSpec.deserialize(data)
 
 
 class OpenAILLMPortObjectSpec(OpenAIModelPortObjectSpec, LLMPortObjectSpec):
@@ -613,7 +609,7 @@ class OpenAILLMConnector:
                 self.input_settings.default_model_name
             ].label
 
-        LOGGER.info(f"Connecting to {model_name}...")
+        LOGGER.info(f"Selected model: {model_name}")
 
         return OpenAILLMPortObjectSpec(
             openai_auth_spec,
@@ -687,7 +683,7 @@ class OpenAIChatModelConnector:
                 self.input_settings.model_name
             ].label
 
-        LOGGER.info(f"Connecting to {model_name}...")
+        LOGGER.info(f"Selected model: {model_name}")
 
         return OpenAIChatModelPortObjectSpec(
             openai_auth_spec,
@@ -717,7 +713,7 @@ class OpenAIChatModelConnector:
 )
 class OpenAIEmbeddingsConnector:
     """
-    Connects to an OpenAI Embedding Model.
+    Connects to an OpenAI Embeddings Model.
 
     This node establishes a connection with an OpenAI Embeddings Model. After successfully authenticating
     using the **OpenAI Authenticator node**, you can select an embedding model from a predefined list.
@@ -757,6 +753,6 @@ class OpenAIEmbeddingsConnector:
                 self.input_settings.model_name
             ].label
 
-        LOGGER.info(f"Connecting to {model_name}...")
+        LOGGER.info(f"Selected model: {model_name}")
 
         return OpenAIEmbeddingsPortObjectSpec(openai_auth_spec, model_name)

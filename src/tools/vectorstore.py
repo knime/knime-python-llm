@@ -17,31 +17,39 @@ from indexes.base import (
     vector_store_port_type,
 )
 from .base import ToolListPortObject, ToolListPortObjectSpec, tool_list_port_type
-from langchain.chains import RetrievalQA
+from langchain.chains import RetrievalQA, RetrievalQAWithSourcesChain
 from langchain.tools import Tool, StructuredTool
 import os
 from pydantic import BaseModel, Field
 
 
 class VectorToolPortObjectSpec(ToolPortObjectSpec):
-    def __init__(self, name, description, top_k) -> None:
+    def __init__(self, name, description, top_k, retrieve_sources) -> None:
         super().__init__(name, description)
         self._top_k = top_k
+        self._retrieve_sources = retrieve_sources
 
     @property
     def top_k(self):
         return self._top_k
+
+    @property
+    def retrieve_sources(self):
+        return self._retrieve_sources
 
     def serialize(self) -> dict:
         return {
             "name": self._name,
             "description": self._description,
             "top_k": self._top_k,
+            "retrieve_sources": self._retrieve_sources,
         }
 
     @classmethod
     def deserialize(cls, data: dict):
-        return cls(data["name"], data["description"], data["top_k"])
+        return cls(
+            data["name"], data["description"], data["top_k"], data["retrieve_sources"]
+        )
 
 
 class VectorToolPortObject(ToolPortObject):
@@ -67,21 +75,46 @@ class VectorToolPortObject(ToolPortObject):
     def vectorstore(self) -> VectorstorePortObject:
         return self._vectorstore
 
-    def _create_function(self, ctx) -> RetrievalQA:
+    def _create_function(self, ctx, retrieve_sources=False):
+        """
+        This method creates a function based on the given context and retrieval sources flag.
+
+        For RetrievalQA and RetrievalQAWithSourcesChain, the default input keys are "query" and "question" respectively.
+        The input key for RetrievalQA can be modified, but not for RetrievalQAWithSourcesChain.
+        Therefore, RetrievalQA's input key is set to "question" to ensure uniformity in function calls within the create method.
+        """
+
         llm = self._llm.create_model(ctx)
         vectorstore = self._vectorstore.load_store(ctx)
+
+        if retrieve_sources:
+            return RetrievalQAWithSourcesChain.from_chain_type(
+                llm=llm,
+                retriever=vectorstore.as_retriever(
+                    search_kwargs={"k": self.spec.top_k}
+                ),
+                verbose=True,
+                return_source_documents=True,
+            )
 
         return RetrievalQA.from_chain_type(
             llm=llm,
             chain_type="stuff",
             retriever=vectorstore.as_retriever(search_kwargs={"k": self.spec.top_k}),
+            input_key="question",
         )
 
     def create(self, ctx) -> StructuredTool:
+        """
+        RetrievalQAWithSourcesChain and RetrievalQA are called via their __call__ method
+        instead of run() to enable returning multiple outputs (answer, source, and source_documents).
+        """
+        retrieval_chain = self._create_function(ctx, self.spec.retrieve_sources)
+
         return StructuredTool(
             name=self.spec.serialize()["name"],
             args_schema=RetrievalQAToolSchema,
-            func=self._create_function(ctx).run,
+            func=lambda query: retrieval_chain({"question": query}),
             description=self.spec.serialize()["description"],
         )
 
@@ -98,10 +131,11 @@ class FilestoreVectorToolPortObjectSpec(VectorToolPortObjectSpec):
         name,
         description,
         top_k,
+        retrieve_sources,
         llm_spec: LLMPortObjectSpec,
         vectorstore_spec: VectorstorePortObjectSpec,
     ) -> None:
-        super().__init__(name, description, top_k)
+        super().__init__(name, description, top_k, retrieve_sources)
         self._llm_spec = llm_spec
         self._llm_type = get_port_type_for_spec_type(type(llm_spec))
         self._vectorstore_spec = vectorstore_spec
@@ -146,7 +180,12 @@ class FilestoreVectorToolPortObjectSpec(VectorToolPortObjectSpec):
             data["vectorstore_spec"]
         )
         return cls(
-            data["name"], data["description"], data["top_k"], llm_spec, vectorstore_spec
+            data["name"],
+            data["description"],
+            data["top_k"],
+            data["retrieve_sources"],
+            llm_spec,
+            vectorstore_spec,
         )
 
 
@@ -235,6 +274,12 @@ class VectorStoreToTool:
         is_advanced=True,
     )
 
+    retrieve_sources = knext.BoolParameter(
+        "Retrieve sources from documents",
+        "Whether or not to retrieve document sources if provided.",
+        default_value=False,
+    )
+
     def configure(
         self,
         ctx: knext.ConfigurationContext,
@@ -252,6 +297,7 @@ class VectorStoreToTool:
             self.tool_name,
             self.tool_description,
             self.top_k,
+            self.retrieve_sources,
             llm_spec,
             vectorstore_spec,
         )

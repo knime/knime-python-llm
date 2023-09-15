@@ -56,7 +56,7 @@ class CredentialsSettings:
 
 @knext.parameter_group(label="Prompt Settings")
 class ChatMessageSettings:
-    message = knext.StringParameter(
+    message = knext.MultilineStringParameter(
         "Message", "The (next) message to send to the agent."
     )
 

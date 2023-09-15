@@ -81,7 +81,7 @@ class OpenAIFunctionsAgentCreator:
     
     Note that these agents do not support tools with whitespaces in their names.
     """
-    system_message = knext.StringParameter(
+    system_message = knext.MultilineStringParameter(
         "System message",
         "Defines the general behavior of the agent.",
         "You are a helpful AI assistant.",

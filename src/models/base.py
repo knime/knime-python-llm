@@ -321,7 +321,7 @@ class ChatModelPrompter:
 
     """
 
-    system_message = knext.StringParameter(
+    system_message = knext.MultilineStringParameter(
         "System Message",
         """
         The first message given to the model describing how it should behave.
@@ -332,7 +332,7 @@ class ChatModelPrompter:
         default_value="",
     )
 
-    chat_message = knext.StringParameter(
+    chat_message = knext.MultilineStringParameter(
         "Message",
         "The (next) message that will be added to the conversation",
         default_value="",

@@ -50,6 +50,7 @@ class GPT4AllInputSettings:
         min_value=0,
         max_value=64,
         is_advanced=True,
+        since_version="5.2.0",
     )
 
 
@@ -198,7 +199,7 @@ class GPT4AllLLMConnector:
     """
 
     settings = GPT4AllInputSettings()
-    params = GPT4AllModelParameterSettings()
+    params = GPT4AllModelParameterSettings(since_version="5.2.0")
 
     def configure(self, ctx: knext.ConfigurationContext) -> GPT4AllLLMPortObjectSpec:
         if not self.settings.local_path:

@@ -409,12 +409,12 @@ class AzureOpenAIAuthenticator:
 )
 @knext.input_port(
     "Azure OpenAI Authentication",
-    "Validated authentication for OpenAI.",
+    "Validated authentication for Azure OpenAI.",
     azure_openai_authentication_port_type,
 )
 @knext.output_port(
     "Azure OpenAI LLM",
-    "Configured OpenAI LLM connection.",
+    "Configured Azure OpenAI LLM connection.",
     azure_openai_llm_port_type,
 )
 class AzureOpenAILLMConnector:

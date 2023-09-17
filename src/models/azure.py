@@ -99,7 +99,9 @@ azure_openai_authentication_port_type = knext.port_type(
 
 
 class AzureOpenAIModelPortObjectSpec(OpenAIModelPortObjectSpec):
-    def __init__(self, azure_auth_spec=AzureOpenAIAuthenticationPortObjectSpec) -> None:
+    def __init__(
+        self, azure_auth_spec: AzureOpenAIAuthenticationPortObjectSpec
+    ) -> None:
         self._credentials = azure_auth_spec
 
     @property

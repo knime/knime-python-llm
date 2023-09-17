@@ -465,8 +465,6 @@ class AzureOpenAILLMConnector:
         azure_auth_spec: AzureOpenAIAuthenticationPortObjectSpec,
         deployment_name: str,
     ) -> AzureOpenAILLMPortObjectSpec:
-        LOGGER.info(f"Selected model: {deployment_name}")
-
         return AzureOpenAILLMPortObjectSpec(
             azure_auth_spec,
             deployment_name,
@@ -543,8 +541,6 @@ class AzureOpenAIChatModelConnector:
         azure_openai_auth_spec: AzureOpenAIAuthenticationPortObjectSpec,
         deployment_name: str,
     ) -> AzureOpenAIChatModelPortObjectSpec:
-        LOGGER.info(f"Selected model: {deployment_name}")
-
         return AzureOpenAIChatModelPortObjectSpec(
             azure_openai_auth_spec,
             deployment_name,
@@ -616,8 +612,6 @@ class AzureOpenAIEmbeddingsConnector:
         azure_openai_auth_spec: AzureOpenAIAuthenticationPortObjectSpec,
         deployment_name: str,
     ) -> AzureOpenAIEmbeddingsPortObjectSpec:
-        LOGGER.info(f"Selected model: {deployment_name}")
-
         return AzureOpenAIEmbeddingsPortObjectSpec(
             azure_openai_auth_spec, deployment_name
         )

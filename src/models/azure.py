@@ -28,9 +28,9 @@ from socket import gaierror
 openai_icon = "icons/azure_logo.png"
 azure_openai_category = knext.category(
     path=model_category,
-    level_id="openai",
+    level_id="azure",
     name="Azure OpenAI",
-    description="",
+    description="Contains nodes for connecting to Azure OpenAI.",
     icon=openai_icon,
 )
 

@@ -363,70 +363,16 @@ openai_llm_port_type = knext.port_type(
 )
 
 
-class OpenAIChatModelPortObjectSpec(OpenAIModelPortObjectSpec, ChatModelPortObjectSpec):
-    def __init__(
-        self,
-        credentials: OpenAIAuthenticationPortObjectSpec,
-        model_name,
-        temperature,
-        top_p,
-        max_tokens,
-        n,
-    ) -> None:
-        super().__init__(credentials)
-        self._model = model_name
-        self._temperature = temperature
-        self._top_p = top_p
-        self._max_tokens = max_tokens
-        self._n = n
-
-    @property
-    def model(self):
-        return self._model
-
-    @property
-    def temperature(self):
-        return self._temperature
-
-    @property
-    def top_p(self):
-        return self._top_p
-
-    @property
-    def max_tokens(self):
-        return self._max_tokens
-
-    @property
-    def n(self):
-        return self._n
-
-    def serialize(self) -> dict:
-        return {
-            **super().serialize(),
-            "model": self._model,
-            "temperature": self._temperature,
-            "top_p": self._top_p,
-            "max_tokens": self._max_tokens,
-            "n": self._n,
-        }
-
-    @classmethod
-    def deserialize(cls, data: dict):
-        return cls(
-            cls.deserialize_credentials_spec(data),
-            data["model"],
-            data["temperature"],
-            data["top_p"],
-            data["max_tokens"],
-            data["n"],
-        )
+class OpenAIChatModelPortObjectSpec(OpenAILLMPortObjectSpec, ChatModelPortObjectSpec):
+    """Spec of an OpenAI chat model."""
 
 
 class OpenAIChatModelPortObject(ChatModelPortObject):
-    def __init__(self, spec: OpenAIChatModelPortObjectSpec):
-        super().__init__(spec)
+    @property
+    def spec(self) -> OpenAIChatModelPortObjectSpec:
+        return super().spec
 
-    def create_model(self, ctx):
+    def create_model(self, ctx: knext.ExecutionContext) -> ChatOpenAI:
         return ChatOpenAI(
             openai_api_key=ctx.get_credentials(self.spec.credentials).password,
             model=self.spec.model,

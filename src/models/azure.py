@@ -182,40 +182,12 @@ azure_openai_llm_port_type = knext.port_type(
 
 
 class AzureOpenAIChatModelPortObjectSpec(
-    AzureOpenAIModelPortObjectSpec, OpenAIChatModelPortObjectSpec
+    AzureOpenAILLMPortObjectSpec, OpenAIChatModelPortObjectSpec
 ):
-    def __init__(
-        self,
-        credentials: AzureOpenAIAuthenticationPortObjectSpec,
-        model_name: str,
-        temperature: float,
-        top_p: float,
-        max_tokens: int,
-        n: int,
-    ) -> None:
-        super().__init__(credentials)
-        self._model = model_name
-        self._temperature = temperature
-        self._top_p = top_p
-        self._max_tokens = max_tokens
-        self._n = n
-
-    @classmethod
-    def deserialize(cls, data: dict):
-        return cls(
-            AzureOpenAIAuthenticationPortObjectSpec.deserialize(data),
-            data["model"],
-            data["temperature"],
-            data["top_p"],
-            data["max_tokens"],
-            data["n"],
-        )
+    """Spec of an Azure OpenAI chat model."""
 
 
 class AzureOpenAIChatModelPortObject(OpenAIChatModelPortObject):
-    def __init__(self, spec: AzureOpenAIChatModelPortObjectSpec):
-        super().__init__(spec)
-
     @property
     def spec(self) -> AzureOpenAIChatModelPortObjectSpec:
         return super().spec

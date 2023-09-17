@@ -25,13 +25,13 @@ from langchain.embeddings.openai import OpenAIEmbeddings
 import openai
 from socket import gaierror
 
-openai_icon = "icons/azure_logo.png"
+azure_icon = "icons/azure_logo.png"
 azure_openai_category = knext.category(
     path=model_category,
     level_id="azure",
     name="Azure OpenAI",
     description="Contains nodes for connecting to Azure OpenAI.",
-    icon=openai_icon,
+    icon=azure_icon,
 )
 
 # This logger is necessary
@@ -308,7 +308,7 @@ class AzureDeploymentSettings:
 @knext.node(
     "Azure OpenAI Authenticator",
     knext.NodeType.SOURCE,
-    openai_icon,
+    azure_icon,
     category=azure_openai_category,
 )
 @knext.output_port(
@@ -392,7 +392,7 @@ class AzureOpenAIAuthenticator:
 @knext.node(
     "Azure OpenAI LLM Connector",
     knext.NodeType.SOURCE,
-    openai_icon,
+    azure_icon,
     category=azure_openai_category,
 )
 @knext.input_port(
@@ -471,7 +471,7 @@ class AzureOpenAILLMConnector:
 @knext.node(
     "Azure OpenAI Chat Model Connector",
     knext.NodeType.SOURCE,
-    openai_icon,
+    azure_icon,
     category=azure_openai_category,
 )
 @knext.input_port(
@@ -552,7 +552,7 @@ class AzureOpenAIChatModelConnector:
 @knext.node(
     "Azure OpenAI Embeddings Connector",
     knext.NodeType.SOURCE,
-    openai_icon,
+    azure_icon,
     category=azure_openai_category,
 )
 @knext.input_port(

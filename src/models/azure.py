@@ -127,11 +127,11 @@ class AzureOpenAILLMPortObjectSpec(
     def __init__(
         self,
         credentials: AzureOpenAIAuthenticationPortObjectSpec,
-        model_name,
-        temperature,
-        top_p,
-        max_tokens,
-        n,
+        model_name: str,
+        temperature: float,
+        top_p: float,
+        max_tokens: int,
+        n: int,
     ) -> None:
         super().__init__(credentials)
         self._model = model_name
@@ -156,8 +156,11 @@ class AzureOpenAILLMPortObject(OpenAILLMPortObject):
     def __init__(self, spec: AzureOpenAILLMPortObjectSpec):
         super().__init__(spec)
 
-    def create_model(self, ctx):
+    @property
+    def spec(self) -> AzureOpenAILLMPortObjectSpec:
+        return super().spec
 
+    def create_model(self, ctx: knext.ExecutionContext) -> AzureOpenAI:
         return AzureOpenAI(
             openai_api_key=ctx.get_credentials(self.spec.credentials).password,
             openai_api_version=self.spec.api_version,
@@ -182,11 +185,11 @@ class AzureOpenAIChatModelPortObjectSpec(
     def __init__(
         self,
         credentials: AzureOpenAIAuthenticationPortObjectSpec,
-        model_name,
-        temperature,
-        top_p,
-        max_tokens,
-        n,
+        model_name: str,
+        temperature: float,
+        top_p: float,
+        max_tokens: int,
+        n: int,
     ) -> None:
         super().__init__(credentials)
         self._model = model_name
@@ -211,8 +214,11 @@ class AzureOpenAIChatModelPortObject(OpenAIChatModelPortObject):
     def __init__(self, spec: AzureOpenAIChatModelPortObjectSpec):
         super().__init__(spec)
 
-    def create_model(self, ctx):
+    @property
+    def spec(self) -> AzureOpenAIChatModelPortObjectSpec:
+        return super().spec
 
+    def create_model(self, ctx: knext.ExecutionContext) -> AzureChatOpenAI:
         model_kwargs = {"top_p": self.spec.top_p}
 
         return AzureChatOpenAI(
@@ -256,7 +262,11 @@ class AzureOpenAIEmbeddingsPortObject(OpenAIEmbeddingsPortObject):
     def __init__(self, spec: AzureOpenAIEmbeddingsPortObjectSpec):
         super().__init__(spec)
 
-    def create_model(self, ctx):
+    @property
+    def spec(self) -> AzureOpenAIEmbeddingsPortObjectSpec:
+        return super().spec
+
+    def create_model(self, ctx: knext.ExecutionContext) -> OpenAIEmbeddings:
         return OpenAIEmbeddings(
             openai_api_key=ctx.get_credentials(self.spec.credentials).password,
             openai_api_base=self.spec.api_base,
@@ -425,7 +435,6 @@ class AzureOpenAILLMConnector:
         ctx: knext.ConfigurationContext,
         azure_auth_spec: AzureOpenAIAuthenticationPortObjectSpec,
     ) -> AzureOpenAILLMPortObjectSpec:
-
         if not hasattr(azure_auth_spec, "api_type"):
             raise knext.InvalidParametersError("Use OpenAI Model Connectors")
 
@@ -441,7 +450,6 @@ class AzureOpenAILLMConnector:
         ctx: knext.ExecutionContext,
         azure_auth_port: AzureOpenAIAuthenticationPortObject,
     ) -> AzureOpenAILLMPortObject:
-
         # We know that the API key is correct from the authenticator, but a call to
         # AzureOpenAI() does not verify the deployment_name unless it is prompted
         # Could be done with an AD Bearer token
@@ -455,7 +463,6 @@ class AzureOpenAILLMConnector:
         azure_auth_spec: AzureOpenAIAuthenticationPortObjectSpec,
         deployment_name: str,
     ) -> AzureOpenAILLMPortObjectSpec:
-
         LOGGER.info(f"Selected model: {deployment_name}")
 
         return AzureOpenAILLMPortObjectSpec(
@@ -505,7 +512,6 @@ class AzureOpenAIChatModelConnector:
         ctx: knext.ConfigurationContext,
         azure_openai_auth_spec: AzureOpenAIAuthenticationPortObjectSpec,
     ) -> AzureOpenAIChatModelPortObjectSpec:
-
         if not hasattr(azure_openai_auth_spec, "api_type"):
             raise knext.InvalidParametersError("Use OpenAI Model Connectors")
 
@@ -521,7 +527,6 @@ class AzureOpenAIChatModelConnector:
         ctx: knext.ExecutionContext,
         azure_openai_auth_port: AzureOpenAIAuthenticationPortObject,
     ) -> AzureOpenAIChatModelPortObject:
-
         # We know that the API key is correct from the authenticator, but a call to
         # AzureChatOpenAI() does not verify the deployment_name until it is prompted
 
@@ -536,7 +541,6 @@ class AzureOpenAIChatModelConnector:
         azure_openai_auth_spec: AzureOpenAIAuthenticationPortObjectSpec,
         deployment_name: str,
     ) -> AzureOpenAIChatModelPortObjectSpec:
-
         LOGGER.info(f"Selected model: {deployment_name}")
 
         return AzureOpenAIChatModelPortObjectSpec(
@@ -581,7 +585,6 @@ class AzureOpenAIEmbeddingsConnector:
         ctx: knext.ConfigurationContext,
         azure_openai_auth_spec: AzureOpenAIAuthenticationPortObjectSpec,
     ) -> AzureOpenAIEmbeddingsPortObjectSpec:
-
         if not hasattr(azure_openai_auth_spec, "api_type"):
             raise knext.InvalidParametersError("Use OpenAI Model Connectors")
 
@@ -597,7 +600,6 @@ class AzureOpenAIEmbeddingsConnector:
         ctx: knext.ExecutionContext,
         azure_openai_auth_port: AzureOpenAIAuthenticationPortObject,
     ) -> AzureOpenAIEmbeddingsPortObject:
-
         # We know that the API key is correct from the authenticator, but a call to
         # OpenAIEmeddings() does not verify the deployment_name unless it is prompted
 
@@ -612,7 +614,6 @@ class AzureOpenAIEmbeddingsConnector:
         azure_openai_auth_spec: AzureOpenAIAuthenticationPortObjectSpec,
         deployment_name: str,
     ) -> AzureOpenAIEmbeddingsPortObjectSpec:
-
         LOGGER.info(f"Selected model: {deployment_name}")
 
         return AzureOpenAIEmbeddingsPortObjectSpec(

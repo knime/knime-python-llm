@@ -39,6 +39,7 @@ LOGGER = logging.getLogger(__name__)
 
 # == SETTINGS ==
 
+
 # @knext.parameter_group(label="Model Settings") -- Imported
 class OpenAIGeneralSettings(GeneralSettings):
     max_tokens = knext.IntParameter(
@@ -286,11 +287,11 @@ class OpenAILLMPortObjectSpec(OpenAIModelPortObjectSpec, LLMPortObjectSpec):
     def __init__(
         self,
         credentials: OpenAIAuthenticationPortObjectSpec,
-        model_name,
-        temperature,
-        top_p,
-        max_tokens,
-        n,
+        model_name: str,
+        temperature: float,
+        top_p: float,
+        max_tokens: int,
+        n: int,
     ) -> None:
         super().__init__(credentials)
         self._model = model_name
@@ -300,23 +301,23 @@ class OpenAILLMPortObjectSpec(OpenAIModelPortObjectSpec, LLMPortObjectSpec):
         self._n = n
 
     @property
-    def model(self):
+    def model(self) -> str:
         return self._model
 
     @property
-    def temperature(self):
+    def temperature(self) -> float:
         return self._temperature
 
     @property
-    def top_p(self):
+    def top_p(self) -> float:
         return self._top_p
 
     @property
-    def max_tokens(self):
+    def max_tokens(self) -> int:
         return self._max_tokens
 
     @property
-    def n(self):
+    def n(self) -> int:
         return self._n
 
     def serialize(self) -> dict:
@@ -342,10 +343,11 @@ class OpenAILLMPortObjectSpec(OpenAIModelPortObjectSpec, LLMPortObjectSpec):
 
 
 class OpenAILLMPortObject(LLMPortObject):
-    def __init__(self, spec: OpenAILLMPortObjectSpec):
-        super().__init__(spec)
+    @property
+    def spec(self) -> OpenAILLMPortObjectSpec:
+        return super().spec
 
-    def create_model(self, ctx):
+    def create_model(self, ctx) -> OpenAI:
         return OpenAI(
             openai_api_key=ctx.get_credentials(self.spec.credentials).password,
             model=self.spec.model,
@@ -585,7 +587,6 @@ class OpenAILLMConnector:
         ctx: knext.ConfigurationContext,
         openai_auth_spec: OpenAIAuthenticationPortObjectSpec,
     ) -> OpenAILLMPortObjectSpec:
-
         if hasattr(openai_auth_spec, "api_type"):
             raise knext.InvalidParametersError("Use Azure Model Connectors")
 
@@ -659,7 +660,6 @@ class OpenAIChatModelConnector:
         ctx: knext.ConfigurationContext,
         openai_auth_spec: OpenAIAuthenticationPortObjectSpec,
     ) -> OpenAIChatModelPortObjectSpec:
-
         if hasattr(openai_auth_spec, "api_type"):
             raise knext.InvalidParametersError("Use Azure Model Connectors")
 
@@ -729,7 +729,6 @@ class OpenAIEmbeddingsConnector:
         ctx: knext.ConfigurationContext,
         openai_auth_spec: OpenAIAuthenticationPortObjectSpec,
     ) -> OpenAIEmbeddingsPortObjectSpec:
-
         if hasattr(openai_auth_spec, "api_type"):
             raise knext.InvalidParametersError("Use Azure Model Connectors")
 

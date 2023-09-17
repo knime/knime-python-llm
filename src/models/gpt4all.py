@@ -34,7 +34,6 @@ gpt4all_category = knext.category(
 
 @knext.parameter_group(label="Model Usage")
 class GPT4AllInputSettings:
-
     local_path = knext.StringParameter(
         label="Model path",
         description="""Path to the pre-trained GPT4All model file eg. my/path/model.bin.
@@ -55,7 +54,6 @@ class GPT4AllInputSettings:
 
 
 class GPT4AllModelParameterSettings(GeneralSettings):
-
     max_token = knext.IntParameter(
         label="Maximum Response Length (token)",
         description="""
@@ -203,7 +201,6 @@ class GPT4AllLLMConnector:
     params = GPT4AllModelParameterSettings()
 
     def configure(self, ctx: knext.ConfigurationContext) -> GPT4AllLLMPortObjectSpec:
-
         if not self.settings.local_path:
             raise knext.InvalidParametersError("Path to local model is missing")
 
@@ -213,7 +210,6 @@ class GPT4AllLLMConnector:
         return GPT4AllLLMPortObject(self.create_spec())
 
     def create_spec(self) -> GPT4AllLLMPortObjectSpec:
-
         n_threads = None if self.settings.n_threads == 0 else self.settings.n_threads
 
         return GPT4AllLLMPortObjectSpec(

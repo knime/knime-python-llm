@@ -1,6 +1,6 @@
 # KNIME / own imports
 import knime.extension as knext
-from .base import model_category, CredentialsSettings, LLMPortObjectSpec
+from .base import model_category, CredentialsSettings
 
 from models.openai import (
     OpenAIGeneralSettings,

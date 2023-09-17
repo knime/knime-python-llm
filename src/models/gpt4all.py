@@ -164,7 +164,7 @@ class GPT4AllLLMPortObject(LLMPortObject):
     def create_model(self, ctx) -> GPT4All:
         return GPT4All(
             model=self.spec.local_path,
-            n_threads=None,
+            n_threads=self.spec.n_threads,
             temp=self.spec.temperature,
             top_p=self.spec.top_p,
             top_k=self.spec.top_k,

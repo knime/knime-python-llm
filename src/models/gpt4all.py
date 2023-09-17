@@ -95,12 +95,12 @@ class GPT4AllModelParameterSettings(GeneralSettings):
 class GPT4AllLLMPortObjectSpec(LLMPortObjectSpec):
     def __init__(
         self,
-        local_path,
-        n_threads,
-        temperature,
-        top_k,
-        top_p,
-        max_token,
+        local_path: str,
+        n_threads: int,
+        temperature: float,
+        top_k: int,
+        top_p: float,
+        max_token: int,
     ) -> None:
         super().__init__()
         self._local_path = local_path
@@ -111,27 +111,27 @@ class GPT4AllLLMPortObjectSpec(LLMPortObjectSpec):
         self._max_token = max_token
 
     @property
-    def local_path(self):
+    def local_path(self) -> str:
         return self._local_path
 
     @property
-    def n_threads(self):
+    def n_threads(self) -> int:
         return self._n_threads
 
     @property
-    def temperature(self):
+    def temperature(self) -> float:
         return self._temperature
 
     @property
-    def top_p(self):
+    def top_p(self) -> float:
         return self._top_p
 
     @property
-    def top_k(self):
+    def top_k(self) -> int:
         return self._top_k
 
     @property
-    def max_token(self):
+    def max_token(self) -> int:
         return self._max_token
 
     def serialize(self) -> dict:
@@ -157,12 +157,13 @@ class GPT4AllLLMPortObjectSpec(LLMPortObjectSpec):
 
 
 class GPT4AllLLMPortObject(LLMPortObject):
-    def __init__(self, spec: GPT4AllLLMPortObjectSpec) -> None:
-        super().__init__(spec)
+    @property
+    def spec(self) -> GPT4AllLLMPortObjectSpec:
+        return super().spec
 
-    def create_model(self, ctx):
+    def create_model(self, ctx) -> GPT4All:
         return GPT4All(
-            model=self.spec._local_path,
+            model=self.spec.local_path,
             n_threads=None,
             temp=self.spec.temperature,
             top_p=self.spec.top_p,

@@ -18,8 +18,9 @@ from indexes.base import (
 )
 from .base import ToolListPortObject, ToolListPortObjectSpec, tool_list_port_type
 from langchain.chains import RetrievalQA
-from langchain.tools import Tool
+from langchain.tools import Tool, StructuredTool
 import os
+from pydantic import BaseModel, Field
 
 
 class VectorToolPortObjectSpec(ToolPortObjectSpec):
@@ -76,12 +77,19 @@ class VectorToolPortObject(ToolPortObject):
             retriever=vectorstore.as_retriever(search_kwargs={"k": self.spec.top_k}),
         )
 
-    def create(self, ctx) -> Tool:
-        return Tool(
+    def create(self, ctx) -> StructuredTool:
+        return StructuredTool(
             name=self.spec.serialize()["name"],
+            args_schema=RetrievalQAToolSchema,
             func=self._create_function(ctx).run,
             description=self.spec.serialize()["description"],
         )
+
+
+class RetrievalQAToolSchema(BaseModel):
+    query: str = Field(
+        description="Should be a detailed search query in natural language to be answered by a retriever."
+    )
 
 
 class FilestoreVectorToolPortObjectSpec(VectorToolPortObjectSpec):

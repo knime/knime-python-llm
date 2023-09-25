@@ -144,11 +144,15 @@ class LLMLoaderInputSettings:
             "text-davinci-003",
             "Can do any language task with better quality, longer output, and consistent instruction-following than the curie, babbage, or ada models.",
         )
+        Gpt35TurboInstruct = (
+            "gpt-3.5-turbo-instruct",
+            "Recommended model for all completion tasks. As capable as text-davinci-003 but faster and lower in cost.",
+        )
 
     default_model_name = knext.EnumParameter(
         "Model ID",
         "Select the OpenAI model ID to be used.",
-        OpenAIModelCompletionsOptions.Ada.name,
+        OpenAIModelCompletionsOptions.Gpt35TurboInstruct.name,
         OpenAIModelCompletionsOptions,
     )
 

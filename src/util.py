@@ -28,7 +28,7 @@ def check_canceled(ctx: knext.ExecutionContext):
 
 
 def pick_default_column(input_table: knext.Schema, ktype: knext.KnimeType) -> str:
-    column = next((c for c in input_table if c.ktype == ktype), None)
+    column = next(reversed([c for c in input_table if c.ktype == ktype]), None)
     if column:
         return column.name
     raise knext.InvalidParametersError(

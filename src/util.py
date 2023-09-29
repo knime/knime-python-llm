@@ -2,7 +2,7 @@ import knime.extension as knext
 from typing import Callable
 
 
-def is_nominal(column):
+def is_nominal(column: knext.Column) -> bool:
     # Filter nominal columns
     return column.ktype == knext.string() or column.ktype == knext.bool_()
 
@@ -22,7 +22,7 @@ main_category = knext.category(
 )
 
 
-def check_canceled(ctx: knext.ExecutionContext):
+def check_canceled(ctx: knext.ExecutionContext) -> None:
     if ctx.is_canceled():
         raise RuntimeError("Execution canceled.")
 
@@ -41,7 +41,7 @@ def check_column(
     column_name: str,
     expected_type: knext.KnimeType,
     column_purpose: str,
-):
+) -> None:
     """
     Raises an InvalidParametersError if a column named column_name is not contained in input_table or has the wrong KnimeType.
     """

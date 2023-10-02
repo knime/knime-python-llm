@@ -107,6 +107,7 @@ class FAISSVectorStoreCreator:
         if v < knext.Version(5, 2, 0)
         else MissingValueHandlingOptions.SkipRow.name,
         enum=MissingValueHandlingOptions,
+        style=knext.EnumParameter.Style.VALUE_SWITCH,
         since_version="5.2.0",
     )
 

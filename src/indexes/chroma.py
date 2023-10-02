@@ -151,6 +151,7 @@ class ChromaVectorStoreCreator:
         if v < knext.Version(5, 2, 0)
         else MissingValueHandlingOptions.SkipRow.name,
         enum=MissingValueHandlingOptions,
+        style=knext.EnumParameter.Style.VALUE_SWITCH,
         since_version="5.2.0",
     )
 
@@ -188,6 +189,7 @@ class ChromaVectorStoreCreator:
         )
 
         documents = [Document(page_content=text) for text in df[self.document_column]]
+        
         db = Chroma.from_documents(
             documents=documents,
             embedding=embeddings.create_model(ctx),

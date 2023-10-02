@@ -192,17 +192,22 @@ class GPT4AllLLMConnector:
     """
     Connects to a locally installed GPT4All LLM.
 
-    This connector allows you to connect to a LLM that was installed locally with GPT4All. To get started,
-    you need to download a specific model from [GPT4All](https://gpt4all.io/index.html) using the installer.
-    Once you have downloaded the model, specify its file path in the 'Model path' setting to use it.
+    This connector allows you to connect to a local GPT4All LLM. To get started,
+    you need to download a specific model from the [GPT4All](https://gpt4all.io/index.html) model explorer on the website.
+    It is not needed to install the GPT4All software. Once you have downloaded the model, specify its file path in the
+    configuration dialog to use it.
 
-    Models like **Llama 2** have been fine tuned for specific prompt inputs. For best results use the following prompt template
-    when using Llama 2:
+    Some models (e.g. Llama 2) have been fine-tuned for chat applications,
+    so they might behave unexpectedly if their prompts don't follow a chat like structure:
 
-        User: Summarize the following text in one sentence:
-        <text>
-
+        User: <The prompt you want to send to the model>
         Assistant:
+
+    Use the prompt template for the specific model from the
+    [GPT4All model list](https://raw.githubusercontent.com/nomic-ai/gpt4all/main/gpt4all-chat/metadata/models.json)
+    if one is provided.
+
+    The currently supported models are based on GPT-J, LLaMA, MPT, Replit, Falcon and StarCoder.
 
     For more information and detailed instructions on downloading compatible models, please visit the [GPT4All GitHub repository](https://github.com/nomic-ai/gpt4all).
     """

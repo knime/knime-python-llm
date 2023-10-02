@@ -14,7 +14,7 @@ from .base import (
 # Langchain imports
 from langchain.llms import GPT4All
 from langchain.embeddings.base import Embeddings
-from pydantic import root_validator, BaseModel
+from pydantic import root_validator, BaseModel, ValidationError
 from gpt4all import GPT4All as _GPT4All
 import shutil
 import os
@@ -148,11 +148,11 @@ class GPT4AllLLMPortObjectSpec(LLMPortObjectSpec):
     def deserialize(cls, data: dict):
         return cls(
             data["local_path"],
-            data["n_threads"],
-            data["temperature"],
-            data["top_p"],
-            data["top_k"],
-            data["max_token"],
+            data.get("n_threads", None),
+            data.get("temperature", 0.2),
+            data.get("top_p", 0.15),
+            data.get("top_k", 20),
+            data.get("max_token", 250),
         )
 
 
@@ -162,14 +162,22 @@ class GPT4AllLLMPortObject(LLMPortObject):
         return super().spec
 
     def create_model(self, ctx) -> GPT4All:
-        return GPT4All(
-            model=self.spec.local_path,
-            n_threads=self.spec.n_threads,
-            temp=self.spec.temperature,
-            top_p=self.spec.top_p,
-            top_k=self.spec.top_k,
-            n_predict=self.spec.max_token,
-        )
+        try:
+            return GPT4All(
+                model=self.spec.local_path,
+                n_threads=self.spec.n_threads,
+                temp=self.spec.temperature,
+                top_p=self.spec.top_p,
+                top_k=self.spec.top_k,
+                n_predict=self.spec.max_token,
+            )
+        except ValidationError:
+            raise knext.InvalidParametersError(
+                """
+                Could not validate model due to version incompatibility. Please provide a model based on one
+                of the following infrastructures: GPT-J, LLaMA, MPT, Replit, Falcon and StarCoder
+                """
+            )
 
 
 gpt4all_llm_port_type = knext.port_type(
@@ -216,8 +224,15 @@ class GPT4AllLLMConnector:
     params = GPT4AllModelParameterSettings(since_version="5.2.0")
 
     def configure(self, ctx: knext.ConfigurationContext) -> GPT4AllLLMPortObjectSpec:
+        import os
+
         if not self.settings.local_path:
             raise knext.InvalidParametersError("Path to local model is missing")
+
+        if not os.path.isfile(self.settings.local_path):
+            raise knext.InvalidParametersError(
+                f"No file found at path: {self.settings.local_path}"
+            )
 
         return self.create_spec()
 

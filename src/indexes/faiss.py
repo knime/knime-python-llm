@@ -11,6 +11,7 @@ from .base import (
     FilestoreVectorstorePortObjectSpec,
     FilestoreVectorstorePortObject,
     MetadataSettings,
+    get_metadata_columns,
     MissingValueHandlingOptions,
     handle_missing_values,
     store_category,
@@ -126,26 +127,12 @@ class FAISSVectorStoreCreator:
         else:
             self.document_column = util.pick_default_column(input_table, knext.string())
 
-        metadata_cols = self._metadata_columns(input_table)
+        metadata_cols = get_metadata_columns(self, input_table)
 
         return FAISSVectorstorePortObjectSpec(
             embeddings_spec=embeddings_spec,
             metadata_column_names=metadata_cols,
         )
-
-    def _metadata_columns(self, schema: knext.Schema) -> list[str]:
-        # metadata was introduced in 5.1.1 and the parameter is None for older versions
-        if not self.metadata_settings.metadata_columns:
-            return []
-        metadata_columns = [
-            column.name
-            for column in self.metadata_settings.metadata_columns.apply(schema)
-        ]
-        try:
-            metadata_columns.remove(self.document_column)
-        except:
-            pass
-        return metadata_columns
 
     def execute(
         self,
@@ -153,7 +140,7 @@ class FAISSVectorStoreCreator:
         embeddings: EmbeddingsPortObject,
         input_table: knext.Table,
     ) -> FAISSVectorstorePortObject:
-        meta_data_columns = self._metadata_columns(input_table.schema)
+        meta_data_columns = get_metadata_columns(self, input_table.schema)
         document_column = self.document_column
 
         df = input_table[[self.document_column] + meta_data_columns].to_pandas()

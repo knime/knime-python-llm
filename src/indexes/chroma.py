@@ -12,6 +12,8 @@ from .base import (
     VectorstorePortObject,
     FilestoreVectorstorePortObjectSpec,
     FilestoreVectorstorePortObject,
+    MetadataSettings,
+    get_metadata_columns,
     MissingValueHandlingOptions,
     handle_missing_values,
     store_category,
@@ -155,6 +157,8 @@ class ChromaVectorStoreCreator:
         since_version="5.2.0",
     )
 
+    metadata_settings = MetadataSettings(since_version="5.2.0")
+
     def configure(
         self,
         ctx: knext.ConfigurationContext,
@@ -166,7 +170,13 @@ class ChromaVectorStoreCreator:
             validate_creator_document_column(input_table, self.document_column)
         else:
             self.document_column = util.pick_default_column(input_table, knext.string())
-        return LocalChromaVectorstorePortObjectSpec(embeddings_spec)
+
+        metadata_cols = get_metadata_columns(self, input_table)
+
+        return LocalChromaVectorstorePortObjectSpec(
+            embeddings_spec=embeddings_spec,
+            metadata_column_names=metadata_cols,
+        )
 
     def execute(
         self,
@@ -174,7 +184,14 @@ class ChromaVectorStoreCreator:
         embeddings: EmbeddingsPortObject,
         input_table: knext.Table,
     ) -> ChromaVectorstorePortObject:
-        df = input_table.to_pandas()
+        meta_data_columns = get_metadata_columns(self, input_table.schema)
+        document_column = self.document_column
+
+        df = input_table[[self.document_column] + meta_data_columns].to_pandas()
+
+        def to_document(row) -> Document:
+            metadata = {name: row[name] for name in meta_data_columns}
+            return Document(page_content=row[document_column], metadata=metadata)
 
         # Skip rows with missing values if "SkipRow" option is selected
         # or fail execution if "Fail" is selected and there are missing documents
@@ -188,15 +205,15 @@ class ChromaVectorStoreCreator:
             missing_value_handling_setting,
         )
 
-        documents = [Document(page_content=text) for text in df[self.document_column]]
-        
+        documents = df.apply(to_document, axis=1).tolist()
+
         db = Chroma.from_documents(
             documents=documents,
             embedding=embeddings.create_model(ctx),
         )
 
         return LocalChromaVectorstorePortObject(
-            LocalChromaVectorstorePortObjectSpec(embeddings.spec),
+            LocalChromaVectorstorePortObjectSpec(embeddings.spec, meta_data_columns),
             embeddings,
             vectorstore=db,
         )
@@ -254,8 +271,16 @@ class ChromaVectorStoreReader:
         chroma = Chroma(
             self.persist_directory, embeddings_port_object.create_model(ctx)
         )
+
+        document_list = chroma.similarity_search("a", k=1)
+        metadata_keys = (
+            [key for key in document_list[0].metadata] if len(document_list) > 0 else []
+        )
+
         return LocalChromaVectorstorePortObject(
-            LocalChromaVectorstorePortObjectSpec(embeddings_port_object.spec),
+            LocalChromaVectorstorePortObjectSpec(
+                embeddings_port_object.spec, metadata_keys
+            ),
             embeddings_port_object,
             vectorstore=chroma,
         )

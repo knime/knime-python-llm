@@ -248,6 +248,20 @@ class MetadataSettings:
     )
 
 
+def get_metadata_columns(self, schema: knext.Schema) -> list[str]:
+    # metadata was introduced in 5.1.1 and the parameter is None for older versions
+    if not self.metadata_settings.metadata_columns:
+        return []
+    metadata_columns = [
+        column.name for column in self.metadata_settings.metadata_columns.apply(schema)
+    ]
+    try:
+        metadata_columns.remove(self.document_column)
+    except:
+        pass
+    return metadata_columns
+
+
 @knext.node(
     "Vector Store Retriever",
     knext.NodeType.SOURCE,

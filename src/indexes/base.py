@@ -248,18 +248,18 @@ class MetadataSettings:
     )
 
 
-def get_metadata_columns(self, schema: knext.Schema) -> list[str]:
+def get_metadata_columns(
+    metadata_columns, document_column, schema: knext.Schema
+) -> list[str]:
     # metadata was introduced in 5.1.1 and the parameter is None for older versions
-    if not self.metadata_settings.metadata_columns:
+    if not metadata_columns:
         return []
-    metadata_columns = [
-        column.name for column in self.metadata_settings.metadata_columns.apply(schema)
-    ]
+    meta_data_columns = [column.name for column in metadata_columns.apply(schema)]
     try:
-        metadata_columns.remove(self.document_column)
+        meta_data_columns.remove(document_column)
     except:
         pass
-    return metadata_columns
+    return meta_data_columns
 
 
 @knext.node(

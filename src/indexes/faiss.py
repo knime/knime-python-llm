@@ -127,8 +127,9 @@ class FAISSVectorStoreCreator:
         else:
             self.document_column = util.pick_default_column(input_table, knext.string())
 
-        metadata_cols = get_metadata_columns(self, input_table)
-
+        metadata_cols = get_metadata_columns(
+            self.metadata_settings.metadata_columns, self.document_column, input_table
+        )
         return FAISSVectorstorePortObjectSpec(
             embeddings_spec=embeddings_spec,
             metadata_column_names=metadata_cols,
@@ -140,14 +141,20 @@ class FAISSVectorStoreCreator:
         embeddings: EmbeddingsPortObject,
         input_table: knext.Table,
     ) -> FAISSVectorstorePortObject:
-        meta_data_columns = get_metadata_columns(self, input_table.schema)
+        meta_data_columns = get_metadata_columns(
+            self.metadata_settings.metadata_columns,
+            self.document_column,
+            input_table.schema,
+        )
         document_column = self.document_column
 
-        df = input_table[[self.document_column] + meta_data_columns].to_pandas()
+        df = input_table[[document_column] + meta_data_columns].to_pandas()
 
         def to_document(row) -> Document:
             metadata = {name: row[name] for name in meta_data_columns}
             return Document(page_content=row[document_column], metadata=metadata)
+
+        documents = df.apply(to_document, axis=1).tolist()
 
         # Skip rows with missing values if "SkipRow" option is selected
         # or fail execution if "Fail" is selected and there are missing documents
@@ -158,8 +165,6 @@ class FAISSVectorStoreCreator:
         df = handle_missing_values(
             df, self.document_column, missing_value_handling_setting, ctx
         )
-
-        documents = df.apply(to_document, axis=1).tolist()
 
         db = FAISS.from_documents(
             documents=documents,

@@ -3,7 +3,7 @@ from models.openai import (
     OpenAIChatModelPortObject,
     OpenAIChatModelPortObjectSpec,
     openai_chat_port_type,
-    openai_icon
+    openai_icon,
 )
 import knime.extension as knext
 from .base import AgentPortObject, AgentPortObjectSpec
@@ -60,7 +60,9 @@ openai_functions_agent_port_type = knext.port_type(
 )
 
 
-@knext.node("OpenAI Functions Agent Creator", knext.NodeType.SOURCE, openai_icon, agent_category)
+@knext.node(
+    "OpenAI Functions Agent Creator", knext.NodeType.SOURCE, openai_icon, agent_category
+)
 @knext.input_port(
     "OpenAI Chat Model",
     "The OpenAI chat model used by the agent to make decisions.",
@@ -78,13 +80,15 @@ class OpenAIFunctionsAgentCreator:
     This node creates an agent that is based on OpenAI chat models that support function calling and can be primed with a custom system message.
 
     In general an agent is an LLM that is configured to dynamically pick a tool from a set of tools to best answer the user prompts.
-    
+
     Note that these agents do not support tools with whitespaces in their names.
     """
+
     system_message = knext.MultilineStringParameter(
         "System message",
         "Defines the general behavior of the agent.",
-        "You are a helpful AI assistant.",
+        """You are a helpful AI assistant. Never solely rely on your own knowledge, 
+        but use tools to get information before answering. """,
     )
 
     def configure(self, ctx, chat_model_spec: OpenAIChatModelPortObjectSpec):

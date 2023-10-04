@@ -239,13 +239,15 @@ class ChromaVectorStoreReader:
     """
     Reads a Chroma vector store created with LangChain from a local path.
 
-    This node allows you to read a Chroma vector store created with [LangChain](https://python.langchain.com/docs/integrations/vectorstores/chroma) from a local path. It combines the Chroma vector store with
-    an input embeddings model that is used in downstream nodes, such as the **Vector Store Retriever node**. The embeddings
-    model is responsible for embedding documents, enabling the vector store to retrieve documents that share similar embeddings,
-    facilitating tasks like document clustering or recommendation systems.
+    This node allows you to read a Chroma vector store created with [LangChain](https://python.langchain.com/docs/integrations/vectorstores/chroma) from a local path. If you want to create a new vector store, use the Chroma Vector Store Creator instead.
 
-    If the vector store was created with LangChain outside of KNIME, the embeddings model is not stored with the vectorstore,
-    so it has to be provided separately (<Provider> Embeddings Connector Node).
+    A vector store is a data structure or storage mechanism that stores a collection of numerical vectors
+    along with their corresponding documents. The vector store enables efficient storage, retrieval, and similarity
+    search operations on these vectors and their associated data.
+
+    If the vector store was created with LangChain in Python, the embeddings model is not stored with the vectorstore, so it has to be provided separately via the matching Embeddings Model Connector node.
+
+    On execution, the node will extract a document from the store to obtain information about the document's metadata. This assumes that each document in the vector store has the same kind of metadata attached to it.
     """
 
     persist_directory = knext.StringParameter(

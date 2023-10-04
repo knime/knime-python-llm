@@ -198,10 +198,9 @@ class FAISSVectorStoreReader:
     along with their corresponding documents. The vector store enables efficient storage, retrieval, and similarity
     search operations on these vectors and their associated data.
 
-    If the vector store was created with LangChain in Python, the embeddings model is not stored with the vectorstore, so it has to be provided separately via the matching Embeddings Model Connector node.
+    If the vector store was created with LangChain in Python, the embeddings model is not stored with the vectorstore, so it has to be provided separately via the matching Embeddings Model Connector node.
 
-    On execution the node will extract a document from the store to obtain information about the document's metadata. This means
-    it will be assumend, that each document of the vector store has the same kind of metadata attached to it.
+    On execution, the node will extract a document from the store to obtain information about the document's metadata. This assumes that each document in the vector store has the same kind of metadata attached to it.
     """
 
     persist_directory = knext.StringParameter(

@@ -169,9 +169,7 @@ class FAISSVectorStoreCreator:
         ]
 
         df = handle_missing_values(
-            df,
-            self.document_column,
-            missing_value_handling_setting,
+            df, self.document_column, missing_value_handling_setting, ctx
         )
 
         documents = df.apply(to_document, axis=1).tolist()

@@ -48,7 +48,10 @@ class VectorToolPortObjectSpec(ToolPortObjectSpec):
     @classmethod
     def deserialize(cls, data: dict):
         return cls(
-            data["name"], data["description"], data["top_k"], data["retrieve_sources"]
+            data["name"],
+            data["description"],
+            data["top_k"],
+            data.get("retrieve_sources", False),
         )
 
 
@@ -86,13 +89,12 @@ class VectorToolPortObject(ToolPortObject):
 
         llm = self._llm.create_model(ctx)
         vectorstore = self._vectorstore.load_store(ctx)
+        retriever = vectorstore.as_retriever(search_kwargs={"k": self.spec.top_k})
 
         if retrieve_sources:
             return RetrievalQAWithSourcesChain.from_chain_type(
                 llm=llm,
-                retriever=vectorstore.as_retriever(
-                    search_kwargs={"k": self.spec.top_k}
-                ),
+                retriever=retriever,
                 verbose=True,
                 return_source_documents=True,
             )
@@ -100,7 +102,7 @@ class VectorToolPortObject(ToolPortObject):
         return RetrievalQA.from_chain_type(
             llm=llm,
             chain_type="stuff",
-            retriever=vectorstore.as_retriever(search_kwargs={"k": self.spec.top_k}),
+            retriever=retriever,
             input_key="question",
         )
 
@@ -183,7 +185,7 @@ class FilestoreVectorToolPortObjectSpec(VectorToolPortObjectSpec):
             data["name"],
             data["description"],
             data["top_k"],
-            data["retrieve_sources"],
+            data.get("retrieve_sources", False),
             llm_spec,
             vectorstore_spec,
         )
@@ -278,6 +280,7 @@ class VectorStoreToTool:
         "Retrieve sources from documents",
         "Whether or not to retrieve document sources if provided.",
         default_value=False,
+        since_version="5.2.0",
     )
 
     def configure(

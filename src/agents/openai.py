@@ -77,16 +77,21 @@ class OpenAIFunctionsAgentCreator:
     """
     Creates an agent that uses the function calling feature of OpenAI chat models.
 
-    This node creates an agent that is based on OpenAI chat models that support function calling and can be primed with a custom system message.
+    This node creates an agent that is based on OpenAI chat models that support function calling
+    (e.g. the 0613 models) and can be primed with a custom system message. The system message plays an essential
+    role in defining the behavior of the agent and how it interacts with users and tools. Best practise is to alter
+    the system message before tampering with model settings, because the message affects the behavior of the agent the most.
 
-    In general an agent is an LLM that is configured to dynamically pick a tool from a set of tools to best answer the user prompts.
+    In general an agent is an LLM that is configured to, if necessary, dynamically pick a tool from
+    a set of tools to best answer the user prompts.
 
     Note that these agents do not support tools with whitespaces in their names.
     """
 
     system_message = knext.StringParameter(
         "System message",
-        "Defines the general behavior of the agent.",
+        """The system message is a pivotal component in shaping an agent's behavior.
+        Defines the general behavior of the agent.""",
         """You are a helpful AI assistant. Never solely rely on your own knowledge, 
         but use tools to get information before answering. """,
     )

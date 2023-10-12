@@ -140,7 +140,7 @@ class GPT4AllLLMPortObjectSpec(LLMPortObjectSpec):
             "n_threads": self._n_threads,
             "temperature": self._temperature,
             "top_p": self._top_p,
-            "top_k": self._top_p,
+            "top_k": self._top_k,
             "max_token": self._max_token,
         }
 
@@ -150,8 +150,8 @@ class GPT4AllLLMPortObjectSpec(LLMPortObjectSpec):
             data["local_path"],
             data.get("n_threads", None),
             data.get("temperature", 0.2),
-            data.get("top_p", 0.15),
             data.get("top_k", 20),
+            data.get("top_p", 0.15),
             data.get("max_token", 250),
         )
 
@@ -246,8 +246,8 @@ class GPT4AllLLMConnector:
             local_path=self.settings.local_path,
             n_threads=n_threads,
             temperature=self.params.temperature,
-            top_p=self.params.top_p,
             top_k=self.params.top_k,
+            top_p=self.params.top_p,
             max_token=self.params.max_token,
         )
 

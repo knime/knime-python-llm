@@ -2,12 +2,28 @@
 import knime.extension as knext
 import util
 import pandas as pd
+from base import AIPortObjectSpec
+from typing import Any, Dict, List, Optional
 
+
+# Langchain imports
 from langchain.schema import HumanMessage, SystemMessage, ChatMessage, AIMessage
 from langchain.embeddings.base import Embeddings
 from langchain.chat_models.base import BaseChatModel
 from langchain.base_language import BaseLanguageModel
-from base import AIPortObjectSpec
+from langchain.llms.base import BaseLLM
+from langchain.schema.messages import (
+    BaseMessage,
+)
+from langchain.callbacks.manager import (
+    AsyncCallbackManagerForLLMRun,
+    CallbackManagerForLLMRun,
+)
+from langchain.chat_models.base import BaseChatModel
+from langchain.schema import (
+    ChatGeneration,
+    ChatResult,
+)
 
 model_category = knext.category(
     path=util.main_category,
@@ -469,3 +485,35 @@ class TextEmbedder:
             i += batch.num_rows
             ctx.set_progress(i / num_rows)
         return output_table
+
+
+class LLMChatModelAdapter(BaseChatModel):
+    """
+    This class adapts LLMs as chat models, allowing LLMs that have been fined tuned for chat applications to be used as chat models with the Chat Model Prompter.
+    """
+
+    llm: BaseLLM
+
+    def _generate(
+        self,
+        messages: List[BaseMessage],
+        stop: Optional[List[str]] = None,
+        run_manager: Optional[CallbackManagerForLLMRun] = None,
+        **kwargs: Any,
+    ) -> ChatResult:
+        prediction = self.llm.predict_messages(messages, stop=stop, **kwargs)
+        return ChatResult(generations=[ChatGeneration(message=prediction)])
+
+    async def _agenerate(
+        self,
+        messages: List[BaseMessage],
+        stop: Optional[List[str]] = None,
+        run_manager: Optional[AsyncCallbackManagerForLLMRun] = None,
+        **kwargs: Any,
+    ) -> ChatResult:
+        prediction = await self.llm.apredict_messages(messages, stop=stop, **kwargs)
+        return ChatResult(generations=[ChatGeneration(message=prediction)])
+
+    def _llm_type(self) -> str:
+        """Return type of llm."""
+        return "LLMChatModelAdapter"

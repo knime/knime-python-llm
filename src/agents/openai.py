@@ -92,8 +92,7 @@ class OpenAIFunctionsAgentCreator:
         "System message",
         """The system message is a pivotal component in shaping an agent's behavior.
         Defines the general behavior of the agent.""",
-        """You are a helpful AI assistant. Never solely rely on your own knowledge, 
-        but use tools to get information before answering. """,
+        """You are a helpful AI assistant. Never solely rely on your own knowledge, but use tools to get information before answering. """,
     )
 
     def configure(self, ctx, chat_model_spec: OpenAIChatModelPortObjectSpec):

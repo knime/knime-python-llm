@@ -14,7 +14,7 @@ from .base import (
 # Langchain imports
 from langchain.llms import GPT4All
 from langchain.embeddings.base import Embeddings
-from pydantic import root_validator, BaseModel, ValidationError
+from pydantic import model_validator, BaseModel, ValidationError
 from gpt4all import GPT4All as _GPT4All
 import shutil
 import os
@@ -261,7 +261,7 @@ class _Embeddings4All(BaseModel, Embeddings):
     num_threads: int = 1
     client: Any  #: :meta private:
 
-    @root_validator()
+    @model_validator(mode="before")
     def validate_environment(cls, values: Dict) -> Dict:
         values["client"] = _GPT4All(
             values["model_name"],

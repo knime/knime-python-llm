@@ -154,8 +154,6 @@ class FAISSVectorStoreCreator:
             metadata = {name: row[name] for name in meta_data_columns}
             return Document(page_content=row[document_column], metadata=metadata)
 
-        documents = df.apply(to_document, axis=1).tolist()
-
         # Skip rows with missing values if "SkipRow" option is selected
         # or fail execution if "Fail" is selected and there are missing documents
         missing_value_handling_setting = MissingValueHandlingOptions[
@@ -165,6 +163,8 @@ class FAISSVectorStoreCreator:
         df = handle_missing_values(
             df, self.document_column, missing_value_handling_setting, ctx
         )
+
+        documents = df.apply(to_document, axis=1).tolist()
 
         db = FAISS.from_documents(
             documents=documents,

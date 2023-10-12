@@ -5,22 +5,27 @@ from models.base import EmbeddingsPortObjectSpec
 from .base import (
     LLMPortObjectSpec,
     LLMPortObject,
+    ChatModelPortObject,
+    ChatModelPortObjectSpec,
     model_category,
     EmbeddingsPortObjectSpec,
     EmbeddingsPortObject,
     GeneralSettings,
+    LLMChatModelAdapter,
 )
 
 # Langchain imports
 from langchain.llms import GPT4All
 from langchain.embeddings.base import Embeddings
 from pydantic import model_validator, BaseModel, ValidationError
+from typing import Any, Dict, List, Optional
 from gpt4all import GPT4All as _GPT4All
 import shutil
 import os
 
-from typing import Optional, Any, Dict, List
-
+# Langchain imports
+from langchain.llms import GPT4All
+from langchain.embeddings.base import Embeddings
 
 gpt4all_icon = "icons/gpt4all.png"
 gpt4all_category = knext.category(
@@ -147,12 +152,12 @@ class GPT4AllLLMPortObjectSpec(LLMPortObjectSpec):
     @classmethod
     def deserialize(cls, data: dict):
         return cls(
-            data["local_path"],
-            data.get("n_threads", None),
-            data.get("temperature", 0.2),
-            data.get("top_k", 20),
-            data.get("top_p", 0.15),
-            data.get("max_token", 250),
+            local_path=data["local_path"],
+            n_threads=data.get("n_threads", None),
+            temperature=data.get("temperature", 0.2),
+            top_k=data.get("top_k", 20),
+            top_p=data.get("top_p", 0.15),
+            max_token=data.get("max_token", 250),
         )
 
 
@@ -180,8 +185,26 @@ class GPT4AllLLMPortObject(LLMPortObject):
             )
 
 
+class GPT4AllChatModelPortObjectSpec(GPT4AllLLMPortObjectSpec, ChatModelPortObjectSpec):
+    pass
+
+
+class GPT4AllChatModelPortObject(GPT4AllLLMPortObject, ChatModelPortObject):
+    @property
+    def spec(self) -> GPT4AllChatModelPortObjectSpec:
+        return super().spec
+
+    def create_model(self, ctx) -> LLMChatModelAdapter:
+        model = LLMChatModelAdapter(llm=super().create_model(ctx))
+        return model
+
+
 gpt4all_llm_port_type = knext.port_type(
     "GPT4All LLM", GPT4AllLLMPortObject, GPT4AllLLMPortObjectSpec
+)
+
+gpt4all_chat_model_port_type = knext.port_type(
+    "GPT4All Chat Model", GPT4AllChatModelPortObject, GPT4AllChatModelPortObjectSpec
 )
 
 
@@ -248,6 +271,63 @@ class GPT4AllLLMConnector:
             temperature=self.params.temperature,
             top_k=self.params.top_k,
             top_p=self.params.top_p,
+            max_token=self.params.max_token,
+        )
+
+
+@knext.node(
+    "GPT4All Chat Model Connector",
+    knext.NodeType.SOURCE,
+    gpt4all_icon,
+    category=gpt4all_category,
+)
+@knext.output_port(
+    "GPT4All Chat Model",
+    "A GPT4All chat model.",
+    gpt4all_chat_model_port_type,
+)
+class GPT4AllChatModelConnector:
+    """
+    Connects to a locally installed GPT4All LLM.
+
+    This connector allows you to connect to a local GPT4All LLM. To get started,
+    you need to download a specific model from the [GPT4All](https://gpt4all.io/index.html) model explorer on the website.
+    It is not needed to install the GPT4All software. Once you have downloaded the model, specify its file path in the
+    configuration dialog to use it.
+
+    It is recommended to use models (e.g. Llama 2) that have been fine-tuned for chat applications. For model specifications
+    including prompt templates, see [GPT4All model list]
+    (https://raw.githubusercontent.com/nomic-ai/gpt4all/main/gpt4all-chat/metadata/models.json).
+
+    The currently supported models are based on GPT-J, LLaMA, MPT, Replit, Falcon and StarCoder.
+
+    For more information and detailed instructions on downloading compatible models, please visit the
+    [GPT4All GitHub repository](https://github.com/nomic-ai/gpt4all).
+    """
+
+    settings = GPT4AllInputSettings()
+    params = GPT4AllModelParameterSettings(since_version="5.2.0")
+
+    def configure(
+        self, ctx: knext.ConfigurationContext
+    ) -> GPT4AllChatModelPortObjectSpec:
+        if not self.settings.local_path:
+            raise knext.InvalidParametersError("Path to local model is missing.")
+
+        return self.create_spec()
+
+    def execute(self, ctx: knext.ExecutionContext) -> GPT4AllChatModelPortObject:
+        return GPT4AllChatModelPortObject(self.create_spec())
+
+    def create_spec(self) -> GPT4AllChatModelPortObjectSpec:
+        n_threads = None if self.settings.n_threads == 0 else self.settings.n_threads
+
+        return GPT4AllChatModelPortObjectSpec(
+            local_path=self.settings.local_path,
+            n_threads=n_threads,
+            temperature=self.params.temperature,
+            top_p=self.params.top_p,
+            top_k=self.params.top_k,
             max_token=self.params.max_token,
         )
 

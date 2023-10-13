@@ -13,10 +13,6 @@ from .base import (
     GeneralSettings,
     LLMChatModelAdapter,
 )
-
-# Langchain imports
-from langchain.llms import GPT4All
-from langchain.embeddings.base import Embeddings
 from pydantic import model_validator, BaseModel, ValidationError
 from typing import Any, Dict, List, Optional
 from gpt4all import GPT4All as _GPT4All

@@ -1,12 +1,11 @@
+# KNIME / own imports
 import knime.extension as knext
 from typing import Optional
-
 from models.base import (
     EmbeddingsPortObjectSpec,
     EmbeddingsPortObject,
     embeddings_model_port_type,
 )
-
 from .base import (
     VectorstorePortObjectSpec,
     VectorstorePortObject,
@@ -19,11 +18,12 @@ from .base import (
     store_category,
     validate_creator_document_column,
 )
-
 import util
 
+# Langchain imports
 from langchain.vectorstores import Chroma
 from langchain.docstore.document import Document
+from langchain.vectorstores.utils import filter_complex_metadata
 
 chroma_icon = "icons/chroma.png"
 chroma_category = knext.category(
@@ -75,11 +75,8 @@ class LocalChromaVectorstorePortObject(
             import chromadb
             import chromadb.config
 
-            settings = chromadb.config.Settings(
-                chroma_db_impl="duckdb+parquet", persist_directory=vectorstore_folder
-            )
             existing_collection = vectorstore._collection
-            client = chromadb.Client(settings)
+            client = chromadb.PersistentClient(path=vectorstore_folder)
             new_collection = client.get_or_create_collection(
                 name=existing_collection.name,
                 metadata=existing_collection.metadata,
@@ -90,7 +87,6 @@ class LocalChromaVectorstorePortObject(
             vectorstore = Chroma(
                 embedding_function=vectorstore._embedding_function,
                 persist_directory=vectorstore_folder,
-                client_settings=settings,
                 collection_metadata=existing_collection.metadata,
                 client=client,
             )
@@ -211,6 +207,10 @@ class ChromaVectorStoreCreator:
         )
 
         documents = df.apply(to_document, axis=1).tolist()
+
+        # Filter out metadata types that are not supported.
+        # Allowed types are str, bool, int, float.
+        documents = filter_complex_metadata(documents=documents)
 
         db = Chroma.from_documents(
             documents=documents,

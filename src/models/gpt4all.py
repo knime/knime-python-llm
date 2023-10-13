@@ -191,8 +191,8 @@ class GPT4AllChatModelPortObject(GPT4AllLLMPortObject, ChatModelPortObject):
         return super().spec
 
     def create_model(self, ctx) -> LLMChatModelAdapter:
-        model = LLMChatModelAdapter(llm=super().create_model(ctx))
-        return model
+        llm = super().create_model(ctx)
+        return LLMChatModelAdapter(llm=llm)
 
 
 gpt4all_llm_port_type = knext.port_type(

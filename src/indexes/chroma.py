@@ -13,6 +13,7 @@ from .base import (
     FilestoreVectorstorePortObject,
     MetadataSettings,
     get_metadata_columns,
+    handle_metadata,
     MissingValueHandlingOptions,
     handle_missing_values,
     store_category,
@@ -23,7 +24,6 @@ import util
 # Langchain imports
 from langchain.vectorstores import Chroma
 from langchain.docstore.document import Document
-from langchain.vectorstores.utils import filter_complex_metadata
 
 chroma_icon = "icons/chroma.png"
 chroma_category = knext.category(
@@ -206,11 +206,9 @@ class ChromaVectorStoreCreator:
             df, self.document_column, missing_value_handling_setting, ctx
         )
 
-        documents = df.apply(to_document, axis=1).tolist()
+        df = handle_metadata(df, meta_data_columns)
 
-        # Filter out metadata types that are not supported.
-        # Allowed types are str, bool, int, float.
-        documents = filter_complex_metadata(documents=documents)
+        documents = df.apply(to_document, axis=1).tolist()
 
         db = Chroma.from_documents(
             documents=documents,

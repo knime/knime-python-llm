@@ -85,6 +85,17 @@ def handle_missing_values(
     return df
 
 
+def handle_metadata(
+    df: pd.DataFrame,
+    metadatas: Optional[list[str]] = None,
+):
+    # Fills missing metadata values with empty string
+    for metadata in metadatas:
+        df[metadata] = df[metadata].fillna("")
+
+    return df
+
+
 class VectorstorePortObjectSpec(AIPortObjectSpec):
     """Marker interface for vector store specs. Used to define the most generic vector store PortType."""
 

@@ -13,7 +13,7 @@ from .base import (
     GeneralSettings,
     LLMChatModelAdapter,
 )
-from pydantic import model_validator, BaseModel, ValidationError
+from pydantic import root_validator, BaseModel, ValidationError
 from typing import Any, Dict, List, Optional
 from gpt4all import GPT4All as _GPT4All
 import shutil
@@ -337,7 +337,7 @@ class _Embeddings4All(BaseModel, Embeddings):
     num_threads: int = 1
     client: Any  #: :meta private:
 
-    @model_validator(mode="before")
+    @root_validator
     def validate_environment(cls, values: Dict) -> Dict:
         values["client"] = _GPT4All(
             values["model_name"],

@@ -302,7 +302,7 @@ class GPT4AllChatModelConnector:
     """
 
     settings = GPT4AllInputSettings()
-    params = GPT4AllModelParameterSettings(since_version="5.2.0")
+    params = GPT4AllModelParameterSettings()
 
     def configure(
         self, ctx: knext.ConfigurationContext

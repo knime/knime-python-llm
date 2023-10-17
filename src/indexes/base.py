@@ -74,8 +74,7 @@ def handle_missing_values(
         if df.isna().any().any():
             raise knext.InvalidParametersError(
                 f"""There are missing documents in the document column. See row ID 
-                <{df[df[document_column].isnull()].index.tolist()[0]}> for the 
-                first row that contains a missing document."""
+                <{df[df[document_column].isnull()].index.tolist()[0]}> for the first row that contains a missing document."""
             )
 
     if df.empty:

@@ -5,11 +5,14 @@ import knime.extension as knext
 from .base import (
     LLMPortObjectSpec,
     LLMPortObject,
+    ChatModelPortObject,
+    ChatModelPortObjectSpec,
     EmbeddingsPortObjectSpec,
     EmbeddingsPortObject,
     model_category,
     GeneralSettings,
     CredentialsSettings,
+    LLMChatModelAdapter,
 )
 from base import AIPortObjectSpec
 
@@ -231,6 +234,30 @@ huggingface_textGenInference_llm_port_type = knext.port_type(
 )
 
 
+class HuggingFaceTextGenInfChatModelPortObjectSpec(
+    HuggingFaceTextGenInfLLMPortObjectSpec, ChatModelPortObjectSpec
+):
+    pass
+
+
+class HuggingFaceTextGenInfChatModelPortObject(
+    HuggingFaceTextGenInfLLMPortObject, ChatModelPortObject
+):
+    def __init__(self, spec: HuggingFaceTextGenInfChatModelPortObjectSpec) -> None:
+        super().__init__(spec)
+
+    def create_model(self, ctx) -> LLMChatModelAdapter:
+        llm = super().create_model(ctx)
+        return LLMChatModelAdapter(llm=llm)
+
+
+huggingface_textGenInference_chat_port_type = knext.port_type(
+    "Hugging Face Chat Model",
+    HuggingFaceTextGenInfChatModelPortObject,
+    HuggingFaceTextGenInfChatModelPortObjectSpec,
+)
+
+
 class HuggingFaceAuthenticationPortObjectSpec(AIPortObjectSpec):
     def __init__(self, credentials: str) -> None:
         super().__init__()
@@ -400,7 +427,6 @@ huggingface_embeddings_port_type = knext.port_type(
     HFHubEmbeddingsPortObjectSpec,
 )
 
-
 # == Nodes ==
 
 
@@ -440,6 +466,52 @@ class HuggingfaceTextGenInferenceConnector:
 
     def create_spec(self):
         return HuggingFaceTextGenInfLLMPortObjectSpec(
+            self.settings.server_url,
+            self.model_settings.max_new_tokens,
+            self.model_settings.top_k,
+            self.model_settings.top_p,
+            self.model_settings.typical_p,
+            self.model_settings.temperature,
+            self.model_settings.repetition_penalty,
+        )
+
+
+@knext.node(
+    "HF TextGen Chat Model Connector",
+    knext.NodeType.SOURCE,
+    huggingface_icon,
+    category=huggingface_category,
+)
+@knext.output_port(
+    "Huggingface TextGen Inference Configuration",
+    "Connection to an LLM hosted on a Text Generation Inference Server.",
+    huggingface_textGenInference_chat_port_type,
+)
+class HuggingfaceTextGenChatModelConnector:
+    """
+    Connects to a dedicated Text Generation Inference Server.
+
+    The [Text Generation Inference](https://github.com/huggingface/text-generation-inference) is a Rust, Python, and gRPC server
+    specifically designed for text generation inference. It can be self-hosted to
+    power LLM APIs and inference widgets.
+
+    Please note that this node does not connect to the Hugging Face Hub, but to a Text Generation Inference Server that can be hosted both locally and remotely.
+
+    For more details and information about integrating with the Hugging Face TextGen Inference and setting up a local server, refer to the
+    [LangChain documentation](https://python.langchain.com/docs/modules/model_io/models/llms/integrations/huggingface_textgen_inference).
+    """
+
+    settings = HuggingFaceTextGenInferenceInputSettings()
+    model_settings = HuggingFaceModelSettings()
+
+    def configure(self, ctx: knext.ConfigurationContext):
+        return self.create_spec()
+
+    def execute(self, ctx: knext.ExecutionContext):
+        return HuggingFaceTextGenInfChatModelPortObject(self.create_spec())
+
+    def create_spec(self):
+        return HuggingFaceTextGenInfChatModelPortObjectSpec(
             self.settings.server_url,
             self.model_settings.max_new_tokens,
             self.model_settings.top_k,

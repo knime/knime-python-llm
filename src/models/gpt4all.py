@@ -33,6 +33,14 @@ gpt4all_category = knext.category(
 )
 
 
+def check_model_path(local_path):
+    if not local_path:
+        raise knext.InvalidParametersError("Path to local model is missing")
+
+    if not os.path.isfile(local_path):
+        raise knext.InvalidParametersError(f"No file found at path: {local_path}")
+
+
 @knext.parameter_group(label="Model Usage")
 class GPT4AllInputSettings:
     local_path = knext.StringParameter(
@@ -315,15 +323,7 @@ class GPT4AllLLMConnector:
     params = GPT4AllModelParameterSettings(since_version="5.2.0")
 
     def configure(self, ctx: knext.ConfigurationContext) -> GPT4AllLLMPortObjectSpec:
-        import os
-
-        if not self.settings.local_path:
-            raise knext.InvalidParametersError("Path to local model is missing")
-
-        if not os.path.isfile(self.settings.local_path):
-            raise knext.InvalidParametersError(
-                f"No file found at path: {self.settings.local_path}"
-            )
+        check_model_path(self.settings.local_path)
 
         return self.create_spec()
 
@@ -380,8 +380,7 @@ class GPT4AllChatModelConnector:
     def configure(
         self, ctx: knext.ConfigurationContext
     ) -> GPT4AllChatModelPortObjectSpec:
-        if not self.settings.local_path:
-            raise knext.InvalidParametersError("Path to local model is missing.")
+        check_model_path(self.settings.local_path)
 
         return self.create_spec()
 

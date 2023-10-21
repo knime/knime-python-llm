@@ -1,11 +1,10 @@
 import indexes.base
 import indexes.faiss
-
 import indexes.chroma
 
 import models.base
 import models.huggingface
-
+import models.fake
 import models.openai
 
 try:

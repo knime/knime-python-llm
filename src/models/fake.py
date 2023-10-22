@@ -6,6 +6,8 @@ from .base import (
     LLMPortObject,
     ChatModelPortObjectSpec,
     ChatModelPortObject,
+    EmbeddingsPortObjectSpec,
+    EmbeddingsPortObject,
     model_category,
     util,
 )
@@ -13,6 +15,7 @@ from .base import (
 # Langchain imports
 from langchain.llms.base import LLM
 from langchain.chat_models.base import SimpleChatModel
+from langchain.embeddings.base import Embeddings
 from langchain.callbacks.manager import (
     AsyncCallbackManagerForLLMRun,
     CallbackManagerForLLMRun,
@@ -21,7 +24,7 @@ from langchain.schema import BaseMessage
 
 # Other imports
 from typing import Any, List, Optional, Mapping, Dict
-
+from pydantic import BaseModel
 import pickle
 
 fake_icon = "icons/fake.png"
@@ -91,6 +94,31 @@ class MismatchSettings:
             handle_key_mismatch, [MissingValueHandlingOptions.DefaultAnswer.name]
         ),
         knext.Effect.SHOW,
+    )
+
+
+@knext.parameter_group(label="Embeddings Model Configuration")
+class FakeEmbeddingsSettings:
+    document_column = knext.ColumnParameter(
+        "Documents",
+        "Column containing the fake documents.",
+        port_index=0,
+        column_filter=util.create_type_filer(knext.string()),
+    )
+
+    vector_column = knext.ColumnParameter(
+        "Vectors",
+        "Column containing the fake vectors.",
+        port_index=0,
+        column_filter=util.create_type_filer(knext.ListType(knext.double())),
+    )
+
+    delay = knext.IntParameter(
+        "Answer delay",
+        "Delays the time the fake LLM will take to respond.",
+        0,
+        min_value=0,
+        is_advanced=True,
     )
 
 
@@ -174,6 +202,20 @@ class FakeChatModel(SimpleChatModel):
     @property
     def _identifying_params(self) -> Mapping[str, Any]:
         return {}
+
+
+class FakeEmbeddings(Embeddings, BaseModel):
+    embeddings_dict: dict[str, list[float]]
+
+    def embed_documents(self, any) -> List[float]:
+        return list(self.embeddings_dict.values())
+
+    def embed_query(self, text: str) -> List[float]:
+        if text is None:
+            raise ValueError("None values are not supported.")
+        elif not text.strip():
+            raise ValueError("Empty documents are not supported.")
+        return self.embeddings_dict[text]
 
 
 # == Port Objects ==
@@ -305,6 +347,47 @@ class FakeChatModelPortObject(ChatModelPortObject):
 
 fake_chat_model_port_type = knext.port_type(
     "Fake Chat Model", FakeChatModelPortObject, FakeChatPortObjectSpec
+)
+
+
+class FakeEmbeddingsPortObjectSpec(FakeModelPortObjectSpec, EmbeddingsPortObjectSpec):
+    def __init__(self) -> None:
+        super().__init__()
+
+    @classmethod
+    def deserialize(cls, data: dict):
+        return FakeEmbeddingsPortObjectSpec()
+
+
+class FakeEmbeddingsPortObject(EmbeddingsPortObject):
+    def __init__(
+        self,
+        spec: FakeEmbeddingsPortObjectSpec,
+        embeddings_dict: dict[str, list[float]],
+    ):
+        super().__init__(spec)
+        self._embeddings_dict = embeddings_dict
+
+    @property
+    def embeddings_dict(self):
+        return self._embeddings_dict
+
+    def serialize(self):
+        return pickle.dumps(self._embeddings_dict)
+
+    @classmethod
+    def deserialize(cls, spec, data: dict):
+        embeddings_dict = pickle.loads(data)
+        return FakeEmbeddingsPortObject(
+            FakeEmbeddingsPortObjectSpec(), embeddings_dict, retrieval_vector
+        )
+
+    def create_model(self, ctx):
+        return FakeEmbeddings(self.embeddings_dict)
+
+
+fake_embeddings_port_type = knext.port_type(
+    "Fake Embeddings", FakeEmbeddingsPortObject, FakeEmbeddingsPortObjectSpec
 )
 
 
@@ -480,4 +563,61 @@ class FakeChatConnector:
     def create_spec(self) -> FakeChatPortObjectSpec:
         return FakeChatPortObjectSpec(
             self.settings.delay, self.mismatch.handle_key_mismatch
+        )
+
+
+@knext.node(
+    "Fake Embeddings Connector",
+    knext.NodeType.SOURCE,
+    fake_icon,
+    category=fake_category,
+)
+@knext.input_table(
+    "Document and vector table",
+    "A table containing a column with documents and one with the respective vectors.",
+)
+@knext.output_port(
+    "Fake Embeddings",
+    "Configured Fake Embeddings Model",
+    fake_embeddings_port_type,
+)
+class FakeEmbeddingsConnector:
+    """
+    Creates a fake Embeddings Model.
+
+    This node creates a fake Embeddings Model implementation for testing purposes without
+    the need to use heavy compute power. Provide a column with documents and queries and in another their respective
+    vectors. When creating a Vector Store with the fake Embeddings model, provide
+    the Vector Store Creator again with the documents that should be embedded and the fake Embeddings
+    model will embedd them with their fake vector.
+    """
+
+    settings = FakeEmbeddingsSettings()
+
+    def configure(
+        self,
+        ctx: knext.ConfigurationContext,
+        table_spec: knext.Schema,
+    ) -> FakeEmbeddingsPortObjectSpec:
+        return FakeEmbeddingsPortObjectSpec()
+
+    def execute(
+        self,
+        ctx: knext.ExecutionContext,
+        input_table: knext.Table,
+    ) -> FakeEmbeddingsPortObject:
+        df = input_table.to_pandas()
+
+        # toList() is needed to parse the numpy.ndarray into a list[float]
+        response_dict = dict(
+            map(
+                lambda i, j: (i, j.tolist()),
+                df[self.settings.document_column],
+                df[self.settings.vector_column],
+            )
+        )
+
+        return FakeEmbeddingsPortObject(
+            FakeEmbeddingsPortObjectSpec(),
+            response_dict,
         )

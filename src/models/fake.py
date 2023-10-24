@@ -61,7 +61,7 @@ class FakeGeneralSettings:
 
     response_column = knext.ColumnParameter(
         "Responses",
-        "Column containing the fake respnses.",
+        "Column containing the fake responses.",
         port_index=0,
         column_filter=util.create_type_filer(knext.string()),
     )
@@ -87,8 +87,8 @@ class MismatchSettings:
 
     default_response = knext.StringParameter(
         "Default response",
-        "The response of the fake LLM when no querie matches",
-        "Could not find an answer to the querie.",
+        "The response of the fake LLM when no query matches",
+        "Could not find an answer to the query.",
     ).rule(
         knext.OneOf(
             handle_key_mismatch, [MissingValueHandlingOptions.DefaultAnswer.name]
@@ -125,8 +125,8 @@ class FakeEmbeddingsSettings:
 # == Fake Implementations ==
 
 
-def handle_missing_value(option: str, prompt: str, response: str):
-    if option == MissingValueHandlingOptions.Fail.name:
+def handle_missing_value(strategy: str, prompt: str, response: str):
+    if strategy == MissingValueHandlingOptions.Fail.name:
         raise knext.InvalidParametersError(
             f"Could not find matching response for prompt: '{prompt}'. Please make sure, that the prompt exactly matches the provided answers."
         )
@@ -138,7 +138,7 @@ class FakeDictLLM(LLM):
 
     response_dict: dict[str, str]
     default_response: str
-    option: str
+    missing_value_strategy: str
     sleep: int = 0
 
     @property
@@ -154,7 +154,10 @@ class FakeDictLLM(LLM):
         **kwargs: Any,
     ) -> str:
         return self.response_dict.get(
-            prompt, handle_missing_value(self.option, prompt, self.default_response)
+            prompt,
+            handle_missing_value(
+                self.missing_value_strategy, prompt, self.default_response
+            ),
         )
 
     async def _acall(
@@ -166,7 +169,10 @@ class FakeDictLLM(LLM):
     ) -> str:
         """Return next response"""
         return self.response_dict.get(
-            prompt, handle_missing_value(self.option, prompt, self.default_response)
+            prompt,
+            handle_missing_value(
+                self.missing_value_strategy, prompt, self.default_response
+            ),
         )
 
     @property
@@ -179,7 +185,7 @@ class FakeChatModel(SimpleChatModel):
 
     response_dict: Dict[str, str]
     default_response: str
-    option: str
+    missing_value_strategy: str
     sleep: Optional[int] = 0
 
     @property
@@ -196,7 +202,10 @@ class FakeChatModel(SimpleChatModel):
         """First try to lookup in response_dict, else return 'foo' or 'bar'."""
         prompt = messages[len(messages) - 1].content
         return self.response_dict.get(
-            prompt, handle_missing_value(self.option, prompt, self.default_response)
+            prompt,
+            handle_missing_value(
+                self.missing_value_strategy, prompt, self.default_response
+            ),
         )
 
     @property
@@ -231,28 +240,28 @@ class FakeModelPortObjectSpec(AIPortObjectSpec):
 
 
 class FakeLLMPortObjectSpec(FakeModelPortObjectSpec, LLMPortObjectSpec):
-    def __init__(self, sleep: float, missing_value_option: str) -> None:
+    def __init__(self, sleep: float, missing_value_strategy: str) -> None:
         super().__init__()
         self._sleep = sleep
-        self._missing_value_option = missing_value_option
+        self._missing_value_strategy = missing_value_strategy
 
     @property
     def sleep(self) -> float:
         return self._sleep
 
     @property
-    def missing_value_option(self) -> str:
-        return self._missing_value_option
+    def missing_value_strategy(self) -> str:
+        return self._missing_value_strategy
 
     def serialize(self) -> dict:
         return {
             "sleep": self._sleep,
-            "missing_value_option": self._missing_value_option,
+            "missing_value_strategy": self._missing_value_strategy,
         }
 
     @classmethod
     def deserialize(cls, data: dict):
-        return FakeLLMPortObjectSpec(data["sleep"], data["missing_value_option"])
+        return FakeLLMPortObjectSpec(data["sleep"], data["missing_value_strategy"])
 
 
 class FakeLLMPortObject(LLMPortObject):
@@ -290,7 +299,7 @@ class FakeLLMPortObject(LLMPortObject):
         return FakeDictLLM(
             response_dict=self.responses,
             default_response=self.default_response,
-            option=self.spec.missing_value_option,
+            missing_value_strategy=self.spec.missing_value_strategy,
             sleep=self.spec.sleep,
         )
 
@@ -301,8 +310,8 @@ fake_llm_port_type = knext.port_type(
 
 
 class FakeChatPortObjectSpec(FakeLLMPortObjectSpec, ChatModelPortObjectSpec):
-    def __init__(self, sleep: float, missing_value_option: str) -> None:
-        super().__init__(sleep, missing_value_option)
+    def __init__(self, sleep: float, missing_value_strategy: str) -> None:
+        super().__init__(sleep, missing_value_strategy)
 
 
 class FakeChatModelPortObject(ChatModelPortObject):
@@ -340,7 +349,7 @@ class FakeChatModelPortObject(ChatModelPortObject):
         return FakeChatModel(
             response_dict=self.responses,
             default_response=self.default_response,
-            option=self.spec.missing_value_option,
+            missing_value_strategy=self.spec.missing_value_strategy,
             sleep=self.spec.sleep,
         )
 
@@ -378,9 +387,7 @@ class FakeEmbeddingsPortObject(EmbeddingsPortObject):
     @classmethod
     def deserialize(cls, spec, data: dict):
         embeddings_dict = pickle.loads(data)
-        return FakeEmbeddingsPortObject(
-            FakeEmbeddingsPortObjectSpec(), embeddings_dict, retrieval_vector
-        )
+        return FakeEmbeddingsPortObject(FakeEmbeddingsPortObjectSpec(), embeddings_dict)
 
     def create_model(self, ctx):
         return FakeEmbeddings(self.embeddings_dict)
@@ -389,6 +396,31 @@ class FakeEmbeddingsPortObject(EmbeddingsPortObject):
 fake_embeddings_port_type = knext.port_type(
     "Fake Embeddings", FakeEmbeddingsPortObject, FakeEmbeddingsPortObjectSpec
 )
+
+
+def _configure_model_generation_columns(
+    table_spec: knext.Schema, query_column: knext.Column, response_column: knext.Column
+):
+    if query_column and response_column:
+        util.check_column(
+            table_spec,
+            query_column,
+            knext.string(),
+            "query",
+        )
+
+        util.check_column(
+            table_spec,
+            response_column,
+            knext.string(),
+            "response",
+        )
+
+        return query_column, response_column
+
+    else:
+        default_columns = util.pick_default_columns(table_spec, knext.string(), 2)
+        return default_columns[0], default_columns[1]
 
 
 # == Nodes ==
@@ -427,29 +459,12 @@ class FakeLLMConnector:
         ctx: knext.ConfigurationContext,
         table_spec: knext.Schema,
     ) -> FakeLLMPortObjectSpec:
-        if self.settings.query_column:
-            util.check_column(
-                table_spec,
-                self.settings.query_column,
-                knext.string(),
-                "String column with prompts",
-            )
-        else:
-            self.settings.query_column = util.pick_default_column(
-                table_spec, knext.string()
-            )
+        query_col, response_col = _configure_model_generation_columns(
+            table_spec, self.settings.query_column, self.settings.response_column
+        )
 
-        if self.settings.response_column:
-            util.check_column(
-                table_spec,
-                self.settings.response_column,
-                knext.string(),
-                "String column with responses",
-            )
-        else:
-            self.settings.query_column = util.pick_default_column(
-                table_spec, knext.string()
-            )
+        self.settings.query_column = query_col
+        self.settings.response_column = response_col
 
         return self.create_spec()
 
@@ -469,7 +484,7 @@ class FakeLLMConnector:
         )
 
         return FakeLLMPortObject(
-            self.create_spec,
+            self.create_spec(),
             response_dict,
             self.mismatch.default_response,
         )
@@ -513,29 +528,12 @@ class FakeChatConnector:
         ctx: knext.ConfigurationContext,
         table_spec: knext.Schema,
     ) -> FakeChatPortObjectSpec:
-        if self.settings.query_column:
-            util.check_column(
-                table_spec,
-                self.settings.query_column,
-                knext.string(),
-                "String column with prompts",
-            )
-        else:
-            self.settings.query_column = util.pick_default_column(
-                table_spec, knext.string()
-            )
+        query_col, response_col = _configure_model_generation_columns(
+            table_spec, self.settings.query_column, self.settings.response_column
+        )
 
-        if self.settings.response_column:
-            util.check_column(
-                table_spec,
-                self.settings.response_column,
-                knext.string(),
-                "String column with responses",
-            )
-        else:
-            self.settings.response_column = util.pick_default_column(
-                table_spec, knext.string()
-            )
+        self.settings.query_column = query_col
+        self.settings.response_column = response_col
 
         return self.create_spec()
 
@@ -586,10 +584,10 @@ class FakeEmbeddingsConnector:
     Creates a fake Embeddings Model.
 
     This node creates a fake Embeddings Model implementation for testing purposes without
-    the need to use heavy compute power. Provide a column with documents and queries and in another their respective
-    vectors. When creating a Vector Store with the fake Embeddings model, provide
-    the Vector Store Creator again with the documents that should be embedded and the fake Embeddings
-    model will embedd them with their fake vector.
+    the need to use heavy compute power. Provide set of documents and queries along with their corresponding vectors
+    for the following nodes e.g. Vector Store Creators and Vector Store Retriever to use.
+
+    With this node you simulate exactly with which vectors documents will be stored and retrieved.
     """
 
     settings = FakeEmbeddingsSettings()

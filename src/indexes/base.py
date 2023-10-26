@@ -85,7 +85,7 @@ def handle_missing_values(
     return df
 
 
-def handle_metadata(
+def handle_missing_metadata_values(
     df: pd.DataFrame,
     metadatas: Optional[list[str]] = None,
 ):

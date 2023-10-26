@@ -13,7 +13,7 @@ from .base import (
     FilestoreVectorstorePortObject,
     MetadataSettings,
     get_metadata_columns,
-    handle_metadata,
+    handle_missing_metadata_values,
     MissingValueHandlingOptions,
     handle_missing_values,
     store_category,
@@ -206,7 +206,9 @@ class ChromaVectorStoreCreator:
             df, self.document_column, missing_value_handling_setting, ctx
         )
 
-        df = handle_metadata(df, meta_data_columns)
+        # Replaces missing values with empty string since the allowed metadata value
+        # types are string, integer, float or bool
+        df = handle_missing_metadata_values(df, meta_data_columns)
 
         documents = df.apply(to_document, axis=1).tolist()
 

@@ -306,14 +306,15 @@ class AzureOpenAIAuthenticator:
 
     This node provides the authentication for all Azure OpenAI models.
     It allows you to select the credentials that contain a valid Azure OpenAI API key in their *password* field (the *username* is ignored).
-    Credentials can be set on the workflow level or created inside the workflow e.g. with the 
+    Credentials can be set on the workflow level or created inside the workflow e.g. with the
     [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
     and fed into this node via flow variable.
 
     To find your Azure OpenAI API key, navigate to your Azure OpenAI Resource on the [Azure Portal](https://portal.azure.com/) and copy one of the keys and the endpoint from
     'Resource Management - Keys and Endpoints'.
 
-    [Available API versions](https://learn.microsoft.com/en-us/azure/ai-services/openai/reference#completions)""",
+    [Available API versions](https://learn.microsoft.com/en-us/azure/ai-services/openai/reference#completions)
+    """
 
     credentials_settings = CredentialsSettings(
         label="Azure OpenAI API Key",

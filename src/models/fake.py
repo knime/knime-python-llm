@@ -224,6 +224,9 @@ class FakeEmbeddings(Embeddings, BaseModel):
             raise ValueError("None values are not supported.")
         elif not text.strip():
             raise ValueError("Empty documents are not supported.")
+        elif text not in list(self.embeddings_dict.keys()):
+            raise KeyError(f"Could not find document '{text}' in dictionary.")
+
         return self.embeddings_dict[text]
 
 
@@ -359,7 +362,7 @@ fake_chat_model_port_type = knext.port_type(
 )
 
 
-class FakeEmbeddingsPortObjectSpec(FakeModelPortObjectSpec, EmbeddingsPortObjectSpec):
+class FakeEmbeddingsPortObjectSpec(EmbeddingsPortObjectSpec):
     def __init__(self) -> None:
         super().__init__()
 
@@ -390,7 +393,7 @@ class FakeEmbeddingsPortObject(EmbeddingsPortObject):
         return FakeEmbeddingsPortObject(FakeEmbeddingsPortObjectSpec(), embeddings_dict)
 
     def create_model(self, ctx):
-        return FakeEmbeddings(self.embeddings_dict)
+        return FakeEmbeddings(embeddings_dict=self.embeddings_dict)
 
 
 fake_embeddings_port_type = knext.port_type(
@@ -463,6 +466,9 @@ class FakeLLMConnector:
             table_spec, self.settings.query_column, self.settings.response_column
         )
 
+        if query_col == response_col:
+            ctx.set_warning("Query and response column are set to be the same column.")
+
         self.settings.query_column = query_col
         self.settings.response_column = response_col
 
@@ -474,6 +480,9 @@ class FakeLLMConnector:
         input_table: knext.Table,
     ) -> FakeLLMPortObject:
         df = input_table.to_pandas()
+
+        if self.settings.query_column == self.settings.response_column:
+            ctx.set_warning("Query and response column are set to be the same column.")
 
         response_dict = dict(
             map(
@@ -532,6 +541,9 @@ class FakeChatConnector:
             table_spec, self.settings.query_column, self.settings.response_column
         )
 
+        if query_col == response_col:
+            ctx.set_warning("Query and response column are set to be the same column.")
+
         self.settings.query_column = query_col
         self.settings.response_column = response_col
 
@@ -543,6 +555,9 @@ class FakeChatConnector:
         input_table: knext.Table,
     ) -> FakeChatModelPortObject:
         df = input_table.to_pandas()
+
+        if self.settings.query_column == self.settings.response_column:
+            ctx.set_warning("Query and response column are set to be the same column.")
 
         response_dict = dict(
             map(

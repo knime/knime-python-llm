@@ -28,12 +28,13 @@ def check_canceled(ctx: knext.ExecutionContext) -> None:
 
 
 def pick_default_column(input_table: knext.Schema, ktype: knext.KnimeType) -> str:
-    return pick_default_columns(input_table, ktype, 1)
+    default_column = pick_default_columns(input_table, ktype, 1)[0]
+    return default_column
 
 
 def pick_default_columns(
     input_table: knext.Schema, ktype: knext.KnimeType, n_columns: int
-) -> Union[str, List[str]]:
+) -> List[str]:
     columns = [c for c in input_table if c.ktype == ktype]
 
     if len(columns) < n_columns:
@@ -42,9 +43,6 @@ def pick_default_columns(
         )
 
     columns.reverse()
-
-    if n_columns == 1:
-        return columns[0].name
 
     return [column.name for column in columns[:n_columns]]
 

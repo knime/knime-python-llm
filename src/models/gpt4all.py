@@ -33,14 +33,6 @@ gpt4all_category = knext.category(
 )
 
 
-def check_model_path(local_path):
-    if not local_path:
-        raise knext.InvalidParametersError("Path to local model is missing")
-
-    if not os.path.isfile(local_path):
-        raise knext.InvalidParametersError(f"No file found at path: {local_path}")
-
-
 @knext.parameter_group(label="Model Usage")
 class GPT4AllInputSettings:
     local_path = knext.StringParameter(
@@ -190,7 +182,51 @@ class GPT4AllLLMPortObject(LLMPortObject):
 
 
 class GPT4AllChatModelPortObjectSpec(GPT4AllLLMPortObjectSpec, ChatModelPortObjectSpec):
-    pass
+    def __init__(
+        self,
+        llm_spec: GPT4AllLLMPortObjectSpec,
+        system_prompt_template: str,
+        prompt_template: str,
+    ) -> None:
+        local_path = llm_spec._local_path
+        n_threads = llm_spec._n_threads
+        temperature = llm_spec._temperature
+        top_k = llm_spec._top_k
+        top_p = llm_spec._top_p
+        max_token = llm_spec._max_token
+
+        super().__init__(
+            local_path=local_path,
+            n_threads=n_threads,
+            temperature=temperature,
+            top_k=top_k,
+            top_p=top_p,
+            max_token=max_token,
+        )
+        self._system_prompt_template = system_prompt_template
+        self._prompt_template = prompt_template
+
+    @property
+    def system_prompt_template(self) -> str:
+        return self._system_prompt_template
+
+    @property
+    def prompt_template(self) -> str:
+        return self._prompt_template
+
+    def serialize(self) -> dict:
+        data = super().serialize()
+        data["system_prompt_template"] = self._system_prompt_template
+        data["prompt_template"] = self._prompt_template
+        return data
+
+    @classmethod
+    def deserialize(cls, data):
+        return cls(
+            GPT4AllLLMPortObjectSpec.deserialize(data),
+            system_prompt_template=data.get("system_prompt_template", None),
+            prompt_template=data.get("prompt_template", None),
+        )
 
 
 class GPT4AllChatModelPortObject(GPT4AllLLMPortObject, ChatModelPortObject):
@@ -200,7 +236,14 @@ class GPT4AllChatModelPortObject(GPT4AllLLMPortObject, ChatModelPortObject):
 
     def create_model(self, ctx) -> LLMChatModelAdapter:
         llm = super().create_model(ctx)
-        return LLMChatModelAdapter(llm=llm)
+        chat_template = self.spec.prompt_template
+        sys_template = self.spec.system_prompt_template
+
+        return LLMChatModelAdapter(
+            llm=llm,
+            chat_message_template=chat_template,
+            system_message_template=sys_template,
+        )
 
 
 gpt4all_llm_port_type = knext.port_type(
@@ -251,7 +294,15 @@ class GPT4AllLLMConnector:
     params = GPT4AllModelParameterSettings(since_version="5.2.0")
 
     def configure(self, ctx: knext.ConfigurationContext) -> GPT4AllLLMPortObjectSpec:
-        check_model_path(self.settings.local_path)
+        import os
+
+        if not self.settings.local_path:
+            raise knext.InvalidParametersError("Path to local model is missing")
+
+        if not os.path.isfile(self.settings.local_path):
+            raise knext.InvalidParametersError(
+                f"No file found at path: {self.settings.local_path}"
+            )
 
         return self.create_spec()
 
@@ -304,10 +355,19 @@ class GPT4AllChatModelConnector:
     settings = GPT4AllInputSettings()
     params = GPT4AllModelParameterSettings()
 
+    system_message_template = knext.MultilineStringParameter(
+        "System Message Template", is_advanced=True
+    )
+
+    chat_message_template = knext.MultilineStringParameter(
+        "Chat Message Template", is_advanced=True
+    )
+
     def configure(
         self, ctx: knext.ConfigurationContext
     ) -> GPT4AllChatModelPortObjectSpec:
-        check_model_path(self.settings.local_path)
+        if not self.settings.local_path:
+            raise knext.InvalidParametersError("Path to local model is missing.")
 
         return self.create_spec()
 
@@ -317,13 +377,19 @@ class GPT4AllChatModelConnector:
     def create_spec(self) -> GPT4AllChatModelPortObjectSpec:
         n_threads = None if self.settings.n_threads == 0 else self.settings.n_threads
 
-        return GPT4AllChatModelPortObjectSpec(
+        llm_spec = GPT4AllLLMPortObjectSpec(
             local_path=self.settings.local_path,
             n_threads=n_threads,
             temperature=self.params.temperature,
             top_p=self.params.top_p,
             top_k=self.params.top_k,
             max_token=self.params.max_token,
+        )
+
+        return GPT4AllChatModelPortObjectSpec(
+            llm_spec=llm_spec,
+            system_prompt_template=self.system_message_template,
+            prompt_template=self.chat_message_template,
         )
 
 

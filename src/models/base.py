@@ -3,7 +3,7 @@ import knime.extension as knext
 import util
 import pandas as pd
 from base import AIPortObjectSpec
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence
 
 
 # Langchain imports
@@ -15,6 +15,7 @@ from langchain.llms.base import BaseLLM
 from langchain.schema.messages import (
     BaseMessage,
 )
+
 from langchain.callbacks.manager import (
     AsyncCallbackManagerForLLMRun,
     CallbackManagerForLLMRun,
@@ -493,6 +494,8 @@ class LLMChatModelAdapter(BaseChatModel):
     """
 
     llm: BaseLLM
+    system_message_template: str
+    chat_message_template: str
 
     def _generate(
         self,
@@ -501,7 +504,13 @@ class LLMChatModelAdapter(BaseChatModel):
         run_manager: Optional[CallbackManagerForLLMRun] = None,
         **kwargs: Any,
     ) -> ChatResult:
-        prediction = self.llm.predict_messages(messages, stop=stop, **kwargs)
+        prediction = self._predict_messages(
+            messages=messages,
+            system_message_template=self.system_message_template,
+            chat_message_template=self.chat_message_template,
+            stop=stop,
+            **kwargs,
+        )
         return ChatResult(generations=[ChatGeneration(message=prediction)])
 
     async def _agenerate(
@@ -511,8 +520,92 @@ class LLMChatModelAdapter(BaseChatModel):
         run_manager: Optional[AsyncCallbackManagerForLLMRun] = None,
         **kwargs: Any,
     ) -> ChatResult:
-        prediction = await self.llm.apredict_messages(messages, stop=stop, **kwargs)
+        prediction = await self._apredict_messages(
+            messages=messages,
+            system_message_template=self.system_message_template,
+            chat_message_template=self.chat_message_template,
+            stop=stop,
+            **kwargs,
+        )
         return ChatResult(generations=[ChatGeneration(message=prediction)])
+
+    def _apply_prompt_templates(
+        self,
+        messages: Sequence[BaseMessage],
+        system_message_template: Optional[str] = None,
+        chat_message_template: Optional[str] = None,
+        human_prefix: str = "Human",
+        ai_prefix: str = "AI",
+    ) -> str:
+        string_messages = []
+
+        chat_message_template = chat_message_template or "%1"
+        system_message_template = system_message_template or "%1"
+
+        message_templates = {
+            HumanMessage: chat_message_template,
+            AIMessage: chat_message_template,
+            SystemMessage: system_message_template,
+        }
+
+        for m in messages:
+            if type(m) not in message_templates:
+                raise ValueError(f"Got unsupported message type: {m}")
+
+            template = message_templates[type(m)]
+            message = template.replace(
+                "%1",
+                m.content if isinstance(m, (HumanMessage, AIMessage)) else m.content,
+            )
+            role = (
+                human_prefix
+                if isinstance(m, HumanMessage)
+                else (ai_prefix if isinstance(m, AIMessage) else "System")
+            )
+            message = f"{role}: {message}"
+            string_messages.append(message)
+
+        return "\n".join(string_messages)
+
+    def _predict_messages(
+        self,
+        messages: List[BaseMessage],
+        stop: Optional[Sequence[str]] = None,
+        system_message_template: Optional[str] = None,
+        chat_message_template: Optional[str] = None,
+        **kwargs: Any,
+    ) -> BaseMessage:
+        text = self._apply_prompt_templates(
+            messages=messages,
+            system_message_template=system_message_template,
+            chat_message_template=chat_message_template,
+        )
+        if stop is None:
+            _stop = None
+        else:
+            _stop = list(stop)
+        content = self.llm(text, stop=_stop, **kwargs)
+        return AIMessage(content=content)
+
+    async def _apredict_messages(
+        self,
+        messages: List[BaseMessage],
+        stop: Optional[Sequence[str]] = None,
+        system_message_template: Optional[str] = None,
+        chat_message_template: Optional[str] = None,
+        **kwargs: Any,
+    ) -> BaseMessage:
+        text = self._apply_prompt_templates(
+            messages=messages,
+            system_message_template=system_message_template,
+            chat_message_template=chat_message_template,
+        )
+        if stop is None:
+            _stop = None
+        else:
+            _stop = list(stop)
+        content = self.llm._call_async(text, stop=_stop, **kwargs)
+        return AIMessage(content=content)
 
     def _llm_type(self) -> str:
         """Return type of llm."""

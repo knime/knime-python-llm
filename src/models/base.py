@@ -299,6 +299,8 @@ class LLMPrompter:
         llm = llm_port.create_model(ctx)
         num_rows = input_table.num_rows
 
+        default_system_prompt = "You are a helpful assistant. "
+
         output_table: knext.BatchOutputTable = knext.BatchOutputTable.create()
         i = 0
         for batch in input_table.batches():
@@ -306,6 +308,7 @@ class LLMPrompter:
             responses = []
             for prompt in data_frame[self.prompt_column]:
                 util.check_canceled(ctx)
+                prompt = default_system_prompt + prompt
                 responses.append(llm.predict(prompt))
                 ctx.set_progress(i / num_rows)
                 i += 1

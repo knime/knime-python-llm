@@ -62,6 +62,21 @@ gpt4all_llm_port_type = knext.port_type(
 )
 
 
+def is_valid_model(model_path: str):
+    import os
+
+    if not model_path:
+        raise knext.InvalidParametersError("Path to local model is missing")
+
+    if not os.path.isfile(model_path):
+        raise knext.InvalidParametersError(f"No file found at path: {model_path}")
+
+    if not model_path.endswith(".gguf"):
+        raise knext.InvalidParametersError(
+            "Models needs to be of type '.gguf'. Find the latest models at: https://gpt4all.io/"
+        )
+
+
 @knext.node(
     "GPT4All LLM Connector",
     knext.NodeType.SOURCE,
@@ -77,9 +92,22 @@ class GPT4AllLLMConnector:
     """
     Connects to a locally installed GPT4ALL LLM.
 
-    This connector allows you to connect to a LLM that was installed locally with GPT4ALL. To get started,
-    you need to download a specific model from [GPT4All](https://gpt4all.io/index.html) using the installer.
-    Once you have downloaded the model, specify its file path in the 'Model path' setting to use it.
+    This connector allows you to connect to a local GPT4All LLM. To get started,
+    you need to download a specific model from the [GPT4All](https://gpt4all.io/index.html) model explorer on the website.
+    It is not needed to install the GPT4All software. Once you have downloaded the model, specify its file path in the
+    configuration dialog to use it.
+
+    Some models (e.g. Llama 2) have been fine-tuned for chat applications,
+    so they might behave unexpectedly if their prompts don't follow a chat like structure:
+
+        User: <The prompt you want to send to the model>
+        Assistant:
+
+    Use the prompt template for the specific model from the
+    [GPT4All model list](https://github.com/nomic-ai/gpt4all/blob/main/gpt4all-chat/metadata/models2.json)
+    if one is provided.
+
+    The currently supported models are based on GPT-J, LLaMA, MPT, Replit, Falcon and StarCoder.
 
     For more information and detailed instructions on downloading compatible models, please visit the [GPT4All GitHub repository](https://github.com/nomic-ai/gpt4all).
     """
@@ -87,9 +115,11 @@ class GPT4AllLLMConnector:
     settings = GPT4AllInputSettings()
 
     def configure(self, ctx: knext.ConfigurationContext) -> GPT4AllLLMPortObjectSpec:
-        return GPT4AllLLMPortObjectSpec(self.settings.local_path)
+        is_valid_model(self.settings.local_path)
+        return self.create_spec()
 
     def execute(self, ctx: knext.ExecutionContext) -> GPT4AllLLMPortObject:
-        return GPT4AllLLMPortObject(
-            GPT4AllLLMPortObjectSpec(local_path=self.settings.local_path)
-        )
+        return GPT4AllLLMPortObject(self.create_spec())
+
+    def create_spec(self) -> GPT4AllLLMPortObjectSpec:
+        return GPT4AllLLMPortObjectSpec(local_path=self.settings.local_path)

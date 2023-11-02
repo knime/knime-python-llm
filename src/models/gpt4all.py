@@ -204,6 +204,21 @@ gpt4all_chat_model_port_type = knext.port_type(
 )
 
 
+def is_valid_model(model_path: str):
+    import os
+
+    if not model_path:
+        raise knext.InvalidParametersError("Path to local model is missing")
+
+    if not os.path.isfile(model_path):
+        raise knext.InvalidParametersError(f"No file found at path: {model_path}")
+
+    if not model_path.endswith(".gguf"):
+        raise knext.InvalidParametersError(
+            "Models needs to be of type '.gguf'. Find the latest models at: https://gpt4all.io/"
+        )
+
+
 @knext.node(
     "GPT4All LLM Connector",
     knext.NodeType.SOURCE,
@@ -231,7 +246,7 @@ class GPT4AllLLMConnector:
         Assistant:
 
     Use the prompt template for the specific model from the
-    [GPT4All model list](https://raw.githubusercontent.com/nomic-ai/gpt4all/main/gpt4all-chat/metadata/models.json)
+    [GPT4All model list](https://github.com/nomic-ai/gpt4all/blob/main/gpt4all-chat/metadata/models2.json)
     if one is provided.
 
     The currently supported models are based on GPT-J, LLaMA, MPT, Replit, Falcon and StarCoder.
@@ -243,17 +258,8 @@ class GPT4AllLLMConnector:
     params = GPT4AllModelParameterSettings(since_version="5.2.0")
 
     def configure(self, ctx: knext.ConfigurationContext) -> GPT4AllLLMPortObjectSpec:
-        import os
-
-        if not self.settings.local_path:
-            raise knext.InvalidParametersError("Path to local model is missing")
-
-        if not os.path.isfile(self.settings.local_path):
-            raise knext.InvalidParametersError(
-                f"No file found at path: {self.settings.local_path}"
-            )
-
-        return self.create_spec()
+        if is_valid_model(self.settings.local_path):
+            return self.create_spec()
 
     def execute(self, ctx: knext.ExecutionContext) -> GPT4AllLLMPortObject:
         return GPT4AllLLMPortObject(self.create_spec())
@@ -292,8 +298,7 @@ class GPT4AllChatModelConnector:
     configuration dialog to use it.
 
     It is recommended to use models (e.g. Llama 2) that have been fine-tuned for chat applications. For model specifications
-    including prompt templates, see [GPT4All model list]
-    (https://raw.githubusercontent.com/nomic-ai/gpt4all/main/gpt4all-chat/metadata/models.json).
+    including prompt templates, see [GPT4All model list]https://github.com/nomic-ai/gpt4all/blob/main/gpt4all-chat/metadata/models2.json).
 
     The currently supported models are based on GPT-J, LLaMA, MPT, Replit, Falcon and StarCoder.
 
@@ -307,10 +312,8 @@ class GPT4AllChatModelConnector:
     def configure(
         self, ctx: knext.ConfigurationContext
     ) -> GPT4AllChatModelPortObjectSpec:
-        if not self.settings.local_path:
-            raise knext.InvalidParametersError("Path to local model is missing.")
-
-        return self.create_spec()
+        if is_valid_model(self.settings.local_path):
+            return self.create_spec()
 
     def execute(self, ctx: knext.ExecutionContext) -> GPT4AllChatModelPortObject:
         return GPT4AllChatModelPortObject(self.create_spec())
@@ -328,7 +331,7 @@ class GPT4AllChatModelConnector:
         )
 
 
-_embeddings4all_model_name = "ggml-all-MiniLM-L6-v2-f16.bin"
+_embeddings4all_model_name = "all-MiniLM-L6-v2-f16.gguf"
 
 
 class _Embeddings4All(BaseModel, Embeddings):

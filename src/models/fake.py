@@ -224,10 +224,11 @@ class FakeEmbeddings(Embeddings, BaseModel):
             raise ValueError("None values are not supported.")
         elif not text.strip():
             raise ValueError("Empty documents are not supported.")
-        elif text not in list(self.embeddings_dict.keys()):
-            raise KeyError(f"Could not find document '{text}' in dictionary.")
 
-        return self.embeddings_dict[text]
+        try:
+            return self.embeddings_dict[text]
+        except KeyError:
+            raise KeyError(f"Could not find document '{text}' in dictionary.")
 
 
 # == Port Objects ==

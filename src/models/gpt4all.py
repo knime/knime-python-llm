@@ -246,7 +246,7 @@ class GPT4AllLLMConnector:
         Assistant:
 
     Use the prompt template for the specific model from the
-    [GPT4All model list](https://github.com/nomic-ai/gpt4all/blob/main/gpt4all-chat/metadata/models2.json)
+    [GPT4All model list](https://raw.githubusercontent.com/nomic-ai/gpt4all/main/gpt4all-chat/metadata/models2.json)
     if one is provided.
 
     The currently supported models are based on GPT-J, LLaMA, MPT, Replit, Falcon and StarCoder.
@@ -298,7 +298,7 @@ class GPT4AllChatModelConnector:
     configuration dialog to use it.
 
     It is recommended to use models (e.g. Llama 2) that have been fine-tuned for chat applications. For model specifications
-    including prompt templates, see [GPT4All model list]https://github.com/nomic-ai/gpt4all/blob/main/gpt4all-chat/metadata/models2.json).
+    including prompt templates, see [GPT4All model list]https://raw.githubusercontent.com/nomic-ai/gpt4all/main/gpt4all-chat/metadata/models2.json).
 
     The currently supported models are based on GPT-J, LLaMA, MPT, Replit, Falcon and StarCoder.
 

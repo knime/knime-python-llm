@@ -93,6 +93,27 @@ class GPT4AllModelParameterSettings(GeneralSettings):
     )
 
 
+@knext.parameter_group(label="Prompt Templates", is_advanced=True)
+class GPT4AllPromptSettings:
+    system_prompt_template = knext.MultilineStringParameter(
+        "System Prompt Template",
+        """ Model specific system template. Defaults to "%1". See 
+        [GPT4All model list](https://raw.githubusercontent.com/nomic-ai/gpt4all/main/gpt4all-chat/metadata/models2.json) 
+        for the predefined system prompt template under the name of "systemPrompt" for the model you are using.""",
+        default_value="%1",
+        is_advanced=True,
+    )
+
+    prompt_template = knext.MultilineStringParameter(
+        "Prompt Template",
+        """ Model specific prompt template. Defaults to "%1". See 
+        [GPT4All model list](https://raw.githubusercontent.com/nomic-ai/gpt4all/main/gpt4all-chat/metadata/models2.json) 
+        for the predefined prompt template under the name of "promptTemplate" for the model you are using.""",
+        default_value="%1",
+        is_advanced=True,
+    )
+
+
 class GPT4AllLLMPortObjectSpec(LLMPortObjectSpec):
     def __init__(
         self,
@@ -236,13 +257,13 @@ class GPT4AllChatModelPortObject(GPT4AllLLMPortObject, ChatModelPortObject):
 
     def create_model(self, ctx) -> LLMChatModelAdapter:
         llm = super().create_model(ctx)
-        chat_template = self.spec.prompt_template
-        sys_template = self.spec.system_prompt_template
+        system_prompt_template = self.spec.system_prompt_template
+        prompt_template = self.spec.prompt_template
 
         return LLMChatModelAdapter(
             llm=llm,
-            chat_message_template=chat_template,
-            system_message_template=sys_template,
+            system_prompt_template=system_prompt_template,
+            prompt_template=prompt_template,
         )
 
 
@@ -354,14 +375,7 @@ class GPT4AllChatModelConnector:
 
     settings = GPT4AllInputSettings()
     params = GPT4AllModelParameterSettings()
-
-    system_message_template = knext.MultilineStringParameter(
-        "System Message Template", is_advanced=True
-    )
-
-    chat_message_template = knext.MultilineStringParameter(
-        "Chat Message Template", is_advanced=True
-    )
+    templates = GPT4AllPromptSettings()
 
     def configure(
         self, ctx: knext.ConfigurationContext
@@ -388,8 +402,8 @@ class GPT4AllChatModelConnector:
 
         return GPT4AllChatModelPortObjectSpec(
             llm_spec=llm_spec,
-            system_prompt_template=self.system_message_template,
-            prompt_template=self.chat_message_template,
+            system_prompt_template=self.templates.system_prompt_template,
+            prompt_template=self.templates.prompt_template,
         )
 
 

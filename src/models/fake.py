@@ -233,16 +233,7 @@ class FakeEmbeddings(Embeddings, BaseModel):
 # == Port Objects ==
 
 
-class FakeModelPortObjectSpec(AIPortObjectSpec):
-    def serialize(self) -> dict:
-        return {}
-
-    @classmethod
-    def deserialize(cls, data: dict):
-        return FakeModelPortObjectSpec()
-
-
-class FakeLLMPortObjectSpec(FakeModelPortObjectSpec, LLMPortObjectSpec):
+class FakeLLMPortObjectSpec(LLMPortObjectSpec):
     def __init__(self, sleep: float, missing_value_strategy: str) -> None:
         super().__init__()
         self._sleep = sleep
@@ -312,7 +303,7 @@ fake_llm_port_type = knext.port_type(
 )
 
 
-class FakeChatPortObjectSpec(FakeLLMPortObjectSpec, ChatModelPortObjectSpec):
+class FakeChatPortObjectSpec(ChatModelPortObjectSpec):
     def __init__(self, sleep: float, missing_value_strategy: str) -> None:
         super().__init__(sleep, missing_value_strategy)
 

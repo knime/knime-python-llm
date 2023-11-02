@@ -494,8 +494,8 @@ class LLMChatModelAdapter(BaseChatModel):
     """
 
     llm: BaseLLM
-    system_message_template: str
-    chat_message_template: str
+    system_prompt_template: str
+    prompt_template: str
 
     def _generate(
         self,
@@ -506,8 +506,8 @@ class LLMChatModelAdapter(BaseChatModel):
     ) -> ChatResult:
         prediction = self._predict_messages(
             messages=messages,
-            system_message_template=self.system_message_template,
-            chat_message_template=self.chat_message_template,
+            system_prompt_template=self.system_prompt_template,
+            prompt_template=self.prompt_template,
             stop=stop,
             **kwargs,
         )
@@ -522,8 +522,8 @@ class LLMChatModelAdapter(BaseChatModel):
     ) -> ChatResult:
         prediction = await self._apredict_messages(
             messages=messages,
-            system_message_template=self.system_message_template,
-            chat_message_template=self.chat_message_template,
+            system_prompt_template=self.system_prompt_template,
+            prompt_template=self.prompt_template,
             stop=stop,
             **kwargs,
         )
@@ -532,20 +532,15 @@ class LLMChatModelAdapter(BaseChatModel):
     def _apply_prompt_templates(
         self,
         messages: Sequence[BaseMessage],
-        system_message_template: Optional[str] = None,
-        chat_message_template: Optional[str] = None,
-        human_prefix: str = "Human",
-        ai_prefix: str = "AI",
+        system_prompt_template: Optional[str] = None,
+        prompt_template: Optional[str] = None,
     ) -> str:
         string_messages = []
 
-        chat_message_template = chat_message_template or "%1"
-        system_message_template = system_message_template or "%1"
-
         message_templates = {
-            HumanMessage: chat_message_template,
-            AIMessage: chat_message_template,
-            SystemMessage: system_message_template,
+            HumanMessage: prompt_template,
+            AIMessage: "%1",
+            SystemMessage: system_prompt_template,
         }
 
         for m in messages:
@@ -553,16 +548,16 @@ class LLMChatModelAdapter(BaseChatModel):
                 raise ValueError(f"Got unsupported message type: {m}")
 
             template = message_templates[type(m)]
-            message = template.replace(
-                "%1",
-                m.content if isinstance(m, (HumanMessage, AIMessage)) else m.content,
-            )
-            role = (
-                human_prefix
-                if isinstance(m, HumanMessage)
-                else (ai_prefix if isinstance(m, AIMessage) else "System")
-            )
-            message = f"{role}: {message}"
+            if "%1" in template:
+                message = template.replace(
+                    "%1",
+                    m.content
+                    if isinstance(m, (HumanMessage, SystemMessage))
+                    else m.content,
+                )
+            else:
+                message = m.content
+
             string_messages.append(message)
 
         return "\n".join(string_messages)
@@ -571,14 +566,14 @@ class LLMChatModelAdapter(BaseChatModel):
         self,
         messages: List[BaseMessage],
         stop: Optional[Sequence[str]] = None,
-        system_message_template: Optional[str] = None,
-        chat_message_template: Optional[str] = None,
+        system_prompt_template: Optional[str] = None,
+        prompt_template: Optional[str] = None,
         **kwargs: Any,
     ) -> BaseMessage:
         text = self._apply_prompt_templates(
             messages=messages,
-            system_message_template=system_message_template,
-            chat_message_template=chat_message_template,
+            system_prompt_template=system_prompt_template,
+            prompt_template=prompt_template,
         )
         if stop is None:
             _stop = None
@@ -591,14 +586,14 @@ class LLMChatModelAdapter(BaseChatModel):
         self,
         messages: List[BaseMessage],
         stop: Optional[Sequence[str]] = None,
-        system_message_template: Optional[str] = None,
-        chat_message_template: Optional[str] = None,
+        system_prompt_template: Optional[str] = None,
+        prompt_template: Optional[str] = None,
         **kwargs: Any,
     ) -> BaseMessage:
         text = self._apply_prompt_templates(
             messages=messages,
-            system_message_template=system_message_template,
-            chat_message_template=chat_message_template,
+            system_prompt_template=system_prompt_template,
+            prompt_template=prompt_template,
         )
         if stop is None:
             _stop = None

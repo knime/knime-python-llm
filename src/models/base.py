@@ -493,7 +493,8 @@ class TextEmbedder:
 
 class LLMChatModelAdapter(BaseChatModel):
     """
-    This class adapts LLMs as chat models, allowing LLMs that have been fined tuned for chat applications to be used as chat models with the Chat Model Prompter.
+    This class adapts LLMs as chat models, allowing LLMs that have been fined tuned for
+    chat applications to be used as chat models with the Chat Model Prompter.
     """
 
     llm: BaseLLM
@@ -551,6 +552,9 @@ class LLMChatModelAdapter(BaseChatModel):
                 raise ValueError(f"Got unsupported message type: {m}")
 
             template = message_templates[type(m)]
+
+            # if the template doesn't include the predefined pattern "%1",
+            # the template input will be ignored and only the entered message will be passed
             if "%1" in template:
                 message = template.replace(
                     "%1",

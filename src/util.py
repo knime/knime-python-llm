@@ -1,5 +1,5 @@
 import knime.extension as knext
-from typing import Callable, Union, List
+from typing import Callable, List
 
 
 def is_nominal(column: knext.Column) -> bool:

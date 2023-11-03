@@ -1,7 +1,6 @@
 # KNIME / own imports
 import knime.extension as knext
 from .base import (
-    AIPortObjectSpec,
     LLMPortObjectSpec,
     LLMPortObject,
     ChatModelPortObjectSpec,
@@ -125,11 +124,22 @@ class FakeEmbeddingsSettings:
 # == Fake Implementations ==
 
 
-def handle_missing_value(strategy: str, prompt: str, response: str):
-    if strategy == MissingValueHandlingOptions.Fail.name:
-        raise knext.InvalidParametersError(
-            f"Could not find matching response for prompt: '{prompt}'. Please make sure, that the prompt exactly matches the provided answers."
-        )
+def generate_response(
+    response_dict: dict[str, str],
+    default_response: str,
+    prompt: str,
+    missing_value_strategy: str,
+):
+    response = response_dict.get(prompt)
+
+    if not response:
+        if missing_value_strategy == MissingValueHandlingOptions.Fail.name:
+            raise knext.InvalidParametersError(
+                f"Could not find matching response for prompt: '{prompt}'. Please make sure, that the prompt exactly matches the provided fake queries."
+            )
+        else:
+            return default_response
+
     return response
 
 
@@ -153,11 +163,11 @@ class FakeDictLLM(LLM):
         run_manager: CallbackManagerForLLMRun | None = None,
         **kwargs: Any,
     ) -> str:
-        return self.response_dict.get(
+        return generate_response(
+            self.response_dict,
+            self.default_response,
             prompt,
-            handle_missing_value(
-                self.missing_value_strategy, prompt, self.default_response
-            ),
+            self.missing_value_strategy,
         )
 
     async def _acall(
@@ -168,11 +178,11 @@ class FakeDictLLM(LLM):
         **kwargs: Any,
     ) -> str:
         """Return next response"""
-        return self.response_dict.get(
+        return generate_response(
+            self.response_dict,
+            self.default_response,
             prompt,
-            handle_missing_value(
-                self.missing_value_strategy, prompt, self.default_response
-            ),
+            self.missing_value_strategy,
         )
 
     @property
@@ -201,11 +211,11 @@ class FakeChatModel(SimpleChatModel):
     ) -> str:
         """First try to lookup in response_dict, else return 'foo' or 'bar'."""
         prompt = messages[len(messages) - 1].content
-        return self.response_dict.get(
+        return generate_response(
+            self.response_dict,
+            self.default_response,
             prompt,
-            handle_missing_value(
-                self.missing_value_strategy, prompt, self.default_response
-            ),
+            self.missing_value_strategy,
         )
 
     @property
@@ -216,7 +226,7 @@ class FakeChatModel(SimpleChatModel):
 class FakeEmbeddings(Embeddings, BaseModel):
     embeddings_dict: dict[str, list[float]]
 
-    def embed_documents(self, any) -> List[float]:
+    def embed_documents(self, documents: list[str]) -> List[float]:
         return list(self.embeddings_dict.values())
 
     def embed_query(self, text: str) -> List[float]:

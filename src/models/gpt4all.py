@@ -37,8 +37,8 @@ gpt4all_category = knext.category(
 class GPT4AllInputSettings:
     local_path = knext.StringParameter(
         label="Model path",
-        description="""Path to the pre-trained GPT4All model file eg. my/path/model.bin.
-        You can find the folder through seetings -> application in the gpt4all desktop application""",
+        description="""Path to the pre-trained GPT4All model file eg. my/path/model.gguf.
+        You can find the folder through settings -> application in the gpt4all desktop application""",
         default_value="",
     )
 
@@ -370,7 +370,7 @@ class GPT4AllChatModelConnector:
     configuration dialog to use it.
 
     It is recommended to use models (e.g. Llama 2) that have been fine-tuned for chat applications. For model specifications
-    including prompt templates, see [GPT4All model list]https://raw.githubusercontent.com/nomic-ai/gpt4all/main/gpt4all-chat/metadata/models2.json).
+    including prompt templates, see [GPT4All model list](https://raw.githubusercontent.com/nomic-ai/gpt4all/main/gpt4all-chat/metadata/models2.json).
 
     The currently supported models are based on GPT-J, LLaMA, MPT, Replit, Falcon and StarCoder.
 

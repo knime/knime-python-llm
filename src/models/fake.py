@@ -431,6 +431,28 @@ def _configure_model_generation_columns(
 # == Nodes ==
 
 
+def to_dictionary(table, columns: list[str]):
+    df = table.to_pandas()
+
+    for col in columns:
+        is_missing = df[col].isnull().any()
+
+        if is_missing:
+            raise knext.InvalidParametersError(
+                f"Missing value found in column '{col}'. Please make sure, that the query and response column do not have missing values."
+            )
+
+    response_dict = dict(
+        map(
+            lambda i, j: (i, j),
+            df[columns[0]],
+            df[columns[1]],
+        )
+    )
+
+    return response_dict
+
+
 @knext.node(
     "Fake LLM Connector",
     knext.NodeType.SOURCE,
@@ -481,17 +503,11 @@ class FakeLLMConnector:
         ctx: knext.ExecutionContext,
         input_table: knext.Table,
     ) -> FakeLLMPortObject:
-        df = input_table.to_pandas()
-
         if self.settings.query_column == self.settings.response_column:
             ctx.set_warning("Query and response column are set to be the same column.")
 
-        response_dict = dict(
-            map(
-                lambda i, j: (i, j),
-                df[self.settings.query_column],
-                df[self.settings.response_column],
-            )
+        response_dict = to_dictionary(
+            input_table, [self.settings.query_column, self.settings.response_column]
         )
 
         return FakeLLMPortObject(

@@ -258,8 +258,8 @@ class GPT4AllLLMConnector:
     params = GPT4AllModelParameterSettings(since_version="5.2.0")
 
     def configure(self, ctx: knext.ConfigurationContext) -> GPT4AllLLMPortObjectSpec:
-        if is_valid_model(self.settings.local_path):
-            return self.create_spec()
+        is_valid_model(self.settings.local_path)
+        return self.create_spec()
 
     def execute(self, ctx: knext.ExecutionContext) -> GPT4AllLLMPortObject:
         return GPT4AllLLMPortObject(self.create_spec())
@@ -312,8 +312,8 @@ class GPT4AllChatModelConnector:
     def configure(
         self, ctx: knext.ConfigurationContext
     ) -> GPT4AllChatModelPortObjectSpec:
-        if is_valid_model(self.settings.local_path):
-            return self.create_spec()
+        is_valid_model(self.settings.local_path)
+        return self.create_spec()
 
     def execute(self, ctx: knext.ExecutionContext) -> GPT4AllChatModelPortObject:
         return GPT4AllChatModelPortObject(self.create_spec())

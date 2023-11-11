@@ -237,7 +237,7 @@ class VectorStoreRetriever:
         i = 0
         output_table: knext.BatchOutputTable = knext.BatchOutputTable.create()
 
-        for batch in input_table:
+        for batch in input_table.batches():
             doc_collection = []
             df = batch.to_pandas()
             for query in df[self.query_column]:

@@ -25,7 +25,7 @@ gpt4all = knext.category(
 class GPT4AllInputSettings:
     local_path = knext.StringParameter(
         label="Model path",
-        description="Path to the pre-trained GPT4All model file eg. my/path/model.bin.",
+        description="Path to the pre-trained GPT4All model file eg. my/path/model.gguf.",
         default_value="",
     )
 

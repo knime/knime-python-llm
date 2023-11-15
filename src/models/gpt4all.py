@@ -97,6 +97,10 @@ class GPT4AllLLMConnector:
     It is not needed to install the GPT4All software. Once you have downloaded the model, specify its file path in the
     configuration dialog to use it.
 
+    **Important Note:** GPT4All discontinued support for the old .bin model format and switched to the new .gguf format.
+    Because of this switch, workflows using models in .bin format will no longer work.
+    You can find models in the new format on the [GPT4All](https://gpt4all.io/index.html) website or on [Hugging Face Hub](https://huggingface.co/).
+
     Some models (e.g. Llama 2) have been fine-tuned for chat applications,
     so they might behave unexpectedly if their prompts don't follow a chat like structure:
 

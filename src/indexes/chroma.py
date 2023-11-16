@@ -87,6 +87,12 @@ class LocalChromaVectorstorePortObject(
                 embedding_function=existing_collection._embedding_function,
             )
             existing_entries = existing_collection.get()
+
+            # replace None (not allowed) metadata values with empty dictionaries (expected value type)
+            for i, entry in enumerate(existing_entries["metadatas"]):
+                if entry is None:
+                    existing_entries["metadatas"][i] = {}
+
             new_collection.add(**existing_entries)
             vectorstore = Chroma(
                 embedding_function=vectorstore._embedding_function,

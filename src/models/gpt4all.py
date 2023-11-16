@@ -97,18 +97,27 @@ class GPT4AllModelParameterSettings(GeneralSettings):
 class GPT4AllPromptSettings:
     system_prompt_template = knext.MultilineStringParameter(
         "System Prompt Template",
-        """ Model specific system template. Defaults to "%1". See 
+        """ Model specific system template. Defaults to "%1". Refer to the 
         [GPT4All model list](https://raw.githubusercontent.com/nomic-ai/gpt4all/main/gpt4all-chat/metadata/models2.json) 
-        for the predefined system prompt template under the name of "systemPrompt" for the model you are using.""",
+        for the correct template for your model:
+
+        1. Locate the model you are using under the field "name". 
+        2. Within the Model object, locate the "systemPrompt" field and use these values.""",
         default_value="%1",
         is_advanced=True,
     )
 
     prompt_template = knext.MultilineStringParameter(
         "Prompt Template",
-        """ Model specific prompt template. Defaults to "%1". See 
+        """ Model specific prompt template. Defaults to "%1". Refer to the 
         [GPT4All model list](https://raw.githubusercontent.com/nomic-ai/gpt4all/main/gpt4all-chat/metadata/models2.json) 
-        for the predefined prompt template under the name of "promptTemplate" for the model you are using.""",
+        for the correct template for your model:
+
+        1. Locate the model you are using under the field "name". 
+        2. Within the Model object, locate the "promptTemplate" field and use these values.
+
+        Note: For instruction based models, it is recommended to use "[INST] %1 [/INST]" as the 
+        prompt template for better output if the "promptTemplate" field is not specified in the model list.""",
         default_value="%1",
         is_advanced=True,
     )

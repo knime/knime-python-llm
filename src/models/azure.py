@@ -50,8 +50,7 @@ class AzureOpenAIAuthenticationPortObjectSpec(OpenAIAuthenticationPortObjectSpec
         api_version: str,
         api_type: str,
     ) -> None:
-        super().__init__(credentials)
-        self._api_base = api_base
+        super().__init__(credentials, api_base=api_base)
         self._api_version = api_version
         self._api_type = api_type
 
@@ -70,7 +69,6 @@ class AzureOpenAIAuthenticationPortObjectSpec(OpenAIAuthenticationPortObjectSpec
     def serialize(self) -> dict:
         return {
             **super().serialize(),
-            "api_base": self._api_base,
             "api_version": self._api_version,
             "api_type": self._api_type,
         }

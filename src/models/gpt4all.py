@@ -1,7 +1,6 @@
 # KNIME / own imports
 import knime.extension as knext
 from knime.extension.nodes import FilestorePortObject
-from models.base import EmbeddingsPortObjectSpec
 from .base import (
     LLMPortObjectSpec,
     LLMPortObject,
@@ -93,7 +92,7 @@ class GPT4AllModelParameterSettings(GeneralSettings):
     )
 
 
-@knext.parameter_group(label="Prompt Templates", is_advanced=True)
+@knext.parameter_group(label="Prompt Templates")
 class GPT4AllPromptSettings:
     system_prompt_template = knext.MultilineStringParameter(
         "System Prompt Template",
@@ -104,7 +103,6 @@ class GPT4AllPromptSettings:
         1. Locate the model you are using under the field "name". 
         2. Within the Model object, locate the "systemPrompt" field and use these values.""",
         default_value="%1",
-        is_advanced=True,
     )
 
     prompt_template = knext.MultilineStringParameter(
@@ -119,7 +117,6 @@ class GPT4AllPromptSettings:
         Note: For instruction based models, it is recommended to use "[INST] %1 [/INST]" as the 
         prompt template for better output if the "promptTemplate" field is not specified in the model list.""",
         default_value="%1",
-        is_advanced=True,
     )
 
 
@@ -254,8 +251,8 @@ class GPT4AllChatModelPortObjectSpec(GPT4AllLLMPortObjectSpec, ChatModelPortObje
     def deserialize(cls, data):
         return cls(
             GPT4AllLLMPortObjectSpec.deserialize(data),
-            system_prompt_template=data.get("system_prompt_template", None),
-            prompt_template=data.get("prompt_template", None),
+            system_prompt_template=data["system_prompt_template"],
+            prompt_template=data["prompt_template"],
         )
 
 
@@ -388,8 +385,8 @@ class GPT4AllChatModelConnector:
     """
 
     settings = GPT4AllInputSettings()
-    params = GPT4AllModelParameterSettings()
     templates = GPT4AllPromptSettings()
+    params = GPT4AllModelParameterSettings()
 
     def configure(
         self, ctx: knext.ConfigurationContext

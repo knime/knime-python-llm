@@ -440,6 +440,63 @@ huggingface_hub_llm_port_type = knext.port_type(
 )
 
 
+class HFHubChatModelPortObjectSpec(
+    HuggingFaceHubLLMPortObjectSpec, ChatModelPortObjectSpec
+):
+    def __init__(
+        self,
+        llm_spec: HuggingFaceHubLLMPortObjectSpec,
+        system_prompt_template: str,
+        prompt_template: str,
+    ) -> None:
+        super().__init__(
+            llm_spec.credentials, llm_spec.repo_id, llm_spec.task, llm_spec.model_kwargs
+        )
+        self._system_prompt_template = system_prompt_template
+        self._prompt_template = prompt_template
+
+    @property
+    def system_prompt_template(self) -> str:
+        return self._system_prompt_template
+
+    @property
+    def prompt_template(self) -> str:
+        return self._prompt_template
+
+    def serialize(self) -> dict:
+        data = super().serialize()
+        data["system_prompt_template"] = self.system_prompt_template
+        data["prompt_template"] = self.prompt_template
+
+    @classmethod
+    def deserialize(cls, data: dict):
+        llm_spec = super().deserialize(data)
+        return cls(
+            llm_spec,
+            system_prompt_template=data["system_prompt_template"],
+            prompt_template=data["prompt_template"],
+        )
+
+
+class HFHubChatModelPortObject(HuggingFaceHubLLMPortObject, ChatModelPortObject):
+    @property
+    def spec(self) -> HFHubChatModelPortObjectSpec:
+        return super().spec
+
+    def create_model(self, ctx) -> LLMChatModelAdapter:
+        llm = super().create_model(ctx)
+        return LLMChatModelAdapter(
+            llm,
+            system_prompt_template=self.spec.system_prompt_template,
+            prompt_template=self.spec.prompt_template,
+        )
+
+
+hf_hub_chat_model_port_type = knext.port_type(
+    "HF Hub Chat Model", HFHubChatModelPortObject, HFHubChatModelPortObjectSpec
+)
+
+
 class HFHubEmbeddingsPortObjectSpec(EmbeddingsPortObjectSpec):
     def __init__(
         self, hub_credentials: HuggingFaceAuthenticationPortObjectSpec, repo_id: str
@@ -723,6 +780,75 @@ class HuggingFaceHubConnector:
             HFHubTask[self.hub_settings.task].label,
             model_kwargs,
         )
+
+
+@knext.node(
+    "HF Hub Chat Model Connector",
+    knext.NodeType.SOURCE,
+    huggingface_icon,
+    category=huggingface_hub_category,
+)
+@knext.input_port(
+    "Hugging Face Authentication",
+    "Validated authentication for Hugging Face Hub.",
+    huggingface_authentication_port_type,
+)
+@knext.output_port(
+    "Hugging Face Hub Chat Model",
+    "Connection to a specific chat model from Hugging Face Hub.",
+    hf_hub_chat_model_port_type,
+)
+class HFHubChatModelConnector:
+    """
+    Connects to an chat model hosted on the Hugging Face Hub.
+
+    This node establishes a connection to a specific chat model hosted on the Hugging Face Hub.
+    The difference to the HF Hub LLM Connector is that this node allows you to provide prompt templates which are crucial for
+    obtaining the best output from many models that have been fine-tuned for chatting.
+    To use this node, you need to successfully authenticate with the Hugging Face Hub using the **HF Hub Authenticator node**.
+
+    Provide the name of the desired chat model repository available on the [Hugging Face Hub](https://python.langchain.com/docs/modules/model_io/models/llms/integrations/huggingface_hub) as an input.
+    """
+
+    hub_settings = HuggingFaceHubSettings()
+    template_settings = HFPromptTemplateSettings()
+    model_settings = HuggingFaceModelSettings()
+
+    def configure(
+        self,
+        ctx: knext.ConfigurationContext,
+        auth: HuggingFaceAuthenticationPortObjectSpec,
+    ) -> HFHubChatModelPortObjectSpec:
+        auth.validate_context(ctx)
+        if not self.hub_settings.repo_id:
+            raise knext.InvalidParametersError("Please enter a repo ID.")
+        _validate_repo_id(self.hub_settings.repo_id)
+        return self._create_spec(auth)
+
+    def _create_spec(self, auth: HuggingFaceAuthenticationPortObjectSpec):
+        model_kwargs = {
+            "temperature": self.model_settings.temperature,
+            "top_p": self.model_settings.top_p,
+            "top_k": self.model_settings.top_k,
+            "max_new_tokens": self.model_settings.max_new_tokens,
+        }
+
+        llm_spec = HuggingFaceHubLLMPortObjectSpec(
+            auth,
+            self.hub_settings.repo_id,
+            HFHubTask[self.hub_settings.task].label,
+            model_kwargs,
+        )
+        return HFHubChatModelPortObjectSpec(
+            llm_spec,
+            self.template_settings.system_prompt_template,
+            self.template_settings.prompt_template,
+        )
+
+    def execute(
+        self, ctx, auth: HuggingFaceAuthenticationPortObject
+    ) -> HFHubChatModelPortObject:
+        return HFHubChatModelPortObject(self._create_spec(auth.spec))
 
 
 def _validate_repo_id(repo_id):

@@ -136,6 +136,23 @@ class HuggingFaceHubSettings:
     )
 
 
+@knext.parameter_group(label="Prompt Templates")
+class HFPromptTemplateSettings:
+    system_prompt_template = knext.MultilineStringParameter(
+        "System Prompt Template",
+        """ Model specific system prompt template. Defaults to "%1".
+        Refer to the Hugging Face Hub model card for information on the correct prompt template.""",
+        default_value="%1",
+    )
+
+    prompt_template = knext.MultilineStringParameter(
+        "Prompt Template",
+        """ Model specific prompt template. Defaults to "%1". 
+        Refer to the Hugging Face Hub model card for information on the correct prompt template.""",
+        default_value="%1",
+    )
+
+
 # == Port Objects ==
 
 
@@ -234,27 +251,73 @@ huggingface_textGenInference_llm_port_type = knext.port_type(
 )
 
 
-class HuggingFaceTextGenInfChatModelPortObjectSpec(
+class HFTextGenInfChatModelPortObjectSpec(
     HuggingFaceTextGenInfLLMPortObjectSpec, ChatModelPortObjectSpec
 ):
-    pass
+    def __init__(
+        self,
+        llm_spec: HuggingFaceTextGenInfLLMPortObjectSpec,
+        system_prompt_template: str,
+        prompt_template: str,
+    ) -> None:
+        super().__init__(
+            llm_spec.inference_server_url,
+            llm_spec.max_new_tokens,
+            llm_spec.top_k,
+            llm_spec.top_p,
+            llm_spec.typical_p,
+            llm_spec.temperature,
+            llm_spec.repetition_penalty,
+        )
+        self._system_prompt_template = system_prompt_template
+        self._prompt_template = prompt_template
+
+    @property
+    def system_prompt_template(self) -> str:
+        return self._system_prompt_template
+
+    @property
+    def prompt_template(self) -> str:
+        return self._prompt_template
+
+    def serialize(self) -> dict:
+        data = super().serialize()
+        data["system_prompt_template"] = self._system_prompt_template
+        data["prompt_template"] = self._prompt_template
+
+    @classmethod
+    def deserialize(cls, data: dict):
+        llm_spec = HuggingFaceTextGenInfLLMPortObjectSpec.deserialize(data)
+        return cls(
+            llm_spec,
+            system_prompt_template=data["system_prompt_template"],
+            prompt_template=data["prompt_template"],
+        )
 
 
-class HuggingFaceTextGenInfChatModelPortObject(
+class HFTextGenInfChatModelPortObject(
     HuggingFaceTextGenInfLLMPortObject, ChatModelPortObject
 ):
-    def __init__(self, spec: HuggingFaceTextGenInfChatModelPortObjectSpec) -> None:
+    def __init__(self, spec: HFTextGenInfChatModelPortObjectSpec) -> None:
         super().__init__(spec)
+
+    @property
+    def spec(self) -> HFTextGenInfChatModelPortObjectSpec:
+        return super().spec
 
     def create_model(self, ctx) -> LLMChatModelAdapter:
         llm = super().create_model(ctx)
-        return LLMChatModelAdapter(llm=llm)
+        return LLMChatModelAdapter(
+            llm=llm,
+            system_prompt_template=self.spec.system_prompt_template,
+            prompt_template=self.spec.prompt_template,
+        )
 
 
 huggingface_textGenInference_chat_port_type = knext.port_type(
     "Hugging Face Chat Model",
-    HuggingFaceTextGenInfChatModelPortObject,
-    HuggingFaceTextGenInfChatModelPortObjectSpec,
+    HFTextGenInfChatModelPortObject,
+    HFTextGenInfChatModelPortObjectSpec,
 )
 
 
@@ -487,7 +550,7 @@ class HuggingfaceTextGenInferenceConnector:
     "Connection to an LLM hosted on a Text Generation Inference Server.",
     huggingface_textGenInference_chat_port_type,
 )
-class HuggingfaceTextGenChatModelConnector:
+class HFTextGenChatModelConnector:
     """
     Connects to a dedicated Text Generation Inference Server.
 
@@ -502,16 +565,19 @@ class HuggingfaceTextGenChatModelConnector:
     """
 
     settings = HuggingFaceTextGenInferenceInputSettings()
+    templates = HFPromptTemplateSettings()
     model_settings = HuggingFaceModelSettings()
 
-    def configure(self, ctx: knext.ConfigurationContext):
+    def configure(
+        self, ctx: knext.ConfigurationContext
+    ) -> HFTextGenInfChatModelPortObjectSpec:
         return self.create_spec()
 
-    def execute(self, ctx: knext.ExecutionContext):
-        return HuggingFaceTextGenInfChatModelPortObject(self.create_spec())
+    def execute(self, ctx: knext.ExecutionContext) -> HFTextGenInfChatModelPortObject:
+        return HFTextGenInfChatModelPortObject(self.create_spec())
 
-    def create_spec(self):
-        return HuggingFaceTextGenInfChatModelPortObjectSpec(
+    def create_spec(self) -> HFTextGenInfChatModelPortObjectSpec:
+        llm_spec = HuggingFaceTextGenInfLLMPortObjectSpec(
             self.settings.server_url,
             self.model_settings.max_new_tokens,
             self.model_settings.top_k,
@@ -519,6 +585,12 @@ class HuggingfaceTextGenChatModelConnector:
             self.model_settings.typical_p,
             self.model_settings.temperature,
             self.model_settings.repetition_penalty,
+        )
+
+        return HFTextGenInfChatModelPortObjectSpec(
+            llm_spec,
+            self.templates.system_prompt_template,
+            self.templates.prompt_template,
         )
 
 

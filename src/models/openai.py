@@ -651,7 +651,8 @@ class OpenAIChatModelConnector:
     of all available OpenAI models but you have to ensure that selected model is compatible with the OpenAI Chat API.
 
     Note that chat models can also be used as LLMs because they are actually a subcategory of LLMs that are optimized
-    for chat-like applications.
+    for chat-like applications. Find documentation about the latest models at [OpenAI](https://platform.openai.com/docs/models/models).
+
     """
 
     input_settings = ChatModelLoaderInputSettings()

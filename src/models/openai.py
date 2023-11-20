@@ -129,24 +129,12 @@ def _create_specific_model_name(api_name: str) -> knext.StringParameter:
 @knext.parameter_group(label="OpenAI Model Selection")
 class LLMLoaderInputSettings:
     class OpenAIModelCompletionsOptions(knext.EnumParameterOptions):
-        Ada = (
-            "text-ada-001",
-            "Capable of very simple tasks, usually the fastest model in the GPT-3 series, and lowest cost.",
-        )
         Babbage = (
-            "text-babbage-001",
+            "text-babbage-002",
             "Capable of straightforward tasks, very fast, and lower cost.",
-        )
-        Curie = (
-            "text-curie-001",
-            "Very capable, but faster and lower cost than Davinci.",
         )
         DaVinci2 = (
             "text-davinci-002",
-            "Can do any language task with better quality, longer output, and consistent instruction-following than the curie, babbage, or ada models.",
-        )
-        DaVinci3 = (
-            "text-davinci-003",
             "Can do any language task with better quality, longer output, and consistent instruction-following than the curie, babbage, or ada models.",
         )
         Gpt35TurboInstruct = (
@@ -588,6 +576,7 @@ class OpenAILLMConnector:
     After successfully authenticating using the **OpenAI Authenticator node**, you can select an LLM from a predefined list
     or explore advanced options to get a list of all models available for your API key (including fine-tunes).
     Note that only models compatible with OpenAI's Completions API will work with this node (unfortunately this information is not available programmatically).
+    Find documentation about all models at [OpenAI](https://platform.openai.com/docs/models/models).
 
     If you a looking for gpt-3.5-turbo (the model behind ChatGPT) or gpt-4, check out the **OpenAI Chat Model Connector** node.
     """

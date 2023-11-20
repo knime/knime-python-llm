@@ -185,10 +185,6 @@ class ChatModelLoaderInputSettings:
 @knext.parameter_group(label="OpenAI Embeddings Selection")
 class EmbeddingsLoaderInputSettings:
     class OpenAIEmbeddingsOptions(knext.EnumParameterOptions):
-        Ada1 = (
-            "text-search-ada-doc-001",
-            "Capable of very simple tasks, usually the fastest model in the GPT-3 series, and lowest cost.",
-        )
         Ada2 = (
             "text-embedding-ada-002",
             "Capable of straightforward tasks, very fast, and lower cost.",
@@ -719,7 +715,8 @@ class OpenAIEmbeddingsConnector:
     Connects to an OpenAI Embeddings Model.
 
     This node establishes a connection with an OpenAI Embeddings Model. After successfully authenticating
-    using the **OpenAI Authenticator node**, you can select an embedding model from a predefined list.
+    using the **OpenAI Authenticator node**, you can select an embedding model. Follow
+    [OpenAI](https://platform.openai.com/docs/models/models) to find the latest Embeddings Models.
 
     If OpenAI releases a new embeddings model that is not contained in the predefined list, you can select it from
     the list in the advanced settings which contains all OpenAI models available for your OpenAI API key.

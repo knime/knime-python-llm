@@ -1,11 +1,12 @@
-# KNIME / own imports
 import knime.extension as knext
 from typing import Optional
+
 from models.base import (
     EmbeddingsPortObjectSpec,
     EmbeddingsPortObject,
     embeddings_model_port_type,
 )
+
 from .base import (
     VectorstorePortObjectSpec,
     VectorstorePortObject,
@@ -19,9 +20,9 @@ from .base import (
     store_category,
     validate_creator_document_column,
 )
+
 import util
 
-# Langchain imports
 from langchain.vectorstores import Chroma
 from langchain.docstore.document import Document
 
@@ -75,8 +76,11 @@ class LocalChromaVectorstorePortObject(
             import chromadb
             import chromadb.config
 
+            settings = chromadb.config.Settings(
+                chroma_db_impl="duckdb+parquet", persist_directory=vectorstore_folder
+            )
             existing_collection = vectorstore._collection
-            client = chromadb.PersistentClient(path=vectorstore_folder)
+            client = chromadb.Client(settings)
             new_collection = client.get_or_create_collection(
                 name=existing_collection.name,
                 metadata=existing_collection.metadata,
@@ -87,6 +91,7 @@ class LocalChromaVectorstorePortObject(
             vectorstore = Chroma(
                 embedding_function=vectorstore._embedding_function,
                 persist_directory=vectorstore_folder,
+                client_settings=settings,
                 collection_metadata=existing_collection.metadata,
                 client=client,
             )

@@ -91,9 +91,30 @@ class GPT4AllModelParameterSettings(GeneralSettings):
         is_advanced=True,
     )
 
-    prompt_batch_size = knext.IntParameter(label="Prompt batch size", description="""Amount of prompt tokens to process at once. 
+    prompt_batch_size = knext.IntParameter(
+        label="Prompt batch size",
+        description="""Amount of prompt tokens to process at once. 
                                            NOTE: Higher values can speed up reading prompts but will also use more RAM.""",
-                                           default_value=128, min_value=1, is_advanced=True)
+        default_value=128,
+        min_value=1,
+        is_advanced=True,
+    )
+
+    device = knext.StringParameter(
+        label="Device",
+        description="""The processing unit on which the GPT4All model will run. It can be set to: 
+        - "cpu": Model will run on the central processing unit.
+        - "gpu": Model will run on the best available graphics processing unit, irrespective of its vendor. 
+        - "amd", "nvidia", "intel": Model will run on the best available GPU from the specified vendor. 
+        
+        Alternatively, a specific GPU name can also be provided, and the model will run on the GPU that matches the name if it's available. 
+        Default is "cpu".
+
+        Note: If a selected GPU device does not have sufficient RAM to accommodate the model, an error will be thrown, and the GPT4All instance will be rendered invalid.
+        It's advised to ensure the device has enough memory before initiating the model.""",
+        default_value="cpu",
+        is_advanced=True,
+    )
 
 
 @knext.parameter_group(label="Prompt Templates")
@@ -134,6 +155,7 @@ class GPT4AllLLMPortObjectSpec(LLMPortObjectSpec):
         top_p: float,
         max_token: int,
         prompt_batch_size: int,
+        device: str,
     ) -> None:
         super().__init__()
         self._local_path = local_path
@@ -143,6 +165,7 @@ class GPT4AllLLMPortObjectSpec(LLMPortObjectSpec):
         self._top_p = top_p
         self._max_token = max_token
         self._prompt_batch_size = prompt_batch_size
+        self._device = device
 
     @property
     def local_path(self) -> str:
@@ -167,10 +190,14 @@ class GPT4AllLLMPortObjectSpec(LLMPortObjectSpec):
     @property
     def max_token(self) -> int:
         return self._max_token
-    
+
     @property
     def prompt_batch_size(self) -> int:
         return self._prompt_batch_size
+
+    @property
+    def device(self) -> str:
+        return self._device
 
     def serialize(self) -> dict:
         return {
@@ -180,7 +207,8 @@ class GPT4AllLLMPortObjectSpec(LLMPortObjectSpec):
             "top_p": self._top_p,
             "top_k": self._top_k,
             "max_token": self._max_token,
-            "prompt_batch_size": self.prompt_batch_size
+            "prompt_batch_size": self.prompt_batch_size,
+            "device": self._device,
         }
 
     @classmethod
@@ -192,7 +220,8 @@ class GPT4AllLLMPortObjectSpec(LLMPortObjectSpec):
             top_k=data.get("top_k", 20),
             top_p=data.get("top_p", 0.15),
             max_token=data.get("max_token", 250),
-            prompt_batch_size=data.get("prompt_batch_size", 128)
+            prompt_batch_size=data.get("prompt_batch_size", 128),
+            device=data.get("device", "cpu"),
         )
 
 
@@ -211,6 +240,7 @@ class GPT4AllLLMPortObject(LLMPortObject):
                 top_k=self.spec.top_k,
                 n_predict=self.spec.max_token,
                 n_batch=self.spec.prompt_batch_size,
+                device=self.spec.device,
             )
         except ValidationError:
             raise knext.InvalidParametersError(
@@ -230,12 +260,13 @@ class GPT4AllChatModelPortObjectSpec(GPT4AllLLMPortObjectSpec, ChatModelPortObje
     ) -> None:
         super().__init__(
             local_path=llm_spec._local_path,
-            n_threads = llm_spec._n_threads,
-            temperature = llm_spec._temperature,
-            top_k = llm_spec._top_k,
-            top_p = llm_spec._top_p,
-            max_token = llm_spec._max_token,
-            prompt_batch_size=llm_spec.prompt_batch_size
+            n_threads=llm_spec._n_threads,
+            temperature=llm_spec._temperature,
+            top_k=llm_spec._top_k,
+            top_p=llm_spec._top_p,
+            max_token=llm_spec._max_token,
+            prompt_batch_size=llm_spec.prompt_batch_size,
+            device=llm_spec.device,
         )
         self._system_prompt_template = system_prompt_template
         self._prompt_template = prompt_template
@@ -359,7 +390,8 @@ class GPT4AllLLMConnector:
             top_k=self.params.top_k,
             top_p=self.params.top_p,
             max_token=self.params.max_token,
-            prompt_batch_size=self.params.prompt_batch_size
+            prompt_batch_size=self.params.prompt_batch_size,
+            device=self.params.device,
         )
 
 
@@ -415,7 +447,8 @@ class GPT4AllChatModelConnector:
             top_p=self.params.top_p,
             top_k=self.params.top_k,
             max_token=self.params.max_token,
-            prompt_batch_size=self.params.prompt_batch_size
+            prompt_batch_size=self.params.prompt_batch_size,
+            device=self.params.device,
         )
 
         return GPT4AllChatModelPortObjectSpec(

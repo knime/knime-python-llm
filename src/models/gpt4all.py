@@ -242,7 +242,10 @@ class GPT4AllLLMPortObject(LLMPortObject):
                 n_batch=self.spec.prompt_batch_size,
                 device=self.spec.device,
             )
-        except ValidationError:
+        except ValidationError as e:
+            error_msg = e.errors()[0]["msg"]
+            if "Unable to initialize model on GPU:" in error_msg:
+                raise knext.InvalidParametersError(error_msg) from e
             raise knext.InvalidParametersError(
                 """
                 Could not validate model due to version incompatibility. Please provide a model based on one

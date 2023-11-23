@@ -768,6 +768,12 @@ class OpenAIDALLEPrompter:
         authentication: OpenAIAuthenticationPortObjectSpec,
     ):
         authentication.validate_context(ctx)
+
+        if len(self.prompt) > 4000:
+            knext.InvalidParametersError(
+                f"Prompt can not exceed a lengh of 4000 characters. Prompt length is {len(self.prompt)}"
+            )
+
         return knext.ImagePortObjectSpec(knext.ImageFormat.PNG)
 
     def execute(

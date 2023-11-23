@@ -17,8 +17,8 @@ from .base import (
 from base import AIPortObjectSpec
 
 # Langchain imports
-from langchain import HuggingFaceHub
-from langchain.llms import HuggingFaceTextGenInference
+from langchain.llms.huggingface_text_gen_inference import HuggingFaceTextGenInference
+from langchain.llms.huggingface_hub import HuggingFaceHub
 from langchain.embeddings import HuggingFaceHubEmbeddings
 
 # Other imports
@@ -80,7 +80,6 @@ class HuggingFaceModelSettings(GeneralSettings):
         The token count of your prompt plus *max new tokens* cannot exceed the model's context length.
         """,
         default_value=50,
-        max_value=256,
         min_value=0,
     )
 
@@ -284,6 +283,7 @@ class HFTextGenInfChatModelPortObjectSpec(
         data = super().serialize()
         data["system_prompt_template"] = self._system_prompt_template
         data["prompt_template"] = self._prompt_template
+        return data
 
     @classmethod
     def deserialize(cls, data: dict):
@@ -382,6 +382,9 @@ class HuggingFaceHubLLMPortObjectSpec(LLMPortObjectSpec):
         self._task = task
         self._model_kwargs = model_kwargs
 
+    def validate_context(self, ctx: knext.ConfigurationContext):
+        return self._credentials.validate_context(ctx)
+
     @property
     def credentials(self) -> str:
         return self._credentials.credentials
@@ -450,7 +453,10 @@ class HFHubChatModelPortObjectSpec(
         prompt_template: str,
     ) -> None:
         super().__init__(
-            llm_spec.credentials, llm_spec.repo_id, llm_spec.task, llm_spec.model_kwargs
+            llm_spec._credentials,
+            llm_spec.repo_id,
+            llm_spec.task,
+            llm_spec.model_kwargs,
         )
         self._system_prompt_template = system_prompt_template
         self._prompt_template = prompt_template
@@ -467,10 +473,11 @@ class HFHubChatModelPortObjectSpec(
         data = super().serialize()
         data["system_prompt_template"] = self.system_prompt_template
         data["prompt_template"] = self.prompt_template
+        return data
 
     @classmethod
     def deserialize(cls, data: dict):
-        llm_spec = super().deserialize(data)
+        llm_spec = HuggingFaceHubLLMPortObjectSpec.deserialize(data)
         return cls(
             llm_spec,
             system_prompt_template=data["system_prompt_template"],
@@ -486,7 +493,7 @@ class HFHubChatModelPortObject(HuggingFaceHubLLMPortObject, ChatModelPortObject)
     def create_model(self, ctx) -> LLMChatModelAdapter:
         llm = super().create_model(ctx)
         return LLMChatModelAdapter(
-            llm,
+            llm=llm,
             system_prompt_template=self.spec.system_prompt_template,
             prompt_template=self.spec.prompt_template,
         )

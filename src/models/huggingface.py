@@ -244,13 +244,13 @@ class HuggingFaceTextGenInfLLMPortObject(LLMPortObject):
 
 
 huggingface_textGenInference_llm_port_type = knext.port_type(
-    "Hugging Face LLM",
+    "Hugging Face TGI LLM",
     HuggingFaceTextGenInfLLMPortObject,
     HuggingFaceTextGenInfLLMPortObjectSpec,
 )
 
 
-class HFTextGenInfChatModelPortObjectSpec(
+class HFTGIChatModelPortObjectSpec(
     HuggingFaceTextGenInfLLMPortObjectSpec, ChatModelPortObjectSpec
 ):
     def __init__(
@@ -295,14 +295,12 @@ class HFTextGenInfChatModelPortObjectSpec(
         )
 
 
-class HFTextGenInfChatModelPortObject(
-    HuggingFaceTextGenInfLLMPortObject, ChatModelPortObject
-):
-    def __init__(self, spec: HFTextGenInfChatModelPortObjectSpec) -> None:
+class HFTGIChatModelPortObject(HuggingFaceTextGenInfLLMPortObject, ChatModelPortObject):
+    def __init__(self, spec: HFTGIChatModelPortObjectSpec) -> None:
         super().__init__(spec)
 
     @property
-    def spec(self) -> HFTextGenInfChatModelPortObjectSpec:
+    def spec(self) -> HFTGIChatModelPortObjectSpec:
         return super().spec
 
     def create_model(self, ctx) -> LLMChatModelAdapter:
@@ -315,9 +313,9 @@ class HFTextGenInfChatModelPortObject(
 
 
 huggingface_textGenInference_chat_port_type = knext.port_type(
-    "Hugging Face Chat Model",
-    HFTextGenInfChatModelPortObject,
-    HFTextGenInfChatModelPortObjectSpec,
+    "Hugging Face TGI Chat Model",
+    HFTGIChatModelPortObject,
+    HFTGIChatModelPortObjectSpec,
 )
 
 
@@ -558,14 +556,14 @@ huggingface_embeddings_port_type = knext.port_type(
 
 
 @knext.node(
-    "HF TextGen LLM Connector",
+    "HF TGI LLM Connector",
     knext.NodeType.SOURCE,
     huggingface_icon,
     category=huggingface_category,
 )
 @knext.output_port(
-    "Huggingface TextGen Inference Configuration",
-    "Connection to an LLM hosted on a Text Generation Inference Server.",
+    "Huggingface TGI Configuration",
+    "Connection to an LLM hosted on a TGI server.",
     huggingface_textGenInference_llm_port_type,
 )
 class HuggingfaceTextGenInferenceConnector:
@@ -604,17 +602,17 @@ class HuggingfaceTextGenInferenceConnector:
 
 
 @knext.node(
-    "HF TextGen Chat Model Connector",
+    "HF TGI Chat Model Connector",
     knext.NodeType.SOURCE,
     huggingface_icon,
     category=huggingface_category,
 )
 @knext.output_port(
-    "Huggingface TextGen Inference Configuration",
-    "Connection to an LLM hosted on a Text Generation Inference Server.",
+    "Huggingface TGI LLM Connection",
+    "Connection to a chat model hosted on a Text Generation Inference server.",
     huggingface_textGenInference_chat_port_type,
 )
-class HFTextGenChatModelConnector:
+class HFTGIChatModelConnector:
     """
     Connects to a dedicated Text Generation Inference Server.
 
@@ -634,13 +632,13 @@ class HFTextGenChatModelConnector:
 
     def configure(
         self, ctx: knext.ConfigurationContext
-    ) -> HFTextGenInfChatModelPortObjectSpec:
+    ) -> HFTGIChatModelPortObjectSpec:
         return self.create_spec()
 
-    def execute(self, ctx: knext.ExecutionContext) -> HFTextGenInfChatModelPortObject:
-        return HFTextGenInfChatModelPortObject(self.create_spec())
+    def execute(self, ctx: knext.ExecutionContext) -> HFTGIChatModelPortObject:
+        return HFTGIChatModelPortObject(self.create_spec())
 
-    def create_spec(self) -> HFTextGenInfChatModelPortObjectSpec:
+    def create_spec(self) -> HFTGIChatModelPortObjectSpec:
         llm_spec = HuggingFaceTextGenInfLLMPortObjectSpec(
             self.settings.server_url,
             self.model_settings.max_new_tokens,
@@ -651,7 +649,7 @@ class HFTextGenChatModelConnector:
             self.model_settings.repetition_penalty,
         )
 
-        return HFTextGenInfChatModelPortObjectSpec(
+        return HFTGIChatModelPortObjectSpec(
             llm_spec,
             self.templates.system_prompt_template,
             self.templates.prompt_template,

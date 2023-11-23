@@ -141,7 +141,10 @@ class GPT4AllPromptSettings:
 
         Note: For instruction based models, it is recommended to use "[INST] %1 [/INST]" as the 
         prompt template for better output if the "promptTemplate" field is not specified in the model list.""",
-        default_value="%1",
+        default_value="""### Human:
+%1
+### Assistant:
+""",
     )
 
 

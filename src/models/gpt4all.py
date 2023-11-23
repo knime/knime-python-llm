@@ -94,7 +94,7 @@ class GPT4AllModelParameterSettings(GeneralSettings):
     prompt_batch_size = knext.IntParameter(
         label="Prompt batch size",
         description="""Amount of prompt tokens to process at once. 
-                                           NOTE: Higher values can speed up reading prompts but will also use more RAM.""",
+                    NOTE: Higher values can speed up reading prompts but will also use more RAM.""",
         default_value=128,
         min_value=1,
         is_advanced=True,
@@ -247,10 +247,7 @@ class GPT4AllLLMPortObject(LLMPortObject):
             if "Unable to initialize model on GPU:" in error_msg:
                 raise knext.InvalidParametersError(error_msg) from e
             raise knext.InvalidParametersError(
-                """
-                Could not validate model due to version incompatibility. Please provide a model based on one
-                of the following infrastructures: GPT-J, LLaMA, MPT, Replit, Falcon and StarCoder
-                """
+                "Could not create model. Please provide a model in GGUF format."
             )
 
 

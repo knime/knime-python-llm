@@ -486,11 +486,11 @@ class OpenAIAuthenticator:
 
     def execute(self, ctx: knext.ExecutionContext) -> OpenAIAuthenticationPortObject:
         try:
-            openai.api_key = ctx.get_credentials(
-                self.credentials_settings.credentials_param
-            ).password
-
-            openai.Model.list()
+            openai.OpenAI(
+                api_key=ctx.get_credentials(
+                    self.credentials_settings.credentials_param
+                ).password
+            ).models.list()
         except:
             raise knext.InvalidParametersError("API key is not valid.")
 

@@ -323,7 +323,7 @@ class VectorStoreRetriever:
         "Retrieve metadata from documents",
         "Whether or not to retrieve document metadata if provided.",
         default_value=False,
-        since_version="5.1.1",
+        since_version="5.2.0",
     )
 
     def configure(

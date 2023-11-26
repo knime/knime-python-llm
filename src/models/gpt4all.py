@@ -94,7 +94,8 @@ class GPT4AllModelParameterSettings(GeneralSettings):
     prompt_batch_size = knext.IntParameter(
         label="Prompt batch size",
         description="""Amount of prompt tokens to process at once. 
-                    NOTE: Higher values can speed up reading prompts but will also use more RAM.""",
+                    NOTE: On CPU higher values can speed up reading prompts but will also use more RAM.
+                    On GPU, a batch size of 1 has outperformed other batch sizes in our experiments.""",
         default_value=128,
         min_value=1,
         is_advanced=True,
@@ -102,15 +103,16 @@ class GPT4AllModelParameterSettings(GeneralSettings):
 
     device = knext.StringParameter(
         label="Device",
-        description="""The processing unit on which the GPT4All model will run. It can be set to: 
+        description="""The processing unit on which the GPT4All model will run. It can be set to:
+
         - "cpu": Model will run on the central processing unit.
-        - "gpu": Model will run on the best available graphics processing unit, irrespective of its vendor. 
+        - "gpu": Model will run on the best available graphics processing unit, irrespective of its vendor.
         - "amd", "nvidia", "intel": Model will run on the best available GPU from the specified vendor. 
         
         Alternatively, a specific GPU name can also be provided, and the model will run on the GPU that matches the name if it's available. 
         Default is "cpu".
 
-        Note: If a selected GPU device does not have sufficient RAM to accommodate the model, an error will be thrown, and the GPT4All instance will be rendered invalid.
+        Note: If a selected GPU device does not have sufficient RAM to accommodate the model, an error will be thrown.
         It's advised to ensure the device has enough memory before initiating the model.""",
         default_value="cpu",
         is_advanced=True,

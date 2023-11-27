@@ -40,6 +40,8 @@ LOGGER = logging.getLogger(__name__)
 
 # == SETTINGS ==
 
+_default_openai_api_base = "https://api.openai.com/v1"
+
 
 # @knext.parameter_group(label="Model Settings") -- Imported
 class OpenAIGeneralSettings(GeneralSettings):
@@ -282,9 +284,7 @@ class OpenAIAuthenticationPortObjectSpec(AIPortObjectSpec):
 
     @classmethod
     def deserialize(cls, data: dict):
-        return cls(
-            data["credentials"], data.get("base_url", "https://api.openai.com/v1")
-        )
+        return cls(data["credentials"], data.get("base_url", _default_openai_api_base))
 
 
 class OpenAIAuthenticationPortObject(knext.PortObject):
@@ -526,7 +526,7 @@ class OpenAIAuthenticator:
     base_url = knext.StringParameter(
         "OpenAI base URL",
         """Sets the destination of the API requests to OpenAI.""",
-        default_value="https://api.openai.com/v1",
+        default_value=_default_openai_api_base,
         since_version="5.2.0",
         is_advanced=True,
     )

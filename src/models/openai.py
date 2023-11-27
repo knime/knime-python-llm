@@ -14,8 +14,8 @@ from .base import (
 )
 
 # Langchain imports
-from langchain.llms import OpenAI
-from langchain.chat_models import ChatOpenAI
+from langchain.llms.openai import OpenAI
+from langchain.chat_models.openai import ChatOpenAI
 from langchain.embeddings.openai import OpenAIEmbeddings
 
 # Other imports
@@ -248,22 +248,20 @@ class ImagelLoaderInputSettings:
 
 # == Port Objects ==
 
-_open_ai_api_base = "https://api.openai.com/v1"
-
 
 class OpenAIAuthenticationPortObjectSpec(AIPortObjectSpec):
-    def __init__(self, credentials: str, api_base: str) -> None:
+    def __init__(self, credentials: str, base_url: str) -> None:
         super().__init__()
         self._credentials = credentials
-        self._api_base = api_base
+        self._base_url = base_url
 
     @property
     def credentials(self) -> str:
         return self._credentials
 
     @property
-    def api_base(self):
-        return self._api_base
+    def base_url(self):
+        return self._base_url
 
     def validate_context(self, ctx: knext.ConfigurationContext):
         if not self.credentials in ctx.get_credential_names():
@@ -279,13 +277,13 @@ class OpenAIAuthenticationPortObjectSpec(AIPortObjectSpec):
     def serialize(self) -> dict:
         return {
             "credentials": self._credentials,
-            "api_base": self._api_base,
+            "base_url": self._base_url,
         }
 
     @classmethod
     def deserialize(cls, data: dict):
         return cls(
-            data["credentials"], data.get("api_base", "https://api.openai.com/v1")
+            data["credentials"], data.get("base_url", "https://api.openai.com/v1")
         )
 
 
@@ -321,8 +319,8 @@ class OpenAIModelPortObjectSpec(AIPortObjectSpec):
         return self._credentials.credentials
 
     @property
-    def api_base(self) -> str:
-        return self._credentials.api_base
+    def base_url(self) -> str:
+        return self._credentials.base_url
 
     def validate_context(self, ctx: knext.ConfigurationContext):
         self._credentials.validate_context(ctx)
@@ -404,7 +402,7 @@ class OpenAILLMPortObject(LLMPortObject):
     def create_model(self, ctx) -> OpenAI:
         return OpenAI(
             openai_api_key=ctx.get_credentials(self.spec.credentials).password,
-            api_base=self.spec.api_base,
+            base_url=self.spec.base_url,
             model=self.spec.model,
             temperature=self.spec.temperature,
             top_p=self.spec.top_p,
@@ -430,7 +428,7 @@ class OpenAIChatModelPortObject(ChatModelPortObject):
     def create_model(self, ctx: knext.ExecutionContext) -> ChatOpenAI:
         return ChatOpenAI(
             openai_api_key=ctx.get_credentials(self.spec.credentials).password,
-            api_base=self.spec.api_base,
+            base_url=self.spec.base_url,
             model=self.spec.model,
             temperature=self.spec.temperature,
             max_tokens=self.spec.max_tokens,
@@ -475,7 +473,7 @@ class OpenAIEmbeddingsPortObject(EmbeddingsPortObject):
     def create_model(self, ctx) -> OpenAIEmbeddings:
         return OpenAIEmbeddings(
             openai_api_key=ctx.get_credentials(self.spec.credentials).password,
-            api_base=self.spec.api_base,
+            base_url=self.spec.base_url,
             model=self.spec.model,
         )
 
@@ -525,8 +523,8 @@ class OpenAIAuthenticator:
         """,
     )
 
-    api_base = knext.StringParameter(
-        "API base",
+    base_url = knext.StringParameter(
+        "OpenAI base URL",
         """Sets the destination of the API requests to OpenAI.""",
         default_value="https://api.openai.com/v1",
         since_version="5.2.0",
@@ -552,7 +550,7 @@ class OpenAIAuthenticator:
                 api_key=ctx.get_credentials(
                     self.credentials_settings.credentials_param
                 ).password,
-                base_url=self.api_base,
+                base_url=self.base_url,
             ).models.list()
         except:
             raise knext.InvalidParametersError("API key is not valid.")
@@ -561,7 +559,7 @@ class OpenAIAuthenticator:
 
     def create_spec(self) -> OpenAIAuthenticationPortObjectSpec:
         return OpenAIAuthenticationPortObjectSpec(
-            self.credentials_settings.credentials_param, api_base=self.api_base
+            self.credentials_settings.credentials_param, base_url=self.base_url
         )
 
 

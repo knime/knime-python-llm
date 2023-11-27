@@ -101,13 +101,12 @@ def get_model_list(ctx: knext.DialogCreationContext):
 
     if not key:
         return model_list
-    openai.api_key = key
 
     try:
-        for model in openai.OpenAI().models.list()["data"]:
+        for model in openai.OpenAI(api_key=key).models.list().data:
             # If model has '-<number>' string or is not owned_by openai
-            if re.search(r"-\d", model["id"]) or "openai" not in model["owned_by"]:
-                model_list.append(model["id"])
+            if re.search(r"-\d", model.id) or "openai" not in model.owned_by:
+                model_list.append(model.id)
     except:
         pass
 

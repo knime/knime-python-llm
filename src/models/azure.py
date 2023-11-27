@@ -16,7 +16,7 @@ from models.openai import (
 )
 
 # Langchain imports
-from langchain.llms import AzureOpenAI
+from langchain.llms.openai import AzureOpenAI
 from langchain.chat_models import AzureChatOpenAI
 from langchain.embeddings import AzureOpenAIEmbeddings
 
@@ -334,14 +334,13 @@ class AzureOpenAIAuthenticator:
         self, ctx: knext.ExecutionContext
     ) -> AzureOpenAIAuthenticationPortObject:
         try:
-            openai.Model.list(
+            openai.AzureOpenAI(
                 api_key=ctx.get_credentials(
-                    self.credentials_settings.credentials_param
+                    self.credentials_settings.credentials_param,
                 ).password,
                 api_version=self.azure_connection.api_version,
-                api_base=self.azure_connection.api_base,
-                api_type="azure",
-            )
+                azure_endpoint=self.azure_connection.api_base,
+            ).models.list()
 
         except gaierror:
             raise knext.InvalidParametersError("API endpoint not valid.")

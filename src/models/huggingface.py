@@ -570,13 +570,15 @@ class HuggingfaceTextGenInferenceConnector:
     """
     Connects to a dedicated Text Generation Inference Server.
 
-    The [Text Generation Inference](https://github.com/huggingface/text-generation-inference) is a Rust, Python, and gRPC server
-    specifically designed for text generation inference. It can be self-hosted to
-    power LLM APIs and inference widgets.
+    The [Text Generation Inference](https://github.com/huggingface/text-generation-inference)
+    is a Rust, Python, and gRPC server specifically designed for text generation inference.
+    It can be self-hosted to power LLM APIs and inference widgets.
 
-    Please note that this node does not connect to the Hugging Face Hub, but to a Text Generation Inference Server that can be hosted both locally and remotely.
+    Please note that this node does not connect to the Hugging Face Hub,
+    but to a Text Generation Inference Server that can be hosted both locally and remotely.
 
-    For more details and information about integrating with the Hugging Face TextGen Inference and setting up a local server, refer to the
+    For more details and information about integrating with the Hugging Face TextGen Inference
+    and setting up a local server, refer to the
     [LangChain documentation](https://python.langchain.com/docs/modules/model_io/models/llms/integrations/huggingface_textgen_inference).
     """
 
@@ -616,13 +618,15 @@ class HFTGIChatModelConnector:
     """
     Connects to a dedicated Text Generation Inference Server.
 
-    The [Text Generation Inference](https://github.com/huggingface/text-generation-inference) is a Rust, Python, and gRPC server
-    specifically designed for text generation inference. It can be self-hosted to
-    power LLM APIs and inference widgets.
+    The [Text Generation Inference](https://github.com/huggingface/text-generation-inference)
+    is a Rust, Python, and gRPC server specifically designed for text generation inference.
+    It can be self-hosted to power LLM APIs and inference widgets.
 
-    Please note that this node does not connect to the Hugging Face Hub, but to a Text Generation Inference Server that can be hosted both locally and remotely.
+    Please note that this node does not connect to the Hugging Face Hub,
+    but to a Text Generation Inference Server that can be hosted both locally and remotely.
 
-    For more details and information about integrating with the Hugging Face TextGen Inference and setting up a local server, refer to the
+    For more details and information about integrating with the Hugging Face TextGen Inference
+    and setting up a local server, refer to the
     [LangChain documentation](https://python.langchain.com/docs/modules/model_io/models/llms/integrations/huggingface_textgen_inference).
     """
 
@@ -805,14 +809,16 @@ class HuggingFaceHubConnector:
 )
 class HFHubChatModelConnector:
     """
-    Connects to an chat model hosted on the Hugging Face Hub.
+    Connects to a chat model hosted on the Hugging Face Hub.
 
     This node establishes a connection to a specific chat model hosted on the Hugging Face Hub.
     The difference to the HF Hub LLM Connector is that this node allows you to provide prompt templates which are crucial for
     obtaining the best output from many models that have been fine-tuned for chatting.
     To use this node, you need to successfully authenticate with the Hugging Face Hub using the **HF Hub Authenticator node**.
 
-    Provide the name of the desired chat model repository available on the [Hugging Face Hub](https://python.langchain.com/docs/modules/model_io/models/llms/integrations/huggingface_hub) as an input.
+    Provide the name of the desired chat model repository available on the
+    [Hugging Face Hub](https://python.langchain.com/docs/modules/model_io/models/llms/integrations/huggingface_hub)
+    as an input.
     """
 
     hub_settings = HuggingFaceHubSettings()

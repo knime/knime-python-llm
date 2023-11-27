@@ -258,12 +258,12 @@ class OpenAIAuthenticationPortObjectSpec(AIPortObjectSpec):
         self._api_base = api_base
 
     @property
-    def api_base(self) -> str:
-        return self._api_base
-
-    @property
     def credentials(self) -> str:
         return self._credentials
+
+    @property
+    def api_base(self):
+        return self._api_base
 
     def validate_context(self, ctx: knext.ConfigurationContext):
         if not self.credentials in ctx.get_credential_names():
@@ -277,11 +277,16 @@ class OpenAIAuthenticationPortObjectSpec(AIPortObjectSpec):
             )
 
     def serialize(self) -> dict:
-        return {"credentials": self._credentials, "api_base": self.api_base}
+        return {
+            "credentials": self._credentials,
+            "api_base": self._api_base,
+        }
 
     @classmethod
     def deserialize(cls, data: dict):
-        return cls(data["credentials"], data.get("api_base", _open_ai_api_base))
+        return cls(
+            data["credentials"], data.get("api_base", "https://api.openai.com/v1")
+        )
 
 
 class OpenAIAuthenticationPortObject(knext.PortObject):
@@ -399,7 +404,7 @@ class OpenAILLMPortObject(LLMPortObject):
     def create_model(self, ctx) -> OpenAI:
         return OpenAI(
             openai_api_key=ctx.get_credentials(self.spec.credentials).password,
-            openai_api_base=self.spec.api_base,
+            api_base=self.spec.api_base,
             model=self.spec.model,
             temperature=self.spec.temperature,
             top_p=self.spec.top_p,
@@ -425,7 +430,7 @@ class OpenAIChatModelPortObject(ChatModelPortObject):
     def create_model(self, ctx: knext.ExecutionContext) -> ChatOpenAI:
         return ChatOpenAI(
             openai_api_key=ctx.get_credentials(self.spec.credentials).password,
-            openai_api_base=self.spec.api_base,
+            api_base=self.spec.api_base,
             model=self.spec.model,
             temperature=self.spec.temperature,
             max_tokens=self.spec.max_tokens,
@@ -470,7 +475,7 @@ class OpenAIEmbeddingsPortObject(EmbeddingsPortObject):
     def create_model(self, ctx) -> OpenAIEmbeddings:
         return OpenAIEmbeddings(
             openai_api_key=ctx.get_credentials(self.spec.credentials).password,
-            openai_api_base=self.spec.api_base,
+            api_base=self.spec.api_base,
             model=self.spec.model,
         )
 
@@ -521,11 +526,11 @@ class OpenAIAuthenticator:
     )
 
     api_base = knext.StringParameter(
-        "API Base URL",
-        "The base URL of the OpenAI API to use.",
+        "API base",
+        """Sets the destination of the API requests to OpenAI.""",
         default_value="https://api.openai.com/v1",
-        is_advanced=True,
         since_version="5.2.0",
+        is_advanced=True,
     )
 
     def configure(
@@ -546,7 +551,8 @@ class OpenAIAuthenticator:
             openai.OpenAI(
                 api_key=ctx.get_credentials(
                     self.credentials_settings.credentials_param
-                ).password
+                ).password,
+                base_url=self.api_base,
             ).models.list()
         except:
             raise knext.InvalidParametersError("API key is not valid.")

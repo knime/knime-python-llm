@@ -18,7 +18,7 @@ from models.openai import (
 # Langchain imports
 from langchain.llms import AzureOpenAI
 from langchain.chat_models import AzureChatOpenAI
-from langchain.embeddings.openai import OpenAIEmbeddings
+from langchain.embeddings import AzureOpenAIEmbeddings
 
 
 # Other imports
@@ -46,17 +46,13 @@ class AzureOpenAIAuthenticationPortObjectSpec(OpenAIAuthenticationPortObjectSpec
     def __init__(
         self,
         credentials: str,
-        api_base: str,
+        base_url: str,
         api_version: str,
         api_type: str,
     ) -> None:
-        super().__init__(credentials, api_base=api_base)
+        super().__init__(credentials, base_url)
         self._api_version = api_version
         self._api_type = api_type
-
-    @property
-    def api_base(self) -> str:
-        return self._api_base
 
     @property
     def api_version(self) -> str:
@@ -76,7 +72,7 @@ class AzureOpenAIAuthenticationPortObjectSpec(OpenAIAuthenticationPortObjectSpec
     @classmethod
     def deserialize(cls, data: dict):
         return cls(
-            data["credentials"], data["api_base"], data["api_version"], data["api_type"]
+            data["credentials"], data["base_url"], data["api_version"], data["api_type"]
         )
 
 
@@ -101,10 +97,6 @@ class AzureOpenAIModelPortObjectSpec(OpenAIModelPortObjectSpec):
         self, azure_auth_spec: AzureOpenAIAuthenticationPortObjectSpec
     ) -> None:
         self._credentials = azure_auth_spec
-
-    @property
-    def api_base(self) -> str:
-        return self._credentials._api_base
 
     @property
     def api_version(self) -> str:
@@ -163,8 +155,8 @@ class AzureOpenAILLMPortObject(OpenAILLMPortObject):
     def create_model(self, ctx: knext.ExecutionContext) -> AzureOpenAI:
         return AzureOpenAI(
             openai_api_key=ctx.get_credentials(self.spec.credentials).password,
-            openai_api_version=self.spec.api_version,
-            openai_api_base=self.spec.api_base,
+            api_version=self.spec.api_version,
+            azure_endpoint=self.spec.base_url,
             openai_api_type=self.spec.api_type,
             deployment_name=self.spec.model,
             temperature=self.spec.temperature,
@@ -196,7 +188,7 @@ class AzureOpenAIChatModelPortObject(OpenAIChatModelPortObject):
         return AzureChatOpenAI(
             openai_api_key=ctx.get_credentials(self.spec.credentials).password,
             openai_api_version=self.spec.api_version,
-            openai_api_base=self.spec.api_base,
+            azure_endpoint=self.spec.base_url,
             openai_api_type=self.spec.api_type,
             deployment_name=self.spec.model,
             temperature=self.spec.temperature,
@@ -238,11 +230,11 @@ class AzureOpenAIEmbeddingsPortObject(OpenAIEmbeddingsPortObject):
     def spec(self) -> AzureOpenAIEmbeddingsPortObjectSpec:
         return super().spec
 
-    def create_model(self, ctx: knext.ExecutionContext) -> OpenAIEmbeddings:
-        return OpenAIEmbeddings(
+    def create_model(self, ctx: knext.ExecutionContext) -> AzureOpenAIEmbeddings:
+        return AzureOpenAIEmbeddings(
             openai_api_key=ctx.get_credentials(self.spec.credentials).password,
-            openai_api_base=self.spec.api_base,
-            openai_api_version=self.spec.api_version,
+            azure_endpoint=self.spec.api_base,
+            api_version=self.spec.api_version,
             openai_api_type=self.spec.api_type,
             deployment=self.spec.model,
             chunk_size=16,  # Azure only supports 16 docs per request

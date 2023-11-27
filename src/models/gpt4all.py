@@ -470,6 +470,7 @@ class _Embeddings4All(BaseModel, Embeddings):
     model_name: str
     model_path: str
     num_threads: int = 1
+    device: str = "cpu"
     client: Any  #: :meta private:
 
     @root_validator
@@ -478,6 +479,7 @@ class _Embeddings4All(BaseModel, Embeddings):
             values["model_name"],
             model_path=values["model_path"],
             n_threads=values["num_threads"],
+            device=values["device"],
         )
         return values
 
@@ -496,20 +498,25 @@ class _Embeddings4All(BaseModel, Embeddings):
 class Embeddings4AllPortObjectSpec(EmbeddingsPortObjectSpec):
     """The Embeddings4All port object spec."""
 
-    def __init__(self, num_threads: int = 1) -> None:
+    def __init__(self, num_threads: int = 1, device: str = "cpu") -> None:
         super().__init__()
         self._num_threads = num_threads
+        self._device = device
 
     @property
     def num_threads(self) -> int:
         return self._num_threads
 
+    @property
+    def device(self) -> str:
+        return self._device
+
     def serialize(self) -> dict:
-        return {"num_threads": self.num_threads}
+        return {"num_threads": self.num_threads, "device": self.device}
 
     @classmethod
     def deserialize(cls, data: dict):
-        return cls(data["num_threads"])
+        return cls(data["num_threads"], data.get("device", "cpu"))
 
 
 class Embeddings4AllPortObject(EmbeddingsPortObject, FilestorePortObject):
@@ -539,6 +546,7 @@ class Embeddings4AllPortObject(EmbeddingsPortObject, FilestorePortObject):
             model_name=self._model_name,
             model_path=self._model_path,
             num_threads=self.spec.num_threads,
+            device=self.spec.device,
         )
 
     def write_to(self, file_path: str) -> None:
@@ -616,10 +624,30 @@ class Embeddings4AllConnector:
         is_advanced=True,
     )
 
-    def configure(self, ctx):
-        return Embeddings4AllPortObjectSpec(self.num_threads)
+    device = knext.StringParameter(
+        "Device",
+        """The processing unit on which the Embedding4All model will run. It can be set to:
 
-    def execute(self, ctx):
+        - "cpu": Model will run on the central processing unit.
+        - "gpu": Model will run on the best available graphics processing unit, irrespective of its vendor.
+        - "amd", "nvidia", "intel": Model will run on the best available GPU from the specified vendor. 
+        
+        Alternatively, a specific GPU name can also be provided, and the model will run on the GPU that matches the name if it's available. 
+        Default is "cpu".
+
+        Note: If a selected GPU device does not have sufficient RAM to accommodate the model, an error will be thrown.
+        It's advised to ensure the device has enough memory before initiating the model.""",
+        default_value="cpu",
+        is_advanced=True,
+    )
+
+    def configure(self, ctx) -> Embeddings4AllPortObjectSpec:
+        return self._create_spec()
+
+    def _create_spec(self) -> Embeddings4AllPortObjectSpec:
+        return Embeddings4AllPortObjectSpec(self.num_threads, self.device)
+
+    def execute(self, ctx) -> Embeddings4AllPortObject:
         if self.model_retrieval == ModelRetrievalOptions.DOWNLOAD.name:
             model_path = None
             model_name = _embeddings4all_model_name
@@ -635,11 +663,11 @@ class Embeddings4AllConnector:
                     model_path=model_path,
                     num_threads=self.num_threads,
                 )
-            except:
+            except Exception:
                 raise ValueError(f"The model at path {self.model_path} is not valid.")
 
         return Embeddings4AllPortObject(
-            Embeddings4AllPortObjectSpec(self.num_threads),
+            self._create_spec(),
             model_name=model_name,
             model_path=model_path,
         )

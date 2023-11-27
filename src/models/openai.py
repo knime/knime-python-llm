@@ -764,7 +764,11 @@ class OpenAIDALLEPrompter:
     """
 
     prompt = knext.StringParameter("Prompt", "The prompt for DALL-E 3.")
-
+    prompt = knext.MultilineStringParameter(
+        "Prompt",
+        """The prompt for DALL-E 3.""",
+        "",
+    )
     settings = ImagelLoaderInputSettings()
 
     def configure(

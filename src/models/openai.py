@@ -262,7 +262,7 @@ class OpenAIAuthenticationPortObjectSpec(AIPortObjectSpec):
         return self._credentials
 
     @property
-    def base_url(self):
+    def base_url(self) -> str:
         return self._base_url
 
     def validate_context(self, ctx: knext.ConfigurationContext):

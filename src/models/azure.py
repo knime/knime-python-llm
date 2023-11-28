@@ -233,7 +233,7 @@ class AzureOpenAIEmbeddingsPortObject(OpenAIEmbeddingsPortObject):
     def create_model(self, ctx: knext.ExecutionContext) -> AzureOpenAIEmbeddings:
         return AzureOpenAIEmbeddings(
             openai_api_key=ctx.get_credentials(self.spec.credentials).password,
-            azure_endpoint=self.spec.api_base,
+            azure_endpoint=self.spec.base_url,
             api_version=self.spec.api_version,
             openai_api_type=self.spec.api_type,
             deployment=self.spec.model,

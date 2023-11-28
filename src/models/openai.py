@@ -817,7 +817,8 @@ class OpenAIDALLEPrompter:
         authentication: OpenAIAuthenticationPortObject,
     ):
         client = openai.OpenAI(
-            api_key=ctx.get_credentials(authentication.spec.credentials).password
+            api_key=ctx.get_credentials(authentication.spec.credentials).password,
+            base_url=authentication.spec.base_url,
         )
 
         response = client.images.generate(

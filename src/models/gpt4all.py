@@ -48,7 +48,6 @@ class GPT4AllInputSettings:
         """,
         default_value=0,
         min_value=0,
-        max_value=64,
         is_advanced=True,
         since_version="5.2.0",
     )

@@ -618,9 +618,10 @@ class Embeddings4AllConnector:
     num_threads = knext.IntParameter(
         "Number of threads",
         """The number of threads the model uses. 
-        More threads may reduce the runtime of queries to the model.""",
-        1,
-        min_value=1,
+        More threads may reduce the runtime of queries to the model.
+        Default is 0, then the number of threads are determined automatically.""",
+        0,
+        min_value=0,
         is_advanced=True,
     )
 
@@ -645,7 +646,8 @@ class Embeddings4AllConnector:
         return self._create_spec()
 
     def _create_spec(self) -> Embeddings4AllPortObjectSpec:
-        return Embeddings4AllPortObjectSpec(self.num_threads, self.device)
+        n_threads = None if self.num_threads == 0 else self.num_threads
+        return Embeddings4AllPortObjectSpec(n_threads, self.device)
 
     def execute(self, ctx) -> Embeddings4AllPortObject:
         if self.model_retrieval == ModelRetrievalOptions.DOWNLOAD.name:

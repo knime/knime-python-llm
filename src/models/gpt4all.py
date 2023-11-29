@@ -497,7 +497,7 @@ class _Embeddings4All(BaseModel, Embeddings):
 class Embeddings4AllPortObjectSpec(EmbeddingsPortObjectSpec):
     """The Embeddings4All port object spec."""
 
-    def __init__(self, num_threads: int = 1, device: str = "cpu") -> None:
+    def __init__(self, num_threads: int = 0, device: str = "cpu") -> None:
         super().__init__()
         self._num_threads = num_threads
         self._device = device

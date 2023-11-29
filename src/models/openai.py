@@ -719,23 +719,23 @@ class OpenAIEmbeddingsConnector:
             raise knext.InvalidParametersError("Use Azure Model Connectors")
 
         openai_auth_spec.validate_context(ctx)
-        return self.create_spec(openai_auth_spec)
+        return self.create_spec(openai_auth_spec, ctx)
 
     def execute(
         self,
         ctx: knext.ExecutionContext,
         openai_auth_port: OpenAIAuthenticationPortObject,
     ) -> OpenAIEmbeddingsPortObject:
-        return OpenAIEmbeddingsPortObject(self.create_spec(openai_auth_port.spec))
+        return OpenAIEmbeddingsPortObject(self.create_spec(openai_auth_port.spec, ctx))
 
     def create_spec(
-        self, openai_auth_spec: OpenAIAuthenticationPortObjectSpec
+        self, openai_auth_spec: OpenAIAuthenticationPortObjectSpec, ctx
     ) -> OpenAIEmbeddingsPortObjectSpec:
         if self.input_settings.specific_model_name != "unselected":
             model_name = self.input_settings.specific_model_name
         else:
             if self.input_settings.default_model_name not in embeddings_models:
-                LOGGER.warn(
+                ctx.set_warning(
                     f"Configured deprecated model, switching to fallback model: {embeddings_default}"
                 )
                 model_name = embeddings_default

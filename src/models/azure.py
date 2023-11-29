@@ -71,9 +71,8 @@ class AzureOpenAIAuthenticationPortObjectSpec(OpenAIAuthenticationPortObjectSpec
 
     @classmethod
     def deserialize(cls, data: dict):
-        return cls(
-            data["credentials"], data["base_url"], data["api_version"], data["api_type"]
-        )
+        base_url = data["base_url"] if "base_url" in data else data["api_base"]
+        return cls(data["credentials"], base_url, data["api_version"], data["api_type"])
 
 
 class AzureOpenAIAuthenticationPortObject(OpenAIAuthenticationPortObject):

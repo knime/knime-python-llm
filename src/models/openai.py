@@ -468,7 +468,7 @@ class OpenAIEmbeddingsPortObject(EmbeddingsPortObject):
 
     @property
     def spec(self) -> OpenAIEmbeddingsPortObjectSpec:
-        return self.spec
+        return super().spec
 
     def create_model(self, ctx) -> OpenAIEmbeddings:
         return OpenAIEmbeddings(

@@ -7,7 +7,12 @@ import models.base
 import models.huggingface
 
 import models.openai
-import models.gpt4all
+
+try:
+    import models.gpt4all
+except ImportError as e:
+    print(f"Could not import gpt4all: {e}")
+
 import models.azure
 
 import agents.base

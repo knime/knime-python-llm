@@ -64,8 +64,8 @@ openai_functions_agent_port_type = knext.port_type(
     "OpenAI Functions Agent Creator", knext.NodeType.SOURCE, openai_icon, agent_category
 )
 @knext.input_port(
-    "OpenAI Chat Model",
-    "The OpenAI chat model used by the agent to make decisions.",
+    "(Azure) OpenAI Chat Model",
+    "The (Azure) OpenAI chat model used by the agent to make decisions.",
     openai_chat_port_type,
 )
 @knext.output_port(
@@ -75,12 +75,17 @@ openai_functions_agent_port_type = knext.port_type(
 )
 class OpenAIFunctionsAgentCreator:
     """
-    Creates an agent that uses the function calling feature of OpenAI chat models.
+    Creates an agent that utilizes the function calling feature of (Azure) OpenAI chat models.
 
-    This node creates an agent that is based on OpenAI chat models that support function calling
+    This node creates an agent based on (Azure) OpenAI chat models that support function calling
     (e.g. the 0613 models) and can be primed with a custom system message. The system message plays an essential
-    role in defining the behavior of the agent and how it interacts with users and tools. Best practise is to alter
-    the system message before tampering with model settings, because the message affects the behavior of the agent the most.
+    role in defining the behavior of the agent and how it interacts with users and tools. Best practice is to alter
+    the system message before tampering with model settings because the message has the most significant impact
+    on the behavior of the agent.
+
+    For Azure: Make sure to use the correct API, since function calling is only available since API version
+    '2023-07-01-preview'. For more information, check the
+    [Microsoft Documentation](https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/function-calling?tabs=python)
 
     In general an agent is an LLM that is configured to, if necessary, dynamically pick a tool from
     a set of tools to best answer the user prompts.

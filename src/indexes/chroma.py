@@ -13,11 +13,11 @@ from .base import (
     FilestoreVectorstorePortObjectSpec,
     FilestoreVectorstorePortObject,
     MetadataSettings,
+    MissingValueHandlingOptions,
+    store_category,
     get_metadata_columns,
     handle_missing_metadata_values,
-    MissingValueHandlingOptions,
-    handle_missing_values,
-    store_category,
+    handle_missing_and_empty_documents,
     validate_creator_document_column,
 )
 
@@ -215,7 +215,7 @@ class ChromaVectorStoreCreator:
             self.missing_value_handling
         ]
 
-        df = handle_missing_values(
+        df = handle_missing_and_empty_documents(
             df, self.document_column, missing_value_handling_setting, ctx
         )
 

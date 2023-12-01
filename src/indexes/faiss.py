@@ -11,10 +11,10 @@ from .base import (
     FilestoreVectorstorePortObjectSpec,
     FilestoreVectorstorePortObject,
     MetadataSettings,
-    get_metadata_columns,
     MissingValueHandlingOptions,
-    handle_missing_values,
     store_category,
+    get_metadata_columns,
+    handle_missing_and_empty_documents,
     validate_creator_document_column,
 )
 
@@ -160,7 +160,7 @@ class FAISSVectorStoreCreator:
             self.missing_value_handling
         ]
 
-        df = handle_missing_values(
+        df = handle_missing_and_empty_documents(
             df, self.document_column, missing_value_handling_setting, ctx
         )
 

@@ -57,7 +57,7 @@ def skip_missing_values(df: pd.DataFrame, col_name: str, ctx: knext.ExecutionCon
     return df_cleaned
 
 
-def handle_missing_values(
+def handle_missing_and_empty_documents(
     df: pd.DataFrame,
     document_column: str,
     missing_value_handling_setting: MissingValueHandlingOptions,
@@ -65,22 +65,29 @@ def handle_missing_values(
 ):
     # Drops rows if SkipRow option is selected, otherwise fails
     # if there are any missing documents in the document column (=Fail option is selected)
+    has_missing_values = df[document_column].isna().any()
     if (
         missing_value_handling_setting == MissingValueHandlingOptions.SkipRow
-        and df.isna().any().any()
+        and has_missing_values
     ):
         df = skip_missing_values(df, document_column, ctx)
-    else:
-        if df.isna().any().any():
-            raise knext.InvalidParametersError(
-                f"""There are missing documents in the document column. See row ID 
-                <{df[df[document_column].isnull()].index.tolist()[0]}> for the first row that contains a missing document."""
-            )
+    elif has_missing_values:
+        missing_row_id = df[df[document_column].isnull()].index[0]
+        raise knext.InvalidParametersError(
+            f"There are missing documents in the document column. See row ID <{missing_row_id}> for the first row that contains a missing document."
+        )
 
     if df.empty:
         raise knext.InvalidParametersError(
             f"""All rows are skipped due to missing documents."""
         )
+
+    # Check for empty documents
+    for id, document in df[document_column].items():
+        if not document.strip():
+            raise ValueError(
+                f"Empty documents are not supported. See row ID {id} for the first empty document."
+            )
 
     return df
 

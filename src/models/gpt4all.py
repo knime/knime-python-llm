@@ -568,7 +568,7 @@ class Embeddings4AllPortObject(EmbeddingsPortObject, FilestorePortObject):
 
 
 embeddings4all_port_type = knext.port_type(
-    "Embeddings4All", Embeddings4AllPortObject, Embeddings4AllPortObjectSpec
+    "GPT4All Embeddings", Embeddings4AllPortObject, Embeddings4AllPortObjectSpec
 )
 
 
@@ -581,11 +581,14 @@ class ModelRetrievalOptions(knext.EnumParameterOptions):
 
 
 @knext.node(
-    "Embeddings4All Connector", knext.NodeType.SOURCE, gpt4all_icon, gpt4all_category
+    "GPT4All Embeddings Connector",
+    knext.NodeType.SOURCE,
+    gpt4all_icon,
+    gpt4all_category,
 )
 @knext.output_port(
-    "Embeddings4All model",
-    "An Embeddings4All model that calculates embeddings on the local machine.",
+    "GPT4All Embeddings model",
+    "A GPT4All Embeddings model that calculates embeddings on the local machine.",
     embeddings4all_port_type,
 )
 class Embeddings4AllConnector:
@@ -626,7 +629,7 @@ class Embeddings4AllConnector:
 
     device = knext.StringParameter(
         "Device",
-        """The processing unit on which the Embedding4All model will run. It can be set to:
+        """The processing unit on which the GPT4All Embeddings model will run. It can be set to:
 
         - "cpu": Model will run on the central processing unit.
         - "gpu": Model will run on the best available graphics processing unit, irrespective of its vendor.

@@ -86,7 +86,9 @@ class LocalChromaVectorstorePortObject(
                 metadata=existing_collection.metadata,
                 embedding_function=existing_collection._embedding_function,
             )
-            existing_entries = existing_collection.get()
+            existing_entries = existing_collection.get(
+                include=["embeddings", "documents", "metadatas"]
+            )
 
             # replace None (not allowed) metadata values with empty dictionaries (expected value type)
             for i, entry in enumerate(existing_entries["metadatas"]):

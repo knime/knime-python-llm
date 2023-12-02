@@ -468,7 +468,7 @@ _embeddings4all_model_name = "all-MiniLM-L6-v2-f16.gguf"
 class _Embeddings4All(BaseModel, Embeddings):
     model_name: str
     model_path: str
-    num_threads: int = 1
+    num_threads: Optional[int] = None
     device: str = "cpu"
     client: Any  #: :meta private:
 
@@ -557,7 +557,11 @@ class Embeddings4AllPortObject(EmbeddingsPortObject, FilestorePortObject):
                 os.path.join(file_path, self._model_name),
             )
         else:
-            _Embeddings4All(model_path=file_path, model_name=_embeddings4all_model_name)
+            _Embeddings4All(
+                model_path=file_path,
+                model_name=_embeddings4all_model_name,
+                num_threads=1,
+            )
 
     @classmethod
     def read_from(

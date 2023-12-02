@@ -1,3 +1,6 @@
+from typing import List, Optional
+
+from langchain.callbacks.manager import CallbackManagerForRetrieverRun
 import knime.extension as knext
 from knime.extension.nodes import (
     get_port_type_for_id,
@@ -18,31 +21,32 @@ from indexes.base import (
 )
 from .base import ToolListPortObject, ToolListPortObjectSpec, tool_list_port_type
 from langchain.chains import RetrievalQA, RetrievalQAWithSourcesChain
-from langchain.tools import Tool, StructuredTool
+from langchain.tools import StructuredTool
+from langchain.schema import Document, BaseRetriever
 import os
 from pydantic import BaseModel, Field
 
 
 class VectorToolPortObjectSpec(ToolPortObjectSpec):
-    def __init__(self, name, description, top_k, retrieve_sources) -> None:
+    def __init__(self, name, description, top_k, source_metadata) -> None:
         super().__init__(name, description)
         self._top_k = top_k
-        self._retrieve_sources = retrieve_sources
+        self._source_metadata = source_metadata
 
     @property
     def top_k(self):
         return self._top_k
 
     @property
-    def retrieve_sources(self):
-        return self._retrieve_sources
+    def source_metadata(self) -> Optional[str]:
+        return self._source_metadata
 
     def serialize(self) -> dict:
         return {
             "name": self._name,
             "description": self._description,
             "top_k": self._top_k,
-            "retrieve_sources": self._retrieve_sources,
+            "source_metadata": self._source_metadata,
         }
 
     @classmethod
@@ -51,7 +55,29 @@ class VectorToolPortObjectSpec(ToolPortObjectSpec):
             data["name"],
             data["description"],
             data["top_k"],
-            data.get("retrieve_sources", False),
+            data.get("source_metadata"),
+        )
+
+
+class _AdapterRetriever(BaseRetriever):
+    """Langchain expects the sources of documents to always be stored in the source metadata field
+    but we would like to give the users the choice of which metadata contains the sources.
+    This class ensures that what the user chooses is put into the source metadata for LangChain.
+    """
+
+    retriever: BaseRetriever
+    source_metadata: str
+
+    def _get_relevant_documents(
+        self, query: str, *, run_manager: CallbackManagerForRetrieverRun
+    ) -> List[Document]:
+        docs = self.retriever.get_relevant_documents(query)
+        return [self._adapt_document(doc) for doc in docs]
+
+    def _adapt_document(self, doc: Document) -> Document:
+        return Document(
+            page_content=doc.page_content,
+            metadata={"source": doc.metadata[self.source_metadata]},
         )
 
 
@@ -78,7 +104,7 @@ class VectorToolPortObject(ToolPortObject):
     def vectorstore(self) -> VectorstorePortObject:
         return self._vectorstore
 
-    def _create_function(self, ctx, retrieve_sources=False):
+    def _create_function(self, ctx, source_metadata: Optional[str] = None):
         """
         This method creates a function based on the given context and retrieval sources flag.
 
@@ -91,10 +117,12 @@ class VectorToolPortObject(ToolPortObject):
         vectorstore = self._vectorstore.load_store(ctx)
         retriever = vectorstore.as_retriever(search_kwargs={"k": self.spec.top_k})
 
-        if retrieve_sources:
+        if source_metadata:
             return RetrievalQAWithSourcesChain.from_chain_type(
                 llm=llm,
-                retriever=retriever,
+                retriever=_AdapterRetriever(
+                    retriever=retriever, source_metadata=source_metadata
+                ),
                 verbose=True,
                 return_source_documents=True,
             )
@@ -111,7 +139,7 @@ class VectorToolPortObject(ToolPortObject):
         RetrievalQAWithSourcesChain and RetrievalQA are called via their __call__ method
         instead of run() to enable returning multiple outputs (answer, source, and source_documents).
         """
-        retrieval_chain = self._create_function(ctx, self.spec.retrieve_sources)
+        retrieval_chain = self._create_function(ctx, self.spec.source_metadata)
 
         return StructuredTool(
             name=self.spec.serialize()["name"],
@@ -133,11 +161,11 @@ class FilestoreVectorToolPortObjectSpec(VectorToolPortObjectSpec):
         name,
         description,
         top_k,
-        retrieve_sources,
+        source_metadata,
         llm_spec: LLMPortObjectSpec,
         vectorstore_spec: VectorstorePortObjectSpec,
     ) -> None:
-        super().__init__(name, description, top_k, retrieve_sources)
+        super().__init__(name, description, top_k, source_metadata)
         self._llm_spec = llm_spec
         self._llm_type = get_port_type_for_spec_type(type(llm_spec))
         self._vectorstore_spec = vectorstore_spec
@@ -185,7 +213,7 @@ class FilestoreVectorToolPortObjectSpec(VectorToolPortObjectSpec):
             data["name"],
             data["description"],
             data["top_k"],
-            data.get("retrieve_sources", False),
+            data.get("source_metadata"),
             llm_spec,
             vectorstore_spec,
         )
@@ -283,6 +311,14 @@ class VectorStoreToTool:
         since_version="5.2.0",
     )
 
+    source_metadata = knext.StringParameter(
+        "Source metadata",
+        "The metadata containing the sources of the documents.",
+        "",
+        choices=lambda ctx: [""] + ctx.get_input_specs()[1].metadata_column_names,
+        since_version="5.2.0",
+    ).rule(knext.OneOf(retrieve_sources, [True]), knext.Effect.SHOW)
+
     def configure(
         self,
         ctx: knext.ConfigurationContext,
@@ -296,11 +332,15 @@ class VectorStoreToTool:
     def _create_tool_spec(
         self, llm_spec: LLMPortObjectSpec, vectorstore_spec: VectorstorePortObjectSpec
     ) -> FilestoreVectorstorePortObjectSpec:
+        if self.retrieve_sources and not self.source_metadata:
+            raise knext.InvalidParametersError(
+                "Select the metadata that holds the sources."
+            )
         return FilestoreVectorToolPortObjectSpec(
             self.tool_name,
             self.tool_description,
             self.top_k,
-            self.retrieve_sources,
+            self.source_metadata,
             llm_spec,
             vectorstore_spec,
         )

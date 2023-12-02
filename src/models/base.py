@@ -82,18 +82,6 @@ class ChatConversationSettings:
         )
 
     def configure(self, input_table_spec: knext.Schema):
-        if self.role_column:
-            util.check_column(
-                input_table_spec,
-                self.role_column,
-                knext.string(),
-                "role",
-            )
-        else:
-            self.role_column = util.pick_default_column(
-                input_table_spec, knext.string()
-            )
-
         if self.content_column:
             util.check_column(
                 input_table_spec,
@@ -102,12 +90,24 @@ class ChatConversationSettings:
                 "content",
             )
         else:
-            spec_without_role = knext.Schema.from_columns(
-                [c for c in input_table_spec if c.name != self.role_column]
+            self.content_column = util.pick_default_column(
+                input_table_spec, knext.string()
+            )
+
+        if self.role_column:
+            util.check_column(
+                input_table_spec,
+                self.role_column,
+                knext.string(),
+                "role",
+            )
+        else:
+            spec_without_content = knext.Schema.from_columns(
+                [c for c in input_table_spec if c.name != self.content_column]
             )
             try:
-                self.content_column = util.pick_default_column(
-                    spec_without_role, knext.string()
+                self.role_column = util.pick_default_column(
+                    spec_without_content, knext.string()
                 )
             except:
                 raise knext.InvalidParametersError(

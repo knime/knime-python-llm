@@ -1,4 +1,5 @@
 # KNIME / own imports
+from typing import Callable, List
 import knime.extension as knext
 from .base import (
     AIPortObjectSpec,
@@ -57,6 +58,49 @@ chat_models = [
 chat_default = "gpt-3.5-turbo"
 embeddings_models = ["text-embedding-ada-002"]
 embeddings_default = "text-embedding-ada-002"
+
+
+class _EnumToStringParameter(knext.StringParameter):
+    """Custom parameter implementation that maps enum names to their label in order to allow
+    backwards compatiblity.
+    The knext.EnumParameter does not support the backwards compatible removal of values which is
+    necessary because OpenAI is shutting down some of their models.
+    Our initial strategy of switching to StringParameter does not work though because the names
+    we used to store the settings are not the actual model names. This class works around this
+    problem by mapping the enum constant names to the OpenAI model names before setting them on
+    the node.
+    """
+
+    def __init__(
+        self,
+        label: str | None = None,
+        description: str | None = None,
+        default_value="",
+        enum: List[str] | None = None,
+        validator: Callable[[str], None] | None = None,
+        since_version=None,
+        is_advanced: bool = False,
+        choices=None,
+        options: knext.EnumParameterOptions = None,
+    ):
+        super().__init__(
+            label,
+            description,
+            default_value,
+            enum,
+            validator,
+            since_version,
+            is_advanced,
+            choices,
+        )
+        self._options = options
+
+    def _set_value(self, obj, value, name):
+        try:
+            value = self._options[value].value[0]
+        except KeyError:
+            pass
+        return super()._set_value(obj, value, name)
 
 
 # @knext.parameter_group(label="Model Settings") -- Imported
@@ -144,11 +188,38 @@ def _create_specific_model_name(api_name: str) -> knext.StringParameter:
 
 @knext.parameter_group(label="OpenAI Model Selection")
 class LLMLoaderInputSettings:
-    default_model_name = knext.StringParameter(
+    class OpenAIModelCompletionsOptions(knext.EnumParameterOptions):
+        Ada = (
+            "text-ada-001",
+            "Capable of very simple tasks, usually the fastest model in the GPT-3 series, and lowest cost.",
+        )
+        Babbage = (
+            "text-babbage-001",
+            "Capable of straightforward tasks, very fast, and lower cost.",
+        )
+        Curie = (
+            "text-curie-001",
+            "Very capable, but faster and lower cost than Davinci.",
+        )
+        DaVinci2 = (
+            "text-davinci-002",
+            "Can do any language task with better quality, longer output, and consistent instruction-following than the curie, babbage, or ada models.",
+        )
+        DaVinci3 = (
+            "text-davinci-003",
+            "Can do any language task with better quality, longer output, and consistent instruction-following than the curie, babbage, or ada models.",
+        )
+        Gpt35TurboInstruct = (
+            "gpt-3.5-turbo-instruct",
+            "Recommended model for all completion tasks. As capable as text-davinci-003 but faster and lower in cost.",
+        )
+
+    default_model_name = _EnumToStringParameter(
         label="Model ID",
         description="Select an OpenAI completions model to be used.",
         choices=lambda c: completion_models,
         default_value=completion_default,
+        options=OpenAIModelCompletionsOptions,
     )
 
     specific_model_name = _create_specific_model_name("Completions")
@@ -156,11 +227,30 @@ class LLMLoaderInputSettings:
 
 @knext.parameter_group(label="OpenAI Chat Model Selection")
 class ChatModelLoaderInputSettings:
-    default_model_name = knext.StringParameter(
+    class OpenAIModelCompletionsOptions(knext.EnumParameterOptions):
+        Turbo = (
+            "gpt-3.5-turbo",
+            """Most capable GPT-3.5 model and optimized for chat at 1/10th the cost of text-davinci-003.""",
+        )
+        Turbo_16k = (
+            "gpt-3.5-turbo-16k",
+            "Same capabilities as the standard gpt-3.5-turbo model but with 4 times the context.",
+        )
+        GPT_4 = (
+            "gpt-4",
+            """More capable than any GPT-3.5 model, able to do more complex tasks, and optimized for chat.""",
+        )
+        GPT_4_32k = (
+            "gpt-4-32k",
+            """Same capabilities as the base gpt-4 mode but with 4x the context length.""",
+        )
+
+    model_name = _EnumToStringParameter(
         label="Model ID",
         description="Select a chat-optimized OpenAI model to be used.",
         choices=lambda c: chat_models,
         default_value=chat_default,
+        options=OpenAIModelCompletionsOptions,
     )
 
     specific_model_name = _create_specific_model_name("Chat")
@@ -168,11 +258,22 @@ class ChatModelLoaderInputSettings:
 
 @knext.parameter_group(label="OpenAI Embeddings Selection")
 class EmbeddingsLoaderInputSettings:
-    default_model_name = knext.StringParameter(
+    class OpenAIEmbeddingsOptions(knext.EnumParameterOptions):
+        Ada1 = (
+            "text-search-ada-doc-001",
+            "Capable of very simple tasks, usually the fastest model in the GPT-3 series, and lowest cost.",
+        )
+        Ada2 = (
+            "text-embedding-ada-002",
+            "Capable of straightforward tasks, very fast, and lower cost.",
+        )
+
+    model_name = _EnumToStringParameter(
         label="Model ID",
         description="Select an embeddings OpenAI model to be used.",
         choices=lambda c: embeddings_models,
         default_value=embeddings_default,
+        options=OpenAIEmbeddingsOptions,
     )
 
     specific_model_name = _create_specific_model_name("Embeddings")
@@ -660,13 +761,13 @@ class OpenAIChatModelConnector:
         if self.input_settings.specific_model_name != "unselected":
             model_name = self.input_settings.specific_model_name
         else:
-            if self.input_settings.default_model_name not in chat_models:
+            if self.input_settings.model_name not in chat_models:
                 ctx.set_warning(
                     f"Configured deprecated model, switching to fallback model: {chat_default}"
                 )
                 model_name = chat_default
             else:
-                model_name = self.input_settings.default_model_name
+                model_name = self.input_settings.model_name
 
         LOGGER.info(f"Selected model: {model_name}")
 
@@ -734,13 +835,13 @@ class OpenAIEmbeddingsConnector:
         if self.input_settings.specific_model_name != "unselected":
             model_name = self.input_settings.specific_model_name
         else:
-            if self.input_settings.default_model_name not in embeddings_models:
+            if self.input_settings.model_name not in embeddings_models:
                 ctx.set_warning(
                     f"Configured deprecated model, switching to fallback model: {embeddings_default}"
                 )
                 model_name = embeddings_default
             else:
-                model_name = self.input_settings.default_model_name
+                model_name = self.input_settings.model_name
 
         return OpenAIEmbeddingsPortObjectSpec(openai_auth_spec, model_name)
 

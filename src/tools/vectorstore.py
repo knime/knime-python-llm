@@ -315,7 +315,9 @@ class VectorStoreToTool:
         "Source metadata",
         "The metadata containing the sources of the documents.",
         "",
-        choices=lambda ctx: [""] + ctx.get_input_specs()[1].metadata_column_names,
+        choices=lambda ctx: ctx.get_input_specs()[1].metadata_column_names
+        if ctx.get_input_specs()[1]
+        else [""],
         since_version="5.2.0",
     ).rule(knext.OneOf(retrieve_sources, [True]), knext.Effect.SHOW)
 

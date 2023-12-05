@@ -342,14 +342,16 @@ class AzureOpenAIAuthenticator:
                 azure_endpoint=self.azure_connection.api_base,
             ).models.list()
 
-        except gaierror:
-            raise knext.InvalidParametersError("API endpoint not valid.")
-        except openai.error.InvalidRequestError:
+        except openai.NotFoundError:
             raise knext.InvalidParametersError(
-                "Wrong resource endpoint or API version provided."
+                f"Invalid API version provided: '{self.azure_connection.api_version}'"
             )
-        except openai.error.AuthenticationError:
-            raise knext.InvalidParametersError("Access denied, wrong API key.")
+        except openai.APIConnectionError:
+            raise knext.InvalidParametersError(
+                f"Invalid Azure endpoint provided: '{self.azure_connection.api_base}'"
+            )
+        except openai.AuthenticationError:
+            raise knext.InvalidParametersError("Invalid API key provided.")
 
         return AzureOpenAIAuthenticationPortObject(self.create_spec())
 

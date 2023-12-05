@@ -614,8 +614,12 @@ class OpenAIAuthenticator:
                 ).password,
                 base_url=self.base_url,
             ).models.list()
-        except:
-            raise knext.InvalidParametersError("API key is not valid.")
+        except openai.AuthenticationError:
+            raise knext.InvalidParametersError("Invalid API key provided.")
+        except openai.NotFoundError:
+            raise knext.InvalidParametersError(
+                f"Invalid OpenAI base URL provided: '{self.base_url}'"
+            )
 
         return OpenAIAuthenticationPortObject(self.create_spec())
 

@@ -9,7 +9,7 @@ import models.openai
 
 try:
     import models.gpt4all
-except ImportError as e:
+except Exception as e:
     print(f"Could not import gpt4all: {e}")
 
 import models.azure

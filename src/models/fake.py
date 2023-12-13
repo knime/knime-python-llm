@@ -41,7 +41,7 @@ fake_category = knext.category(
 class MissingValueHandlingOptions(knext.EnumParameterOptions):
     DefaultAnswer = (
         "Default response",
-        "Return a predefined default response.",
+        "Return a predefined response.",
     )
     Fail = (
         "Fail",
@@ -51,16 +51,16 @@ class MissingValueHandlingOptions(knext.EnumParameterOptions):
 
 @knext.parameter_group(label="Fake Configuration")
 class FakeGeneralSettings:
-    query_column = knext.ColumnParameter(
-        "Queries",
-        "Column containing the fake queries.",
+    fake_prompt_col = knext.ColumnParameter(
+        "Prompt column",
+        "Column containing the fake prompts.",
         port_index=0,
         column_filter=util.create_type_filer(knext.string()),
     )
 
-    response_column = knext.ColumnParameter(
+    fake_response_col = knext.ColumnParameter(
         "Responses",
-        "Column containing the fake responses.",
+        "Column containing the fake responses for each prompt.",
         port_index=0,
         column_filter=util.create_type_filer(knext.string()),
     )
@@ -74,11 +74,12 @@ class FakeGeneralSettings:
     )
 
 
-@knext.parameter_group(label="Key mismatch")
+@knext.parameter_group(label="Prompt mismatch")
 class MismatchSettings:
-    handle_key_mismatch = knext.EnumParameter(
-        "Handle key mismatch",
-        """Define whether the LLM should 'answer' with a predefined answer or fail when the prompt can not be found in the provided queries.""",
+    prompt_mismatch = knext.EnumParameter(
+        "Handle prompt mismatch",
+        """Specify whether the LLM should provide a default response or fail when a given prompt cannot 
+        be found in the prompt column.""",
         default_value=lambda v: MissingValueHandlingOptions.DefaultAnswer.name,
         enum=MissingValueHandlingOptions,
         style=knext.EnumParameter.Style.VALUE_SWITCH,
@@ -86,12 +87,10 @@ class MismatchSettings:
 
     default_response = knext.StringParameter(
         "Default response",
-        "The response of the fake LLM when no query matches",
+        "The fake LLM's response when a query is not found in the prompt column.",
         "Could not find an answer to the query.",
     ).rule(
-        knext.OneOf(
-            handle_key_mismatch, [MissingValueHandlingOptions.DefaultAnswer.name]
-        ),
+        knext.OneOf(prompt_mismatch, [MissingValueHandlingOptions.DefaultAnswer.name]),
         knext.Effect.SHOW,
     )
 
@@ -99,14 +98,14 @@ class MismatchSettings:
 @knext.parameter_group(label="Embeddings Model Configuration")
 class FakeEmbeddingsSettings:
     document_column = knext.ColumnParameter(
-        "Documents",
+        "Document column",
         "Column containing the fake documents.",
         port_index=0,
         column_filter=util.create_type_filer(knext.string()),
     )
 
     vector_column = knext.ColumnParameter(
-        "Vectors",
+        "Vector column",
         "Column containing the fake vectors.",
         port_index=0,
         column_filter=util.create_type_filer(knext.ListType(knext.double())),
@@ -124,6 +123,11 @@ class FakeEmbeddingsSettings:
 # == Fake Implementations ==
 
 
+def _warn_if_same_columns(ctx, f_prompt_col: str, response_col: str) -> None:
+    if f_prompt_col == response_col:
+        ctx.set_warning("Query and response column are set to be the same column.")
+
+
 def generate_response(
     response_dict: dict[str, str],
     default_response: str,
@@ -135,7 +139,7 @@ def generate_response(
     if not response:
         if missing_value_strategy == MissingValueHandlingOptions.Fail.name:
             raise knext.InvalidParametersError(
-                f"Could not find matching response for prompt: '{prompt}'. Please make sure, that the prompt exactly matches the provided fake queries."
+                f"Could not find matching response for prompt: '{prompt}'. Please make sure, that the prompt exactly matches one from the given prompt column."
             )
         else:
             return default_response
@@ -153,7 +157,6 @@ class FakeDictLLM(LLM):
 
     @property
     def _llm_type(self) -> str:
-        """Return type of llm."""
         return "fake-dict"
 
     def _call(
@@ -209,7 +212,6 @@ class FakeChatModel(SimpleChatModel):
         run_manager: Optional[CallbackManagerForLLMRun] = None,
         **kwargs: Any,
     ) -> str:
-        """First try to lookup in response_dict, else return 'foo' or 'bar'."""
         prompt = messages[len(messages) - 1].content
         return generate_response(
             self.response_dict,
@@ -226,7 +228,7 @@ class FakeChatModel(SimpleChatModel):
 class FakeEmbeddings(Embeddings, BaseModel):
     embeddings_dict: dict[str, list[float]]
 
-    def embed_documents(self, documents: list[str]) -> List[float]:
+    def embed_documents(self, _: any) -> List[float]:
         return list(self.embeddings_dict.values())
 
     def embed_query(self, text: str) -> List[float]:
@@ -404,24 +406,25 @@ fake_embeddings_port_type = knext.port_type(
 
 
 def _configure_model_generation_columns(
-    table_spec: knext.Schema, query_column: knext.Column, response_column: knext.Column
+    table_spec: knext.Schema,
+    fake_prompt_col: knext.Column,
+    fake_response_col: knext.Column,
 ):
-    if query_column and response_column:
+    if fake_prompt_col and fake_response_col:
         util.check_column(
             table_spec,
-            query_column,
+            fake_prompt_col,
             knext.string(),
-            "query",
+            "fake prompt",
         )
 
         util.check_column(
             table_spec,
-            response_column,
+            fake_response_col,
             knext.string(),
-            "response",
+            "fake response",
         )
-
-        return query_column, response_column
+        return fake_prompt_col, fake_response_col
 
     else:
         default_columns = util.pick_default_columns(table_spec, knext.string(), 2)
@@ -460,8 +463,8 @@ def to_dictionary(table, columns: list[str]):
     category=fake_category,
 )
 @knext.input_table(
-    "Prompt and answer table",
-    "A table containing a column with expected prompts and one with the matching responses.",
+    "Prompt and response table",
+    "A table with columns for fake prompts and their corresponding responses.",
 )
 @knext.output_port(
     "Fake LLM",
@@ -472,10 +475,10 @@ class FakeLLMConnector:
     """
     Creates a fake Large Language Model.
 
-    This node creates a fake Large Language Model (LLM) implementation for testing purposes without
-    the need to use heavy compute power. Provide a column with expected prompts and their respective
-    answer in a second column. When the 'Fake Model' will be prompted with a matching prompt, it will
-    return the provided answer.
+    This node creates a fake Large Language Model (LLM) implementation for testing
+    purposes without the need for heavy computing power. Provide a column with expected
+    prompts and their respective answers in a second column. When the 'Fake Model'
+    is prompted with a matching prompt, it will return the provided answer.
     """
 
     settings = FakeGeneralSettings()
@@ -486,15 +489,14 @@ class FakeLLMConnector:
         ctx: knext.ConfigurationContext,
         table_spec: knext.Schema,
     ) -> FakeLLMPortObjectSpec:
-        query_col, response_col = _configure_model_generation_columns(
-            table_spec, self.settings.query_column, self.settings.response_column
+        fake_prompt_col, response_col = _configure_model_generation_columns(
+            table_spec, self.settings.fake_prompt_col, self.settings.fake_response_col
         )
 
-        if query_col == response_col:
-            ctx.set_warning("Query and response column are set to be the same column.")
+        _warn_if_same_columns(ctx, fake_prompt_col, response_col)
 
-        self.settings.query_column = query_col
-        self.settings.response_column = response_col
+        self.settings.fake_prompt_col = fake_prompt_col
+        self.settings.fake_response_col = response_col
 
         return self.create_spec()
 
@@ -503,11 +505,13 @@ class FakeLLMConnector:
         ctx: knext.ExecutionContext,
         input_table: knext.Table,
     ) -> FakeLLMPortObject:
-        if self.settings.query_column == self.settings.response_column:
-            ctx.set_warning("Query and response column are set to be the same column.")
+        _warn_if_same_columns(
+            ctx, self.settings.fake_prompt_col, self.settings.fake_response_col
+        )
 
         response_dict = to_dictionary(
-            input_table, [self.settings.query_column, self.settings.response_column]
+            input_table,
+            [self.settings.fake_prompt_col, self.settings.fake_response_col],
         )
 
         return FakeLLMPortObject(
@@ -517,9 +521,7 @@ class FakeLLMConnector:
         )
 
     def create_spec(self) -> FakeLLMPortObjectSpec:
-        return FakeLLMPortObjectSpec(
-            self.settings.delay, self.mismatch.handle_key_mismatch
-        )
+        return FakeLLMPortObjectSpec(self.settings.delay, self.mismatch.prompt_mismatch)
 
 
 @knext.node(
@@ -529,8 +531,8 @@ class FakeLLMConnector:
     category=fake_category,
 )
 @knext.input_table(
-    "Prompt and answer table",
-    "A table containing a column with expected prompts and one with the matching responses.",
+    "Prompt and response table",
+    "A table with columns for fake prompts and their corresponding responses.",
 )
 @knext.output_port(
     "Fake Chat Model",
@@ -541,10 +543,10 @@ class FakeChatConnector:
     """
     Creates a fake Chat Model.
 
-    This node creates a fake Chat Model implementation for testing purposes without
-    the need to use heavy compute power. Provide a column with expected prompts and their respective
-    answer in a second column. When the 'Fake Chat Model' will be prompted with a matching prompt, it will
-    return the provided answer as an AI message.
+    This node creates a fake Chat Model implementation for testing purposes without the
+    need for heavy computing power. Provide a column with prompts and their respective
+    responses in a second column. When the 'Fake Chat Model' is prompted,
+    it will return the provided answer as an AI message.
     """
 
     settings = FakeGeneralSettings()
@@ -555,15 +557,14 @@ class FakeChatConnector:
         ctx: knext.ConfigurationContext,
         table_spec: knext.Schema,
     ) -> FakeChatPortObjectSpec:
-        query_col, response_col = _configure_model_generation_columns(
-            table_spec, self.settings.query_column, self.settings.response_column
+        fake_prompt_col, response_col = _configure_model_generation_columns(
+            table_spec, self.settings.fake_prompt_col, self.settings.fake_response_col
         )
 
-        if query_col == response_col:
-            ctx.set_warning("Query and response column are set to be the same column.")
+        _warn_if_same_columns(ctx, fake_prompt_col, response_col)
 
-        self.settings.query_column = query_col
-        self.settings.response_column = response_col
+        self.settings.fake_prompt_col = fake_prompt_col
+        self.settings.fake_response_col = response_col
 
         return self.create_spec()
 
@@ -574,14 +575,15 @@ class FakeChatConnector:
     ) -> FakeChatModelPortObject:
         df = input_table.to_pandas()
 
-        if self.settings.query_column == self.settings.response_column:
-            ctx.set_warning("Query and response column are set to be the same column.")
+        _warn_if_same_columns(
+            ctx, self.settings.fake_prompt_col, self.settings.fake_response_col
+        )
 
         response_dict = dict(
             map(
                 lambda i, j: (i, j),
-                df[self.settings.query_column],
-                df[self.settings.response_column],
+                df[self.settings.fake_prompt_col],
+                df[self.settings.fake_response_col],
             )
         )
 
@@ -593,7 +595,7 @@ class FakeChatConnector:
 
     def create_spec(self) -> FakeChatPortObjectSpec:
         return FakeChatPortObjectSpec(
-            self.settings.delay, self.mismatch.handle_key_mismatch
+            self.settings.delay, self.mismatch.prompt_mismatch
         )
 
 
@@ -617,8 +619,9 @@ class FakeEmbeddingsConnector:
     Creates a fake Embeddings Model.
 
     This node creates a fake Embeddings Model implementation for testing purposes without
-    the need to use heavy compute power. Provide set of documents and queries along with their corresponding vectors
-    for the following nodes e.g. Vector Store Creators and Vector Store Retriever to use.
+    the need for heavy computing power. Provide a set of documents and queries along with their
+    corresponding vectors for the following nodes, e.g., Vector Store Creators and Vector Store Retriever,
+    to use.
 
     With this node you simulate exactly with which vectors documents will be stored and retrieved.
     """
@@ -639,7 +642,6 @@ class FakeEmbeddingsConnector:
     ) -> FakeEmbeddingsPortObject:
         df = input_table.to_pandas()
 
-        # toList() is needed to parse the numpy.ndarray into a list[float]
         response_dict = dict(
             map(
                 lambda i, j: (i, j.tolist()),

@@ -13,6 +13,8 @@ from langchain.agents import OpenAIFunctionsAgent
 from langchain.prompts import MessagesPlaceholder
 from langchain.schema import SystemMessage
 
+import re
+
 
 class OpenAIFunctionsAgentPortObjectSpec(AgentPortObjectSpec):
     def __init__(self, llm_spec: OpenAIChatModelPortObjectSpec, system_message) -> None:
@@ -43,8 +45,23 @@ class OpenAiFunctionsAgentPortObject(AgentPortObject):
     def spec(self) -> OpenAIFunctionsAgentPortObjectSpec:
         return super().spec
 
+    def validate_tools(self, tools):
+        pattern = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
+        for tool in tools:
+            if not pattern.match(tool.name):
+                raise knext.InvalidParametersError(
+                    f"Invalid tool name '{tool.name}'. The name must be 1 to 64 characters long and can only contain alphanumeric characters, underscores, and hyphens."
+                )
+            if not tool.description or not tool.description.strip():
+                raise knext.InvalidParametersError(
+                    f"Invalid or missing tool description for tool: {tool.name}."
+                )
+
+        return tools
+
     def create_agent(self, ctx, tools):
         llm = self.llm.create_model(ctx)
+        tools = self.validate_tools(tools)
         return OpenAIFunctionsAgent.from_llm_and_tools(
             llm=llm,
             tools=tools,

@@ -12,6 +12,7 @@ from .base import (
     GeneralSettings,
     LLMChatModelAdapter,
 )
+from requests.exceptions import ConnectionError
 from pydantic import root_validator, BaseModel, ValidationError
 from typing import Any, Dict, List, Optional
 from gpt4all import GPT4All as _GPT4All
@@ -469,16 +470,23 @@ class _Embeddings4All(BaseModel, Embeddings):
     model_name: str
     model_path: str
     num_threads: Optional[int] = None
+    allow_api_request: bool = True
     client: Any  #: :meta private:
 
     @root_validator
     def validate_environment(cls, values: Dict) -> Dict:
-        values["client"] = _GPT4All(
-            values["model_name"],
-            model_path=values["model_path"],
-            n_threads=values["num_threads"],
-        )
-        return values
+        try:
+            values["client"] = _GPT4All(
+                values["model_name"],
+                model_path=values["model_path"],
+                n_threads=values["num_threads"],
+                allow_download=values["allow_api_request"],
+            )
+            return values
+        except ConnectionError:
+            raise knext.InvalidParametersError(
+                "Connection error. Please make sure to enable to download the model"
+            )
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
         embeddings = [self.embed_query(text) for text in texts]
@@ -495,20 +503,28 @@ class _Embeddings4All(BaseModel, Embeddings):
 class Embeddings4AllPortObjectSpec(EmbeddingsPortObjectSpec):
     """The Embeddings4All port object spec."""
 
-    def __init__(self, num_threads: int = 0) -> None:
+    def __init__(self, num_threads: int = 0, allow_api_request: bool = True) -> None:
         super().__init__()
         self._num_threads = num_threads
+        self._allow_api_request = allow_api_request
 
     @property
     def num_threads(self) -> int:
         return self._num_threads
 
+    @property
+    def allow_api_request(self) -> bool:
+        return self._allow_api_request
+
     def serialize(self) -> dict:
-        return {"num_threads": self.num_threads}
+        return {
+            "num_threads": self._num_threads,
+            "allow_api_request": self._allow_api_request,
+        }
 
     @classmethod
     def deserialize(cls, data: dict):
-        return cls(data["num_threads"])
+        return cls(data["num_threads"], data.get("allow_api_request", True))
 
 
 class Embeddings4AllPortObject(EmbeddingsPortObject, FilestorePortObject):
@@ -522,7 +538,7 @@ class Embeddings4AllPortObject(EmbeddingsPortObject, FilestorePortObject):
     def __init__(
         self,
         spec: EmbeddingsPortObjectSpec,
-        model_name=_embeddings4all_model_name,
+        model_name: str = _embeddings4all_model_name,
         model_path: Optional[str] = None,
     ) -> None:
         super().__init__(spec)
@@ -538,6 +554,7 @@ class Embeddings4AllPortObject(EmbeddingsPortObject, FilestorePortObject):
             model_name=self._model_name,
             model_path=self._model_path,
             num_threads=self.spec.num_threads,
+            allow_download=self.spec.allow_download,
         )
 
     def write_to(self, file_path: str) -> None:
@@ -624,17 +641,19 @@ class Embeddings4AllConnector:
     )
 
     def configure(self, ctx) -> Embeddings4AllPortObjectSpec:
-        return self._create_spec()
+        return self._create_spec(download=True)
 
-    def _create_spec(self) -> Embeddings4AllPortObjectSpec:
+    def _create_spec(self, download: bool) -> Embeddings4AllPortObjectSpec:
         n_threads = None if self.num_threads == 0 else self.num_threads
-        return Embeddings4AllPortObjectSpec(n_threads)
+        return Embeddings4AllPortObjectSpec(n_threads, download)
 
     def execute(self, ctx) -> Embeddings4AllPortObject:
         if self.model_retrieval == ModelRetrievalOptions.DOWNLOAD.name:
+            allow_api_request = True
             model_path = None
             model_name = _embeddings4all_model_name
         else:
+            allow_api_request = False
             if not os.path.exists(self.model_path):
                 raise ValueError(
                     f"The provided model path {self.model_path} does not exist."
@@ -645,12 +664,13 @@ class Embeddings4AllConnector:
                     model_name=model_name,
                     model_path=model_path,
                     num_threads=self.num_threads,
+                    allow_api_request=allow_api_request,
                 )
             except Exception:
                 raise ValueError(f"The model at path {self.model_path} is not valid.")
 
         return Embeddings4AllPortObject(
-            self._create_spec(),
+            self._create_spec(allow_api_request),
             model_name=model_name,
             model_path=model_path,
         )

@@ -41,17 +41,8 @@ def pick_default_columns(
         raise knext.InvalidParametersError(
             f"The input table does not contain enough ({n_columns}) distinct columns of type '{str(ktype)}'. Found: {len(columns)}"
         )
-    # This logger is necessary
-    import logging
 
-    LOGGER = logging.getLogger(__name__)
-
-    # return [column.name for column in columns[n_columns:]]
-    LOGGER.info([column.name for column in columns[n_columns:]])
-    LOGGER.info([column_name.name for column_name in columns[:-n_columns]])
-    LOGGER.info(column.name for column in reversed(columns[-2:]))
-
-    return [column_name.name for column_name in columns[:n_columns]]
+    return [column_name.name for column_name in columns[n_columns * -1 :]]
 
 
 def check_column(

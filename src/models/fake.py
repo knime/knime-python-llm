@@ -99,14 +99,18 @@ class MismatchSettings:
 class FakeEmbeddingsSettings:
     document_column = knext.ColumnParameter(
         "Document column",
-        "Column containing the fake documents.",
+        "Column containing the fake documents as strings.",
         port_index=0,
         column_filter=util.create_type_filer(knext.string()),
     )
 
     vector_column = knext.ColumnParameter(
         "Vector column",
-        "Column containing the fake vectors.",
+        """Column containing the fake vectors. The column is expected to be a list of doubles. You may create the list 
+        using the 
+        [Table Creator](https://hub.knime.com/knime/extensions/org.knime.features.base/latest/org.knime.base.node.io.tablecreator.TableCreator2NodeFactory) and
+        the [Create Collection Column](https://hub.knime.com/knime/extensions/org.knime.features.base/latest/org.knime.base.collection.list.create2.CollectionCreate2NodeFactoryhttps://hub.knime.com/knime/extensions/org.knime.features.base/latest/org.knime.base.collection.list.create2.CollectionCreate2NodeFactory) 
+        nodes.""",
         port_index=0,
         column_filter=util.create_type_filer(knext.ListType(knext.double())),
     )
@@ -318,7 +322,27 @@ fake_llm_port_type = knext.port_type(
 
 class FakeChatPortObjectSpec(ChatModelPortObjectSpec):
     def __init__(self, sleep: float, missing_value_strategy: str) -> None:
-        super().__init__(sleep, missing_value_strategy)
+        super().__init__()
+        self._sleep = sleep
+        self._missing_value_strategy = missing_value_strategy
+
+    @property
+    def sleep(self) -> int:
+        return self._sleep
+
+    @property
+    def missing_value_strategy(self) -> str:
+        return self._missing_value_strategy
+
+    def serialize(self) -> dict:
+        return {
+            "sleep": self._sleep,
+            "missing_value_strategy": self._missing_value_strategy,
+        }
+
+    @classmethod
+    def deserialize(cls, data: dict):
+        return FakeLLMPortObjectSpec(data["sleep"], data["missing_value_strategy"])
 
 
 class FakeChatModelPortObject(ChatModelPortObject):
@@ -409,6 +433,7 @@ def _configure_model_generation_columns(
     table_spec: knext.Schema,
     fake_prompt_col: knext.Column,
     fake_response_col: knext.Column,
+    response_includes_vectors: bool = None,
 ):
     if fake_prompt_col and fake_response_col:
         util.check_column(
@@ -418,15 +443,31 @@ def _configure_model_generation_columns(
             "fake prompt",
         )
 
-        util.check_column(
-            table_spec,
-            fake_response_col,
-            knext.string(),
-            "fake response",
-        )
+        if response_includes_vectors:
+            util.check_column(
+                table_spec,
+                fake_response_col,
+                knext.ListType(knext.double()),
+                "fake embeddings",
+            )
+        else:
+            util.check_column(
+                table_spec,
+                fake_response_col,
+                knext.string(),
+                "fake response",
+            )
+
         return fake_prompt_col, fake_response_col
 
     else:
+        if response_includes_vectors:
+            query_col = util.pick_default_column(table_spec, knext.string())
+            vector_col = util.pick_default_column(
+                table_spec, knext.ListType(knext.double())
+            )
+            return query_col, vector_col
+
         default_columns = util.pick_default_columns(table_spec, knext.string(), 2)
         return default_columns[0], default_columns[1]
 
@@ -633,6 +674,18 @@ class FakeEmbeddingsConnector:
         ctx: knext.ConfigurationContext,
         table_spec: knext.Schema,
     ) -> FakeEmbeddingsPortObjectSpec:
+        fake_document_col, fake_vector_col = _configure_model_generation_columns(
+            table_spec,
+            self.settings.document_column,
+            self.settings.vector_column,
+            response_includes_vectors=True,
+        )
+
+        _warn_if_same_columns(ctx, fake_document_col, fake_vector_col)
+
+        self.settings.document_column = fake_document_col
+        self.settings.vector_column = fake_vector_col
+
         return FakeEmbeddingsPortObjectSpec()
 
     def execute(

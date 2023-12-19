@@ -99,10 +99,30 @@ def handle_column_name_collision(
         index += 1
 
     return new_column_name
+
+
 class MissingValueHandlingOptions(knext.EnumParameterOptions):
     SkipRow = (
         "Skip rows",
         "Rows with missing values will be ignored.",
+    )
+    Fail = (
+        "Fail",
+        "This node will fail during the execution.",
+    )
+
+
+class MissingValueOutputOptions(knext.EnumParameterOptions):
+    """
+    Instead of skipping rows with missing values as done with MissingValueHandlingOptions,
+    this class outputs missing values. This ensures table consistency by maintaining
+    the original row count, preventing the confusion caused by sudden table shrinkage
+    for nodes that perform row-wise mapping operations (e.g. Text Embedder).
+    """
+
+    OutputMissingValues = (
+        "Output Missing Values",
+        "Rows with missing values will not be processed but are included in the output.",
     )
     Fail = (
         "Fail",
@@ -154,3 +174,34 @@ def handle_missing_and_empty_values(
             )
 
     return df
+
+
+def output_missing_values(
+    df: pd.DataFrame,
+    input_column: str,
+    missing_value_handling_setting: MissingValueOutputOptions,
+    ctx: knext.ExecutionContext,
+):
+    if df[input_column].isna().all():
+        ctx.set_warning("All rows have missing values.")
+
+    has_missing_values = df[input_column].isna().any()
+
+    if has_missing_values:
+        if (
+            missing_value_handling_setting
+            != MissingValueOutputOptions.OutputMissingValues
+        ):
+            missing_row_id = df[df[input_column].isnull()].index[0]
+            raise knext.InvalidParametersError(
+                f"There are missing values in column {input_column}. See row ID <{missing_row_id}> for the first row that contains a missing value."
+            )
+
+    # Extract non-NaN texts and their indices
+    non_nan_mask = df[input_column].notna()
+    non_nan_texts = df.loc[non_nan_mask, input_column].tolist()
+
+    # get default numeric indices instead of rowIDs
+    df.reset_index(inplace=True)
+    indices = df.index[non_nan_mask].tolist()
+    return non_nan_texts, indices

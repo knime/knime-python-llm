@@ -1,5 +1,8 @@
 # KNIME / own imports
 import knime.extension as knext
+import knime.api.schema as ks
+import pyarrow as pa
+
 import util
 import pandas as pd
 from base import AIPortObjectSpec
@@ -487,6 +490,18 @@ class TextEmbedder:
         "Embeddings",
     )
 
+    missing_value_handling = knext.EnumParameter(
+        "Handle missing values in the text column",
+        """Define whether missing values in the text column should be kept or whether the 
+        node execution should fail on missing values.""",
+        default_value=lambda v: util.MissingValueOutputOptions.Fail.name
+        if v < knext.Version(5, 3, 0)
+        else util.MissingValueOutputOptions.OutputMissingValues.name,
+        enum=util.MissingValueOutputOptions,
+        style=knext.EnumParameter.Style.VALUE_SWITCH,
+        since_version="5.3.0",
+    )
+
     def configure(
         self,
         ctx: knext.ConfigurationContext,
@@ -501,15 +516,13 @@ class TextEmbedder:
             )
 
         embeddings_spec.validate_context(ctx)
-
         output_column_name = util.handle_column_name_collision(
             table_spec.column_names, self.embeddings_column_name
         )
-
         return table_spec.append(self._create_output_column(output_column_name))
 
     def _create_output_column(self, output_column_name) -> knext.Column:
-        return knext.Column(knext.list_(knext.double()), output_column_name)
+        return knext.Column(knext.list_(inner_type=knext.double()), output_column_name)
 
     def execute(
         self,
@@ -517,6 +530,12 @@ class TextEmbedder:
         embeddings_obj: EmbeddingsPortObject,
         table: knext.Table,
     ) -> knext.Table:
+        # Output rows with missing values if "Output Missing Values" option is selected
+        # or fail execution if "Fail" is selected and there are missing values
+        missing_value_handling_setting = util.MissingValueOutputOptions[
+            self.missing_value_handling
+        ]
+
         embeddings_model = embeddings_obj.create_model(ctx)
         output_table = knext.BatchOutputTable.create()
         num_rows = table.num_rows
@@ -525,14 +544,37 @@ class TextEmbedder:
             table.schema.column_names, self.embeddings_column_name
         )
         for batch in table.batches():
+            batch_num_rows = batch.num_rows
             util.check_canceled(ctx)
+
             data_frame = batch.to_pandas()
-            texts = data_frame[self.text_column].tolist()
-            embeddings = embeddings_model.embed_documents(texts)
-            data_frame[output_column_name] = embeddings
-            output_table.append(knext.Table.from_pandas(data_frame))
+
+            non_nan_texts, indices = util.output_missing_values(
+                data_frame, self.text_column, missing_value_handling_setting, ctx
+            )
+
+            embeddings = embeddings_model.embed_documents(non_nan_texts)
+
+            batch_pa = batch.to_pyarrow()
+            table_from_batch = pa.Table.from_batches([batch_pa])
+
+            embeddings_column = [None] * batch_num_rows
+
+            for index, embedding in zip(indices, embeddings):
+                embeddings_column[index] = embedding
+
+            embeddings_pa_column = pa.array(
+                embeddings_column, type=pa.list_(pa.float64())
+            )
+
+            updated_table_pa = table_from_batch.append_column(
+                output_column_name, embeddings_pa_column
+            )
+
+            output_table.append(knext.Table.from_pyarrow(updated_table_pa))
             i += batch.num_rows
             ctx.set_progress(i / num_rows)
+
         return output_table
 
 

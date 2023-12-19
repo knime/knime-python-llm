@@ -283,18 +283,19 @@ class VectorStoreToTool:
     Description: Use this tool whenever you need information about which nodes a user would need in a given
     situation or if you need information about nodes' configuration options.
 
-    Note that *OpenAI Functions Agents* require the name to contain no whitespaces while other kinds
+    Note that *OpenAI Functions Agents* require the name to contain no whitespace while other kinds
     of agents may not have this restriction.
     """
 
     tool_name = knext.StringParameter(
-        label="Tool name", description="The name for the Tool."
+        label="Tool name",
+        description="""The name for the tool. Note that *OpenAI Functions Agents* require the name to contain no whitespace, while other types of agents may not have this restriction.""",
     )
 
     tool_description = knext.StringParameter(
         label="Tool description",
-        description="""The description for the tool through which an agent decides whether to use the tool or not. 
-        Provide a meaningful description to make the agent decide more optimally.""",
+        description="""The description of the tool by which an agent decides whether or not to use the tool. 
+        Provide a meaningful description to make the agent decide more optimally. Note that the tool description cannot be empty for *OpenAI Functions Agents*.""",
     )
 
     top_k = knext.IntParameter(

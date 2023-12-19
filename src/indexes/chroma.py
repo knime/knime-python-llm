@@ -13,11 +13,9 @@ from .base import (
     FilestoreVectorstorePortObjectSpec,
     FilestoreVectorstorePortObject,
     MetadataSettings,
-    MissingValueHandlingOptions,
     store_category,
     get_metadata_columns,
     handle_missing_metadata_values,
-    handle_missing_and_empty_documents,
     validate_creator_document_column,
 )
 
@@ -163,12 +161,10 @@ class ChromaVectorStoreCreator:
         "Handle missing values in the document column",
         """Define whether missing values in the document column should be skipped or whether the 
         node execution should fail on missing values.""",
-        default_value=lambda v: (
-            MissingValueHandlingOptions.Fail.name
-            if v < knext.Version(5, 2, 0)
-            else MissingValueHandlingOptions.SkipRow.name
-        ),
-        enum=MissingValueHandlingOptions,
+        default_value=lambda v: util.MissingValueHandlingOptions.Fail.name
+        if v < knext.Version(5, 2, 0)
+        else util.MissingValueHandlingOptions.SkipRow.name,
+        enum=util.MissingValueHandlingOptions,
         style=knext.EnumParameter.Style.VALUE_SWITCH,
         since_version="5.2.0",
     )
@@ -218,11 +214,11 @@ class ChromaVectorStoreCreator:
 
         # Skip rows with missing values if "SkipRow" option is selected
         # or fail execution if "Fail" is selected and there are missing documents
-        missing_value_handling_setting = MissingValueHandlingOptions[
+        missing_value_handling_setting = util.MissingValueHandlingOptions[
             self.missing_value_handling
         ]
 
-        df = handle_missing_and_empty_documents(
+        df = util.handle_missing_and_empty_values(
             df, self.document_column, missing_value_handling_setting, ctx
         )
 

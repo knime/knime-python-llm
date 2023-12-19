@@ -1,6 +1,7 @@
 import knime.extension as knext
 from typing import Callable, List
 import re
+import pandas as pd
 
 
 def is_nominal(column: knext.Column) -> bool:
@@ -98,3 +99,58 @@ def handle_column_name_collision(
         index += 1
 
     return new_column_name
+class MissingValueHandlingOptions(knext.EnumParameterOptions):
+    SkipRow = (
+        "Skip rows",
+        "Rows with missing values will be ignored.",
+    )
+    Fail = (
+        "Fail",
+        "This node will fail during the execution.",
+    )
+
+
+def skip_missing_values(df: pd.DataFrame, col_name: str, ctx: knext.ExecutionContext):
+    # Drops rows with missing values
+    df_cleaned = df.dropna(subset=[col_name], how="any")
+    n_skipped_rows = len(df) - len(df_cleaned)
+
+    if n_skipped_rows > 0:
+        ctx.set_warning(f"{n_skipped_rows} / {len(df)} rows are skipped.")
+
+    return df_cleaned
+
+
+def handle_missing_and_empty_values(
+    df: pd.DataFrame,
+    input_column: str,
+    missing_value_handling_setting: MissingValueHandlingOptions,
+    ctx: knext.ExecutionContext,
+):
+    # Drops rows if SkipRow option is selected, otherwise fails
+    # if there are any missing values in the input column (=Fail option is selected)
+    has_missing_values = df[input_column].isna().any()
+    if (
+        missing_value_handling_setting == MissingValueHandlingOptions.SkipRow
+        and has_missing_values
+    ):
+        df = skip_missing_values(df, input_column, ctx)
+    elif has_missing_values:
+        missing_row_id = df[df[input_column].isnull()].index[0]
+        raise knext.InvalidParametersError(
+            f"There are missing values in column {input_column}. See row ID <{missing_row_id}> for the first row that contains a missing value."
+        )
+
+    if df.empty:
+        raise knext.InvalidParametersError(
+            f"""All rows are skipped due to missing values."""
+        )
+
+    # Check for empty values
+    for id, value in df[input_column].items():
+        if not value.strip():
+            raise ValueError(
+                f"Empty values are not supported. See row ID {id} for the first empty value."
+            )
+
+    return df

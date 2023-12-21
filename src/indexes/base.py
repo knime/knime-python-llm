@@ -333,6 +333,22 @@ class VectorStoreRetriever:
         since_version="5.2.0",
     )
 
+    retrieve_similarity_scores = knext.BoolParameter(
+        "Retrieve similarity scores",
+        """Whether or not to retrieve similarity scores for the retrieved documents. 
+        FAISS uses L2 distance and Chroma uses cosine distance to calculate similarity scores. 
+        Lower score represents more similarity.""",
+        default_value=False,
+        since_version="5.2.0",
+    )
+
+    similarity_scores_column_name = knext.StringParameter(
+        "Similarity score column name",
+        "The name for the appended column containing the similarity scores.",
+        "Similarity scores",
+        since_version="5.2.0",
+    ).rule(knext.OneOf(retrieve_similarity_scores, [True]), knext.Effect.SHOW)
+
     def configure(
         self,
         ctx: knext.ConfigurationContext,
@@ -351,6 +367,11 @@ class VectorStoreRetriever:
                 "No name for the column holding the retrieved documents is provided."
             )
 
+        if not self.similarity_scores_column_name:
+            raise knext.InvalidParametersError(
+                "No name for the column holding the similarity scores is provided."
+            )
+
         return table_spec.append(self._create_column_list(vectorstore_spec))
 
     def execute(
@@ -366,6 +387,7 @@ class VectorStoreRetriever:
 
         for batch in input_table.batches():
             doc_collection = []
+            similarity_scores = []
             metadata_dict = {}
 
             df = batch.to_pandas()
@@ -373,9 +395,11 @@ class VectorStoreRetriever:
             for query in df[self.query_column]:
                 util.check_canceled(ctx)
 
-                documents = db.similarity_search(query, k=self.top_k)
+                documents = db.similarity_search_with_score(query, k=self.top_k)
 
-                doc_collection.append([document.page_content for document in documents])
+                doc_collection.append(
+                    [document[0].page_content for document in documents]
+                )
 
                 if self.retrieve_metadata:
 
@@ -387,10 +411,12 @@ class VectorStoreRetriever:
                             metadata_dict[key] = []
                         metadata_dict[key].append(
                             [
-                                to_str_or_none(document.metadata.get(key))
+                                to_str_or_none(document[0].metadata.get(key))
                                 for document in documents
                             ]
                         )
+                if self.retrieve_similarity_scores:
+                    similarity_scores.append([document[1] for document in documents])
 
                 i += 1
                 ctx.set_progress(i / num_rows)
@@ -399,6 +425,9 @@ class VectorStoreRetriever:
 
             for key in metadata_dict.keys():
                 df[key] = metadata_dict[key]
+
+            if self.retrieve_similarity_scores:
+                df[self.similarity_scores_column_name] = similarity_scores
 
             output_table.append(df)
 
@@ -416,4 +445,13 @@ class VectorStoreRetriever:
                 result_columns.append(
                     knext.Column(knext.ListType(knext.string()), column_name)
                 )
+
+        if self.retrieve_similarity_scores:
+            result_columns.append(
+                knext.Column(
+                    knext.ListType(knext.double()),
+                    self.similarity_scores_column_name,
+                )
+            )
+
         return result_columns

@@ -232,8 +232,9 @@ class FakeChatModel(SimpleChatModel):
 class FakeEmbeddings(Embeddings, BaseModel):
     embeddings_dict: dict[str, list[float]]
 
-    def embed_documents(self, _: any) -> List[float]:
-        return list(self.embeddings_dict.values())
+    def embed_documents(self, documents: any) -> List[float]:
+        embeddings = [self.embeddings_dict.get(text) for text in documents]
+        return embeddings
 
     def embed_query(self, text: str) -> List[float]:
         if text is None:

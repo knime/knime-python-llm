@@ -432,10 +432,10 @@ fake_embeddings_port_type = knext.port_type(
 
 def _configure_model_generation_columns(
     table_spec: knext.Schema,
-    fake_prompt_col: knext.Column,
-    fake_response_col: knext.Column,
+    fake_prompt_col: str,
+    fake_response_col: str,
     response_includes_vectors: bool = None,
-):
+) -> tuple[str, str]:
     if fake_prompt_col and fake_response_col:
         util.check_column(
             table_spec,

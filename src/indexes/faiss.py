@@ -20,7 +20,7 @@ from .base import (
 
 import util
 
-from langchain.vectorstores import FAISS
+from langchain.vectorstores.faiss import FAISS
 from langchain.docstore.document import Document
 
 faiss_icon = "icons/ml.png"

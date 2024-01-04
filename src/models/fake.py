@@ -66,8 +66,8 @@ class FakeGeneralSettings:
     )
 
     delay = knext.IntParameter(
-        "Answer delay",
-        "Delays the time the fake LLM will take to respond.",
+        "Response delay (s)",
+        "Delays the response of the model for each prompt by the given number of seconds.",
         0,
         min_value=0,
         is_advanced=True,
@@ -115,14 +115,6 @@ class FakeEmbeddingsSettings:
         column_filter=util.create_type_filer(knext.ListType(knext.double())),
     )
 
-    delay = knext.IntParameter(
-        "Answer delay",
-        "Delays the time the fake LLM will take to respond.",
-        0,
-        min_value=0,
-        is_advanced=True,
-    )
-
 
 # == Fake Implementations ==
 
@@ -137,13 +129,15 @@ def generate_response(
     default_response: str,
     prompt: str,
     missing_value_strategy: str,
+    node: str,
 ):
     response = response_dict.get(prompt)
 
     if not response:
         if missing_value_strategy == MissingValueHandlingOptions.Fail.name:
             raise knext.InvalidParametersError(
-                f"Could not find matching response for prompt: '{prompt}'. Please make sure, that the prompt exactly matches one from the given prompt column."
+                f"Could not find matching response for prompt: '{prompt}'. Please ensure that the prompt \
+                exactly matches one specified in the prompt column of the {node} upstream."
             )
         else:
             return default_response
@@ -175,6 +169,7 @@ class FakeDictLLM(LLM):
             self.default_response,
             prompt,
             self.missing_value_strategy,
+            "Fake LLM Connector",
         )
 
     async def _acall(
@@ -190,6 +185,7 @@ class FakeDictLLM(LLM):
             self.default_response,
             prompt,
             self.missing_value_strategy,
+            "Fake LLM Connector",
         )
 
     @property
@@ -222,6 +218,7 @@ class FakeChatModel(SimpleChatModel):
             self.default_response,
             prompt,
             self.missing_value_strategy,
+            "Fake Chat Model Connector",
         )
 
     @property
@@ -245,7 +242,10 @@ class FakeEmbeddings(Embeddings, BaseModel):
         try:
             return self.embeddings_dict[text]
         except KeyError:
-            raise KeyError(f"Could not find document '{text}' in dictionary.")
+            raise KeyError(
+                f"Could not find document '{text}' in the fake Embeddings Model. Please ensure that \
+                    the query exactly matches one of the embedded documents."
+            )
 
 
 # == Port Objects ==
@@ -484,7 +484,8 @@ def to_dictionary(table, columns: list[str]):
 
         if is_missing:
             raise knext.InvalidParametersError(
-                f"Missing value found in column '{col}'. Please make sure, that the query and response column do not have missing values."
+                f"Missing value found in column '{col}'. Please ensure, that the query \
+                    and response columns do not have missing values."
             )
 
     response_dict = dict(
@@ -520,7 +521,8 @@ class FakeLLMConnector:
     This node creates a fake Large Language Model (LLM) implementation for testing
     purposes without the need for heavy computing power. Provide a column with expected
     prompts and their respective answers in a second column. When the 'Fake Model'
-    is prompted with a matching prompt, it will return the provided answer.
+    is prompted with a matching prompt, it will return the provided answer. If the prompt
+    does not match, it will return a default value or fail based on its configuration.
     """
 
     settings = FakeGeneralSettings()
@@ -588,7 +590,8 @@ class FakeChatConnector:
     This node creates a fake Chat Model implementation for testing purposes without the
     need for heavy computing power. Provide a column with prompts and their respective
     responses in a second column. When the 'Fake Chat Model' is prompted,
-    it will return the provided answer as an AI message.
+    it will return the provided answer as an AI message. If the prompt
+    does not match, it will return a default value or fail based on its configuration.
     """
 
     settings = FakeGeneralSettings()
@@ -664,6 +667,10 @@ class FakeEmbeddingsConnector:
     the need for heavy computing power. Provide a set of documents and queries along with their
     corresponding vectors for the following nodes, e.g., Vector Store Creators and Vector Store Retriever,
     to use.
+
+    All downstream nodes working with the fake Embeddings Model need to be supplied with matching documents,
+    which should also be used as queries in the Vector Store Retriever node.
+    Failure to do so will result in errors in these nodes.
 
     With this node you simulate exactly with which vectors documents will be stored and retrieved.
     """

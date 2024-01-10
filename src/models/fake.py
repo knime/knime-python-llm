@@ -27,10 +27,10 @@ from pydantic import BaseModel
 import pickle
 
 fake_icon = "icons/fake.png"
-fake_category = knext.category(
+test_category = knext.category(
     path=model_category,
-    level_id="fake",
-    name="Fake",
+    level_id="test",
+    name="Test",
     description="",
     icon=fake_icon,
 )
@@ -49,18 +49,18 @@ class MissingValueHandlingOptions(knext.EnumParameterOptions):
     )
 
 
-@knext.parameter_group(label="Fake Configuration")
-class FakeGeneralSettings:
-    fake_prompt_col = knext.ColumnParameter(
+@knext.parameter_group(label="Test Configuration")
+class TestNodesGeneralSettings:
+    test_prompt_col = knext.ColumnParameter(
         "Prompt column",
-        "Column containing the fake prompts.",
+        "Column containing the test prompts.",
         port_index=0,
         column_filter=util.create_type_filer(knext.string()),
     )
 
-    fake_response_col = knext.ColumnParameter(
-        "Responses",
-        "Column containing the fake responses for each prompt.",
+    test_response_col = knext.ColumnParameter(
+        "Response column",
+        "Column containing the test responses for each prompt.",
         port_index=0,
         column_filter=util.create_type_filer(knext.string()),
     )
@@ -87,7 +87,7 @@ class MismatchSettings:
 
     default_response = knext.StringParameter(
         "Default response",
-        "The fake LLM's response when a query is not found in the prompt column.",
+        "The test LLM's response when a query is not found in the prompt column.",
         "Could not find an answer to the query.",
     ).rule(
         knext.OneOf(prompt_mismatch, [MissingValueHandlingOptions.DefaultAnswer.name]),
@@ -96,17 +96,17 @@ class MismatchSettings:
 
 
 @knext.parameter_group(label="Embeddings Model Configuration")
-class FakeEmbeddingsSettings:
-    document_column = knext.ColumnParameter(
+class TestEmbeddingsSettings:
+    test_doc_col = knext.ColumnParameter(
         "Document column",
-        "Column containing the fake documents as strings.",
+        "Column containing the test documents as strings.",
         port_index=0,
         column_filter=util.create_type_filer(knext.string()),
     )
 
-    vector_column = knext.ColumnParameter(
+    test_vector_col = knext.ColumnParameter(
         "Vector column",
-        """Column containing the fake vectors. The column is expected to be a list of doubles. You may create the list 
+        """Column containing the test vectors. The column is expected to be a list of doubles. You may create the list 
         using the 
         [Table Creator](https://hub.knime.com/knime/extensions/org.knime.features.base/latest/org.knime.base.node.io.tablecreator.TableCreator2NodeFactory) and
         the [Create Collection Column](https://hub.knime.com/knime/extensions/org.knime.features.base/latest/org.knime.base.collection.list.create2.CollectionCreate2NodeFactoryhttps://hub.knime.com/knime/extensions/org.knime.features.base/latest/org.knime.base.collection.list.create2.CollectionCreate2NodeFactory) 
@@ -116,7 +116,7 @@ class FakeEmbeddingsSettings:
     )
 
 
-# == Fake Implementations ==
+# == Fake Implementations for testing Nodes ==
 
 
 def _warn_if_same_columns(ctx, f_prompt_col: str, response_col: str) -> None:
@@ -136,8 +136,8 @@ def generate_response(
     if not response:
         if missing_value_strategy == MissingValueHandlingOptions.Fail.name:
             raise knext.InvalidParametersError(
-                f"Could not find matching response for prompt: '{prompt}'. Please ensure that the prompt \
-                exactly matches one specified in the prompt column of the {node} upstream."
+                f"""Could not find matching response for prompt: '{prompt}'. Please ensure that the prompt 
+                exactly matches one specified in the prompt column of the {node} upstream."""
             )
         else:
             return default_response
@@ -145,8 +145,8 @@ def generate_response(
     return response
 
 
-class FakeDictLLM(LLM):
-    """Self implemented Fake LLM wrapper for testing purposes."""
+class TestDictLLM(LLM):
+    """Self implemented Test LLM wrapper for testing purposes."""
 
     response_dict: dict[str, str]
     default_response: str
@@ -155,7 +155,7 @@ class FakeDictLLM(LLM):
 
     @property
     def _llm_type(self) -> str:
-        return "fake-dict"
+        return "test-dict"
 
     def _call(
         self,
@@ -169,7 +169,7 @@ class FakeDictLLM(LLM):
             self.default_response,
             prompt,
             self.missing_value_strategy,
-            "Fake LLM Connector",
+            "Test LLM Connector",
         )
 
     async def _acall(
@@ -185,7 +185,7 @@ class FakeDictLLM(LLM):
             self.default_response,
             prompt,
             self.missing_value_strategy,
-            "Fake LLM Connector",
+            "Test LLM Connector",
         )
 
     @property
@@ -193,8 +193,8 @@ class FakeDictLLM(LLM):
         return {}
 
 
-class FakeChatModel(SimpleChatModel):
-    """Fake ChatModel for testing purposes."""
+class TestChatModel(SimpleChatModel):
+    """Test ChatModel for testing purposes."""
 
     response_dict: Dict[str, str]
     default_response: str
@@ -203,7 +203,7 @@ class FakeChatModel(SimpleChatModel):
 
     @property
     def _llm_type(self) -> str:
-        return "fake-chat-model"
+        return "test-chat-model"
 
     def _call(
         self,
@@ -218,7 +218,7 @@ class FakeChatModel(SimpleChatModel):
             self.default_response,
             prompt,
             self.missing_value_strategy,
-            "Fake Chat Model Connector",
+            "Test Chat Model Connector",
         )
 
     @property
@@ -226,7 +226,7 @@ class FakeChatModel(SimpleChatModel):
         return {}
 
 
-class FakeEmbeddings(Embeddings, BaseModel):
+class TestEmbeddings(Embeddings, BaseModel):
     embeddings_dict: dict[str, list[float]]
 
     def embed_documents(self, documents: any) -> List[float]:
@@ -243,15 +243,15 @@ class FakeEmbeddings(Embeddings, BaseModel):
             return self.embeddings_dict[text]
         except KeyError:
             raise KeyError(
-                f"Could not find document '{text}' in the fake Embeddings Model. Please ensure that \
-                    the query exactly matches one of the embedded documents."
+                f"""Could not find document '{text}' in the Test Embeddings Model. Please ensure that 
+                the query exactly matches one of the embedded documents."""
             )
 
 
 # == Port Objects ==
 
 
-class FakeLLMPortObjectSpec(LLMPortObjectSpec):
+class TestLLMPortObjectSpec(LLMPortObjectSpec):
     def __init__(self, sleep: float, missing_value_strategy: str) -> None:
         super().__init__()
         self._sleep = sleep
@@ -273,13 +273,13 @@ class FakeLLMPortObjectSpec(LLMPortObjectSpec):
 
     @classmethod
     def deserialize(cls, data: dict):
-        return FakeLLMPortObjectSpec(data["sleep"], data["missing_value_strategy"])
+        return TestLLMPortObjectSpec(data["sleep"], data["missing_value_strategy"])
 
 
-class FakeLLMPortObject(LLMPortObject):
+class TestLLMPortObject(LLMPortObject):
     def __init__(
         self,
-        spec: FakeLLMPortObjectSpec,
+        spec: TestLLMPortObjectSpec,
         responses: dict[str, str],
         default_response: str,
     ) -> None:
@@ -288,7 +288,7 @@ class FakeLLMPortObject(LLMPortObject):
         self._default_response = default_response
 
     @property
-    def spec(self) -> FakeLLMPortObjectSpec:
+    def spec(self) -> TestLLMPortObjectSpec:
         return super().spec
 
     @property
@@ -307,8 +307,8 @@ class FakeLLMPortObject(LLMPortObject):
         (responses, default_response) = pickle.loads(data)
         return cls(spec, responses, default_response)
 
-    def create_model(self, ctx) -> FakeDictLLM:
-        return FakeDictLLM(
+    def create_model(self, ctx) -> TestDictLLM:
+        return TestDictLLM(
             response_dict=self.responses,
             default_response=self.default_response,
             missing_value_strategy=self.spec.missing_value_strategy,
@@ -316,12 +316,12 @@ class FakeLLMPortObject(LLMPortObject):
         )
 
 
-fake_llm_port_type = knext.port_type(
-    "Fake LLM", FakeLLMPortObject, FakeLLMPortObjectSpec
+test_llm_port_type = knext.port_type(
+    "Test LLM", TestLLMPortObject, TestLLMPortObjectSpec
 )
 
 
-class FakeChatPortObjectSpec(ChatModelPortObjectSpec):
+class TestChatModelPortObjectSpec(ChatModelPortObjectSpec):
     def __init__(self, sleep: float, missing_value_strategy: str) -> None:
         super().__init__()
         self._sleep = sleep
@@ -343,13 +343,13 @@ class FakeChatPortObjectSpec(ChatModelPortObjectSpec):
 
     @classmethod
     def deserialize(cls, data: dict):
-        return FakeLLMPortObjectSpec(data["sleep"], data["missing_value_strategy"])
+        return TestLLMPortObjectSpec(data["sleep"], data["missing_value_strategy"])
 
 
-class FakeChatModelPortObject(ChatModelPortObject):
+class TestChatModelPortObject(ChatModelPortObject):
     def __init__(
         self,
-        spec: FakeLLMPortObjectSpec,
+        spec: TestLLMPortObjectSpec,
         responses: dict[str, str],
         default_response: str,
     ) -> None:
@@ -358,7 +358,7 @@ class FakeChatModelPortObject(ChatModelPortObject):
         self._default_response = default_response
 
     @property
-    def spec(self) -> FakeChatPortObjectSpec:
+    def spec(self) -> TestChatModelPortObjectSpec:
         return super().spec
 
     @property
@@ -377,8 +377,8 @@ class FakeChatModelPortObject(ChatModelPortObject):
         (responses, default_response) = pickle.loads(data)
         return cls(spec, responses, default_response)
 
-    def create_model(self, ctx: knext.ExecutionContext) -> FakeChatModel:
-        return FakeChatModel(
+    def create_model(self, ctx: knext.ExecutionContext) -> TestChatModel:
+        return TestChatModel(
             response_dict=self.responses,
             default_response=self.default_response,
             missing_value_strategy=self.spec.missing_value_strategy,
@@ -386,24 +386,24 @@ class FakeChatModelPortObject(ChatModelPortObject):
         )
 
 
-fake_chat_model_port_type = knext.port_type(
-    "Fake Chat Model", FakeChatModelPortObject, FakeChatPortObjectSpec
+test_chat_model_port_type = knext.port_type(
+    "Test Chat Model", TestChatModelPortObject, TestChatModelPortObjectSpec
 )
 
 
-class FakeEmbeddingsPortObjectSpec(EmbeddingsPortObjectSpec):
+class TestEmbeddingsPortObjectSpec(EmbeddingsPortObjectSpec):
     def __init__(self) -> None:
         super().__init__()
 
     @classmethod
     def deserialize(cls, data: dict):
-        return FakeEmbeddingsPortObjectSpec()
+        return TestEmbeddingsPortObjectSpec()
 
 
-class FakeEmbeddingsPortObject(EmbeddingsPortObject):
+class TestEmbeddingsPortObject(EmbeddingsPortObject):
     def __init__(
         self,
-        spec: FakeEmbeddingsPortObjectSpec,
+        spec: TestEmbeddingsPortObjectSpec,
         embeddings_dict: dict[str, list[float]],
     ):
         super().__init__(spec)
@@ -419,47 +419,47 @@ class FakeEmbeddingsPortObject(EmbeddingsPortObject):
     @classmethod
     def deserialize(cls, spec, data: dict):
         embeddings_dict = pickle.loads(data)
-        return FakeEmbeddingsPortObject(FakeEmbeddingsPortObjectSpec(), embeddings_dict)
+        return TestEmbeddingsPortObject(TestEmbeddingsPortObjectSpec(), embeddings_dict)
 
     def create_model(self, ctx):
-        return FakeEmbeddings(embeddings_dict=self.embeddings_dict)
+        return TestEmbeddings(embeddings_dict=self.embeddings_dict)
 
 
-fake_embeddings_port_type = knext.port_type(
-    "Fake Embeddings", FakeEmbeddingsPortObject, FakeEmbeddingsPortObjectSpec
+test_embeddings_port_type = knext.port_type(
+    "Test Embeddings", TestEmbeddingsPortObject, TestEmbeddingsPortObjectSpec
 )
 
 
 def _configure_model_generation_columns(
     table_spec: knext.Schema,
-    fake_prompt_col: str,
-    fake_response_col: str,
+    test_prompt_col: str,
+    test_response_col: str,
     response_includes_vectors: bool = None,
 ) -> tuple[str, str]:
-    if fake_prompt_col and fake_response_col:
+    if test_prompt_col and test_response_col:
         util.check_column(
             table_spec,
-            fake_prompt_col,
+            test_prompt_col,
             knext.string(),
-            "fake prompt",
+            "test prompt",
         )
 
         if response_includes_vectors:
             util.check_column(
                 table_spec,
-                fake_response_col,
+                test_response_col,
                 knext.ListType(knext.double()),
-                "fake embeddings",
+                "test embeddings",
             )
         else:
             util.check_column(
                 table_spec,
-                fake_response_col,
+                test_response_col,
                 knext.string(),
-                "fake response",
+                "test response",
             )
 
-        return fake_prompt_col, fake_response_col
+        return test_prompt_col, test_response_col
 
     else:
         if response_includes_vectors:
@@ -484,8 +484,8 @@ def to_dictionary(table, columns: list[str]):
 
         if is_missing:
             raise knext.InvalidParametersError(
-                f"Missing value found in column '{col}'. Please ensure, that the query \
-                    and response columns do not have missing values."
+                f"""Missing value found in column '{col}'. Please ensure, that the query 
+                and response columns do not have missing values."""
             )
 
     response_dict = dict(
@@ -500,47 +500,47 @@ def to_dictionary(table, columns: list[str]):
 
 
 @knext.node(
-    "Fake LLM Connector",
+    "Test LLM Connector",
     knext.NodeType.SOURCE,
     fake_icon,
-    category=fake_category,
+    category=test_category,
 )
 @knext.input_table(
     "Prompt and response table",
-    "A table with columns for fake prompts and their corresponding responses.",
+    "A table with columns for test prompts and their corresponding responses.",
 )
 @knext.output_port(
-    "Fake LLM",
-    "Configured Fake LLM",
-    fake_llm_port_type,
+    "Test LLM",
+    "Configured test LLM",
+    test_llm_port_type,
 )
-class FakeLLMConnector:
+class TestLLMConnector:
     """
-    Creates a fake Large Language Model.
+    Creates a Test Large Language Model.
 
-    This node creates a fake Large Language Model (LLM) implementation for testing
+    This node creates a Test Large Language Model (LLM) implementation for testing
     purposes without the need for heavy computing power. Provide a column with expected
-    prompts and their respective answers in a second column. When the 'Fake Model'
+    prompts and their respective answers in a second column. When the 'Test Model'
     is prompted with a matching prompt, it will return the provided answer. If the prompt
     does not match, it will return a default value or fail based on its configuration.
     """
 
-    settings = FakeGeneralSettings()
+    settings = TestNodesGeneralSettings()
     mismatch = MismatchSettings()
 
     def configure(
         self,
         ctx: knext.ConfigurationContext,
         table_spec: knext.Schema,
-    ) -> FakeLLMPortObjectSpec:
-        fake_prompt_col, response_col = _configure_model_generation_columns(
-            table_spec, self.settings.fake_prompt_col, self.settings.fake_response_col
+    ) -> TestLLMPortObjectSpec:
+        test_prompt_col, test_response_col = _configure_model_generation_columns(
+            table_spec, self.settings.test_prompt_col, self.settings.test_response_col
         )
 
-        _warn_if_same_columns(ctx, fake_prompt_col, response_col)
+        _warn_if_same_columns(ctx, test_prompt_col, test_response_col)
 
-        self.settings.fake_prompt_col = fake_prompt_col
-        self.settings.fake_response_col = response_col
+        self.settings.test_prompt_col = test_prompt_col
+        self.settings.test_response_col = test_response_col
 
         return self.create_spec()
 
@@ -548,68 +548,68 @@ class FakeLLMConnector:
         self,
         ctx: knext.ExecutionContext,
         input_table: knext.Table,
-    ) -> FakeLLMPortObject:
+    ) -> TestLLMPortObject:
         _warn_if_same_columns(
-            ctx, self.settings.fake_prompt_col, self.settings.fake_response_col
+            ctx, self.settings.test_prompt_col, self.settings.test_response_col
         )
 
         response_dict = to_dictionary(
             input_table,
-            [self.settings.fake_prompt_col, self.settings.fake_response_col],
+            [self.settings.test_prompt_col, self.settings.test_response_col],
         )
 
-        return FakeLLMPortObject(
+        return TestLLMPortObject(
             self.create_spec(),
             response_dict,
             self.mismatch.default_response,
         )
 
-    def create_spec(self) -> FakeLLMPortObjectSpec:
-        return FakeLLMPortObjectSpec(self.settings.delay, self.mismatch.prompt_mismatch)
+    def create_spec(self) -> TestLLMPortObjectSpec:
+        return TestLLMPortObjectSpec(self.settings.delay, self.mismatch.prompt_mismatch)
 
 
 @knext.node(
-    "Fake Chat Model Connector",
+    "Test Chat Model Connector",
     knext.NodeType.SOURCE,
     fake_icon,
-    category=fake_category,
+    category=test_category,
 )
 @knext.input_table(
     "Prompt and response table",
-    "A table with columns for fake prompts and their corresponding responses.",
+    "A table with columns for test prompts and their corresponding responses.",
 )
 @knext.output_port(
-    "Fake Chat Model",
-    "Configured Fake Chat Model",
-    fake_chat_model_port_type,
+    "Test Chat Model",
+    "Configured Test Chat Model",
+    test_chat_model_port_type,
 )
-class FakeChatConnector:
+class TestChatModelConnector:
     """
-    Creates a fake Chat Model.
+    Creates a Test Chat Model.
 
-    This node creates a fake Chat Model implementation for testing purposes without the
+    This node creates a Test Chat Model implementation for testing purposes without the
     need for heavy computing power. Provide a column with prompts and their respective
-    responses in a second column. When the 'Fake Chat Model' is prompted,
+    responses in a second column. When the 'Test Chat Model' is prompted,
     it will return the provided answer as an AI message. If the prompt
     does not match, it will return a default value or fail based on its configuration.
     """
 
-    settings = FakeGeneralSettings()
+    settings = TestNodesGeneralSettings()
     mismatch = MismatchSettings()
 
     def configure(
         self,
         ctx: knext.ConfigurationContext,
         table_spec: knext.Schema,
-    ) -> FakeChatPortObjectSpec:
-        fake_prompt_col, response_col = _configure_model_generation_columns(
-            table_spec, self.settings.fake_prompt_col, self.settings.fake_response_col
+    ) -> TestChatModelPortObjectSpec:
+        test_prompt_col, test_response_col = _configure_model_generation_columns(
+            table_spec, self.settings.test_prompt_col, self.settings.test_response_col
         )
 
-        _warn_if_same_columns(ctx, fake_prompt_col, response_col)
+        _warn_if_same_columns(ctx, test_prompt_col, test_response_col)
 
-        self.settings.fake_prompt_col = fake_prompt_col
-        self.settings.fake_response_col = response_col
+        self.settings.test_prompt_col = test_prompt_col
+        self.settings.test_response_col = test_response_col
 
         return self.create_spec()
 
@@ -617,101 +617,101 @@ class FakeChatConnector:
         self,
         ctx: knext.ExecutionContext,
         input_table: knext.Table,
-    ) -> FakeChatModelPortObject:
+    ) -> TestChatModelPortObject:
         df = input_table.to_pandas()
 
         _warn_if_same_columns(
-            ctx, self.settings.fake_prompt_col, self.settings.fake_response_col
+            ctx, self.settings.test_prompt_col, self.settings.test_response_col
         )
 
         response_dict = dict(
             map(
                 lambda i, j: (i, j),
-                df[self.settings.fake_prompt_col],
-                df[self.settings.fake_response_col],
+                df[self.settings.test_prompt_col],
+                df[self.settings.test_response_col],
             )
         )
 
-        return FakeChatModelPortObject(
+        return TestChatModelPortObject(
             self.create_spec(),
             response_dict,
             self.mismatch.default_response,
         )
 
-    def create_spec(self) -> FakeChatPortObjectSpec:
-        return FakeChatPortObjectSpec(
+    def create_spec(self) -> TestChatModelPortObjectSpec:
+        return TestChatModelPortObjectSpec(
             self.settings.delay, self.mismatch.prompt_mismatch
         )
 
 
 @knext.node(
-    "Fake Embeddings Connector",
+    "Test Embeddings Connector",
     knext.NodeType.SOURCE,
     fake_icon,
-    category=fake_category,
+    category=test_category,
 )
 @knext.input_table(
     "Document and vector table",
     "A table containing a column with documents and one with the respective vectors.",
 )
 @knext.output_port(
-    "Fake Embeddings",
-    "Configured Fake Embeddings Model",
-    fake_embeddings_port_type,
+    "Test Embeddings",
+    "Configured Test Embeddings Model",
+    test_embeddings_port_type,
 )
-class FakeEmbeddingsConnector:
+class TestEmbeddingsConnector:
     """
-    Creates a fake Embeddings Model.
+    Creates a Test Embeddings Model.
 
-    This node creates a fake Embeddings Model implementation for testing purposes without
+    This node creates a Test Embeddings Model implementation for testing purposes without
     the need for heavy computing power. Provide a set of documents and queries along with their
     corresponding vectors for the following nodes, e.g., Vector Store Creators and Vector Store Retriever,
     to use.
 
-    All downstream nodes working with the fake Embeddings Model need to be supplied with matching documents,
+    All downstream nodes working with the Test Embeddings Model need to be supplied with matching documents,
     which should also be used as queries in the Vector Store Retriever node.
     Failure to do so will result in errors in these nodes.
 
     With this node you simulate exactly with which vectors documents will be stored and retrieved.
     """
 
-    settings = FakeEmbeddingsSettings()
+    settings = TestEmbeddingsSettings()
 
     def configure(
         self,
         ctx: knext.ConfigurationContext,
         table_spec: knext.Schema,
-    ) -> FakeEmbeddingsPortObjectSpec:
-        fake_document_col, fake_vector_col = _configure_model_generation_columns(
+    ) -> TestEmbeddingsPortObjectSpec:
+        test_doc_col, test_vector_col = _configure_model_generation_columns(
             table_spec,
-            self.settings.document_column,
-            self.settings.vector_column,
+            self.settings.test_doc_col,
+            self.settings.test_vector_col,
             response_includes_vectors=True,
         )
 
-        _warn_if_same_columns(ctx, fake_document_col, fake_vector_col)
+        _warn_if_same_columns(ctx, test_doc_col, test_vector_col)
 
-        self.settings.document_column = fake_document_col
-        self.settings.vector_column = fake_vector_col
+        self.settings.test_doc_col = test_doc_col
+        self.settings.test_vector_col = test_vector_col
 
-        return FakeEmbeddingsPortObjectSpec()
+        return TestEmbeddingsPortObjectSpec()
 
     def execute(
         self,
         ctx: knext.ExecutionContext,
         input_table: knext.Table,
-    ) -> FakeEmbeddingsPortObject:
+    ) -> TestEmbeddingsPortObject:
         df = input_table.to_pandas()
 
         response_dict = dict(
             map(
                 lambda i, j: (i, j.tolist()),
-                df[self.settings.document_column],
-                df[self.settings.vector_column],
+                df[self.settings.test_doc_col],
+                df[self.settings.test_vector_col],
             )
         )
 
-        return FakeEmbeddingsPortObject(
-            FakeEmbeddingsPortObjectSpec(),
+        return TestEmbeddingsPortObject(
+            TestEmbeddingsPortObjectSpec(),
             response_dict,
         )

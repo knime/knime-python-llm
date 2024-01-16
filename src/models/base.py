@@ -4,7 +4,7 @@ import util
 import pandas as pd
 from base import AIPortObjectSpec
 from typing import Any, List, Optional, Sequence
-
+from util import handle_column_name_collision
 
 # Langchain imports
 from langchain.schema import HumanMessage, SystemMessage, ChatMessage, AIMessage
@@ -285,6 +285,11 @@ class LLMPrompter:
                 "The response column name must not be empty."
             )
 
+        if self.response_column_name in input_table_spec.column_names:
+            self.response_column_name = handle_column_name_collision(
+                ctx, self.response_column_name
+            )
+
         return input_table_spec.append(
             knext.Column(ktype=knext.string(), name=self.response_column_name)
         )
@@ -460,6 +465,12 @@ class TextEmbedder:
             )
 
         embeddings_spec.validate_context(ctx)
+
+        if self.embeddings_column_name in table_spec.column_names:
+            self.embeddings_column_name = handle_column_name_collision(
+                ctx, self.embeddings_column_name
+            )
+
         return table_spec.append(self._create_output_column())
 
     def _create_output_column(self) -> knext.Column:

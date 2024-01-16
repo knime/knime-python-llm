@@ -1,5 +1,6 @@
 # KNIME / own imports
 import knime.extension as knext
+import util
 from knime.extension.nodes import (
     FilestorePortObject,
     load_port_object,
@@ -14,13 +15,12 @@ from models.base import (
     EmbeddingsPortObjectSpec,
 )
 from base import AIPortObjectSpec
+from util import handle_column_name_collision
 
 import pandas as pd
-import util
 from typing import Optional, Any
 import os
 import shutil
-
 import logging
 
 LOGGER = logging.getLogger(__name__)

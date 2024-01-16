@@ -63,3 +63,18 @@ def check_column(
         raise knext.InvalidParametersError(
             f"The {column_purpose} column '{column_name}' is of type {str(ktype)} but should be of type {str(expected_type)}."
         )
+
+
+def handle_column_name_collision(
+    ctx: knext.ConfigurationContext,
+    column_name: str,
+) -> str:
+    """
+    If the output column name collides with an input column name, it's been made unique by appending _dup.
+    """
+    new_column_name = f"{column_name}_dup"
+    ctx.set_warning(
+        f"The {column_name} is also used as an input column name, so it is changed to '{new_column_name}' to avoid column name collisions."
+    )
+
+    return new_column_name

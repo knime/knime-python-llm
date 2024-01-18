@@ -12,4 +12,3 @@ group_id: org.knime.python
 version: 5.2.0
 vendor: KNIME AG, Zurich, Switzerland
 license_file: LICENSE.txt
-excluded_files: [] # list of files to exclude from the extension

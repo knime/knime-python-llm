@@ -17,9 +17,11 @@ from .base import (
 from base import AIPortObjectSpec
 
 # Langchain imports
-from langchain.llms.huggingface_text_gen_inference import HuggingFaceTextGenInference
-from langchain.llms.huggingface_hub import HuggingFaceHub
-from langchain.embeddings import HuggingFaceHubEmbeddings
+from langchain_community.llms.huggingface_text_gen_inference import (
+    HuggingFaceTextGenInference,
+)
+from langchain_community.llms.huggingface_hub import HuggingFaceHub
+from langchain_community.embeddings import HuggingFaceHubEmbeddings
 
 # Other imports
 import huggingface_hub

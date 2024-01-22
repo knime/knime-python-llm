@@ -339,14 +339,14 @@ class VectorStoreRetriever:
         FAISS uses L2 distance and Chroma uses cosine distance to calculate similarity scores. 
         Lower score represents more similarity.""",
         default_value=False,
-        since_version="5.2.0",
+        since_version="5.3.0",
     )
 
     similarity_scores_column_name = knext.StringParameter(
-        "Similarity score column name",
+        "Similarity scores column name",
         "The name for the appended column containing the similarity scores.",
         "Similarity scores",
-        since_version="5.2.0",
+        since_version="5.3.0",
     ).rule(knext.OneOf(retrieve_similarity_scores, [True]), knext.Effect.SHOW)
 
     def configure(

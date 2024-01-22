@@ -143,6 +143,25 @@ class OpenAIGeneralSettings(GeneralSettings):
         is_advanced=True,
     )
 
+    seed = knext.IntParameter(
+        label="Seed",
+        description="""
+        Set the seed parameter to any integer of your choice to have (mostly) deterministic outputs.
+
+        If the seed and other model parameters are the same for each request, 
+        then responses will be mostly identical. There is a chance that responses 
+        will differ, due to the inherent non-determinism of OpenAI models.
+
+        Please note that this feature is in beta and only currently supported for gpt-4-1106-preview and 
+        gpt-3.5-turbo-1106 [1].
+
+        [1] [OpenAI Cookbook](https://cookbook.openai.com/examples/reproducible_outputs_with_the_seed_parameter)
+        """,
+        default_value=0,
+        is_advanced=True,
+        since_version="5.2.0",
+    )
+
 
 def _create_specific_model_name(api_name: str) -> knext.StringParameter:
     def list_models(ctx: knext.DialogCreationContext) -> list[str]:
@@ -405,6 +424,7 @@ class OpenAILLMPortObjectSpec(OpenAIModelPortObjectSpec, LLMPortObjectSpec):
         top_p: float,
         max_tokens: int,
         n: int,
+        seed: int,
     ) -> None:
         super().__init__(credentials)
         self._model = model_name
@@ -412,6 +432,7 @@ class OpenAILLMPortObjectSpec(OpenAIModelPortObjectSpec, LLMPortObjectSpec):
         self._top_p = top_p
         self._max_tokens = max_tokens
         self._n = n
+        self._seed = seed
 
     @property
     def model(self) -> str:
@@ -433,6 +454,10 @@ class OpenAILLMPortObjectSpec(OpenAIModelPortObjectSpec, LLMPortObjectSpec):
     def n(self) -> int:
         return self._n
 
+    @property
+    def seed(self) -> int:
+        return self._seed
+
     def serialize(self) -> dict:
         return {
             **super().serialize(),
@@ -441,6 +466,7 @@ class OpenAILLMPortObjectSpec(OpenAIModelPortObjectSpec, LLMPortObjectSpec):
             "top_p": self._top_p,
             "max_tokens": self._max_tokens,
             "n": self._n,
+            "seed": self._seed,
         }
 
     @classmethod
@@ -452,6 +478,7 @@ class OpenAILLMPortObjectSpec(OpenAIModelPortObjectSpec, LLMPortObjectSpec):
             data["top_p"],
             data["max_tokens"],
             data["n"],
+            seed=data.get("seed", 0),
         )
 
 
@@ -469,6 +496,7 @@ class OpenAILLMPortObject(LLMPortObject):
             top_p=self.spec.top_p,
             max_tokens=self.spec.max_tokens,
             n=self.spec.n,
+            seed=self.spec.seed,
         )
 
 
@@ -494,6 +522,7 @@ class OpenAIChatModelPortObject(ChatModelPortObject):
             temperature=self.spec.temperature,
             max_tokens=self.spec.max_tokens,
             n=self.spec.n,
+            seed=self.spec.seed,
         )
 
 
@@ -714,6 +743,8 @@ class OpenAILLMConnector:
 
         LOGGER.info(f"Selected model: {model_name}")
 
+        seed = None if self.model_settings.seed == 0 else self.model_settings.seed
+
         return OpenAILLMPortObjectSpec(
             openai_auth_spec,
             model_name,
@@ -721,6 +752,7 @@ class OpenAILLMConnector:
             self.model_settings.top_p,
             self.model_settings.max_tokens,
             self.model_settings.n,
+            seed=seed,
         )
 
 
@@ -792,6 +824,8 @@ class OpenAIChatModelConnector:
 
         LOGGER.info(f"Selected model: {model_name}")
 
+        seed = None if self.model_settings.seed == 0 else self.model_settings.seed
+
         return OpenAIChatModelPortObjectSpec(
             openai_auth_spec,
             model_name,
@@ -799,6 +833,7 @@ class OpenAIChatModelConnector:
             self.model_settings.top_p,
             self.model_settings.max_tokens,
             self.model_settings.n,
+            seed=seed,
         )
 
 

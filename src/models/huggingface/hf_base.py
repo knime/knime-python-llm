@@ -54,7 +54,6 @@ class HFModelSettings(GeneralSettings):
         min_value=0,
     )
 
-
 @knext.parameter_group(label="Prompt Templates")
 class HFPromptTemplateSettings:
     system_prompt_template = knext.MultilineStringParameter(

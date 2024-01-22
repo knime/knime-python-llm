@@ -36,6 +36,19 @@ class HFTGIServerSettings:
         default_value="",
     )
 
+class HFTGIModelSettings(HFModelSettings):
+    seed = knext.IntParameter(
+        label="Seed",
+        description="""
+        Set the seed parameter to any integer of your choice and use the same value across requests
+        to have reproducible outputs. 
+        The default value of 0 means that no seed is specified.
+        """,
+        default_value=0,
+        is_advanced=True,
+        since_version="5.2.0",
+    )
+
 
 class HFTGILLMPortObjectSpec(LLMPortObjectSpec):
     def __init__(
@@ -47,6 +60,7 @@ class HFTGILLMPortObjectSpec(LLMPortObjectSpec):
         typical_p,
         temperature,
         repetition_penalty,
+        seed,
     ) -> None:
         super().__init__()
         self._inference_server_url = inference_server_url
@@ -56,6 +70,7 @@ class HFTGILLMPortObjectSpec(LLMPortObjectSpec):
         self._typical_p = typical_p
         self._temperature = temperature
         self._repetition_penalty = repetition_penalty
+        self._seed = seed
 
     @property
     def inference_server_url(self):
@@ -85,6 +100,10 @@ class HFTGILLMPortObjectSpec(LLMPortObjectSpec):
     def repetition_penalty(self):
         return self._repetition_penalty
 
+    @property
+    def seed(self):
+        return self._seed
+
     def serialize(self) -> dict:
         return {
             "inference_server_url": self.inference_server_url,
@@ -94,6 +113,7 @@ class HFTGILLMPortObjectSpec(LLMPortObjectSpec):
             "typical_p": self.typical_p,
             "temperature": self.temperature,
             "repetition_penalty": self.repetition_penalty,
+            "seed": self.seed,
         }
 
     @classmethod
@@ -106,6 +126,7 @@ class HFTGILLMPortObjectSpec(LLMPortObjectSpec):
             data["typical_p"],
             data["temperature"],
             data["repetition_penalty"],
+            seed=data.get("seed", 0),
         )
 
 
@@ -122,6 +143,7 @@ class HFTGILLMPortObject(LLMPortObject):
             typical_p=self.spec.typical_p,
             temperature=self.spec.temperature,
             repetition_penalty=self.spec.repetition_penalty,
+            seed=self.spec.seed,
         )
 
 
@@ -148,6 +170,7 @@ class HFTGIChatModelPortObjectSpec(HFTGILLMPortObjectSpec, ChatModelPortObjectSp
             llm_spec.typical_p,
             llm_spec.temperature,
             llm_spec.repetition_penalty,
+            llm_spec.seed,
         )
         self._system_prompt_template = system_prompt_template
         self._prompt_template = prompt_template
@@ -230,7 +253,7 @@ class HFTGILLMConnector:
     """
 
     settings = HFTGIServerSettings()
-    model_settings = HFModelSettings()
+    model_settings = HFTGIModelSettings()
 
     def configure(self, ctx: knext.ConfigurationContext) -> HFTGILLMPortObjectSpec:
         if not self.settings.server_url:
@@ -242,6 +265,8 @@ class HFTGILLMConnector:
         return HFTGILLMPortObject(self.create_spec())
 
     def create_spec(self) -> HFTGILLMPortObjectSpec:
+        seed = None if self.model_settings.seed == 0 else self.model_settings.seed
+
         return HFTGILLMPortObjectSpec(
             self.settings.server_url,
             self.model_settings.max_new_tokens,
@@ -250,6 +275,7 @@ class HFTGILLMConnector:
             self.model_settings.typical_p,
             self.model_settings.temperature,
             self.model_settings.repetition_penalty,
+            seed=seed,
         )
 
 
@@ -283,7 +309,7 @@ class HFTGIChatModelConnector:
 
     settings = HFTGIServerSettings()
     templates = HFPromptTemplateSettings()
-    model_settings = HFModelSettings()
+    model_settings = HFTGIModelSettings()
 
     def configure(
         self, ctx: knext.ConfigurationContext
@@ -297,6 +323,8 @@ class HFTGIChatModelConnector:
         return HFTGIChatModelPortObject(self.create_spec())
 
     def create_spec(self) -> HFTGIChatModelPortObjectSpec:
+        seed = None if self.model_settings.seed == 0 else self.model_settings.seed
+
         llm_spec = HFTGILLMPortObjectSpec(
             self.settings.server_url,
             self.model_settings.max_new_tokens,
@@ -305,6 +333,7 @@ class HFTGIChatModelConnector:
             self.model_settings.typical_p,
             self.model_settings.temperature,
             self.model_settings.repetition_penalty,
+            seed=seed,
         )
 
         return HFTGIChatModelPortObjectSpec(

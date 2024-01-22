@@ -321,6 +321,38 @@ huggingface_textGenInference_chat_port_type = knext.port_type(
 )
 
 
+class HFTEIEmbeddingsPortObjectSpec(EmbeddingsPortObjectSpec):
+    def __init__(self, inference_server_url: str) -> None:
+        super().__init__()
+        self._inference_server_url = inference_server_url
+
+    @property
+    def inference_server_url(self):
+        return self._inference_server_url
+
+    def serialize(self) -> dict:
+        return {"inference_server_url": self.inference_server_url}
+
+    @classmethod
+    def deserialize(cls, data: dict):
+        return cls(data["inference_server_url"])
+
+
+class HFTEIEmbeddingsPortObject(EmbeddingsPortObject):
+    def __init__(self, spec: HFTEIEmbeddingsPortObjectSpec) -> None:
+        super().__init__(spec)
+
+    def create_model(self, ctx):
+        return HuggingFaceHubEmbeddings(model=self.spec.inference_server_url)
+
+
+huggingface_tei_embeddings_port_type = knext.port_type(
+    "Hugging Face TEI Embeddings Model",
+    HFTEIEmbeddingsPortObject,
+    HFTEIEmbeddingsPortObjectSpec,
+)
+
+
 class HuggingFaceAuthenticationPortObjectSpec(AIPortObjectSpec):
     def __init__(self, credentials: str) -> None:
         super().__init__()
@@ -588,6 +620,9 @@ class HuggingfaceTextGenInferenceConnector:
     model_settings = HuggingFaceModelSettings()
 
     def configure(self, ctx: knext.ConfigurationContext):
+        if not self.settings.server_url:
+            raise knext.InvalidParametersError("Server URL missing")
+
         return self.create_spec()
 
     def execute(self, ctx: knext.ExecutionContext):
@@ -639,6 +674,9 @@ class HFTGIChatModelConnector:
     def configure(
         self, ctx: knext.ConfigurationContext
     ) -> HFTGIChatModelPortObjectSpec:
+        if not self.settings.server_url:
+            raise knext.InvalidParametersError("Server URL missing")
+
         return self.create_spec()
 
     def execute(self, ctx: knext.ExecutionContext) -> HFTGIChatModelPortObject:
@@ -660,6 +698,52 @@ class HFTGIChatModelConnector:
             self.templates.system_prompt_template,
             self.templates.prompt_template,
         )
+
+
+@knext.node(
+    "HF TEI Embeddings Connector",
+    knext.NodeType.SOURCE,
+    huggingface_icon,
+    huggingface_category,
+)
+@knext.output_port(
+    "Embeddings Model",
+    "Connection to an embeddings model hosted on a Text Embeddings Inference server.",
+    huggingface_tei_embeddings_port_type,
+)
+class HFTEIEmbeddingsConnector:
+    """
+    Connects to a dedicated Text Embeddings Inference Server.
+
+    The [Text Embeddings Inference Server](https://github.com/huggingface/text-embeddings-inference)
+    is a toolkit for deploying and serving open source text embeddings and sequence classification models.
+
+    Please note that this node does not connect to the Hugging Face Hub,
+    but to a Text Embeddings Inference Server that can be hosted both locally and remotely.
+
+    For more details and information about integrating with the Hugging Face Embeddings Inference
+    and setting up a server, refer to
+    [Text Embeddings Inference GitHub](https://github.com/huggingface/text-embeddings-inference).
+    """
+
+    server_url = knext.StringParameter(
+        "Text Embeddings Inference Server URL",
+        "The URL where the Text Embeddings Inference server is hostet.",
+    )
+
+    def configure(
+        self, ctx: knext.ConfigurationContext
+    ) -> HFTEIEmbeddingsPortObjectSpec:
+        if not self.server_url:
+            raise knext.InvalidParametersError("Server URL missing")
+
+        return self.create_spec()
+
+    def execute(self, ctx: knext.ExecutionContext):
+        return HFTEIEmbeddingsPortObject(self.create_spec())
+
+    def create_spec(self) -> HFTEIEmbeddingsPortObjectSpec:
+        return HFTEIEmbeddingsPortObjectSpec(self.server_url)
 
 
 @knext.node(

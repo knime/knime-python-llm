@@ -147,6 +147,7 @@ class OpenAIGeneralSettings(GeneralSettings):
         label="Seed",
         description="""
         Set the seed parameter to any integer of your choice to have (mostly) deterministic outputs.
+        The default value of 0 means that no seed is specified.
 
         If the seed and other model parameters are the same for each request, 
         then responses will be mostly identical. There is a chance that responses 

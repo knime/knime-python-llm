@@ -1,5 +1,6 @@
 import knime.extension as knext
 from typing import Callable, List
+import re
 
 
 def is_nominal(column: knext.Column) -> bool:
@@ -67,14 +68,36 @@ def check_column(
 
 def handle_column_name_collision(
     ctx: knext.ConfigurationContext,
+    input_table_spec: knext.Schema,
     column_name: str,
-) -> str:
+):
     """
-    If the output column name collides with an input column name, it's been made unique by appending _dup.
+    If the output column name collides with an input column name, it's been made unique by appending (#<count>).
+    For example, if "column" exists as an input column name and is entered as an output column name,
+    the output column name will be "column (#1)". Adding "column" or "column (#1)" again will result
+    in "column1 (#2)".
     """
-    new_column_name = f"{column_name}_dup"
-    ctx.set_warning(
-        f"The {column_name} is also used as an input column name, so it is changed to '{new_column_name}' to avoid column name collisions."
-    )
+    basename = column_name.strip()
+
+    existing_column_names = set(input_table_spec.column_names)
+
+    if column_name not in existing_column_names:
+        return column_name
+
+    # Pattern to match strings that have a name followed by a
+    # numerical identifier in parentheses, e.g. "column (#1)"
+    pattern = re.compile(r"^(.*) \(#(\d+)\)$")
+    match = pattern.match(basename)
+
+    if match:
+        basename, index = match.groups()
+        index = int(index) + 1
+    else:
+        index = 1
+
+    new_column_name = basename
+    while new_column_name in existing_column_names:
+        new_column_name = f"{basename} (#{index})"
+        index += 1
 
     return new_column_name

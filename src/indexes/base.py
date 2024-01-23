@@ -15,7 +15,6 @@ from models.base import (
     EmbeddingsPortObjectSpec,
 )
 from base import AIPortObjectSpec
-from util import handle_column_name_collision
 
 import pandas as pd
 from typing import Optional, Any
@@ -371,8 +370,15 @@ class VectorStoreRetriever:
             raise knext.InvalidParametersError(
                 "No name for the column holding the similarity scores is provided."
             )
+        output_column_name = self.retrieved_docs_column_name
+        output_column_name = util.handle_column_name_collision(
+            ctx, table_spec, self.retrieved_docs_column_name
+        )
 
-        return table_spec.append(self._create_column_list(vectorstore_spec))
+        table_spec = table_spec.append(
+            self._create_column_list(vectorstore_spec, output_column_name)
+        )
+        return table_spec
 
     def execute(
         self,
@@ -421,7 +427,11 @@ class VectorStoreRetriever:
                 i += 1
                 ctx.set_progress(i / num_rows)
 
-            df[self.retrieved_docs_column_name] = doc_collection
+            output_column_name = util.handle_column_name_collision(
+                ctx, input_table.schema, self.retrieved_docs_column_name
+            )
+
+            df[output_column_name] = doc_collection
 
             for key in metadata_dict.keys():
                 df[key] = metadata_dict[key]
@@ -433,11 +443,11 @@ class VectorStoreRetriever:
 
         return output_table
 
-    def _create_column_list(self, vectorstore_spec) -> list[knext.Column]:
+    def _create_column_list(
+        self, vectorstore_spec, output_column_name
+    ) -> list[knext.Column]:
         result_columns = [
-            knext.Column(
-                knext.ListType(knext.string()), self.retrieved_docs_column_name
-            )
+            knext.Column(knext.ListType(knext.string()), output_column_name)
         ]
 
         if self.retrieve_metadata:

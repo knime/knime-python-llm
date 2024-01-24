@@ -144,43 +144,21 @@ class OpenAIGeneralSettings(GeneralSettings):
     )
 
 
-def get_model_list(ctx: knext.DialogCreationContext):
-    def get_key(specs):
-        auth_spec = specs[0] if specs else None
-        if (
-            auth_spec is not None
-            and auth_spec.credentials in ctx.get_credential_names()
-        ):
-            return ctx.get_credentials(auth_spec.credentials).password
-        return None
-
-    model_list = ["unselected"]
-
-    specs = ctx.get_input_specs()
-    key = get_key(specs)
-
-    if not key:
-        return model_list
-
-    try:
-        for model in openai.OpenAI(api_key=key).models.list().data:
-            # If model has '-<number>' string or is not owned_by openai
-            if re.search(r"-\d", model.id) or "openai" not in model.owned_by:
-                model_list.append(model.id)
-    except:
-        pass
-
-    model_list.sort()
-    return model_list
-
-
 def _create_specific_model_name(api_name: str) -> knext.StringParameter:
+    def list_models(ctx: knext.DialogCreationContext) -> list[str]:
+        if (specs := ctx.get_input_specs()) and (auth_spec := specs[0]):
+            models = auth_spec.get_model_list(ctx)
+        else:
+            models = []
+        models.append("unselected")
+        return models
+
     return knext.StringParameter(
         label="Specific Model ID",
         description=f"""Select from a list of all available OpenAI models.
             The model chosen has to be compatible with OpenAI's {api_name} API.
             This configuration will **overwrite** the default model configurations when set.""",
-        choices=lambda c: get_model_list(c),
+        choices=list_models,
         default_value="unselected",
         is_advanced=True,
     )
@@ -337,6 +315,27 @@ class OpenAIAuthenticationPortObjectSpec(AIPortObjectSpec):
             raise knext.InvalidParametersError(
                 f"The OpenAI API token in the credentials '{self.credentials}' is not present."
             )
+
+        if not self.base_url:
+            raise knext.InvalidParametersError(f"Please provide a base URL.")
+
+    def get_model_list(self, ctx: knext.ConfigurationContext) -> list[str]:
+        key = ctx.get_credentials(self.credentials).password
+        base_url = self.base_url
+
+        try:
+            model_list = [
+                model.id
+                for model in openai.OpenAI(api_key=key, base_url=base_url)
+                .models.list()
+                .data
+            ]
+        except Exception:
+            model_list = []
+
+        model_list.sort()
+
+        return model_list
 
     def serialize(self) -> dict:
         return {
@@ -616,6 +615,12 @@ class OpenAIAuthenticator:
             ).models.list()
         except openai.AuthenticationError:
             raise knext.InvalidParametersError("Invalid API key provided.")
+        except openai.APIConnectionError:
+            raise knext.InvalidParametersError(
+                f"""API connection failed. Please make sure that your base URL '{self.base_url}' 
+                is valid and uses a supported ('http://' or 'https://') protocol.
+                It might also be caused by your network settings, proxy configuration, SSL certificates, or firewall rules."""
+            )
         except openai.NotFoundError:
             raise knext.InvalidParametersError(
                 f"Invalid OpenAI base URL provided: '{self.base_url}'"

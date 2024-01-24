@@ -35,11 +35,10 @@ gpt4all_category = knext.category(
 
 @knext.parameter_group(label="Model Usage")
 class GPT4AllInputSettings:
-    local_path = knext.StringParameter(
+    local_path = knext.LocalPathParameter(
         label="Model path",
         description="""Path to the pre-trained GPT4All model file eg. my/path/model.gguf.
-        You can find the folder through settings -> application in the gpt4all desktop application""",
-        default_value="",
+        You can find the folder through settings -> application in the gpt4all desktop application.""",
     )
 
     n_threads = knext.IntParameter(
@@ -618,7 +617,7 @@ class Embeddings4AllConnector:
         style=knext.EnumParameter.Style.VALUE_SWITCH,
     )
 
-    model_path = knext.StringParameter(
+    model_path = knext.LocalPathParameter(
         "Path to model", "The local file system path to the model."
     ).rule(
         knext.OneOf(model_retrieval, [ModelRetrievalOptions.READ.name]),

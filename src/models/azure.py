@@ -314,6 +314,14 @@ class AzureOpenAIAuthenticator:
 
     azure_connection = AzureSettings()
 
+    verify_settings = knext.BoolParameter(
+        "Verify settings",
+        "Whether to verify the settings by calling the list models endpoint.",
+        True,
+        since_version="5.2.1",
+        is_advanced=True,
+    )
+
     def configure(
         self, ctx: knext.ConfigurationContext
     ) -> AzureOpenAIAuthenticationPortObjectSpec:
@@ -333,6 +341,12 @@ class AzureOpenAIAuthenticator:
     def execute(
         self, ctx: knext.ExecutionContext
     ) -> AzureOpenAIAuthenticationPortObject:
+        if self.verify_settings:
+            self._verify_settings(ctx)
+
+        return AzureOpenAIAuthenticationPortObject(self.create_spec())
+
+    def _verify_settings(self, ctx):
         try:
             openai.AzureOpenAI(
                 api_key=ctx.get_credentials(
@@ -352,8 +366,6 @@ class AzureOpenAIAuthenticator:
             )
         except openai.AuthenticationError:
             raise knext.InvalidParametersError("Invalid API key provided.")
-
-        return AzureOpenAIAuthenticationPortObject(self.create_spec())
 
     def create_spec(self) -> AzureOpenAIAuthenticationPortObjectSpec:
         return AzureOpenAIAuthenticationPortObjectSpec(

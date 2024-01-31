@@ -592,6 +592,14 @@ class OpenAIAuthenticator:
         is_advanced=True,
     )
 
+    verify_settings = knext.BoolParameter(
+        "Verify settings",
+        "Whether to verify the settings by calling the list models endpoint.",
+        default_value=True,
+        since_version="5.2.1",
+        is_advanced=True,
+    )
+
     def configure(
         self, ctx: knext.ConfigurationContext
     ) -> OpenAIAuthenticationPortObjectSpec:
@@ -606,6 +614,12 @@ class OpenAIAuthenticator:
         return spec
 
     def execute(self, ctx: knext.ExecutionContext) -> OpenAIAuthenticationPortObject:
+        if self.verify_settings:
+            self._verify_settings(ctx)
+
+        return OpenAIAuthenticationPortObject(self.create_spec())
+
+    def _verify_settings(self, ctx):
         try:
             openai.OpenAI(
                 api_key=ctx.get_credentials(
@@ -625,8 +639,6 @@ class OpenAIAuthenticator:
             raise knext.InvalidParametersError(
                 f"Invalid OpenAI base URL provided: '{self.base_url}'"
             )
-
-        return OpenAIAuthenticationPortObject(self.create_spec())
 
     def create_spec(self) -> OpenAIAuthenticationPortObjectSpec:
         return OpenAIAuthenticationPortObjectSpec(

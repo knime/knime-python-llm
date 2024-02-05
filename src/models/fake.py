@@ -484,6 +484,7 @@ def to_dictionary(table, columns: list[str]):
     knext.NodeType.SOURCE,
     fake_icon,
     category=test_category,
+    is_hidden=True
 )
 @knext.input_table(
     "Prompt and response table",
@@ -553,6 +554,7 @@ class TestLLMConnector:
     knext.NodeType.SOURCE,
     fake_icon,
     category=test_category,
+    is_hidden=True
 )
 @knext.input_table(
     "Prompt and response table",
@@ -628,6 +630,7 @@ class TestChatModelConnector:
     knext.NodeType.SOURCE,
     fake_icon,
     category=test_category,
+    is_hidden=True
 )
 @knext.input_table(
     "Document and vector table",

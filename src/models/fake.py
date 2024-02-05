@@ -65,14 +65,6 @@ class TestNodesGeneralSettings:
         column_filter=util.create_type_filer(knext.string()),
     )
 
-    delay = knext.IntParameter(
-        "Response delay (s)",
-        "Delays the response of the model for each prompt by the given number of seconds.",
-        0,
-        min_value=0,
-        is_advanced=True,
-    )
-
 
 @knext.parameter_group(label="Prompt mismatch")
 class MismatchSettings:
@@ -136,8 +128,10 @@ def generate_response(
     if not response:
         if missing_value_strategy == MissingValueHandlingOptions.Fail.name:
             raise knext.InvalidParametersError(
-                f"""Could not find matching response for prompt: '{prompt}'. Please ensure that the prompt 
-                exactly matches one specified in the prompt column of the {node} upstream."""
+                f"""
+                Could not find matching response for prompt: '{prompt}'. Please ensure that the prompt 
+                exactly matches one specified in the prompt column of the {node} upstream.
+                """
             )
         else:
             return default_response
@@ -151,7 +145,6 @@ class TestDictLLM(LLM):
     response_dict: dict[str, str]
     default_response: str
     missing_value_strategy: str
-    sleep: int = 0
 
     @property
     def _llm_type(self) -> str:
@@ -199,7 +192,6 @@ class TestChatModel(SimpleChatModel):
     response_dict: Dict[str, str]
     default_response: str
     missing_value_strategy: str
-    sleep: Optional[int] = 0
 
     @property
     def _llm_type(self) -> str:
@@ -243,8 +235,10 @@ class TestEmbeddings(Embeddings, BaseModel):
             return self.embeddings_dict[text]
         except KeyError:
             raise KeyError(
-                f"""Could not find document '{text}' in the Test Embeddings Model. Please ensure that 
-                the query exactly matches one of the embedded documents."""
+                f"""
+                Could not find document '{text}' in the Test Embeddings Model. Please ensure that 
+                the query exactly matches one of the embedded documents.
+                """
             )
 
 
@@ -252,14 +246,9 @@ class TestEmbeddings(Embeddings, BaseModel):
 
 
 class TestLLMPortObjectSpec(LLMPortObjectSpec):
-    def __init__(self, sleep: float, missing_value_strategy: str) -> None:
+    def __init__(self, missing_value_strategy: str) -> None:
         super().__init__()
-        self._sleep = sleep
         self._missing_value_strategy = missing_value_strategy
-
-    @property
-    def sleep(self) -> float:
-        return self._sleep
 
     @property
     def missing_value_strategy(self) -> str:
@@ -267,13 +256,12 @@ class TestLLMPortObjectSpec(LLMPortObjectSpec):
 
     def serialize(self) -> dict:
         return {
-            "sleep": self._sleep,
             "missing_value_strategy": self._missing_value_strategy,
         }
 
     @classmethod
     def deserialize(cls, data: dict):
-        return TestLLMPortObjectSpec(data["sleep"], data["missing_value_strategy"])
+        return TestLLMPortObjectSpec(data["missing_value_strategy"])
 
 
 class TestLLMPortObject(LLMPortObject):
@@ -312,7 +300,6 @@ class TestLLMPortObject(LLMPortObject):
             response_dict=self.responses,
             default_response=self.default_response,
             missing_value_strategy=self.spec.missing_value_strategy,
-            sleep=self.spec.sleep,
         )
 
 
@@ -322,14 +309,9 @@ test_llm_port_type = knext.port_type(
 
 
 class TestChatModelPortObjectSpec(ChatModelPortObjectSpec):
-    def __init__(self, sleep: float, missing_value_strategy: str) -> None:
+    def __init__(self, missing_value_strategy: str) -> None:
         super().__init__()
-        self._sleep = sleep
         self._missing_value_strategy = missing_value_strategy
-
-    @property
-    def sleep(self) -> int:
-        return self._sleep
 
     @property
     def missing_value_strategy(self) -> str:
@@ -337,13 +319,12 @@ class TestChatModelPortObjectSpec(ChatModelPortObjectSpec):
 
     def serialize(self) -> dict:
         return {
-            "sleep": self._sleep,
             "missing_value_strategy": self._missing_value_strategy,
         }
 
     @classmethod
     def deserialize(cls, data: dict):
-        return TestLLMPortObjectSpec(data["sleep"], data["missing_value_strategy"])
+        return TestLLMPortObjectSpec(data["missing_value_strategy"])
 
 
 class TestChatModelPortObject(ChatModelPortObject):
@@ -382,7 +363,6 @@ class TestChatModelPortObject(ChatModelPortObject):
             response_dict=self.responses,
             default_response=self.default_response,
             missing_value_strategy=self.spec.missing_value_strategy,
-            sleep=self.spec.sleep,
         )
 
 
@@ -565,7 +545,7 @@ class TestLLMConnector:
         )
 
     def create_spec(self) -> TestLLMPortObjectSpec:
-        return TestLLMPortObjectSpec(self.settings.delay, self.mismatch.prompt_mismatch)
+        return TestLLMPortObjectSpec(self.mismatch.prompt_mismatch)
 
 
 @knext.node(
@@ -640,9 +620,8 @@ class TestChatModelConnector:
 
     def create_spec(self) -> TestChatModelPortObjectSpec:
         return TestChatModelPortObjectSpec(
-            self.settings.delay, self.mismatch.prompt_mismatch
+            self.mismatch.prompt_mismatch
         )
-
 
 @knext.node(
     "Test Embeddings Connector",

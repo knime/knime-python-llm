@@ -722,7 +722,9 @@ class HFTEIEmbeddingsConnector:
     The [Text Embeddings Inference Server](https://github.com/huggingface/text-embeddings-inference)
     is a toolkit for deploying and serving open source text embeddings and sequence classification models.
 
-    Please note that this node does only connect to public embedding inference endpoints that do not require an API key.
+    This node can connect to locally or remotely hosted TEI servers which includes public
+    [Inference Endpoints](https://huggingface.co/docs/inference-endpoints/) of
+    popular embeddings models that are deployed via Hugging Face Hub.
 
     For more details and information about integrating with the Hugging Face Embeddings Inference
     and setting up a server, refer to

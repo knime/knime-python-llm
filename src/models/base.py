@@ -284,7 +284,6 @@ class LLMPrompter:
                 "The response column name must not be empty."
             )
 
-        output_column_name = self.response_column_name
         output_column_name = util.handle_column_name_collision(
             ctx, input_table_spec, self.response_column_name
         )
@@ -471,7 +470,6 @@ class TextEmbedder:
 
         embeddings_spec.validate_context(ctx)
 
-        output_column_name = self.embeddings_column_name
         output_column_name = util.handle_column_name_collision(
             ctx, table_spec, self.embeddings_column_name
         )

@@ -370,7 +370,6 @@ class VectorStoreRetriever:
             raise knext.InvalidParametersError(
                 "No name for the column holding the similarity scores is provided."
             )
-        output_column_name = self.retrieved_docs_column_name
         output_column_name = util.handle_column_name_collision(
             ctx, table_spec, self.retrieved_docs_column_name
         )

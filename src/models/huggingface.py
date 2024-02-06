@@ -342,7 +342,11 @@ class HFTEIEmbeddingsPortObject(EmbeddingsPortObject):
     def __init__(self, spec: HFTEIEmbeddingsPortObjectSpec) -> None:
         super().__init__(spec)
 
-    def create_model(self, ctx):
+    @property
+    def spec(self) -> HFTEIEmbeddingsPortObjectSpec:
+        return super().spec
+
+    def create_model(self, ctx) -> HuggingFaceHubEmbeddings:
         return HuggingFaceHubEmbeddings(model=self.spec.inference_server_url)
 
 
@@ -718,8 +722,7 @@ class HFTEIEmbeddingsConnector:
     The [Text Embeddings Inference Server](https://github.com/huggingface/text-embeddings-inference)
     is a toolkit for deploying and serving open source text embeddings and sequence classification models.
 
-    Please note that this node does not connect to the Hugging Face Hub,
-    but to a Text Embeddings Inference Server that can be hosted both locally and remotely.
+    Please note that this node does only connect to public embedding inference endpoints that do not require an API key.
 
     For more details and information about integrating with the Hugging Face Embeddings Inference
     and setting up a server, refer to
@@ -728,7 +731,7 @@ class HFTEIEmbeddingsConnector:
 
     server_url = knext.StringParameter(
         "Text Embeddings Inference Server URL",
-        "The URL where the Text Embeddings Inference server is hostet.",
+        "The URL where the Text Embeddings Inference server is hosted e.g. `http://localhost:8010/`.",
     )
 
     def configure(

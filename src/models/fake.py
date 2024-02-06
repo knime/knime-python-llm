@@ -30,11 +30,10 @@ fake_icon = "icons/fake.png"
 test_category = knext.category(
     path=model_category,
     level_id="test",
-    name="Test",
+    name="Testing",
     description="",
     icon=fake_icon,
 )
-
 # == Settings ==
 
 
@@ -107,6 +106,12 @@ class TestEmbeddingsSettings:
         column_filter=util.create_type_filer(knext.ListType(knext.double())),
     )
 
+    fail_on_mismatch = knext.BoolParameter(
+        "Fail on retrieval mismatch",
+        "Whether the Test Embeddings Model should fail downstream on document mismatch.",
+        default_value=False
+    )
+
 
 # == Fake Implementations for testing Nodes ==
 
@@ -128,10 +133,8 @@ def generate_response(
     if not response:
         if missing_value_strategy == MissingValueHandlingOptions.Fail.name:
             raise knext.InvalidParametersError(
-                f"""
-                Could not find matching response for prompt: '{prompt}'. Please ensure that the prompt 
-                exactly matches one specified in the prompt column of the {node} upstream.
-                """
+                f"""Could not find matching response for prompt: '{prompt}'. Please ensure that the prompt 
+                exactly matches one specified in the prompt column of the {node} upstream."""
             )
         else:
             return default_response
@@ -220,26 +223,25 @@ class TestChatModel(SimpleChatModel):
 
 class TestEmbeddings(Embeddings, BaseModel):
     embeddings_dict: dict[str, list[float]]
+    fail_on_mismatch: bool
 
-    def embed_documents(self, documents: any) -> List[float]:
-        embeddings = [self.embeddings_dict.get(text) for text in documents]
-        return embeddings
+    def embed_documents(self, documents: List[str]) -> List[float]:
+        return [self.embed_query(document) for document in documents]
 
     def embed_query(self, text: str) -> List[float]:
-        if text is None:
-            raise ValueError("None values are not supported.")
-        elif not text.strip():
-            raise ValueError("Empty documents are not supported.")
-
         try:
             return self.embeddings_dict[text]
         except KeyError:
-            raise KeyError(
-                f"""
-                Could not find document '{text}' in the Test Embeddings Model. Please ensure that 
-                the query exactly matches one of the embedded documents.
-                """
-            )
+            if self.fail_on_mismatch:
+                raise knext.InvalidParametersError(
+                    f"""Could not find document '{text}' in the Test Embeddings Model. Please ensure that 
+                    the query exactly matches one of the embedded documents."""
+                )
+            else:
+                embeddings_dimension = len(next(iter(self.embeddings_dict.values())))
+                zero_vector = [0.0 for _ in range(embeddings_dimension)]
+
+                return zero_vector
 
 
 # == Port Objects ==
@@ -372,12 +374,20 @@ test_chat_model_port_type = knext.port_type(
 
 
 class TestEmbeddingsPortObjectSpec(EmbeddingsPortObjectSpec):
-    def __init__(self) -> None:
+    def __init__(self, fail_on_mismatch: bool) -> None:
         super().__init__()
+        self._fail_on_mismatch = fail_on_mismatch
+
+    @property
+    def fail_on_mismatch(self) -> bool:
+        return self._fail_on_mismatch
+
+    def serialize(self) -> dict:
+        return {"fail_on_mismatch": self._fail_on_mismatch}
 
     @classmethod
     def deserialize(cls, data: dict):
-        return TestEmbeddingsPortObjectSpec()
+        return TestEmbeddingsPortObjectSpec(data["fail_on_mismatch"])
 
 
 class TestEmbeddingsPortObject(EmbeddingsPortObject):
@@ -399,10 +409,13 @@ class TestEmbeddingsPortObject(EmbeddingsPortObject):
     @classmethod
     def deserialize(cls, spec, data: dict):
         embeddings_dict = pickle.loads(data)
-        return TestEmbeddingsPortObject(TestEmbeddingsPortObjectSpec(), embeddings_dict)
+        return TestEmbeddingsPortObject(spec, embeddings_dict)
 
     def create_model(self, ctx):
-        return TestEmbeddings(embeddings_dict=self.embeddings_dict)
+        return TestEmbeddings(
+            embeddings_dict=self.embeddings_dict, 
+            fail_on_mismatch=self.spec.fail_on_mismatch
+        )
 
 
 test_embeddings_port_type = knext.port_type(
@@ -652,7 +665,8 @@ class TestEmbeddingsConnector:
 
     All downstream nodes working with the Test Embeddings Model need to be supplied with matching documents,
     which should also be used as queries in the Vector Store Retriever node.
-    Failure to do so will result in errors in these nodes.
+    Failure to do so will, based on the configuration, either result in errors or return documents closest to the
+    zero vector.
 
     With this node you simulate exactly with which vectors documents will be stored and retrieved.
     """
@@ -676,7 +690,7 @@ class TestEmbeddingsConnector:
         self.settings.test_doc_col = test_doc_col
         self.settings.test_vector_col = test_vector_col
 
-        return TestEmbeddingsPortObjectSpec()
+        return self.create_spec()
 
     def execute(
         self,
@@ -685,7 +699,7 @@ class TestEmbeddingsConnector:
     ) -> TestEmbeddingsPortObject:
         df = input_table.to_pandas()
 
-        response_dict = dict(
+        embeddings_dict = dict(
             map(
                 lambda i, j: (i, j.tolist()),
                 df[self.settings.test_doc_col],
@@ -694,6 +708,9 @@ class TestEmbeddingsConnector:
         )
 
         return TestEmbeddingsPortObject(
-            TestEmbeddingsPortObjectSpec(),
-            response_dict,
+            self.create_spec(),
+            embeddings_dict
         )
+
+    def create_spec(self) -> TestEmbeddingsPortObjectSpec:
+        return TestEmbeddingsPortObjectSpec(self.settings.fail_on_mismatch)

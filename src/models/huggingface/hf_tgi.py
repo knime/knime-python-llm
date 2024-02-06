@@ -46,7 +46,7 @@ class HFTGIModelSettings(HFModelSettings):
         """,
         default_value=0,
         is_advanced=True,
-        since_version="5.2.0",
+        since_version="5.3.0",
     )
 
 

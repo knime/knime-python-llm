@@ -370,12 +370,12 @@ class VectorStoreRetriever:
             raise knext.InvalidParametersError(
                 "No name for the column holding the similarity scores is provided."
             )
-        output_column_name = util.handle_column_name_collision(
-            ctx, table_spec, self.retrieved_docs_column_name
-        )
 
+        output_column_name = self.retrieved_docs_column_name
         table_spec = table_spec.append(
-            self._create_column_list(vectorstore_spec, output_column_name)
+            self._create_column_list(
+                table_spec.column_names, vectorstore_spec, output_column_name
+            )
         )
         return table_spec
 
@@ -427,39 +427,71 @@ class VectorStoreRetriever:
                 ctx.set_progress(i / num_rows)
 
             output_column_name = util.handle_column_name_collision(
-                ctx, input_table.schema, self.retrieved_docs_column_name
+                list(df.columns), self.retrieved_docs_column_name
             )
 
             df[output_column_name] = doc_collection
 
             for key in metadata_dict.keys():
-                df[key] = metadata_dict[key]
+                metadata_column_name = util.handle_column_name_collision(
+                    list(df.columns), key
+                )
+                df[metadata_column_name] = metadata_dict[key]
 
             if self.retrieve_similarity_scores:
-                df[self.similarity_scores_column_name] = similarity_scores
+                similarity_score_name = util.handle_column_name_collision(
+                    list(df.columns), self.similarity_scores_column_name
+                )
+                df[similarity_score_name] = similarity_scores
 
             output_table.append(df)
 
         return output_table
 
     def _create_column_list(
-        self, vectorstore_spec, output_column_name
+        self, table_spec_columns, vectorstore_spec, output_column_name
     ) -> list[knext.Column]:
-        result_columns = [
-            knext.Column(knext.ListType(knext.string()), output_column_name)
-        ]
+        """
+        Generates a list of column objects and handles column name collisions for metadata,
+        output and similarity score columns.
+        Column name collisions are handled in this order:
+            - Keep original metadata column names
+            - Handle if output_column_name collides with table_spec or metadata column names
+            - Handle if similarity_scores_column_name collides with metadata & output column names
+        """
+        column_names = table_spec_columns
+        result_columns = []
+
+        output_column_name = util.handle_column_name_collision(
+            column_names, output_column_name
+        )
+
+        result_columns.append(
+            knext.Column(
+                knext.ListType(knext.string()),
+                output_column_name,
+            )
+        )
+        column_names.append(output_column_name)
 
         if self.retrieve_metadata:
             for column_name in vectorstore_spec.metadata_column_names:
+                column_name = util.handle_column_name_collision(
+                    column_names, column_name
+                )
                 result_columns.append(
                     knext.Column(knext.ListType(knext.string()), column_name)
                 )
+                column_names.append(column_name)
 
         if self.retrieve_similarity_scores:
+            column_name = util.handle_column_name_collision(
+                column_names, self.similarity_scores_column_name
+            )
             result_columns.append(
                 knext.Column(
                     knext.ListType(knext.double()),
-                    self.similarity_scores_column_name,
+                    column_name,
                 )
             )
 

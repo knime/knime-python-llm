@@ -285,7 +285,7 @@ class LLMPrompter:
             )
 
         output_column_name = util.handle_column_name_collision(
-            ctx, input_table_spec, self.response_column_name
+            input_table_spec.column_names, self.response_column_name
         )
 
         input_table_spec = input_table_spec.append(
@@ -304,7 +304,7 @@ class LLMPrompter:
         num_rows = input_table.num_rows
 
         output_column_name = util.handle_column_name_collision(
-            ctx, input_table.schema, self.response_column_name
+            input_table.schema.column_names, self.response_column_name
         )
 
         output_table: knext.BatchOutputTable = knext.BatchOutputTable.create()
@@ -471,7 +471,7 @@ class TextEmbedder:
         embeddings_spec.validate_context(ctx)
 
         output_column_name = util.handle_column_name_collision(
-            ctx, table_spec, self.embeddings_column_name
+            table_spec.column_names, self.embeddings_column_name
         )
 
         table_spec = table_spec.append(self._create_output_column(output_column_name))
@@ -497,7 +497,7 @@ class TextEmbedder:
             texts = data_frame[self.text_column].tolist()
             embeddings = embeddings_model.embed_documents(texts)
             output_column_name = util.handle_column_name_collision(
-                ctx, table.schema, self.embeddings_column_name
+                table.schema.column_names, self.embeddings_column_name
             )
             data_frame[output_column_name] = embeddings
             output_table.append(knext.Table.from_pandas(data_frame))

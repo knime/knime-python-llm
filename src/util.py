@@ -67,10 +67,9 @@ def check_column(
 
 
 def handle_column_name_collision(
-    ctx: knext.ConfigurationContext,
-    input_table_spec: knext.Schema,
+    column_names: List[str],
     column_name: str,
-):
+) -> str:
     """
     If the output column name collides with an input column name, it's been made unique by appending (#<count>).
     For example, if "column" exists as an input column name and is entered as an output column name,
@@ -78,17 +77,15 @@ def handle_column_name_collision(
     in "column1 (#2)".
     """
     basename = column_name.strip()
+    existing_column_names = set(column_names)
 
-    existing_column_names = set(input_table_spec.column_names)
-
-    if column_name not in existing_column_names:
-        return column_name
+    if basename not in existing_column_names:
+        return basename
 
     # Pattern to match strings that have a name followed by a
     # numerical identifier in parentheses, e.g. "column (#1)"
     pattern = re.compile(r"^(.*) \(#(\d+)\)$")
     match = pattern.match(basename)
-
     if match:
         basename, index = match.groups()
         index = int(index) + 1

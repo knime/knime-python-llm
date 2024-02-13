@@ -1,5 +1,4 @@
 # KNIME / own imports
-from typing import Callable, List
 import knime.extension as knext
 from .base import (
     AIPortObjectSpec,
@@ -22,7 +21,23 @@ from langchain.embeddings.openai import OpenAIEmbeddings
 
 # Other imports
 import openai
+import io
+import util
+import time
+import json
 import requests
+import tempfile
+import pandas as pd
+from typing import Callable, List
+
+import openai
+from openai.types import FileObject
+from openai.types.fine_tuning.fine_tuning_job import Hyperparameters, FineTuningJob
+
+# This logger is necessary
+import logging
+
+LOGGER = logging.getLogger(__name__)
 
 from openai import NotFoundError
 
@@ -309,6 +324,113 @@ class ImagelLoaderInputSettings:
         choices=lambda c: ["vivid", "natural"],
         default_value="vivid",
     )
+
+
+@knext.parameter_group(label="Data")
+class FineTuneFileSettings:
+    id_column = knext.ColumnParameter(
+        "Conversation ID column",
+        "Column containing references to group rows into conversations.",
+        port_index=1,
+        column_filter=util.create_type_filer(knext.string()),
+    )
+
+    role_column = knext.ColumnParameter(
+        "Role column",
+        "Column containing the message role. Can be either 'system', 'assistant' or 'user'.",
+        port_index=1,
+        column_filter=util.create_type_filer(knext.string()),
+    )
+
+    content_column = knext.ColumnParameter(
+        "Content column",
+        "Column containing the message contents.",
+        port_index=1,
+        column_filter=util.create_type_filer(knext.string()),
+    )
+
+
+class AutomationOptions(knext.EnumParameterOptions):
+    AUTOMATE = (
+        "Auto",
+        "OpenAI will determine a reasonable value for the configuration.",
+    )
+
+    MANUAL = ("Custom", "Allows to specify a custom value for the configuration..")
+
+
+@knext.parameter_group(label="Fine-tuning")
+class FineTunerInputSettings:
+    automate_epochs = knext.EnumParameter(
+        "Training epochs",
+        """An epoch refers to one full cycle through the training dataset. If set to 'Automate',
+        OpenAI will determine a reasonable value.""",
+        default_value=AutomationOptions.AUTOMATE.name,
+        enum=AutomationOptions,
+        style=knext.EnumParameter.Style.VALUE_SWITCH,
+        since_version="5.3.0",
+    )
+
+    n_epochs = knext.IntParameter(
+        "Number of training epochs",
+        "An epoch refers to one full cycle through the training dataset.",
+        default_value=1,
+        min_value=1,
+        since_version="5.3.0",
+    ).rule(knext.OneOf(automate_epochs, ["MANUAL"]), knext.Effect.SHOW)
+
+    automate_batch_size = knext.EnumParameter(
+        "Batch size",
+        """A larger batch size means that model parameters are updated less frequently, but with lower variance.
+        If set to 'Automate', OpenAI will determine a reasonable value.""",
+        default_value=AutomationOptions.AUTOMATE.name,
+        enum=AutomationOptions,
+        style=knext.EnumParameter.Style.VALUE_SWITCH,
+        since_version="5.3.0",
+    )
+
+    batch_size = knext.IntParameter(
+        "Custom batch size",
+        "A larger batch size means that model parameters are updated less frequently, but with lower variance.",
+        default_value=1,
+        min_value=1,
+    ).rule(knext.OneOf(automate_batch_size, ["MANUAL"]), knext.Effect.SHOW)
+
+    automate_learning_rate_multiplier = knext.EnumParameter(
+        "Learning rate factor",
+        """A smaller learning rate may be useful to avoid overfitting.
+        If set to 'Automate', OpenAI will determine a reasonable value.""",
+        default_value=AutomationOptions.AUTOMATE.name,
+        enum=AutomationOptions,
+        style=knext.EnumParameter.Style.VALUE_SWITCH,
+        since_version="5.3.0",
+    )
+
+    learning_rate_multiplier = knext.DoubleParameter(
+        "Custom scaling factor",
+        "A smaller learning rate may be useful to avoid overfitting.",
+        default_value=1.0,
+        min_value=0.01,
+    ).rule(
+        knext.OneOf(automate_learning_rate_multiplier, ["MANUAL"]), knext.Effect.SHOW
+    )
+
+
+@knext.parameter_group(label="Output")
+class FineTunerResultSettings:
+    suffix = knext.StringParameter(
+        "Model name suffix",
+        "A string of up to 18 characters that will be added to your fine-tuned model name.",
+    )
+
+    progress_interval = knext.IntParameter(
+        "Polling interval (s)",
+        "The time interval in seconds in which the node will check the progress of the fine-tuning job.",
+        default_value=1,
+        min_value=1,
+    )
+
+    # TODO: Add eventual validation file results
 
 
 # == Port Objects ==
@@ -1044,3 +1166,284 @@ class OpenAIFineTuneDeleter:
             )
 
         LOGGER.info(f"{response.id} was successfully deleted.")
+
+
+@knext.node(
+    "OpenAI Chat Model Fine-Tuner",
+    node_type=knext.NodeType.LEARNER,
+    icon_path=openai_icon,
+    category=openai_category,
+)
+@knext.input_port(
+    "OpenAI Chat Model",
+    "Configured OpenAI Chat Model which supports fine-tuning.",
+    openai_chat_port_type,
+)
+@knext.input_table(
+    "Fine-tuning Data",
+    """
+    The data should be presented across 3 columns: 
+    
+    One column specifying a conversation ID, one representing the role of a message (system, assistant and user), 
+    and the third for the content of the message.
+
+    The table has to include at least 10 conversations, each of which must contain at least one system message.
+    """,
+)
+@knext.output_port(
+    "OpenAI Chat Model",
+    "Configured fine-tuned OpenAI Chat Model connection.",
+    openai_chat_port_type,
+)
+@knext.output_table(
+    "Fine-tuning Metrics",
+    """
+    Metrics to evaluate the fine-tuning performance. The values of the metrics are: 
+    'train loss', 'train accuracy', 'valid loss', and 'valid mean token accuracy' for each step of training.
+    """,
+)
+class OpenAIFineTuner:
+    """
+    Fine-tunes an OpenAI Chat Model based on a conversation table.
+
+    The fine-tuning data needs to be in the following format and contain at least 10 conversations,
+    each of which must contain at least one system message:
+
+    | ID | Role | Content |
+    |----|------------|-----------------------------------------------|
+    | 1 | system | You are a happy assistant that puts a positive spin on everything. |
+    | 1 | user | I lost my tennis match today. |
+    | 1 | assistant | It's ok, it happens to everyone. |
+    | 2 | user | I lost my book today. |
+    | 2 | assistant | You can read everything on ebooks these days! |
+    | id_string | system | You are a happy assistant that puts a positive spin on everything. |
+    | id_string | assistant | You're great! |
+
+    For a training file with 100,000 tokens trained over 3 epochs, the expected cost would be ~$2.40 USD. For
+    more information, visit [OpenAI](https://platform.openai.com/docs/guides/fine-tuning/estimate-costs)
+    """
+
+    file_settings = FineTuneFileSettings()
+    ft_settings = FineTunerInputSettings()
+    ft_result_settings = FineTunerResultSettings()
+
+    def configure(
+        self,
+        ctx: knext.ConfigurationContext,
+        model_spec: OpenAIChatModelPortObjectSpec,
+        table_spec: knext.Schema,
+    ) -> OpenAIChatModelPortObjectSpec:
+        util.pick_default_columns(table_spec, knext.string(), 3)  # raises an expection
+
+        if not self._unique_columns_selected():
+            raise knext.InvalidParametersError("Selected columns need to be unique")
+
+        if len(self.ft_result_settings.suffix) > 18:
+            raise knext.InvalidParametersError(
+                f"Suffix can at maximum be 18 characters long. Used characters: {len(self.ft_result_settings.suffix)}."
+            )
+
+        metric_spec = knext.Schema.from_columns(
+            [
+                knext.Column(knext.int32(), "step"),
+                knext.Column(knext.double(), "train_loss"),
+                knext.Column(knext.double(), "train_accuracy"),
+                knext.Column(knext.double(), "valid_loss"),
+                knext.Column(knext.double(), "valid_mean_token_accuracy"),
+            ]
+        )
+        return model_spec, metric_spec
+
+    def execute(
+        self,
+        ctx: knext.ExecutionContext,
+        model: OpenAIChatModelPortObject,
+        table: knext.Table,
+    ):
+        client = openai.Client(
+            api_key=ctx.get_credentials(model.spec.credentials).password,
+            base_url=model.spec.base_url,
+        )
+
+        hyperparameters = self._build_hyper_params()
+
+        try:
+            training_file: FileObject = self._prepare_training_file(table, client)
+
+            response: FineTuningJob = self._run_fine_tuning(
+                client=client,
+                model_name=model.spec.model,
+                training_file=training_file,
+                hyper_params=hyperparameters,
+                ctx=ctx,
+            )
+
+            result_df = self._response_to_df(client, response)
+
+            fine_tuned_model = OpenAIChatModelPortObject(
+                OpenAIChatModelPortObjectSpec(
+                    credentials=model.spec.credentials,
+                    model_name=response.fine_tuned_model,
+                    temperature=model.spec.temperature,
+                    top_p=model.spec.top_p,
+                    max_tokens=model.spec.max_tokens,
+                    n=model.spec.n,
+                )
+            )
+
+        except openai.BadRequestError as e:
+            if e.message.endswith("'code': 'model_not_available'}}"):
+                raise knext.InvalidParametersError(
+                    "Selected model is not available or does not support fine-tuning."
+                )
+            else:
+                raise knext.InvalidParametersError(e.message)
+
+        finally:
+            client.files.delete(training_file.id)  # deletes the tmp file at openai
+
+            for file in response.result_files:
+                client.files.delete(file)
+
+        return fine_tuned_model, result_df
+
+    def _unique_columns_selected(self) -> bool:
+        selected_columns = set(
+            [
+                self.file_settings.id_column,
+                self.file_settings.role_column,
+                self.file_settings.content_column,
+            ]
+        )
+
+        return len(selected_columns) == 3
+
+    def _build_hyper_params(self) -> Hyperparameters:
+        batch_size: int = (
+            self.ft_settings.batch_size
+            if self.ft_settings.automate_batch_size == "Manual"
+            else "auto"
+        )
+
+        learning_rate_multiplier: float = (
+            self.ft_settings.learning_rate_multiplier
+            if self.ft_settings.automate_learning_rate_multiplier == "Manual"
+            else "auto"
+        )
+
+        n_epochs: int = (
+            self.ft_settings.n_epochs
+            if self.ft_settings.automate_epochs == "Manual"
+            else "auto"
+        )
+
+        return Hyperparameters(
+            batch_size=batch_size,
+            learning_rate_multiplier=learning_rate_multiplier,
+            n_epochs=n_epochs,
+        )
+
+    def _prepare_training_file(self, client, table: knext.Table) -> FileObject:
+        df = table.to_pandas()
+
+        conversation_list = self._validate_fine_tune_table(df)
+
+        with tempfile.NamedTemporaryFile(
+            delete=False, suffix=".jsonl"
+        ) as temp_jsonl_file:
+            temp_file_path = temp_jsonl_file.name
+
+            for conversation in conversation_list:
+                conversation_bytes = json.dumps(conversation).encode("utf-8")
+                temp_jsonl_file.write(conversation_bytes + b"\n")
+
+            file = client.files.create(
+                file=open(temp_file_path, "rb"), purpose="fine-tune"
+            )
+
+        return file
+
+    def _validate_fine_tune_table(self, df) -> List[dict[str, List[dict[str, any]]]]:
+        grouped_ids = df.groupby(self.file_settings.id_column)
+
+        if len(grouped_ids) < 10:
+            raise knext.InvalidParametersError(
+                "Table needs to contain at least 10 conversations."
+            )
+
+        has_assistant_roles = grouped_ids[self.file_settings.role_column].apply(
+            lambda x: "assistant" in x.values
+        )
+
+        if not has_assistant_roles.all():
+            missing_assistant_groups = [
+                index for index, value in has_assistant_roles.items() if not value
+            ]
+
+            raise knext.InvalidParametersError(
+                f"The following conversations are missing 'assistant' messages: {', '.join(map(str, missing_assistant_groups))}"
+            )
+
+        conversation_list = [
+            {
+                "messages": [
+                    {"role": role.lower(), "content": content}
+                    for role, content in zip(
+                        group[self.file_settings.role_column],
+                        group[self.file_settings.content_column],
+                    )
+                ]
+            }
+            for _, group in grouped_ids
+        ]
+
+        return conversation_list
+
+    def _run_fine_tuning(
+        self,
+        client,
+        model_name: str,
+        training_file: FileObject,
+        hyper_params: Hyperparameters,
+        ctx: knext.ExecutionContext,
+    ) -> FineTuningJob:
+        job = client.fine_tuning.jobs.create(
+            model=model_name,
+            training_file=training_file.id,
+            hyperparameters=hyper_params,
+            suffix=self.ft_result_settings.suffix,
+        )
+
+        return self._await_fine_tuning_response(client, job, ctx)
+
+    def _await_fine_tuning_response(
+        self, client, job: FineTuningJob, ctx: knext.ExecutionContext
+    ) -> FineTuningJob:
+        while True:
+            if ctx.is_canceled():
+                client.fine_tuning.jobs.cancel(job.id)
+                raise RuntimeError("Fine-tuning job has been canceled.")
+
+            response = client.fine_tuning.jobs.retrieve(job.id)
+            ctx.set_progress(0.5, f"Current fine-tuning status: {response.status}")
+
+            if response.status == "failed":
+                raise ValueError(response.error.message)
+
+            if response.fine_tuned_model and response.status in [
+                "succeeded",
+                "failed",
+                "cancelled",
+            ]:
+                return response
+
+            time.sleep(self.ft_result_settings.progress_interval)
+
+    def _response_to_df(self, client, response: FineTuningJob) -> pd.DataFrame:
+        result_files = [
+            client.files.content(file_id).content for file_id in response.result_files
+        ]
+
+        df_list = [pd.read_csv(io.BytesIO(result), header=0) for result in result_files]
+
+        return pd.concat(df_list, ignore_index=True)

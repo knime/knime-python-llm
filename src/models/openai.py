@@ -192,13 +192,38 @@ def _create_specific_model_name(api_name: str) -> knext.StringParameter:
         return models
 
     return knext.StringParameter(
-        label="Specific Model ID",
+        label="Model ID",
         description=f"""Select from a list of all available OpenAI models.
             The model chosen has to be compatible with OpenAI's {api_name} API.
             This configuration will **overwrite** the default model configurations when set.""",
         choices=list_models,
         default_value="unselected",
-        is_advanced=True,
+    )
+
+
+class OpenAIModelOptions(knext.EnumParameterOptions):
+    DEFAULT_MODELS = (
+        "Default models",
+        "Shows default models for this model type.",
+    )
+    ALL_MODELS = (
+        "All models",
+        """
+        Shows all models available for the provided API key. This includes models that 
+        may not be compatible with this specific endpoint, so it is the responsibility 
+        of the user to select a model that is compatible with this node.
+        """,
+    )
+
+
+def _get_model_selection_value_switch() -> knext.EnumParameter:
+    return knext.EnumParameter(
+        "Model selection",
+        "Whether all available models are listed or only selected compatible ones.",
+        OpenAIModelOptions.DEFAULT_MODELS.name,
+        OpenAIModelOptions,
+        style=knext.EnumParameter.Style.VALUE_SWITCH,
+        since_version="5.3.0",
     )
 
 
@@ -230,15 +255,29 @@ class LLMLoaderInputSettings:
             "Recommended model for all completion tasks. As capable as text-davinci-003 but faster and lower in cost.",
         )
 
+    selection = _get_model_selection_value_switch()
+
     default_model_name = _EnumToStringParameter(
         label="Model ID",
         description="Select an OpenAI completions model to be used.",
         choices=lambda c: completion_models,
         default_value=completion_default,
         options=OpenAIModelCompletionsOptions,
+    ).rule(
+        knext.OneOf(
+            selection,
+            [OpenAIModelOptions.DEFAULT_MODELS.name],
+        ),
+        knext.Effect.SHOW,
     )
 
-    specific_model_name = _create_specific_model_name("Completions")
+    specific_model_name = _create_specific_model_name("Completions").rule(
+        knext.OneOf(
+            selection,
+            [OpenAIModelOptions.ALL_MODELS.name],
+        ),
+        knext.Effect.SHOW,
+    )
 
 
 @knext.parameter_group(label="OpenAI Chat Model Selection")
@@ -261,15 +300,23 @@ class ChatModelLoaderInputSettings:
             """Same capabilities as the base gpt-4 mode but with 4x the context length.""",
         )
 
+    selection = _get_model_selection_value_switch()
+
     model_name = _EnumToStringParameter(
         label="Model ID",
         description="Select a chat-optimized OpenAI model to be used.",
         choices=lambda c: chat_models,
         default_value=chat_default,
         options=OpenAIModelCompletionsOptions,
+    ).rule(
+        knext.OneOf(selection, [OpenAIModelOptions.DEFAULT_MODELS.name]),
+        knext.Effect.SHOW,
     )
 
-    specific_model_name = _create_specific_model_name("Chat")
+    specific_model_name = _create_specific_model_name("Chat").rule(
+        knext.OneOf(selection, [OpenAIModelOptions.ALL_MODELS.name]),
+        knext.Effect.SHOW,
+    )
 
 
 @knext.parameter_group(label="OpenAI Embeddings Selection")
@@ -284,15 +331,23 @@ class EmbeddingsLoaderInputSettings:
             "Capable of straightforward tasks, very fast, and lower cost.",
         )
 
+    selection = _get_model_selection_value_switch()
+
     model_name = _EnumToStringParameter(
         label="Model ID",
         description="Select an embeddings OpenAI model to be used.",
         choices=lambda c: embeddings_models,
         default_value=embeddings_default,
         options=OpenAIEmbeddingsOptions,
+    ).rule(
+        knext.OneOf(selection, [OpenAIModelOptions.DEFAULT_MODELS.name]),
+        knext.Effect.SHOW,
     )
 
-    specific_model_name = _create_specific_model_name("Embeddings")
+    specific_model_name = _create_specific_model_name("Embeddings").rule(
+        knext.OneOf(selection, [OpenAIModelOptions.ALL_MODELS.name]),
+        knext.Effect.SHOW,
+    )
 
 
 @knext.parameter_group(label="OpenAI Chat Model Selection")
@@ -866,7 +921,10 @@ class OpenAILLMConnector:
     def create_spec(
         self, openai_auth_spec: OpenAIAuthenticationPortObjectSpec, ctx
     ) -> OpenAILLMPortObjectSpec:
-        if self.input_settings.specific_model_name != "unselected":
+        if (
+            hasattr(self.input_settings, "selection")
+            and self.input_settings.selection == OpenAIModelOptions.ALL_MODELS.name
+        ):
             model_name = self.input_settings.specific_model_name
         else:
             if self.input_settings.default_model_name not in completion_models:
@@ -949,7 +1007,10 @@ class OpenAIChatModelConnector:
     def create_spec(
         self, openai_auth_spec: OpenAIAuthenticationPortObjectSpec, ctx
     ) -> OpenAIChatModelPortObjectSpec:
-        if self.input_settings.specific_model_name != "unselected":
+        if (
+            self.input_settings.selection == OpenAIModelOptions.ALL_MODELS.name
+            and self.input_settings.specific_model_name != "unselected"
+        ):
             model_name = self.input_settings.specific_model_name
         else:
             if self.input_settings.model_name not in chat_models:
@@ -974,6 +1035,19 @@ class OpenAIChatModelConnector:
             seed=seed,
             n_requests=self.model_settings.n_requests,
         )
+
+    def _modify_parameters(self, parameters):
+        # 'input_settings' is the variable name for ChatModelLoaderInputSettings()
+
+        if (
+            parameters["input_settings"]["specific_model_name"] == "unselected"
+            or parameters["input_settings"]["selection"] in chat_models
+        ):
+            parameters["input_settings"]["selection"] = "DEFAULT_MODELS"
+        else:
+            parameters["input_settings"]["selection"] = "ALL_MODELS"
+
+        return parameters
 
 
 @knext.node(
@@ -1035,7 +1109,15 @@ class OpenAIEmbeddingsConnector:
     def create_spec(
         self, openai_auth_spec: OpenAIAuthenticationPortObjectSpec, ctx
     ) -> OpenAIEmbeddingsPortObjectSpec:
-        if self.input_settings.specific_model_name != "unselected":
+        if (
+            hasattr(self.input_settings, "selection")
+            and self.input_settings.selection == OpenAIModelOptions.ALL_MODELS.name
+        ):
+            model_name = self.input_settings.specific_model_name
+        elif (
+            not hasattr(self.input_settings, "selection")
+            and self.input_settings.specific_model_name != "unselected"
+        ):
             model_name = self.input_settings.specific_model_name
         else:
             if self.input_settings.model_name not in embeddings_models:

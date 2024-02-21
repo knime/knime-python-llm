@@ -1,9 +1,11 @@
 import sys
 
-sys.path.append("src")
+sys.path.append("../src")
 
 import unittest
 from util import handle_column_name_collision
+
+# TODO run tests during every build
 
 
 class HandleColumnNameCollisionTest(unittest.TestCase):

@@ -4,7 +4,6 @@ from ..base import (
     model_category,
     GeneralSettings,
 )
-from ..base import AIPortObjectSpec
 
 
 hf_icon = "icons/huggingface.png"
@@ -71,46 +70,3 @@ class HFPromptTemplateSettings:
         Refer to the Hugging Face Hub model card for information on the correct prompt template.""",
         default_value="%1",
     )
-
-
-# == Port Objects ==
-
-
-class HFAuthenticationPortObjectSpec(AIPortObjectSpec):
-    def __init__(self, credentials: str) -> None:
-        super().__init__()
-        self._credentials = credentials
-
-    @property
-    def credentials(self) -> str:
-        return self._credentials
-
-    def validate_context(self, ctx: knext.ConfigurationContext):
-        if not self.credentials in ctx.get_credential_names():
-            raise knext.InvalidParametersError(
-                f"The selected credentials '{self.credentials}' holding the Hugging Face Hub API token are not present."
-            )
-        hub_token = ctx.get_credentials(self.credentials)
-        if not hub_token.password:
-            raise knext.InvalidParametersError(
-                f"The Hugging Face Hub token in the credentials '{self.credentials}' is not present."
-            )
-
-    def serialize(self) -> dict:
-        return {"credentials": self._credentials}
-
-    @classmethod
-    def deserialize(cls, data: dict):
-        return cls(data["credentials"])
-
-
-class HFAuthenticationPortObject(knext.PortObject):
-    def __init__(self, spec: HFAuthenticationPortObjectSpec) -> None:
-        super().__init__(spec)
-
-    def serialize(self) -> bytes:
-        return b""
-
-    @classmethod
-    def deserialize(cls, spec: HFAuthenticationPortObjectSpec, storage: bytes):
-        return cls(spec)

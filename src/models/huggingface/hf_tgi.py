@@ -113,7 +113,7 @@ class HFTGILLMPortObject(LLMPortObject):
     def __init__(self, spec: HFTGILLMPortObjectSpec) -> None:
         super().__init__(spec)
 
-    def create_model(self, ctx):
+    def create_model(self, ctx) -> HuggingFaceTextGenInference:
         return HuggingFaceTextGenInference(
             inference_server_url=self.spec.inference_server_url,
             max_new_tokens=self.spec.max_new_tokens,
@@ -232,16 +232,16 @@ class HFTGILLMConnector:
     settings = HFTGIServerSettings()
     model_settings = HFModelSettings()
 
-    def configure(self, ctx: knext.ConfigurationContext):
+    def configure(self, ctx: knext.ConfigurationContext) -> HFTGILLMPortObjectSpec:
         if not self.settings.server_url:
             raise knext.InvalidParametersError("Server URL missing")
 
         return self.create_spec()
 
-    def execute(self, ctx: knext.ExecutionContext):
+    def execute(self, ctx: knext.ExecutionContext) -> HFTGILLMPortObject:
         return HFTGILLMPortObject(self.create_spec())
 
-    def create_spec(self):
+    def create_spec(self) -> HFTGILLMPortObjectSpec:
         return HFTGILLMPortObjectSpec(
             self.settings.server_url,
             self.model_settings.max_new_tokens,

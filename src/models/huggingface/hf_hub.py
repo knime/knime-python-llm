@@ -9,20 +9,19 @@ from ..base import (
     EmbeddingsPortObject,
     CredentialsSettings,
     LLMChatModelAdapter,
+    AIPortObjectSpec,
 )
 from .hf_base import (
     hf_category,
     hf_icon,
     HFPromptTemplateSettings,
-    HFAuthenticationPortObject,
-    HFAuthenticationPortObjectSpec,
     HFModelSettings,
 )
 
 
 # Langchain imports
 from langchain.llms.huggingface_hub import HuggingFaceHub
-from langchain.embeddings import HuggingFaceHubEmbeddings
+from langchain.embeddings.huggingface_hub import HuggingFaceHubEmbeddings
 
 # Other imports
 import huggingface_hub
@@ -36,7 +35,7 @@ hf_hub_category = knext.category(
 )
 
 
-def _create_repo_id_parameter():
+def _create_repo_id_parameter() -> knext.StringParameter:
     return knext.StringParameter(
         label="Repo ID",
         description="""The model name to be used, in the format `<organization_name>/<model_name>`. For example, `Writer/camel-5b-hf`.
@@ -76,6 +75,46 @@ class HFHubSettings:
         HFHubTask.TEXT_GENERATION.name,
         HFHubTask,
     )
+
+
+class HFAuthenticationPortObjectSpec(AIPortObjectSpec):
+    def __init__(self, credentials: str) -> None:
+        super().__init__()
+        self._credentials = credentials
+
+    @property
+    def credentials(self) -> str:
+        return self._credentials
+
+    def validate_context(self, ctx: knext.ConfigurationContext):
+        if not self.credentials in ctx.get_credential_names():
+            raise knext.InvalidParametersError(
+                f"The selected credentials '{self.credentials}' holding the Hugging Face Hub API token are not present."
+            )
+        hub_token = ctx.get_credentials(self.credentials)
+        if not hub_token.password:
+            raise knext.InvalidParametersError(
+                f"The Hugging Face Hub token in the credentials '{self.credentials}' is not present."
+            )
+
+    def serialize(self) -> dict:
+        return {"credentials": self._credentials}
+
+    @classmethod
+    def deserialize(cls, data: dict):
+        return cls(data["credentials"])
+
+
+class HFAuthenticationPortObject(knext.PortObject):
+    def __init__(self, spec: HFAuthenticationPortObjectSpec) -> None:
+        super().__init__(spec)
+
+    def serialize(self) -> bytes:
+        return b""
+
+    @classmethod
+    def deserialize(cls, spec: HFAuthenticationPortObjectSpec, storage: bytes):
+        return cls(spec)
 
 
 class HFHubLLMPortObjectSpec(LLMPortObjectSpec):
@@ -137,7 +176,7 @@ class HFHubLLMPortObject(LLMPortObject):
     def spec(self) -> HFHubLLMPortObjectSpec:
         return super().spec
 
-    def create_model(self, ctx):
+    def create_model(self, ctx) -> HuggingFaceHub:
         return HuggingFaceHub(
             huggingfacehub_api_token=ctx.get_credentials(
                 self.spec.credentials
@@ -299,7 +338,7 @@ class HFHubAuthenticator:
         spec.validate_context(ctx)
         return spec
 
-    def execute(self, ctx: knext.ExecutionContext):
+    def execute(self, ctx: knext.ExecutionContext) -> HFAuthenticationPortObject:
         try:
             huggingface_hub.whoami(
                 ctx.get_credentials(
@@ -311,7 +350,7 @@ class HFHubAuthenticator:
 
         return HFAuthenticationPortObject(self.create_spec())
 
-    def create_spec(self):
+    def create_spec(self) -> HFAuthenticationPortObjectSpec:
         return HFAuthenticationPortObjectSpec(
             self.credentials_settings.credentials_param,
         )
@@ -375,7 +414,9 @@ class HFHubConnector:
     ) -> HFHubLLMPortObject:
         return HFHubLLMPortObject(self.create_spec(huggingface_auth.spec))
 
-    def create_spec(self, huggingface_auth_spec: HFAuthenticationPortObjectSpec):
+    def create_spec(
+        self, huggingface_auth_spec: HFAuthenticationPortObjectSpec
+    ) -> HFHubLLMPortObjectSpec:
         model_kwargs = {
             "temperature": self.model_settings.temperature,
             "top_p": self.model_settings.top_p,
@@ -445,7 +486,9 @@ class HFHubChatModelConnector:
         _validate_repo_id(self.hub_settings.repo_id)
         return self._create_spec(auth)
 
-    def _create_spec(self, auth: HFAuthenticationPortObjectSpec):
+    def _create_spec(
+        self, auth: HFAuthenticationPortObjectSpec
+    ) -> HFHubChatModelPortObjectSpec:
         model_kwargs = {
             "temperature": self.model_settings.temperature,
             "top_p": self.model_settings.top_p,
@@ -520,7 +563,7 @@ class HFHubEmbeddingsConnector:
         self,
         ctx: knext.ConfigurationContext,
         authentication_spec: HFAuthenticationPortObjectSpec,
-    ):
+    ) -> HFHubEmbeddingsPortObjectSpec:
         if not self.repo_id:
             raise knext.InvalidParametersError("Please enter a repo ID.")
         _validate_repo_id(self.repo_id)
@@ -536,7 +579,7 @@ class HFHubEmbeddingsConnector:
         self,
         ctx: knext.ExecutionContext,
         authentication: HFAuthenticationPortObject,
-    ):
+    ) -> HFHubEmbeddingsPortObject:
         output = HFHubEmbeddingsPortObject(self.create_spec(authentication.spec))
         # TODO validate that repo does supports what we want to do
         output.create_model(ctx)

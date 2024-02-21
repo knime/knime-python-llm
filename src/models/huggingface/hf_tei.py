@@ -92,7 +92,7 @@ class HFTEIEmbeddingsConnector:
 
         return self.create_spec()
 
-    def execute(self, ctx: knext.ExecutionContext):
+    def execute(self, ctx: knext.ExecutionContext) -> HFTEIEmbeddingsPortObject:
         return HFTEIEmbeddingsPortObject(self.create_spec())
 
     def create_spec(self) -> HFTEIEmbeddingsPortObjectSpec:

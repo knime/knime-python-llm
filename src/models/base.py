@@ -288,11 +288,9 @@ class LLMPrompter:
             input_table_spec.column_names, self.response_column_name
         )
 
-        input_table_spec = input_table_spec.append(
+        return input_table_spec.append(
             knext.Column(ktype=knext.string(), name=output_column_name)
         )
-
-        return input_table_spec
 
     def execute(
         self,
@@ -474,9 +472,7 @@ class TextEmbedder:
             table_spec.column_names, self.embeddings_column_name
         )
 
-        table_spec = table_spec.append(self._create_output_column(output_column_name))
-
-        return table_spec
+        return table_spec.append(self._create_output_column(output_column_name))
 
     def _create_output_column(self, output_column_name) -> knext.Column:
         return knext.Column(knext.list_(knext.double()), output_column_name)
@@ -491,14 +487,14 @@ class TextEmbedder:
         output_table = knext.BatchOutputTable.create()
         num_rows = table.num_rows
         i = 0
+        output_column_name = util.handle_column_name_collision(
+            table.schema.column_names, self.embeddings_column_name
+        )
         for batch in table.batches():
             util.check_canceled(ctx)
             data_frame = batch.to_pandas()
             texts = data_frame[self.text_column].tolist()
             embeddings = embeddings_model.embed_documents(texts)
-            output_column_name = util.handle_column_name_collision(
-                table.schema.column_names, self.embeddings_column_name
-            )
             data_frame[output_column_name] = embeddings
             output_table.append(knext.Table.from_pandas(data_frame))
             i += batch.num_rows
@@ -573,9 +569,11 @@ class LLMChatModelAdapter(BaseChatModel):
             if "%1" in template:
                 message = template.replace(
                     "%1",
-                    m.content
-                    if isinstance(m, (HumanMessage, SystemMessage))
-                    else m.content,
+                    (
+                        m.content
+                        if isinstance(m, (HumanMessage, SystemMessage))
+                        else m.content
+                    ),
                 )
             else:
                 message = m.content

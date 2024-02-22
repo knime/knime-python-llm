@@ -233,7 +233,18 @@ embeddings_model_port_type = knext.port_type(
 )
 
 
-@knext.node("LLM Prompter", knext.NodeType.PREDICTOR, "icons/ml.png", model_category)
+@knext.node(
+    "LLM Prompter",
+    knext.NodeType.PREDICTOR,
+    "icons/ml.png",
+    model_category,
+    keywords=[
+        "GenAI",
+        "Gen AI",
+        "Generative AI",
+        "Large Language Model",
+    ],
+)
 @knext.input_port(
     "LLM or chat model", "A large language model or chat model.", llm_port_type
 )
@@ -323,7 +334,16 @@ class LLMPrompter:
 
 
 @knext.node(
-    "Chat Model Prompter", knext.NodeType.PREDICTOR, "icons/ml.png", model_category
+    "Chat Model Prompter",
+    knext.NodeType.PREDICTOR,
+    "icons/ml.png",
+    model_category,
+    keywords=[
+        "GenAI",
+        "Gen AI",
+        "Generative AI",
+        "Large Language Model",
+    ],
 )
 @knext.input_port("Chat Model Port", "A chat model model.", chat_model_port_type)
 @knext.input_table(
@@ -417,7 +437,21 @@ def _string_col_filter(column: knext.Column):
     return column.ktype == knext.string()
 
 
-@knext.node("Text Embedder", knext.NodeType.PREDICTOR, util.ai_icon, model_category)
+@knext.node(
+    "Text Embedder",
+    knext.NodeType.PREDICTOR,
+    util.ai_icon,
+    model_category,
+    keywords=[
+        "GenAI",
+        "Gen AI",
+        "Generative AI",
+        "Embeddings",
+        "Vector",
+        "RAG",
+        "Retrieval Augmented Generation",
+    ],
+)
 @knext.input_port(
     "Embeddings Model",
     "Used to embed the texts from the input table into numerical vectors.",

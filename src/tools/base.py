@@ -122,6 +122,16 @@ tool_list_port_type = knext.port_type(
     knext.NodeType.SOURCE,
     icon_path="icons/store.png",
     category=store_category,
+    keywords=[
+        "GenAI",
+        "Gen AI",
+        "Generative AI",
+        "Agent",
+        "Functions",
+        "OpenAI",
+        "RAG",
+        "Retrieval Augmented Generation",
+    ],
 )
 @knext.input_port(
     "Agent Tool(s)", "One or more tools for an agent to use.", tool_list_port_type

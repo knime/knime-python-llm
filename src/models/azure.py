@@ -283,6 +283,7 @@ class AzureDeploymentSettings:
     knext.NodeType.SOURCE,
     azure_icon,
     category=azure_openai_category,
+    keywords=["GenAI", "Gen AI", "Generative AI", "OpenAI"],
 )
 @knext.output_port(
     "Azure OpenAI Authentication",
@@ -381,6 +382,14 @@ class AzureOpenAIAuthenticator:
     knext.NodeType.SOURCE,
     azure_icon,
     category=azure_openai_category,
+    keywords=[
+        "GenAI",
+        "Gen AI",
+        "Generative AI",
+        "Large Language Model",
+        "OpenAI",
+        "Azure",
+    ],
 )
 @knext.input_port(
     "Azure OpenAI Authentication",
@@ -455,6 +464,7 @@ class AzureOpenAILLMConnector:
     knext.NodeType.SOURCE,
     azure_icon,
     category=azure_openai_category,
+    keywords=["GenAI", "Gen AI", "Generative AI", "OpenAI", "Azure"],
 )
 @knext.input_port(
     "Azure OpenAI Authentication",
@@ -531,6 +541,15 @@ class AzureOpenAIChatModelConnector:
     knext.NodeType.SOURCE,
     azure_icon,
     category=azure_openai_category,
+    keywords=[
+        "GenAI",
+        "Gen AI",
+        "Generative AI",
+        "OpenAI",
+        "Azure",
+        "RAG",
+        "Retrieval Assisted Geeration",
+    ],
 )
 @knext.input_port(
     "Azure OpenAI Authentication",

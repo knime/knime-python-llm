@@ -297,6 +297,13 @@ hf_authentication_port_type = knext.port_type(
     hf_icon,
     category=hf_hub_category,
     id="HuggingFaceHubAuthenticator",
+    keywords=[
+        "GenAI",
+        "Gen AI",
+        "Generative AI",
+        "HuggingFace",
+        "Hugging Face",
+    ],
 )
 @knext.output_port(
     "HF Hub Authentication",
@@ -370,6 +377,14 @@ hf_hub_llm_port_type = knext.port_type(
     hf_icon,
     category=hf_hub_category,
     id="HuggingFaceHubConnector",
+    keywords=[
+        "GenAI",
+        "Gen AI",
+        "Generative AI",
+        "HuggingFace",
+        "Hugging Face",
+        "Large Language Model",
+    ],
 )
 @knext.input_port(
     "HF Authentication",
@@ -446,6 +461,13 @@ hf_hub_chat_model_port_type = knext.port_type(
     hf_icon,
     category=hf_hub_category,
     id="HFHubChatModelConnector",
+    keywords=[
+        "GenAI",
+        "Gen AI",
+        "Generative AI",
+        "HuggingFace",
+        "Hugging Face",
+    ],
 )
 @knext.input_port(
     "HF Authentication",
@@ -535,6 +557,15 @@ hf_embeddings_port_type = knext.port_type(
     hf_icon,
     category=hf_hub_category,
     id="HFHubEmbeddingsConnector",
+    keywords=[
+        "GenAI",
+        "Gen AI",
+        "Generative AI",
+        "HuggingFace",
+        "Hugging Face",
+        "RAG",
+        "Retrieval Augmented Generation",
+    ],
 )
 @knext.input_port(
     "HF Hub Authentication",

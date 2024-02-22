@@ -344,6 +344,12 @@ def is_valid_model(model_path: str):
     knext.NodeType.SOURCE,
     gpt4all_icon,
     category=gpt4all_category,
+    keywords=[
+        "GenAI",
+        "Gen AI",
+        "Generative AI",
+        "Local Large Language Model",
+    ],
 )
 @knext.output_port(
     "GPT4All LLM",
@@ -406,6 +412,12 @@ class GPT4AllLLMConnector:
     knext.NodeType.SOURCE,
     gpt4all_icon,
     category=gpt4all_category,
+    keywords=[
+        "GenAI",
+        "Gen AI",
+        "Generative AI",
+        "Local Large Language Model",
+    ],
 )
 @knext.output_port(
     "GPT4All Chat Model",
@@ -596,6 +608,13 @@ class ModelRetrievalOptions(knext.EnumParameterOptions):
     knext.NodeType.SOURCE,
     gpt4all_icon,
     gpt4all_category,
+    keywords=[
+        "GenAI",
+        "Gen AI",
+        "Generative AI",
+        "Local RAG",
+        "Local Retrieval Augmented Generation",
+    ],
 )
 @knext.output_port(
     "GPT4All Embeddings model",

@@ -57,6 +57,16 @@ huggingface_tei_embeddings_port_type = knext.port_type(
     knext.NodeType.SOURCE,
     hf_icon,
     hf_tei_category,
+    keywords=[
+        "GenAI",
+        "Gen AI",
+        "Generative AI",
+        "HuggingFace",
+        "Hugging Face",
+        "Text Embeddings Inference",
+        "RAG",
+        "Retrieval Augmented Generation",
+    ],
 )
 @knext.output_port(
     "Embeddings Model",

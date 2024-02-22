@@ -254,6 +254,15 @@ class LLMAgentCreator:
     knext.NodeType.PREDICTOR,
     agent_icon,
     category=agent_category,
+    keywords=[
+        "GenAI",
+        "Gen AI",
+        "Generative AI",
+        "Large Language Model",
+        "OpenAI",
+        "RAG",
+        "Retrieval Augmented Generation",
+    ],
 )
 @knext.input_port("Agent", "The agent to prompt.", agent_port_type)
 @knext.input_port("Tools", "The tools the agent can use.", tool_list_port_type)

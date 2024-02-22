@@ -36,6 +36,7 @@ class HFTGIServerSettings:
         default_value="",
     )
 
+
 class HFTGIModelSettings(HFModelSettings):
     seed = knext.IntParameter(
         label="Seed",
@@ -230,6 +231,15 @@ huggingface_textGenInference_chat_port_type = knext.port_type(
     hf_icon,
     category=hf_tgi_category,
     id="HuggingfaceTextGenInferenceConnector",
+    keywords=[
+        "GenAI",
+        "Gen AI",
+        "Generative AI",
+        "HuggingFace",
+        "Hugging Face",
+        "Text Generation Inference",
+        "Large Language Model",
+    ],
 )
 @knext.output_port(
     "Huggingface TGI Configuration",
@@ -285,6 +295,14 @@ class HFTGILLMConnector:
     hf_icon,
     category=hf_tgi_category,
     id="HFTGIChatModelConnector",
+    keywords=[
+        "GenAI",
+        "Gen AI",
+        "Generative AI",
+        "HuggingFace",
+        "Hugging Face",
+        "Text Generation Inference",
+    ],
 )
 @knext.output_port(
     "Huggingface TGI LLM Connection",

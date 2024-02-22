@@ -262,6 +262,15 @@ _filestore_vector_tool_port_type = knext.port_type(
     knext.NodeType.MANIPULATOR,
     icon_path="icons/store.png",
     category=store_category,
+    keywords=[
+        "GenAI",
+        "Gen AI",
+        "Generative AI",
+        "Agent",
+        "OpenAI",
+        "RAG",
+        "Retrieval Augmented Generation",
+    ],
 )
 @knext.input_port("LLM Port", "A large language model.", llm_port_type)
 @knext.input_port("Vector Store Port", "A loaded vector store.", vector_store_port_type)

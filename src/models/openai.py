@@ -583,6 +583,7 @@ openai_embeddings_port_type = knext.port_type(
     knext.NodeType.SOURCE,
     openai_icon,
     category=openai_category,
+    keywords=["GenAI", "Gen AI", "Generative AI", "OpenAI"],
 )
 @knext.output_port(
     "OpenAI Authentication",
@@ -682,6 +683,7 @@ class OpenAIAuthenticator:
     knext.NodeType.SOURCE,
     openai_icon,
     category=openai_category,
+    keywords=["GenAI", "Gen AI", "Generative AI", "Large Language Model", "OpenAI"],
 )
 @knext.input_port(
     "OpenAI Authentication",
@@ -761,6 +763,7 @@ class OpenAILLMConnector:
     knext.NodeType.SOURCE,
     openai_icon,
     category=openai_category,
+    keywords=["GenAI", "Gen AI", "Generative AI", "OpenAI"],
 )
 @knext.input_port(
     "OpenAI Authentication",
@@ -842,6 +845,14 @@ class OpenAIChatModelConnector:
     knext.NodeType.SOURCE,
     openai_icon,
     category=openai_category,
+    keywords=[
+        "GenAI",
+        "Gen AI",
+        "Generative AI",
+        "OpenAI",
+        "RAG",
+        "Retrieval Assisted Geeration",
+    ],
 )
 @knext.input_port(
     "OpenAI Authentication",
@@ -907,6 +918,7 @@ class OpenAIEmbeddingsConnector:
     node_type=knext.NodeType.VISUALIZER,
     icon_path=openai_icon,
     category=openai_category,
+    keywords=["GenAI", "Gen AI", "Generative AI", "OpenAI", "Image generation"],
 )
 @knext.input_port(
     "OpenAI Authentication",

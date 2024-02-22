@@ -256,11 +256,13 @@ class MetadataSettings:
         """Selection of columns used as metadata for each document. The documents column will be ignored.""",
         port_index=1,
         column_filter=util.create_type_filer(knext.string()),  # TODO fix typo
-        default_value=lambda v: knext.ColumnFilterConfig(
-            manual_filter=ManualFilterConfig(include_unknown_columns=False)
-        )
-        if v < knext.Version(5, 2, 0)
-        else knext.ColumnFilterConfig(),
+        default_value=lambda v: (
+            knext.ColumnFilterConfig(
+                manual_filter=ManualFilterConfig(include_unknown_columns=False)
+            )
+            if v < knext.Version(5, 2, 0)
+            else knext.ColumnFilterConfig()
+        ),
     )
 
 
@@ -283,6 +285,11 @@ def get_metadata_columns(
     knext.NodeType.SOURCE,
     store_icon,
     category=store_category,
+    keywords=[
+        "RAG",
+        "Retrieval Augmented Generation",
+        "Embeddings",
+    ],
 )
 @knext.input_port(
     "Vector Store",

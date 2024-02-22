@@ -121,6 +121,11 @@ local_chroma_vector_store_port_type = knext.port_type(
     knext.NodeType.SOURCE,
     chroma_icon,
     category=chroma_category,
+    keywords=[
+        "RAG",
+        "Retrieval Augmented Generation",
+        "Embeddings",
+    ],
 )
 @knext.input_port(
     "Embeddings",
@@ -158,9 +163,11 @@ class ChromaVectorStoreCreator:
         "Handle missing values in the document column",
         """Define whether missing values in the document column should be skipped or whether the 
         node execution should fail on missing values.""",
-        default_value=lambda v: MissingValueHandlingOptions.Fail.name
-        if v < knext.Version(5, 2, 0)
-        else MissingValueHandlingOptions.SkipRow.name,
+        default_value=lambda v: (
+            MissingValueHandlingOptions.Fail.name
+            if v < knext.Version(5, 2, 0)
+            else MissingValueHandlingOptions.SkipRow.name
+        ),
         enum=MissingValueHandlingOptions,
         style=knext.EnumParameter.Style.VALUE_SWITCH,
         since_version="5.2.0",
@@ -242,6 +249,11 @@ class ChromaVectorStoreCreator:
     knext.NodeType.SOURCE,
     chroma_icon,
     category=chroma_category,
+    keywords=[
+        "RAG",
+        "Retrieval Augmented Generation",
+        "Embeddings",
+    ],
 )
 @knext.input_port(
     "Embeddings",

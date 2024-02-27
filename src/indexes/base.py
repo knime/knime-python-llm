@@ -306,11 +306,17 @@ class VectorStoreRetriever:
     """
     Performs a similarity search on a vector store.
 
-    A vector store retriever is a component or module that
-    specializes in retrieving vectors from a vector store
-    based on user queries. It works in conjunction with a
-    vector store to facilitate efficient vector
-    retrieval and similarity search operations.
+    A vector store retriever is a component or module that specializes in retrieving vectors
+    from a vector store based on user queries. It works in conjunction with a vector store to
+    facilitate efficient vector retrieval and similarity search operations.
+
+    Note on dissimilarity scores:
+    Dissimilarity scores calculated using FAISS or Chroma with L2 distance are not bound to a
+    specific range, therefore allowing only for ordinal comparison of scores. These scores also depend
+    on the embeddings model used to generate the embeddings, as different models produce embeddings
+    with varying scales and distributions. Therefore, understanding or comparing similarity across
+    different models or spaces without contextual normalization is not meaningful.
+
     """
 
     query_column = knext.ColumnParameter(
@@ -339,21 +345,21 @@ class VectorStoreRetriever:
         since_version="5.2.0",
     )
 
-    retrieve_similarity_scores = knext.BoolParameter(
-        "Retrieve similarity scores",
-        """Whether or not to retrieve similarity scores for the retrieved documents. 
-        FAISS uses L2 distance and Chroma uses cosine distance to calculate similarity scores. 
+    retrieve_dissimilarity_scores = knext.BoolParameter(
+        "Retrieve dissimilarity scores",
+        """Whether or not to retrieve dissimilarity scores for the retrieved documents. 
+        FAISS and Chroma use L2 distance by default to calculate dissimilarity scores. 
         Lower score represents more similarity.""",
         default_value=False,
         since_version="5.3.0",
     )
 
-    similarity_scores_column_name = knext.StringParameter(
-        "Similarity scores column name",
-        "The name for the appended column containing the similarity scores.",
-        "Similarity scores",
+    dissimilarity_scores_column_name = knext.StringParameter(
+        "Dissimilarity scores column name",
+        "The name for the appended column containing the dissimilarity scores.",
+        "Dissimilarity scores",
         since_version="5.3.0",
-    ).rule(knext.OneOf(retrieve_similarity_scores, [True]), knext.Effect.SHOW)
+    ).rule(knext.OneOf(retrieve_dissimilarity_scores, [True]), knext.Effect.SHOW)
 
     def configure(
         self,
@@ -373,9 +379,9 @@ class VectorStoreRetriever:
                 "No name for the column holding the retrieved documents is provided."
             )
 
-        if not self.similarity_scores_column_name:
+        if not self.dissimilarity_scores_column_name:
             raise knext.InvalidParametersError(
-                "No name for the column holding the similarity scores is provided."
+                "No name for the column holding the dissimilarity scores is provided."
             )
 
         output_column_name = self.retrieved_docs_column_name
@@ -399,7 +405,7 @@ class VectorStoreRetriever:
 
         for batch in input_table.batches():
             doc_collection = []
-            similarity_scores = []
+            dissimilarity_scores = []
             metadata_dict = {}
 
             df = batch.to_pandas()
@@ -427,8 +433,8 @@ class VectorStoreRetriever:
                                 for document in documents
                             ]
                         )
-                if self.retrieve_similarity_scores:
-                    similarity_scores.append([document[1] for document in documents])
+                if self.retrieve_dissimilarity_scores:
+                    dissimilarity_scores.append([document[1] for document in documents])
 
                 i += 1
                 ctx.set_progress(i / num_rows)
@@ -445,11 +451,11 @@ class VectorStoreRetriever:
                 )
                 df[metadata_column_name] = metadata_dict[key]
 
-            if self.retrieve_similarity_scores:
-                similarity_score_name = util.handle_column_name_collision(
-                    list(df.columns), self.similarity_scores_column_name
+            if self.retrieve_dissimilarity_scores:
+                dissimilarity_score_name = util.handle_column_name_collision(
+                    list(df.columns), self.dissimilarity_scores_column_name
                 )
-                df[similarity_score_name] = similarity_scores
+                df[dissimilarity_score_name] = dissimilarity_scores
 
             output_table.append(df)
 
@@ -460,11 +466,11 @@ class VectorStoreRetriever:
     ) -> list[knext.Column]:
         """
         Generates a list of column objects and handles column name collisions for metadata,
-        output and similarity score columns.
+        output and dissimilarity score columns.
         Column name collisions are handled in this order:
             - Keep original metadata column names
             - Handle if output_column_name collides with table_spec or metadata column names
-            - Handle if similarity_scores_column_name collides with metadata & output column names
+            - Handle if dissimilarity_scores_column_name collides with metadata & output column names
         """
         column_names = table_spec_columns
         result_columns = []
@@ -491,9 +497,9 @@ class VectorStoreRetriever:
                 )
                 column_names.append(column_name)
 
-        if self.retrieve_similarity_scores:
+        if self.retrieve_dissimilarity_scores:
             column_name = util.handle_column_name_collision(
-                column_names, self.similarity_scores_column_name
+                column_names, self.dissimilarity_scores_column_name
             )
             result_columns.append(
                 knext.Column(

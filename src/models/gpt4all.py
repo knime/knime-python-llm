@@ -340,7 +340,7 @@ def is_valid_model(model_path: str):
 
 
 @knext.node(
-    "GPT4All LLM Connector",
+    "Local GPT4All LLM Connector",
     knext.NodeType.SOURCE,
     gpt4all_icon,
     category=gpt4all_category,
@@ -372,6 +372,8 @@ class GPT4AllLLMConnector:
     The currently supported models are based on GPT-J, LLaMA, MPT, Replit, Falcon and StarCoder.
 
     For more information and detailed instructions on downloading compatible models, please visit the [GPT4All GitHub repository](https://github.com/nomic-ai/gpt4all).
+
+    Note: This node can not be used on the KNIME Hub, as the models can't be embedded into the workflow due to their large size.
     """
 
     settings = GPT4AllInputSettings()
@@ -400,7 +402,7 @@ class GPT4AllLLMConnector:
 
 
 @knext.node(
-    "GPT4All Chat Model Connector",
+    "Local GPT4All Chat Model Connector",
     knext.NodeType.SOURCE,
     gpt4all_icon,
     category=gpt4all_category,
@@ -426,6 +428,8 @@ class GPT4AllChatModelConnector:
 
     For more information and detailed instructions on downloading compatible models, please visit the
     [GPT4All GitHub repository](https://github.com/nomic-ai/gpt4all).
+
+    Note: This node can not be used on the KNIME Hub, as the models can't be embedded into the workflow due to their large size.
     """
 
     settings = GPT4AllInputSettings()
@@ -605,8 +609,10 @@ class Embeddings4AllConnector:
     Connect to an embeddings model that runs on the local machine via GPT4All.
     The default model was trained on sentences and short paragrpahs of English text.
     It ignores special characters like 'ß' i.e. the embeddings for 'Schloß' are the same as for 'Schlo'.
-    If downstream nodes fail with 'Execute failed: Error while sending a command.', then this is likely caused by an input that
-    consists entirely of characters the model doesn't support.
+    If downstream nodes fail with 'Execute failed: Error while sending a command.', then this is likely
+    caused by an input that consists entirely of characters the model doesn't support.
+
+    Note: Unlike the other GPT4All nodes, this node can be used on the KNIME Hub.
     """
 
     model_retrieval = knext.EnumParameter(

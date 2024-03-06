@@ -123,12 +123,14 @@ class HFHubLLMPortObjectSpec(LLMPortObjectSpec):
         credentials: HFAuthenticationPortObjectSpec,
         repo_id,
         task,
+        n_requests,
         model_kwargs,
     ) -> None:
         super().__init__()
         self._credentials = credentials
         self._repo_id = repo_id
         self._task = task
+        self._n_requests = n_requests
         self._model_kwargs = model_kwargs
 
     def validate_context(self, ctx: knext.ConfigurationContext):
@@ -147,6 +149,10 @@ class HFHubLLMPortObjectSpec(LLMPortObjectSpec):
         return self._task
 
     @property
+    def n_requests(self):
+        return self._n_requests
+
+    @property
     def model_kwargs(self):
         return self._model_kwargs
 
@@ -155,6 +161,7 @@ class HFHubLLMPortObjectSpec(LLMPortObjectSpec):
             **self._credentials.serialize(),
             "repo_id": self._repo_id,
             "task": self._task,
+            "n_requests": self._n_requests,
             "model_kwargs": self._model_kwargs,
         }
 
@@ -164,6 +171,7 @@ class HFHubLLMPortObjectSpec(LLMPortObjectSpec):
             HFAuthenticationPortObjectSpec.deserialize(data),
             data["repo_id"],
             data["task"],
+            data.get("n_requests", 1),
             data["model_kwargs"],
         )
 
@@ -198,6 +206,7 @@ class HFHubChatModelPortObjectSpec(HFHubLLMPortObjectSpec, ChatModelPortObjectSp
             llm_spec._credentials,
             llm_spec.repo_id,
             llm_spec.task,
+            llm_spec.n_requests,
             llm_spec.model_kwargs,
         )
         self._system_prompt_template = system_prompt_template
@@ -443,6 +452,7 @@ class HFHubConnector:
             huggingface_auth_spec,
             self.hub_settings.repo_id,
             HFHubTask[self.hub_settings.task].label,
+            self.model_settings.n_requests,
             model_kwargs,
         )
 
@@ -522,6 +532,7 @@ class HFHubChatModelConnector:
             auth,
             self.hub_settings.repo_id,
             HFHubTask[self.hub_settings.task].label,
+            self.model_settings.n_requests,
             model_kwargs,
         )
         return HFHubChatModelPortObjectSpec(

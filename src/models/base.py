@@ -3,6 +3,7 @@ import knime.extension as knext
 import pyarrow as pa
 import util
 import pandas as pd
+import asyncio
 from base import AIPortObjectSpec
 from typing import Any, List, Optional, Sequence
 
@@ -61,6 +62,26 @@ class GeneralSettings:
         min_value=0.01,
         max_value=1.0,
         is_advanced=True,
+    )
+
+
+class GeneralRemoteSettings(GeneralSettings):
+    n_requests = knext.IntParameter(
+        label="Number of concurrent requests",
+        description="""Maximum number of concurrent requests to LLMs that can be made, 
+        whether through API calls or to an inference server.
+        Exceeding this limit may result in temporary restrictions on your access.
+
+        It is important to plan your usage according to the model provider's rate limits,
+        and keep in mind that both software and hardware constraints can impact performance.
+
+        For OpenAI, please refer to the [Limits page](https://platform.openai.com/account/limits) 
+        for the rate limits available to you.
+        """,
+        default_value=1,
+        min_value=1,
+        is_advanced=True,
+        since_version="5.3.0",
     )
 
 
@@ -166,6 +187,17 @@ class CredentialsSettings:
 
 class LLMPortObjectSpec(AIPortObjectSpec):
     """Most generic spec of LLMs. Used to define the most generic LLM PortType"""
+
+    def __init__(
+        self,
+        n_requests: int = 1,
+    ) -> None:
+        super().__init__()
+        self._n_requests = n_requests
+
+    @property
+    def n_requests(self) -> int:
+        return self._n_requests
 
 
 class LLMPortObject(knext.PortObject):
@@ -274,6 +306,32 @@ class LLMPrompter:
         default_value="Response",
     )
 
+    async def aprocess_batch(self, llm: BaseLanguageModel, sub_batch: List[str]):
+        responses = await llm.abatch(sub_batch)
+        if isinstance(llm, BaseChatModel):
+            # chat models return AIMessage, therefore content field of the response has to be extracted
+            responses = [response.content for response in responses]
+        return responses
+
+    async def aprocess_batches_concurrently(
+        self, batches: List[str], llm: BaseLanguageModel, n_requests: int
+    ):
+        all_responses = []
+
+        # Create sub-batches based on n_requests
+        sub_batches = [
+            batches[i : i + n_requests] for i in range(0, len(batches), n_requests)
+        ]
+
+        # Process sub-batches in chunks
+        for i in range(0, len(sub_batches), n_requests):
+            current_chunk = sub_batches[i : i + n_requests]
+            tasks = [self.aprocess_batch(llm, sub_batch) for sub_batch in current_chunk]
+            responses = await asyncio.gather(*tasks)
+            all_responses.extend(responses)
+
+        return all_responses
+
     def configure(
         self,
         ctx: knext.ConfigurationContext,
@@ -319,17 +377,26 @@ class LLMPrompter:
 
         output_table: knext.BatchOutputTable = knext.BatchOutputTable.create()
         i = 0
+
+        n_requests = llm_port.spec.n_requests
+
         for batch in input_table.batches():
-            data_frame = batch.to_pandas()
             responses = []
-            for prompt in data_frame[self.prompt_column]:
-                util.check_canceled(ctx)
-                responses.append(llm.predict(prompt))
-                ctx.set_progress(i / num_rows)
-                i += 1
+            util.check_canceled(ctx)
+            data_frame = batch.to_pandas()
+            prompts = data_frame[self.prompt_column].tolist()
+
+            final_responses = asyncio.run(
+                self.aprocess_batches_concurrently(prompts, llm, n_requests)
+            )
+
+            for response_batch in final_responses:
+                responses.extend(response_batch)
 
             data_frame[output_column_name] = responses
             output_table.append(data_frame)
+            i += len(prompts)
+            ctx.set_progress(i / num_rows)
 
         return output_table
 
@@ -689,7 +756,7 @@ class LLMChatModelAdapter(BaseChatModel):
             _stop = None
         else:
             _stop = list(stop)
-        content = self.llm._call_async(text, stop=_stop, **kwargs)
+        content = await self.llm._call_async(text, stop=_stop, **kwargs)
         return AIMessage(content=content)
 
     def _llm_type(self) -> str:

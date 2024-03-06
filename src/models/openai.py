@@ -10,7 +10,7 @@ from .base import (
     EmbeddingsPortObjectSpec,
     EmbeddingsPortObject,
     model_category,
-    GeneralSettings,
+    GeneralRemoteSettings,
     CredentialsSettings,
 )
 
@@ -104,7 +104,7 @@ class _EnumToStringParameter(knext.StringParameter):
 
 
 # @knext.parameter_group(label="Model Settings") -- Imported
-class OpenAIGeneralSettings(GeneralSettings):
+class OpenAIGeneralSettings(GeneralRemoteSettings):
     max_tokens = knext.IntParameter(
         label="Maximum Response Length (token)",
         description="""
@@ -426,6 +426,7 @@ class OpenAILLMPortObjectSpec(OpenAIModelPortObjectSpec, LLMPortObjectSpec):
         max_tokens: int,
         n: int,
         seed: int,
+        n_requests: int,
     ) -> None:
         super().__init__(credentials)
         self._model = model_name
@@ -434,6 +435,7 @@ class OpenAILLMPortObjectSpec(OpenAIModelPortObjectSpec, LLMPortObjectSpec):
         self._max_tokens = max_tokens
         self._n = n
         self._seed = seed
+        self._n_requests = n_requests
 
     @property
     def model(self) -> str:
@@ -459,6 +461,10 @@ class OpenAILLMPortObjectSpec(OpenAIModelPortObjectSpec, LLMPortObjectSpec):
     def seed(self) -> int:
         return self._seed
 
+    @property
+    def n_requests(self) -> int:
+        return self._n_requests
+
     def serialize(self) -> dict:
         return {
             **super().serialize(),
@@ -468,6 +474,7 @@ class OpenAILLMPortObjectSpec(OpenAIModelPortObjectSpec, LLMPortObjectSpec):
             "max_tokens": self._max_tokens,
             "n": self._n,
             "seed": self._seed,
+            "n_requests": self._n_requests,
         }
 
     @classmethod
@@ -480,6 +487,7 @@ class OpenAILLMPortObjectSpec(OpenAIModelPortObjectSpec, LLMPortObjectSpec):
             data["max_tokens"],
             data["n"],
             seed=data.get("seed", 0),
+            n_requests=data.get("n_requests", 1),
         )
 
 
@@ -756,6 +764,7 @@ class OpenAILLMConnector:
             self.model_settings.max_tokens,
             self.model_settings.n,
             seed=seed,
+            n_requests=self.model_settings.n_requests,
         )
 
 
@@ -838,6 +847,7 @@ class OpenAIChatModelConnector:
             self.model_settings.max_tokens,
             self.model_settings.n,
             seed=seed,
+            n_requests=self.model_settings.n_requests,
         )
 
 

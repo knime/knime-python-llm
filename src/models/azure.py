@@ -124,6 +124,7 @@ class AzureOpenAILLMPortObjectSpec(
         max_tokens: int,
         n: int,
         seed: int,
+        n_requests: int,
     ) -> None:
         super().__init__(credentials)
         self._model = model_name
@@ -132,6 +133,7 @@ class AzureOpenAILLMPortObjectSpec(
         self._max_tokens = max_tokens
         self._n = n
         self._seed = seed
+        self._n_requests = n_requests
 
     @classmethod
     def deserialize(cls, data: dict):
@@ -143,6 +145,7 @@ class AzureOpenAILLMPortObjectSpec(
             data["max_tokens"],
             data["n"],
             data.get("seed", 0),
+            data.get("n_requests", 1),
         )
 
 
@@ -462,6 +465,7 @@ class AzureOpenAILLMConnector:
             self.model_settings.max_tokens,
             self.model_settings.n,
             self.model_settings.seed,
+            self.model_settings.n_requests,
         )
 
 
@@ -540,6 +544,7 @@ class AzureOpenAIChatModelConnector:
             self.model_settings.max_tokens,
             self.model_settings.n,
             self.model_settings.seed,
+            self.model_settings.n_requests,
         )
 
 

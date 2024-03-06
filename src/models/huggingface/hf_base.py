@@ -2,7 +2,7 @@
 import knime.extension as knext
 from ..base import (
     model_category,
-    GeneralSettings,
+    GeneralRemoteSettings,
 )
 
 
@@ -16,7 +16,7 @@ hf_category = knext.category(
 )
 
 
-class HFModelSettings(GeneralSettings):
+class HFModelSettings(GeneralRemoteSettings):
     top_k = knext.IntParameter(
         label="Top k",
         description="The number of top-k tokens to consider when generating text.",
@@ -53,6 +53,7 @@ class HFModelSettings(GeneralSettings):
         default_value=50,
         min_value=0,
     )
+
 
 @knext.parameter_group(label="Prompt Templates")
 class HFPromptTemplateSettings:

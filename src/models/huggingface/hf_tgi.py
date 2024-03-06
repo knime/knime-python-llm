@@ -62,6 +62,7 @@ class HFTGILLMPortObjectSpec(LLMPortObjectSpec):
         temperature,
         repetition_penalty,
         seed,
+        n_requests,
     ) -> None:
         super().__init__()
         self._inference_server_url = inference_server_url
@@ -72,6 +73,7 @@ class HFTGILLMPortObjectSpec(LLMPortObjectSpec):
         self._temperature = temperature
         self._repetition_penalty = repetition_penalty
         self._seed = seed
+        self._n_requests = n_requests
 
     @property
     def inference_server_url(self):
@@ -105,6 +107,10 @@ class HFTGILLMPortObjectSpec(LLMPortObjectSpec):
     def seed(self):
         return self._seed
 
+    @property
+    def n_requests(self):
+        return self._n_requests
+
     def serialize(self) -> dict:
         return {
             "inference_server_url": self.inference_server_url,
@@ -115,6 +121,7 @@ class HFTGILLMPortObjectSpec(LLMPortObjectSpec):
             "temperature": self.temperature,
             "repetition_penalty": self.repetition_penalty,
             "seed": self.seed,
+            "n_requests": self.n_requests,
         }
 
     @classmethod
@@ -128,6 +135,7 @@ class HFTGILLMPortObjectSpec(LLMPortObjectSpec):
             data["temperature"],
             data["repetition_penalty"],
             seed=data.get("seed", 0),
+            n_requests=data.get("n_requests", 1),
         )
 
 
@@ -172,6 +180,7 @@ class HFTGIChatModelPortObjectSpec(HFTGILLMPortObjectSpec, ChatModelPortObjectSp
             llm_spec.temperature,
             llm_spec.repetition_penalty,
             llm_spec.seed,
+            llm_spec.n_requests,
         )
         self._system_prompt_template = system_prompt_template
         self._prompt_template = prompt_template
@@ -286,6 +295,7 @@ class HFTGILLMConnector:
             self.model_settings.temperature,
             self.model_settings.repetition_penalty,
             seed=seed,
+            n_requests=self.model_settings.n_requests,
         )
 
 
@@ -352,6 +362,7 @@ class HFTGIChatModelConnector:
             self.model_settings.temperature,
             self.model_settings.repetition_penalty,
             seed=seed,
+            n_requests=self.model_settings.n_requests,
         )
 
         return HFTGIChatModelPortObjectSpec(

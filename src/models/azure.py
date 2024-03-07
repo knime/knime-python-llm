@@ -123,6 +123,7 @@ class AzureOpenAILLMPortObjectSpec(
         top_p: float,
         max_tokens: int,
         n: int,
+        seed: int,
     ) -> None:
         super().__init__(credentials)
         self._model = model_name
@@ -130,6 +131,7 @@ class AzureOpenAILLMPortObjectSpec(
         self._top_p = top_p
         self._max_tokens = max_tokens
         self._n = n
+        self._seed = seed
 
     @classmethod
     def deserialize(cls, data: dict):
@@ -140,6 +142,7 @@ class AzureOpenAILLMPortObjectSpec(
             data["top_p"],
             data["max_tokens"],
             data["n"],
+            data.get("seed", 0),
         )
 
 
@@ -162,6 +165,7 @@ class AzureOpenAILLMPortObject(OpenAILLMPortObject):
             top_p=self.spec.top_p,
             max_tokens=self.spec.max_tokens,
             n=self.spec.n,
+            seed=self.spec.seed,
         )
 
 
@@ -194,6 +198,7 @@ class AzureOpenAIChatModelPortObject(OpenAIChatModelPortObject):
             model_kwargs=model_kwargs,
             max_tokens=self.spec.max_tokens,
             n=self.spec.n,
+            seed=self.spec.seed,
         )
 
 
@@ -456,6 +461,7 @@ class AzureOpenAILLMConnector:
             self.model_settings.top_p,
             self.model_settings.max_tokens,
             self.model_settings.n,
+            self.model_settings.seed,
         )
 
 
@@ -533,6 +539,7 @@ class AzureOpenAIChatModelConnector:
             self.model_settings.top_p,
             self.model_settings.max_tokens,
             self.model_settings.n,
+            self.model_settings.seed,
         )
 
 

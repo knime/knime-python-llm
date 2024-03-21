@@ -7,7 +7,7 @@ def knimeVersion = '5.3'
 
 def repositoryName = "knime-python-llm"
 
-def extensionPath = "." // Path to knime.yml file
+def extensionPath = "./" // Path to knime.yml file
 def outputPath = "output"
 
 library "knime-pipeline@$BN"
@@ -16,7 +16,8 @@ properties([
     parameters(
         [p2Tools.getP2pruningParameter()] + \
         workflowTests.getConfigurationsAsParameters() + \
-        condaHelpers.getForceCondaBuildParameter()
+        condaHelpers.getForceCondaBuildParameter() + \
+        condaHelpers.getGenerateSBOMForCondaParameter()
     ),
     buildDiscarder(logRotator(numToKeepStr: '5')),
     disableConcurrentBuilds()
@@ -33,20 +34,37 @@ try {
             stage("Create Conda Env"){
                 env.lastStage = env.STAGE_NAME
                 prefixPath = "${WORKSPACE}/${repositoryName}"
-                condaHelpers.createCondaEnv(prefixPath: prefixPath, pythonVersion:'3.9', packageNames: ['knime-extension-bundling'])
+                condaHelpers.createCondaEnv(prefixPath: prefixPath, pythonVersion:'3.9', packageNames: ['knime-extension-bundling', 'jake'])
             }
             stage("Build Python Extension") {
                 env.lastStage = env.STAGE_NAME
-                force_conda_build = params?.FORCE_CONDA_BUILD ? "--force_new_timestamp" : ""
+                force_conda_build = params?.FORCE_CONDA_BUILD ? "--force-new-timestamp" : ""
+                buildSboms = ""
+                if (params.SBOM_FOR_CONDA) {
+                    binaryFile = condaHelpers.downloadAndPrepareCycloneDX()
+                    buildSboms = "--generate-sbom --cyclonedx-binary ${binaryFile}"
+
+
+                }
+                def buildPath = "build"
 
                 withMavenJarsignerCredentials(options: [artifactsPublisher(disabled: true)], skipJarsigner: false) {
                     withEnv([ "MVN_OPTIONS=-Dknime.p2.repo=https://jenkins.devops.knime.com/p2/knime/" ]) {
                         withCredentials([usernamePassword(credentialsId: 'ARTIFACTORY_CREDENTIALS', passwordVariable: 'ARTIFACTORY_PASSWORD', usernameVariable: 'ARTIFACTORY_LOGIN'),
                         ]) {
                             sh """
-                            micromamba run -p ${prefixPath} build_python_extension.py ${extensionPath} ${outputPath} -f --knime-version ${knimeVersion} --knime_build --excluded-files ${prefixPath} ${force_conda_build}
+                            micromamba run -p ${prefixPath} build_python_extension.py ${extensionPath} ${outputPath} --render-folder ${buildPath} -f --knime-version ${knimeVersion} --knime-build --excluded-files ${prefixPath} ${force_conda_build} ${buildSboms}
                             """
                         }
+                        if (params.SBOM_FOR_CONDA) {
+                            echo "Sending SBOMs to OWASP"
+                            knimeYML = readYaml file: 'knime.yml'
+                            projectVersion = knimeYML.version
+                            owasp.sendCondaSBOMs(projectVersion)
+                        }
+                        sh"""
+                          rm -r ${buildPath}
+                        """
                     }
                 }
             }

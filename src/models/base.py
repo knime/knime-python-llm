@@ -1,8 +1,6 @@
 # KNIME / own imports
 import knime.extension as knext
-import knime.api.schema as ks
 import pyarrow as pa
-
 import util
 import pandas as pd
 from base import AIPortObjectSpec
@@ -492,8 +490,9 @@ class TextEmbedder:
 
     missing_value_handling = knext.EnumParameter(
         "Handle missing values in the text column",
-        """Define whether missing values in the text column should be kept or whether the 
-        node execution should fail on missing values.""",
+        """Define whether missing or empty values in the text column should 
+        result in missing values in the output table or whether the 
+        node execution should fail on such values.""",
         default_value=lambda v: util.MissingValueOutputOptions.Fail.name
         if v < knext.Version(5, 3, 0)
         else util.MissingValueOutputOptions.OutputMissingValues.name,
@@ -543,37 +542,32 @@ class TextEmbedder:
         output_column_name = util.handle_column_name_collision(
             table.schema.column_names, self.embeddings_column_name
         )
+        output_type = pa.list_(pa.float64())
+        if missing_value_handling_setting == util.MissingValueOutputOptions.Fail:
+            mapper = util.FailOnMissingMapper(
+                self.text_column, embeddings_model.embed_documents, output_type
+            )
+        else:
+            mapper = util.OutputMissingMapper(
+                self.text_column,
+                embeddings_model.embed_documents,
+                output_type,
+            )
         for batch in table.batches():
-            batch_num_rows = batch.num_rows
             util.check_canceled(ctx)
-
-            data_frame = batch.to_pandas()
-
-            non_nan_texts, indices = util.output_missing_values(
-                data_frame, self.text_column, missing_value_handling_setting, ctx
+            pa_table = batch.to_pyarrow()
+            table_from_batch = pa.Table.from_batches([pa_table])
+            embeddings_array = mapper.map(table_from_batch)
+            table_from_batch = table_from_batch.append_column(
+                output_column_name, embeddings_array
             )
+            output_table.append(knext.Table.from_pyarrow(table_from_batch))
 
-            embeddings = embeddings_model.embed_documents(non_nan_texts)
-
-            batch_pa = batch.to_pyarrow()
-            table_from_batch = pa.Table.from_batches([batch_pa])
-
-            embeddings_column = [None] * batch_num_rows
-
-            for index, embedding in zip(indices, embeddings):
-                embeddings_column[index] = embedding
-
-            embeddings_pa_column = pa.array(
-                embeddings_column, type=pa.list_(pa.float64())
-            )
-
-            updated_table_pa = table_from_batch.append_column(
-                output_column_name, embeddings_pa_column
-            )
-
-            output_table.append(knext.Table.from_pyarrow(updated_table_pa))
             i += batch.num_rows
             ctx.set_progress(i / num_rows)
+
+        if mapper.all_missing:
+            ctx.set_warning("All rows contain missing or empty values.")
 
         return output_table
 

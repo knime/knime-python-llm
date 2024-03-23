@@ -1,7 +1,10 @@
 import knime.extension as knext
 from typing import Callable, List
+from abc import ABC, abstractmethod
 import re
 import pandas as pd
+import pyarrow as pa
+import pyarrow.compute as pc
 
 
 def is_nominal(column: knext.Column) -> bool:
@@ -157,14 +160,12 @@ def handle_missing_and_empty_values(
         df = skip_missing_values(df, input_column, ctx)
     elif has_missing_values:
         missing_row_id = df[df[input_column].isnull()].index[0]
-        raise knext.InvalidParametersError(
+        raise ValueError(
             f"There are missing values in column {input_column}. See row ID <{missing_row_id}> for the first row that contains a missing value."
         )
 
     if df.empty:
-        raise knext.InvalidParametersError(
-            f"""All rows are skipped due to missing values."""
-        )
+        raise ValueError("All rows are skipped due to missing values.")
 
     # Check for empty values
     for id, value in df[input_column].items():
@@ -176,32 +177,86 @@ def handle_missing_and_empty_values(
     return df
 
 
-def output_missing_values(
-    df: pd.DataFrame,
-    input_column: str,
-    missing_value_handling_setting: MissingValueOutputOptions,
-    ctx: knext.ExecutionContext,
-):
-    if df[input_column].isna().all():
-        ctx.set_warning("All rows have missing values.")
+class BaseMapper(ABC):
+    def __init__(self, column: str, fn: Callable, output_type) -> None:
+        super().__init__()
+        self._column = column
+        self._fn = fn
+        self._output_type = output_type
 
-    has_missing_values = df[input_column].isna().any()
+    def _is_valid(self, text_array):
+        text_array = pc.utf8_trim_whitespace(text_array)
+        return pc.fill_null(pc.not_equal(text_array, pa.scalar("")), False)
 
-    if has_missing_values:
-        if (
-            missing_value_handling_setting
-            != MissingValueOutputOptions.OutputMissingValues
-        ):
-            missing_row_id = df[df[input_column].isnull()].index[0]
-            raise knext.InvalidParametersError(
-                f"There are missing values in column {input_column}. See row ID <{missing_row_id}> for the first row that contains a missing value."
+    @abstractmethod
+    def map(self, table: pa.Table) -> pa.Array:
+        """Maps the given table to an output array."""
+
+    @property
+    @abstractmethod
+    def all_missing(self) -> bool:
+        """Indicates if all observed values were missing or empty"""
+
+
+class FailOnMissingMapper(BaseMapper):
+    def map(self, table: pa.Table):
+        array = table.column(self._column)
+        is_valid = self._is_valid(array)
+        all_valid = pc.all(is_valid)
+        if not all_valid.as_py():
+            raise ValueError(
+                f"There are missing or empty values in column {self._column}. "
+                f"See row ID <{self._get_row_id_of_first_null(table, is_valid)}> "
+                "for the first row that contains such a value."
             )
 
-    # Extract non-NaN texts and their indices
-    non_nan_mask = df[input_column].notna()
-    non_nan_texts = df.loc[non_nan_mask, input_column].tolist()
+        results = self._fn(array.to_pylist())
+        return pa.array(results, type=self._output_type)
 
-    # get default numeric indices instead of rowIDs
-    df.reset_index(inplace=True)
-    indices = df.index[non_nan_mask].tolist()
-    return non_nan_texts, indices
+    def _get_row_id_of_first_null(self, table, is_valid):
+        empties = pc.filter(table, pc.invert(is_valid))
+        return empties[0][0].as_py()
+
+    @property
+    def all_missing(self) -> bool:
+        return False
+
+
+class OutputMissingMapper(BaseMapper):
+    def __init__(
+        self,
+        column: str,
+        fn: Callable,
+        output_type,
+    ) -> None:
+        super().__init__(column, fn, output_type)
+        self._all_missing = True
+
+    @property
+    def all_missing(self):
+        return self._all_missing
+
+    def map(self, table: pa.Table):
+        text_array = table.column(self._column)
+        is_valid = self._is_valid(text_array)
+        if pc.any(is_valid).as_py():
+            self._all_missing = False
+
+        all_valid = pc.all(is_valid).as_py()
+        non_empty = text_array if all_valid else text_array.filter(is_valid)
+
+        processed_values = self._fn(non_empty.to_pylist())
+        processed_array = pa.array(processed_values, type=self._output_type)
+        if all_valid:
+            return processed_array
+
+        # pc.replace_with_mask does not support list types for some reason
+        # so we do that part ourselves here
+        j = 0
+        results = [None] * len(text_array)
+        for k in range(len(text_array)):
+            if is_valid[k].as_py():
+                results[k] = processed_array[j]
+                j += 1
+
+        return pa.array(results, type=self._output_type)

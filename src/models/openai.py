@@ -21,11 +21,13 @@ from langchain.chat_models.openai import ChatOpenAI
 from langchain.embeddings.openai import OpenAIEmbeddings
 
 # Other imports
-import re
 import openai
 import requests
 
 from openai import NotFoundError
+
+# This logger is necessary
+import logging
 
 openai_icon = "icons/openai.png"
 openai_category = knext.category(
@@ -36,8 +38,6 @@ openai_category = knext.category(
     icon=openai_icon,
 )
 
-# This logger is necessary
-import logging
 
 LOGGER = logging.getLogger(__name__)
 
@@ -329,7 +329,7 @@ class OpenAIAuthenticationPortObjectSpec(AIPortObjectSpec):
         return self._base_url
 
     def validate_context(self, ctx: knext.ConfigurationContext):
-        if not self.credentials in ctx.get_credential_names():
+        if self.credentials not in ctx.get_credential_names():
             raise knext.InvalidParametersError(
                 f"The selected credentials '{self.credentials}' holding the OpenAI API token are not present."
             )
@@ -340,7 +340,7 @@ class OpenAIAuthenticationPortObjectSpec(AIPortObjectSpec):
             )
 
         if not self.base_url:
-            raise knext.InvalidParametersError(f"Please provide a base URL.")
+            raise knext.InvalidParametersError("Please provide a base URL.")
 
     def get_model_list(self, ctx: knext.ConfigurationContext) -> list[str]:
         key = ctx.get_credentials(self.credentials).password

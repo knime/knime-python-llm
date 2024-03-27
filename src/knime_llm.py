@@ -6,6 +6,7 @@ import models.base
 import models.huggingface
 import models.fake
 import models.openai
+import models.knime
 
 try:
     import models.gpt4all

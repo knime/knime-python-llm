@@ -2,6 +2,7 @@
 import knime.extension as knext
 from ..base import EmbeddingsPortObjectSpec, EmbeddingsPortObject
 from .hf_base import hf_category, hf_icon
+import util
 
 # Langchain imports
 from langchain_community.embeddings import HuggingFaceHubEmbeddings
@@ -23,27 +24,11 @@ class _HuggingFaceEmbeddings(HuggingFaceHubEmbeddings):
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
         # Overrides HuggingFaceHubEmbeddings 'embed_documents' to allow batches
-
-        embeddings_vectors: List[List[float]] = []
-
-        for batch in self._generate_batches(texts):
-            embeddings_vectors.extend(super().embed_documents(batch))
-
-        return embeddings_vectors
+        return util.batched_apply(super().embed_documents, texts, self.batch_size)
 
     async def aembed_documents(self, texts: List[str]) -> List[List[float]]:
         # Overrides HuggingFaceHubEmbeddings 'aembed_documents' to allow batches
-
-        embeddings_vectors: List[List[float]] = []
-
-        for batch in self._generate_batches(texts):
-            embeddings_vectors.extend(super().aembed_documents(batch))
-
-        return embeddings_vectors
-
-    def _generate_batches(self, texts: List[str]):
-        for i in range(0, len(texts), self.batch_size):
-            yield texts[i : i + self.batch_size]
+        return util.abatched_apply(super().aembed_documents, texts, self.batch_size)
 
 
 class HFTEIEmbeddingsPortObjectSpec(EmbeddingsPortObjectSpec):

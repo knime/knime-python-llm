@@ -7,7 +7,6 @@ from .hf_base import hf_category, hf_icon
 from langchain_community.embeddings import HuggingFaceHubEmbeddings
 
 # Other imports
-import json
 from typing import List
 
 hf_tei_category = knext.category(
@@ -23,54 +22,31 @@ class _HuggingFaceEmbeddings(HuggingFaceHubEmbeddings):
     batch_size: int = 32
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        # Overrides HuggingFaceHubEmbeddings 'embed_documents' method for batch_size
+        # Overrides HuggingFaceHubEmbeddings 'embed_documents' to allow batches
 
         embeddings_vectors: List[List[float]] = []
+        batches = self._generate_batch_list(texts, self.batch_size)
 
-        # replace newlines, which can negatively affect performance.
-        texts = [text.replace("\n", " ") for text in texts]
-        n_texts = len(texts)
-
-        _model_kwargs = self.model_kwargs or {}
-
-        for index in range(0, n_texts, self.batch_size):
-            batch_end = index + self.batch_size
-
-            text_batch = texts[index:batch_end]
-
-            responses = self.client.post(
-                json={"inputs": text_batch, "parameters": _model_kwargs}, task=self.task
-            )
-
-            vectors = json.loads(responses.decode())
-
-            embeddings_vectors.extend(vectors)
+        for batch in batches:
+            embeddings_vectors.extend(super().embed_documents(batch))
 
         return embeddings_vectors
 
     async def aembed_documents(self, texts: List[str]) -> List[List[float]]:
-        # Overrides HuggingFaceHubEmbeddings 'aembed_documents' method for batch_size
+        # Overrides HuggingFaceHubEmbeddings 'aembed_documents' to allow batches
 
         embeddings_vectors: List[List[float]] = []
+        text_batches = self._generate_batch_list(texts, self.batch_size)
 
-        # replace newlines, which can negatively affect performance.
-        texts = [text.replace("\n", " ") for text in texts]
-        n_texts = len(texts)
-
-        _model_kwargs = self.model_kwargs or {}
-
-        for index in range(0, n_texts, self.batch_size):
-            batch_end = index + self.batch_size
-
-            text_batch = texts[index:batch_end]
-
-            responses = await self.client.post(
-                json={"inputs": text_batch, "parameters": _model_kwargs}, task=self.task
-            )
-
-            embeddings_vectors.extend(json.loads(responses.decode()))
+        for batch in text_batches:
+            embeddings_vectors.extend(super().aembed_documents(batch))
 
         return embeddings_vectors
+
+    def _generate_batch_list(
+        self, texts: List[str], batch_size: int
+    ) -> List[List[str]]:
+        return [texts[i : i + batch_size] for i in range(0, len(texts), batch_size)]
 
 
 class HFTEIEmbeddingsPortObjectSpec(EmbeddingsPortObjectSpec):
@@ -163,10 +139,9 @@ class HFTEIEmbeddingsConnector:
 
     batch_size = knext.IntParameter(
         "Batch size",
-        "How many texts will be send to the embeddings endpoint in one batch.",
+        "How many texts should be sent to the embeddings endpoint in one batch.",
         min_value=1,
         default_value=32,
-        since_version="5.3.0",
     )
 
     def configure(
@@ -181,6 +156,4 @@ class HFTEIEmbeddingsConnector:
         return HFTEIEmbeddingsPortObject(self.create_spec())
 
     def create_spec(self) -> HFTEIEmbeddingsPortObjectSpec:
-        batch_size = getattr(self, "batch_size", 32)
-
-        return HFTEIEmbeddingsPortObjectSpec(self.server_url, batch_size)
+        return HFTEIEmbeddingsPortObjectSpec(self.server_url, self.batch_size)

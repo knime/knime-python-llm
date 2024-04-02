@@ -25,9 +25,8 @@ class _HuggingFaceEmbeddings(HuggingFaceHubEmbeddings):
         # Overrides HuggingFaceHubEmbeddings 'embed_documents' to allow batches
 
         embeddings_vectors: List[List[float]] = []
-        batches = self._generate_batch_list(texts, self.batch_size)
 
-        for batch in batches:
+        for batch in self._generate_batches(texts):
             embeddings_vectors.extend(super().embed_documents(batch))
 
         return embeddings_vectors
@@ -36,17 +35,15 @@ class _HuggingFaceEmbeddings(HuggingFaceHubEmbeddings):
         # Overrides HuggingFaceHubEmbeddings 'aembed_documents' to allow batches
 
         embeddings_vectors: List[List[float]] = []
-        text_batches = self._generate_batch_list(texts, self.batch_size)
 
-        for batch in text_batches:
+        for batch in self._generate_batches(texts):
             embeddings_vectors.extend(super().aembed_documents(batch))
 
         return embeddings_vectors
 
-    def _generate_batch_list(
-        self, texts: List[str], batch_size: int
-    ) -> List[List[str]]:
-        return [texts[i : i + batch_size] for i in range(0, len(texts), batch_size)]
+    def _generate_batches(self, texts: List[str]):
+        for i in range(0, len(texts), self.batch_size):
+            yield texts[i : i + self.batch_size]
 
 
 class HFTEIEmbeddingsPortObjectSpec(EmbeddingsPortObjectSpec):

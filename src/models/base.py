@@ -6,6 +6,7 @@ import pandas as pd
 import asyncio
 from base import AIPortObjectSpec
 from typing import Any, List, Optional, Sequence
+from functools import partial
 
 # Langchain imports
 from langchain.schema import HumanMessage, SystemMessage, ChatMessage, AIMessage
@@ -314,23 +315,11 @@ class LLMPrompter:
         return responses
 
     async def aprocess_batches_concurrently(
-        self, batches: List[str], llm: BaseLanguageModel, n_requests: int
+        self, prompts: List[str], llm: BaseLanguageModel, n_requests: int
     ):
-        all_responses = []
-
-        # Create sub-batches based on n_requests
-        sub_batches = [
-            batches[i : i + n_requests] for i in range(0, len(batches), n_requests)
-        ]
-
-        # Process sub-batches in chunks
-        for i in range(0, len(sub_batches), n_requests):
-            current_chunk = sub_batches[i : i + n_requests]
-            tasks = [self.aprocess_batch(llm, sub_batch) for sub_batch in current_chunk]
-            responses = await asyncio.gather(*tasks)
-            all_responses.extend(responses)
-
-        return all_responses
+        return await util.abatched_apply(
+            partial(self.aprocess_batch, llm), prompts, n_requests
+        )
 
     def configure(
         self,
@@ -386,12 +375,9 @@ class LLMPrompter:
             data_frame = batch.to_pandas()
             prompts = data_frame[self.prompt_column].tolist()
 
-            final_responses = asyncio.run(
+            responses = asyncio.run(
                 self.aprocess_batches_concurrently(prompts, llm, n_requests)
             )
-
-            for response_batch in final_responses:
-                responses.extend(response_batch)
 
             data_frame[output_column_name] = responses
             output_table.append(data_frame)

@@ -260,3 +260,22 @@ class OutputMissingMapper(BaseMapper):
                 j += 1
 
         return pa.array(results, type=self._output_type)
+
+
+async def abatched_apply(afn, inputs: list, batch_size: int) -> list:
+    outputs = []
+    for batch in _generate_batches(inputs, batch_size):
+        outputs.extend(await afn(batch))
+    return outputs
+
+
+def batched_apply(fn: Callable[[list], list], inputs: list, batch_size: int) -> list:
+    outputs = []
+    for batch in _generate_batches(inputs, batch_size):
+        outputs.extend(fn(batch))
+    return outputs
+
+
+def _generate_batches(inputs: list, batch_size: int):
+    for i in range(0, len(inputs), batch_size):
+        yield inputs[i : i + batch_size]

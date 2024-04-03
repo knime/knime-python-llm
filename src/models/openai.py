@@ -5,6 +5,7 @@ from .base import (
     AIPortObjectSpec,
     LLMPortObjectSpec,
     LLMPortObject,
+    llm_port_type,
     ChatModelPortObjectSpec,
     ChatModelPortObject,
     EmbeddingsPortObjectSpec,
@@ -23,6 +24,8 @@ from langchain.embeddings.openai import OpenAIEmbeddings
 import re
 import openai
 import requests
+
+from openai import NotFoundError
 
 openai_icon = "icons/openai.png"
 openai_category = knext.category(
@@ -995,3 +998,49 @@ class OpenAIDALLEView:
             raise RuntimeError("Could not retrieve image from OpenAI.")
 
         return response.content, knext.view_png(response.content)
+
+
+@knext.node(
+    "OpenAI Fine-Tuned Model Deleter", knext.NodeType.SINK, openai_icon, openai_category
+)
+@knext.input_port(
+    "Fine-Tuned OpenAI Model", "A fine-tuned model from OpenAI", llm_port_type
+)
+class OpenAIFineTuneDeleter:
+    """
+    Deletes a fine-tuned model from an OpenAI Account.
+
+    The fine-tuned model must be selected via either the 'OpenAI LLM Connector' or 'OpenAI Chat Model Connector' node.
+    If the provided API key possesses the necessary permissions, the model will then be irreversibly removed from the
+    authenticated OpenAI account.
+    """
+
+    def configure(self, ctx: knext.ConfigurationContext, llm_spec: LLMPortObjectSpec):
+        client = openai.Client(
+            api_key=ctx.get_credentials(llm_spec.credentials).password,
+            base_url=llm_spec.base_url,
+        )
+
+        response = client.models.retrieve(llm_spec.model)
+
+        owned_by_openai = ["openai", "openai-internal", "system"]
+
+        if response.owned_by in owned_by_openai:
+            raise knext.InvalidParametersError(
+                f"This model is owned by OpenAI ('{response.owned_by}') and can not be deleted."
+            )
+
+    def execute(self, ctx: knext.ExecutionContext, model: LLMPortObject):
+        client = openai.Client(
+            api_key=ctx.get_credentials(model.spec.credentials).password,
+            base_url=model.spec.base_url,
+        )
+
+        try:
+            response = client.models.delete(model.spec.model)
+        except NotFoundError:
+            raise RuntimeError(
+                f"Could not delete model. Please make sure that you have the right permissions to delete '{model.spec.model}'"
+            )
+
+        LOGGER.info(f"{response.id} was successfully deleted.")

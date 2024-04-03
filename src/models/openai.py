@@ -192,7 +192,7 @@ def _create_specific_model_name(api_name: str) -> knext.StringParameter:
         return models
 
     return knext.StringParameter(
-        label="Model ID",
+        label="Specific Model ID",
         description=f"""Select from a list of all available OpenAI models.
             The model chosen has to be compatible with OpenAI's {api_name} API.
             This configuration will **overwrite** the default model configurations when set.""",
@@ -227,6 +227,34 @@ def _get_model_selection_value_switch() -> knext.EnumParameter:
     )
 
 
+def _get_model_name(self, ctx, default_model_list, default_model) -> str:
+    if (
+        self.input_settings.selection == OpenAIModelOptions.ALL_MODELS.name
+        and self.input_settings.specific_model_name != "unselected"
+    ):
+        model_name = self.input_settings.specific_model_name
+    elif self.input_settings.model_name not in default_model_list:
+        ctx.set_warning(
+            f"Configured deprecated model, switching to fallback model: {default_model}"
+        )
+        model_name = default_model
+    else:
+        model_name = self.input_settings.model_name
+
+    LOGGER.info(f"Selected model: {model_name}")
+
+    return model_name
+
+
+def _set_selection_parameter(parameters: dict, model_list: List[str]) -> dict:
+    if parameters["input_settings"]["specific_model_name"] != "unselected":
+        parameters["input_settings"]["selection"] = "ALL_MODELS"
+    else:
+        parameters["input_settings"]["selection"] = "DEFAULT_MODELS"
+
+    return parameters
+
+
 @knext.parameter_group(label="OpenAI Model Selection")
 class LLMLoaderInputSettings:
     class OpenAIModelCompletionsOptions(knext.EnumParameterOptions):
@@ -257,7 +285,7 @@ class LLMLoaderInputSettings:
 
     selection = _get_model_selection_value_switch()
 
-    default_model_name = _EnumToStringParameter(
+    model_name = _EnumToStringParameter(
         label="Model ID",
         description="Select an OpenAI completions model to be used.",
         choices=lambda c: completion_models,
@@ -921,21 +949,7 @@ class OpenAILLMConnector:
     def create_spec(
         self, openai_auth_spec: OpenAIAuthenticationPortObjectSpec, ctx
     ) -> OpenAILLMPortObjectSpec:
-        if (
-            hasattr(self.input_settings, "selection")
-            and self.input_settings.selection == OpenAIModelOptions.ALL_MODELS.name
-        ):
-            model_name = self.input_settings.specific_model_name
-        else:
-            if self.input_settings.default_model_name not in completion_models:
-                ctx.set_warning(
-                    f"Configured deprecated model, switching to fallback model: {completion_default}"
-                )
-                model_name = completion_default
-            else:
-                model_name = self.input_settings.default_model_name
-
-        LOGGER.info(f"Selected model: {model_name}")
+        model_name = _get_model_name(self, ctx, completion_models, completion_default)
 
         seed = None if self.model_settings.seed == 0 else self.model_settings.seed
 
@@ -949,6 +963,9 @@ class OpenAILLMConnector:
             seed=seed,
             n_requests=self.model_settings.n_requests,
         )
+
+    def _modify_parameters(self, parameters):
+        return _set_selection_parameter(parameters, completion_models)
 
 
 @knext.node(
@@ -1007,21 +1024,7 @@ class OpenAIChatModelConnector:
     def create_spec(
         self, openai_auth_spec: OpenAIAuthenticationPortObjectSpec, ctx
     ) -> OpenAIChatModelPortObjectSpec:
-        if (
-            self.input_settings.selection == OpenAIModelOptions.ALL_MODELS.name
-            and self.input_settings.specific_model_name != "unselected"
-        ):
-            model_name = self.input_settings.specific_model_name
-        else:
-            if self.input_settings.model_name not in chat_models:
-                ctx.set_warning(
-                    f"Configured deprecated model, switching to fallback model: {chat_default}"
-                )
-                model_name = chat_default
-            else:
-                model_name = self.input_settings.model_name
-
-        LOGGER.info(f"Selected model: {model_name}")
+        model_name = _get_model_name(self, ctx, chat_models, chat_default)
 
         seed = None if self.model_settings.seed == 0 else self.model_settings.seed
 
@@ -1037,17 +1040,8 @@ class OpenAIChatModelConnector:
         )
 
     def _modify_parameters(self, parameters):
-        # 'input_settings' is the variable name for ChatModelLoaderInputSettings()
-
-        if (
-            parameters["input_settings"]["specific_model_name"] == "unselected"
-            or parameters["input_settings"]["selection"] in chat_models
-        ):
-            parameters["input_settings"]["selection"] = "DEFAULT_MODELS"
-        else:
-            parameters["input_settings"]["selection"] = "ALL_MODELS"
-
-        return parameters
+        print("miin")
+        return _set_selection_parameter(parameters, chat_models)
 
 
 @knext.node(
@@ -1109,26 +1103,12 @@ class OpenAIEmbeddingsConnector:
     def create_spec(
         self, openai_auth_spec: OpenAIAuthenticationPortObjectSpec, ctx
     ) -> OpenAIEmbeddingsPortObjectSpec:
-        if (
-            hasattr(self.input_settings, "selection")
-            and self.input_settings.selection == OpenAIModelOptions.ALL_MODELS.name
-        ):
-            model_name = self.input_settings.specific_model_name
-        elif (
-            not hasattr(self.input_settings, "selection")
-            and self.input_settings.specific_model_name != "unselected"
-        ):
-            model_name = self.input_settings.specific_model_name
-        else:
-            if self.input_settings.model_name not in embeddings_models:
-                ctx.set_warning(
-                    f"Configured deprecated model, switching to fallback model: {embeddings_default}"
-                )
-                model_name = embeddings_default
-            else:
-                model_name = self.input_settings.model_name
+        model_name = _get_model_name(self, ctx, embeddings_models, embeddings_default)
 
         return OpenAIEmbeddingsPortObjectSpec(openai_auth_spec, model_name)
+
+    def _modify_parameters(self, parameters):
+        return _set_selection_parameter(parameters, embeddings_models)
 
 
 @knext.node(

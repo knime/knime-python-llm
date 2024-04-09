@@ -3,7 +3,7 @@ import knime.extension as knext
 import knime.api.schema as ks
 from knime.extension import ExecutionContext
 from urllib.parse import urlparse, urlunparse
-from .openai import OpenAIGeneralSettings
+from .base import GeneralSettings
 import requests
 from typing import Callable
 
@@ -34,7 +34,6 @@ class KnimeHubChatModelPortObjectSpec(ChatModelPortObjectSpec):
         max_tokens: int,
         temperature: float,
         top_p: float,
-        seed: int,
     ) -> None:
         super().__init__()
         self._auth_spec = auth_spec
@@ -42,7 +41,6 @@ class KnimeHubChatModelPortObjectSpec(ChatModelPortObjectSpec):
         self._max_tokens = max_tokens
         self._temperature = temperature
         self._top_p = top_p
-        self._seed = seed
 
     @property
     def auth_spec(self) -> ks.HubAuthenticationPortObjectSpec:
@@ -59,7 +57,6 @@ class KnimeHubChatModelPortObjectSpec(ChatModelPortObjectSpec):
             "max_tokens": self._max_tokens,
             "temperature": self._temperature,
             "top_p": self._top_p,
-            "seed": self._seed,
         }
 
     @property
@@ -74,10 +71,6 @@ class KnimeHubChatModelPortObjectSpec(ChatModelPortObjectSpec):
     def top_p(self) -> float:
         return self._top_p
 
-    @property
-    def seed(self) -> int:
-        return self._seed
-
     @classmethod
     def deserialize(cls, data: dict, java_callback):
         return cls(
@@ -86,7 +79,6 @@ class KnimeHubChatModelPortObjectSpec(ChatModelPortObjectSpec):
             data["max_tokens"],
             data["temperature"],
             data["top_p"],
-            data["seed"],
         )
 
 
@@ -104,7 +96,6 @@ class KnimeHubChatModelPortObject(ChatModelPortObject):
             openai_api_key="placeholder",
             temperature=self.spec.temperature,
             max_tokens=self.spec.max_tokens,
-            seed=self.spec.seed,
         )
 
 
@@ -163,6 +154,34 @@ def _model_info(auth_spec):
     return response.json()["data"]
 
 
+class ModelSettings(GeneralSettings):
+    max_tokens = knext.IntParameter(
+        label="Maximum Response Length (token)",
+        description="""
+        The maximum number of tokens to generate.
+
+        The token count of your prompt plus 
+        max_tokens cannot exceed the model's context length.
+        """,
+        default_value=200,
+        min_value=1,
+    )
+
+    # Altered from GeneralSettings because OpenAI has temperatures going up to 2
+    temperature = knext.DoubleParameter(
+        label="Temperature",
+        description="""
+        Sampling temperature to use, between 0.0 and 2.0. 
+        Higher values means the model will take more risks. 
+        Try 0.9 for more creative applications, and 0 for ones with a well-defined answer.
+        It is generally recommend altering this or top_p but not both.
+        """,
+        default_value=0.2,
+        min_value=0.0,
+        max_value=2.0,
+    )
+
+
 @knext.node(
     name="KNIME Hub Chat Model Connector",
     node_type=knext.NodeType.SOURCE,
@@ -184,7 +203,7 @@ class KnimeHubChatModelConnector:
         "Model", "Select the model to use.", choices=_list_models_in_dialog("chat")
     )
 
-    model_settings = OpenAIGeneralSettings()
+    model_settings = ModelSettings()
 
     def configure(
         self,
@@ -212,5 +231,4 @@ class KnimeHubChatModelConnector:
             max_tokens=self.model_settings.max_tokens,
             temperature=self.model_settings.temperature,
             top_p=self.model_settings.top_p,
-            seed=self.model_settings.seed,
         )

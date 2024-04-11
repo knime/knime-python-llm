@@ -157,6 +157,10 @@ def _get_model_data(auth_spec):
     response = requests.get(
         url=model_info, headers=_create_authorization_headers(auth_spec)
     )
+    if response.status_code == 404:
+        raise ValueError(
+            "The AI proxy is not reachable. Is it activated in the connected KNIME Hub?"
+        )
     response.raise_for_status()
     return response.json()["data"]
 

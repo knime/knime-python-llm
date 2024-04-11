@@ -865,7 +865,7 @@ class OpenAIChatModelConnector:
         "Generative AI",
         "OpenAI",
         "RAG",
-        "Retrieval Assisted Geeration",
+        "Retrieval Assisted Generation",
     ],
 )
 @knext.input_port(

@@ -111,7 +111,7 @@ def _extract_api_base(auth_spec: ks.HubAuthenticationPortObjectSpec) -> str:
     hub_url = auth_spec.hub_url
     parsed_url = urlparse(hub_url)
     # drop params, query and fragment
-    ai_proxy_url = (parsed_url.scheme, parsed_url.netloc, "ai-proxy", "", "", "")
+    ai_proxy_url = (parsed_url.scheme, parsed_url.netloc, "ai-proxy/v1", "", "", "")
     return urlunparse(ai_proxy_url)
 
 

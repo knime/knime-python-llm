@@ -133,9 +133,9 @@ def _list_models_in_dialog(
 
 def _list_models(auth_spec, mode: str) -> list[str]:
     model_list = [
-        model["model_name"]
-        for model in _model_info(auth_spec)
-        if mode == model["model_info"]["mode"]
+        model_data["model_name"]
+        for model_data in _get_model_data(auth_spec)
+        if mode == _get_mode(model_data)
     ]
     if len(model_list) == 0:
         model_list.append("")
@@ -144,7 +144,14 @@ def _list_models(auth_spec, mode: str) -> list[str]:
         return model_list
 
 
-def _model_info(auth_spec):
+def _get_mode(model_data: dict):
+    model_info: dict = model_data.get("model_info")
+    if model_info:
+        return model_info.get("mode")
+    return None
+
+
+def _get_model_data(auth_spec):
     api_base = _extract_api_base(auth_spec)
     model_info = api_base + "/model/info"
     response = requests.get(

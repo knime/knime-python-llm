@@ -15,14 +15,14 @@ from .base import (
 )
 
 
-knime_icon = "icons/Hub_AI_connector.png"
+hub_connector_icon = "icons/Hub_AI_connector.png"
 
 knime_category = knext.category(
     path=model_category,
     level_id="knime",
     name="KNIME",
     description="Models that connect to the KNIME Hub.",
-    icon=knime_icon,
+    icon=hub_connector_icon,
 )
 
 
@@ -192,7 +192,7 @@ class ModelSettings(GeneralSettings):
 @knext.node(
     name="KNIME Hub Chat Model Connector",
     node_type=knext.NodeType.SOURCE,
-    icon_path=knime_icon,
+    icon_path=hub_connector_icon,
     category=knime_category,
 )
 @knext.input_port(

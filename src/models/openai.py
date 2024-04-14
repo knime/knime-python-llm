@@ -1268,7 +1268,7 @@ class OpenAIFineTuner:
         hyperparameters = self._build_hyper_params()
 
         try:
-            training_file: FileObject = self._prepare_training_file(table, client)
+            training_file: FileObject = self._prepare_training_file(client, table)
 
             response: FineTuningJob = self._run_fine_tuning(
                 client=client,
@@ -1282,12 +1282,14 @@ class OpenAIFineTuner:
 
             fine_tuned_model = OpenAIChatModelPortObject(
                 OpenAIChatModelPortObjectSpec(
-                    credentials=model.spec.credentials,
+                    credentials=model.spec._credentials,
                     model_name=response.fine_tuned_model,
                     temperature=model.spec.temperature,
                     top_p=model.spec.top_p,
                     max_tokens=model.spec.max_tokens,
                     n=model.spec.n,
+                    seed=model.spec.seed,
+                    n_requests=model.spec.n_requests,
                 )
             )
 
@@ -1357,9 +1359,7 @@ class OpenAIFineTuner:
                 conversation_bytes = json.dumps(conversation).encode("utf-8")
                 temp_jsonl_file.write(conversation_bytes + b"\n")
 
-            file = client.files.create(
-                file=open(temp_file_path, "rb"), purpose="fine-tune"
-            )
+        file = client.files.create(file=open(temp_file_path, "rb"), purpose="fine-tune")
 
         return file
 
@@ -1446,4 +1446,7 @@ class OpenAIFineTuner:
 
         df_list = [pd.read_csv(io.BytesIO(result), header=0) for result in result_files]
 
-        return pd.concat(df_list, ignore_index=True)
+        df = pd.concat(df_list, ignore_index=True)
+        df["step"] = df["step"].astype("int32")
+
+        return knext.Table.from_pandas(df)

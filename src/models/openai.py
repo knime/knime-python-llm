@@ -1323,19 +1323,20 @@ class OpenAIFineTuner:
     def _build_hyper_params(self) -> Hyperparameters:
         batch_size: int = (
             self.ft_settings.batch_size
-            if self.ft_settings.automate_batch_size == "Manual"
+            if self.ft_settings.automate_batch_size == AutomationOptions.MANUAL.name
             else "auto"
         )
 
         learning_rate_multiplier: float = (
             self.ft_settings.learning_rate_multiplier
-            if self.ft_settings.automate_learning_rate_multiplier == "Manual"
+            if self.ft_settings.automate_learning_rate_multiplier
+            == AutomationOptions.MANUAL.name
             else "auto"
         )
 
         n_epochs: int = (
             self.ft_settings.n_epochs
-            if self.ft_settings.automate_epochs == "Manual"
+            if self.ft_settings.automate_epochs == AutomationOptions.MANUAL.name
             else "auto"
         )
 

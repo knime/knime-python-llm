@@ -1,16 +1,14 @@
 #!groovy
 def BN = (BRANCH_NAME == 'master' || BRANCH_NAME.startsWith('releases/')) ? BRANCH_NAME : 'releases/2024-06'
 
-// The knime version defines which parent pom is used in the built feature. The version was added in KNIME 4.7.0 and
-// will have to be updated with later KNIME versions.
-def knimeVersion = '5.3'
-
 def repositoryName = "knime-python-llm"
 
 def extensionPath = "./" // Path to knime.yml file
 def outputPath = "output"
 
 library "knime-pipeline@$BN"
+
+knimeVersion = KNIMEConstants.getAPReleaseForBranch(BN)
 
 properties([
     parameters(
@@ -34,7 +32,7 @@ try {
             stage("Create Conda Env"){
                 env.lastStage = env.STAGE_NAME
                 prefixPath = "${WORKSPACE}/${repositoryName}"
-                condaHelpers.createCondaEnv(prefixPath: prefixPath, pythonVersion:'3.9', packageNames: ['knime-extension-bundling', 'jake'])
+                condaHelpers.createCondaEnv(prefixPath: prefixPath, pythonVersion:'3.9', packageNames: ["knime-extension-bundling=${knimeVersion}", 'jake'])
             }
             stage("Build Python Extension") {
                 env.lastStage = env.STAGE_NAME
@@ -53,7 +51,7 @@ try {
                         withCredentials([usernamePassword(credentialsId: 'ARTIFACTORY_CREDENTIALS', passwordVariable: 'ARTIFACTORY_PASSWORD', usernameVariable: 'ARTIFACTORY_LOGIN'),
                         ]) {
                             sh """
-                            micromamba run -p ${prefixPath} build_python_extension.py ${extensionPath} ${outputPath} --render-folder ${buildPath} -f --knime-version ${knimeVersion} --knime-build --excluded-files ${prefixPath} ${force_conda_build} ${buildSboms}
+                            micromamba run -p ${prefixPath} build_python_extension.py ${extensionPath} ${outputPath} --render-folder ${buildPath} -f --knime-build --excluded-files ${prefixPath} ${force_conda_build} ${buildSboms}
                             """
                         }
                         if (params.SBOM_FOR_CONDA) {

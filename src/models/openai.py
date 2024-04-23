@@ -80,7 +80,7 @@ embeddings_default = "text-embedding-ada-002"
 
 class _EnumToStringParameter(knext.StringParameter):
     """Custom parameter implementation that maps enum names to their label in order to allow
-    backwards compatiblity.
+    backwards compatibility.
     The knext.EnumParameter does not support the backwards compatible removal of values which is
     necessary because OpenAI is shutting down some of their models.
     Our initial strategy of switching to StringParameter does not work though because the names
@@ -223,35 +223,33 @@ def _get_model_selection_value_switch() -> knext.EnumParameter:
         OpenAIModelOptions.DEFAULT_MODELS.name,
         OpenAIModelOptions,
         style=knext.EnumParameter.Style.VALUE_SWITCH,
-        since_version="5.3.0",
     )
 
 
-def _get_model_name(self, ctx, default_model_list, default_model) -> str:
-    if (
-        self.input_settings.selection == OpenAIModelOptions.ALL_MODELS.name
-        and self.input_settings.specific_model_name != "unselected"
-    ):
-        model_name = self.input_settings.specific_model_name
-    elif self.input_settings.model_name not in default_model_list:
+def _get_model_name(
+    ctx,
+    selection_mode: str,
+    model: str,
+    specific_model: str,
+    default_model_list: List[str],
+    default_model: str,
+) -> str:
+    if selection_mode == OpenAIModelOptions.ALL_MODELS.name:
+        return specific_model
+
+    if model not in default_model_list:
         ctx.set_warning(
             f"Configured deprecated model, switching to fallback model: {default_model}"
         )
-        model_name = default_model
-    else:
-        model_name = self.input_settings.model_name
-
-    LOGGER.info(f"Selected model: {model_name}")
-
-    return model_name
+        return default_model
+    return model
 
 
-def _set_selection_parameter(parameters: dict, model_list: List[str]) -> dict:
+def _set_selection_parameter(parameters: dict) -> dict:
     if parameters["input_settings"]["specific_model_name"] != "unselected":
         parameters["input_settings"]["selection"] = "ALL_MODELS"
     else:
         parameters["input_settings"]["selection"] = "DEFAULT_MODELS"
-
     return parameters
 
 
@@ -285,7 +283,7 @@ class LLMLoaderInputSettings:
 
     selection = _get_model_selection_value_switch()
 
-    model_name = _EnumToStringParameter(
+    default_model_name = _EnumToStringParameter(
         label="Model ID",
         description="Select an OpenAI completions model to be used.",
         choices=lambda c: completion_models,
@@ -949,7 +947,15 @@ class OpenAILLMConnector:
     def create_spec(
         self, openai_auth_spec: OpenAIAuthenticationPortObjectSpec, ctx
     ) -> OpenAILLMPortObjectSpec:
-        model_name = _get_model_name(self, ctx, completion_models, completion_default)
+        model_name = _get_model_name(
+            ctx,
+            self.input_settings.selection,
+            self.input_settings.default_model_name,
+            self.input_settings.specific_model_name,
+            completion_models,
+            completion_default,
+        )
+        LOGGER.info(f"Selected model: {model_name}")
 
         seed = None if self.model_settings.seed == 0 else self.model_settings.seed
 
@@ -965,7 +971,7 @@ class OpenAILLMConnector:
         )
 
     def _modify_parameters(self, parameters):
-        return _set_selection_parameter(parameters, completion_models)
+        return _set_selection_parameter(parameters)
 
 
 @knext.node(
@@ -1024,7 +1030,15 @@ class OpenAIChatModelConnector:
     def create_spec(
         self, openai_auth_spec: OpenAIAuthenticationPortObjectSpec, ctx
     ) -> OpenAIChatModelPortObjectSpec:
-        model_name = _get_model_name(self, ctx, chat_models, chat_default)
+        model_name = _get_model_name(
+            ctx,
+            self.input_settings.selection,
+            self.input_settings.model_name,
+            self.input_settings.specific_model_name,
+            chat_models,
+            chat_default,
+        )
+        LOGGER.info(f"Selected model: {model_name}")
 
         seed = None if self.model_settings.seed == 0 else self.model_settings.seed
 
@@ -1040,8 +1054,7 @@ class OpenAIChatModelConnector:
         )
 
     def _modify_parameters(self, parameters):
-        print("miin")
-        return _set_selection_parameter(parameters, chat_models)
+        return _set_selection_parameter(parameters)
 
 
 @knext.node(
@@ -1103,12 +1116,20 @@ class OpenAIEmbeddingsConnector:
     def create_spec(
         self, openai_auth_spec: OpenAIAuthenticationPortObjectSpec, ctx
     ) -> OpenAIEmbeddingsPortObjectSpec:
-        model_name = _get_model_name(self, ctx, embeddings_models, embeddings_default)
+        model_name = _get_model_name(
+            ctx,
+            self.input_settings.selection,
+            self.input_settings.model_name,
+            self.input_settings.specific_model_name,
+            embeddings_models,
+            embeddings_default,
+        )
+        LOGGER.info(f"Selected model: {model_name}")
 
         return OpenAIEmbeddingsPortObjectSpec(openai_auth_spec, model_name)
 
     def _modify_parameters(self, parameters):
-        return _set_selection_parameter(parameters, embeddings_models)
+        return _set_selection_parameter(parameters)
 
 
 @knext.node(
@@ -1295,7 +1316,7 @@ class OpenAIFineTuner:
         model_spec: OpenAIChatModelPortObjectSpec,
         table_spec: knext.Schema,
     ) -> OpenAIChatModelPortObjectSpec:
-        util.pick_default_columns(table_spec, knext.string(), 3)  # raises an expection
+        util.pick_default_columns(table_spec, knext.string(), 3)  # raises an exception
 
         if not self._unique_columns_selected():
             raise knext.InvalidParametersError("Selected columns need to be unique")

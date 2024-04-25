@@ -279,3 +279,14 @@ def batched_apply(fn: Callable[[list], list], inputs: list, batch_size: int) -> 
 def _generate_batches(inputs: list, batch_size: int):
     for i in range(0, len(inputs), batch_size):
         yield inputs[i : i + batch_size]
+
+
+class ProgressTracker:
+    def __init__(self, total_rows: int, ctx: knext.ExecutionContext):
+        self.total_rows = total_rows
+        self.current_progress = 0
+        self.ctx = ctx
+
+    def update_progress(self, batch_size: int):
+        self.current_progress += batch_size
+        self.ctx.set_progress(self.current_progress / self.total_rows)

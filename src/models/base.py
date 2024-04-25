@@ -5,7 +5,7 @@ import util
 import pandas as pd
 import asyncio
 from base import AIPortObjectSpec
-from typing import Any, List, Optional, Sequence
+from typing import Any, List, Optional, Sequence, Callable
 from functools import partial
 
 # Langchain imports
@@ -307,19 +307,30 @@ class LLMPrompter:
         default_value="Response",
     )
 
-    async def aprocess_batch(self, llm: BaseLanguageModel, sub_batch: List[str]):
+    async def aprocess_batch(
+        self,
+        llm: BaseLanguageModel,
+        sub_batch: List[str],
+        progress_tracker: Callable[[int], None],
+    ):
         responses = await llm.abatch(sub_batch)
         if isinstance(llm, BaseChatModel):
             # chat models return AIMessage, therefore content field of the response has to be extracted
             responses = [response.content for response in responses]
+        if progress_tracker:
+            progress_tracker.update_progress(len(sub_batch))
         return responses
 
     async def aprocess_batches_concurrently(
-        self, prompts: List[str], llm: BaseLanguageModel, n_requests: int
+        self,
+        prompts: List[str],
+        llm: BaseLanguageModel,
+        n_requests: int,
+        progress_tracker: Callable[[int], None],
     ):
-        return await util.abatched_apply(
-            partial(self.aprocess_batch, llm), prompts, n_requests
-        )
+        func = partial(self.aprocess_batch, llm, progress_tracker=progress_tracker)
+
+        return await util.abatched_apply(func, prompts, n_requests)
 
     def configure(
         self,
@@ -365,10 +376,10 @@ class LLMPrompter:
         )
 
         output_table: knext.BatchOutputTable = knext.BatchOutputTable.create()
-        i = 0
 
         n_requests = llm_port.spec.n_requests
 
+        progress_tracker = util.ProgressTracker(total_rows=num_rows, ctx=ctx)
         for batch in input_table.batches():
             responses = []
             util.check_canceled(ctx)
@@ -376,13 +387,12 @@ class LLMPrompter:
             prompts = data_frame[self.prompt_column].tolist()
 
             responses = asyncio.run(
-                self.aprocess_batches_concurrently(prompts, llm, n_requests)
+                self.aprocess_batches_concurrently(
+                    prompts, llm, n_requests, progress_tracker
+                )
             )
-
             data_frame[output_column_name] = responses
             output_table.append(data_frame)
-            i += len(prompts)
-            ctx.set_progress(i / num_rows)
 
         return output_table
 
@@ -546,9 +556,11 @@ class TextEmbedder:
         """Define whether missing or empty values in the text column should 
         result in missing values in the output table or whether the 
         node execution should fail on such values.""",
-        default_value=lambda v: util.MissingValueOutputOptions.Fail.name
-        if v < knext.Version(5, 3, 0)
-        else util.MissingValueOutputOptions.OutputMissingValues.name,
+        default_value=lambda v: (
+            util.MissingValueOutputOptions.Fail.name
+            if v < knext.Version(5, 3, 0)
+            else util.MissingValueOutputOptions.OutputMissingValues.name
+        ),
         enum=util.MissingValueOutputOptions,
         style=knext.EnumParameter.Style.VALUE_SWITCH,
         since_version="5.3.0",

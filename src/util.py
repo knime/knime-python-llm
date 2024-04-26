@@ -288,5 +288,6 @@ class ProgressTracker:
         self.ctx = ctx
 
     def update_progress(self, batch_size: int):
+        check_canceled(self.ctx)
         self.current_progress += batch_size
         self.ctx.set_progress(self.current_progress / self.total_rows)

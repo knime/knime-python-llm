@@ -15,16 +15,10 @@ from .base import (
 )
 
 # Langchain imports
-from langchain_openai import OpenAI
+from langchain_openai import OpenAI, ChatOpenAI, OpenAIEmbeddings
 
-# from langchain.llms.openai import OpenAI
-from langchain.chat_models.openai import ChatOpenAI
-
-# from langchain_openai import ChatOpenAI
-from langchain_openai import OpenAIEmbeddings
 
 # Other imports
-import openai
 import io
 import util
 import time
@@ -34,19 +28,20 @@ import tempfile
 import pandas as pd
 from typing import Callable, List
 
-import openai
+from openai import Client as OpenAIClient
 from openai.types import FileObject
 from openai.types.fine_tuning.fine_tuning_job import Hyperparameters, FineTuningJob
+from openai import (
+    NotFoundError,
+    AuthenticationError,
+    APIConnectionError,
+    BadRequestError,
+)
 
 # This logger is necessary
 import logging
 
 LOGGER = logging.getLogger(__name__)
-
-from openai import NotFoundError
-
-# This logger is necessary
-import logging
 
 openai_icon = "icons/openai.png"
 openai_category = knext.category(
@@ -56,10 +51,6 @@ openai_category = knext.category(
     description="",
     icon=openai_icon,
 )
-
-
-LOGGER = logging.getLogger(__name__)
-
 
 # == SETTINGS ==
 
@@ -602,7 +593,7 @@ class OpenAIAuthenticationPortObjectSpec(AIPortObjectSpec):
         try:
             model_list = [
                 model.id
-                for model in openai.OpenAI(api_key=key, base_url=base_url)
+                for model in OpenAIClient(api_key=key, base_url=base_url)
                 .models.list()
                 .data
             ]
@@ -933,21 +924,21 @@ class OpenAIAuthenticator:
 
     def _verify_settings(self, ctx):
         try:
-            openai.OpenAI(
+            OpenAIClient(
                 api_key=ctx.get_credentials(
                     self.credentials_settings.credentials_param
                 ).password,
                 base_url=self.base_url,
             ).models.list()
-        except openai.AuthenticationError:
+        except AuthenticationError:
             raise knext.InvalidParametersError("Invalid API key provided.")
-        except openai.APIConnectionError:
+        except APIConnectionError:
             raise knext.InvalidParametersError(
                 f"""API connection failed. Please make sure that your base URL '{self.base_url}' 
                 is valid and uses a supported ('http://' or 'https://') protocol.
                 It might also be caused by your network settings, proxy configuration, SSL certificates, or firewall rules."""
             )
-        except openai.NotFoundError:
+        except NotFoundError:
             raise knext.InvalidParametersError(
                 f"Invalid OpenAI base URL provided: '{self.base_url}'"
             )
@@ -1256,7 +1247,7 @@ class OpenAIDALLEView:
         ctx: knext.ExecutionContext,
         authentication: OpenAIAuthenticationPortObject,
     ):
-        client = openai.OpenAI(
+        client = OpenAIClient(
             api_key=ctx.get_credentials(authentication.spec.credentials).password,
             base_url=authentication.spec.base_url,
         )
@@ -1296,10 +1287,10 @@ class OpenAIFineTuneDeleter:
     """
 
     def configure(self, ctx: knext.ConfigurationContext, llm_spec: LLMPortObjectSpec):
-        client = openai.Client(
+        client = OpenAIClient(
             api_key=ctx.get_credentials(llm_spec.credentials).password,
             base_url=llm_spec.base_url,
-        )
+        ).models.list()
 
         response = client.models.retrieve(llm_spec.model)
 
@@ -1311,7 +1302,7 @@ class OpenAIFineTuneDeleter:
             )
 
     def execute(self, ctx: knext.ExecutionContext, model: LLMPortObject):
-        client = openai.Client(
+        client = OpenAIClient(
             api_key=ctx.get_credentials(model.spec.credentials).password,
             base_url=model.spec.base_url,
         )
@@ -1418,7 +1409,7 @@ class OpenAIFineTuner:
         model: OpenAIChatModelPortObject,
         table: knext.Table,
     ):
-        client = openai.Client(
+        client = OpenAIClient(
             api_key=ctx.get_credentials(model.spec.credentials).password,
             base_url=model.spec.base_url,
         )
@@ -1456,7 +1447,7 @@ class OpenAIFineTuner:
                 )
             )
 
-        except openai.BadRequestError as e:
+        except BadRequestError as e:
             if e.message.endswith("'code': 'model_not_available'}}"):
                 raise knext.InvalidParametersError(
                     "Selected model is not available or does not support fine-tuning."

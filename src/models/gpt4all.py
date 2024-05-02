@@ -15,13 +15,13 @@ from .base import (
 from requests.exceptions import ConnectionError
 from pydantic import root_validator, BaseModel, ValidationError
 from typing import Any, Dict, List, Optional
-from gpt4all import GPT4All as _GPT4All
+from gpt4all import Embed4All
 import shutil
 import os
 
 # Langchain imports
-from langchain.llms import GPT4All
-from langchain.embeddings.base import Embeddings
+from langchain_community.llms.gpt4all import GPT4All
+from langchain_core.embeddings import Embeddings
 
 gpt4all_icon = "icons/gpt4all.png"
 gpt4all_category = knext.category(
@@ -478,7 +478,7 @@ class GPT4AllChatModelConnector:
         )
 
 
-_embeddings4all_model_name = "all-MiniLM-L6-v2-f16.gguf"
+_embeddings4all_model_name = "all-MiniLM-L6-v2.gguf2.f16.gguf"
 
 
 class _Embeddings4All(BaseModel, Embeddings):
@@ -491,7 +491,7 @@ class _Embeddings4All(BaseModel, Embeddings):
     @root_validator
     def validate_environment(cls, values: Dict) -> Dict:
         try:
-            values["client"] = _GPT4All(
+            values["client"] = Embed4All(
                 model_name=values["model_name"],
                 model_path=values["model_path"],
                 n_threads=values["num_threads"],
@@ -504,7 +504,7 @@ class _Embeddings4All(BaseModel, Embeddings):
             )
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        embeddings = [self.embed_query(text) for text in texts]
+        embeddings = [self.client.embed(text) for text in texts]
         return [list(map(float, e)) for e in embeddings]
 
     def embed_query(self, text: str) -> List[float]:
@@ -512,7 +512,7 @@ class _Embeddings4All(BaseModel, Embeddings):
             raise ValueError("None values are not supported.")
         elif not text.strip():
             raise ValueError("Empty documents are not supported.")
-        return self.client.model.generate_embedding(text)
+        return self.client.embed(text)
 
 
 class Embeddings4AllPortObjectSpec(EmbeddingsPortObjectSpec):
@@ -626,7 +626,7 @@ class Embeddings4AllConnector:
     Connects to an embeddings model that runs on the local machine.
 
     Connect to an embeddings model that runs on the local machine via GPT4All.
-    The default model was trained on sentences and short paragrpahs of English text.
+    The default model was trained on sentences and short paragraphs of English text.
     It ignores special characters like 'ß' i.e. the embeddings for 'Schloß' are the same as for 'Schlo'.
     If downstream nodes fail with 'Execute failed: Error while sending a command.', then this is likely
     caused by an input that consists entirely of characters the model doesn't support.
@@ -677,14 +677,14 @@ class Embeddings4AllConnector:
                 )
             model_path, model_name = os.path.split(self.model_path)
             try:
-                _Embeddings4All(
+                Embed4All(
                     model_name=model_name,
                     model_path=model_path,
-                    num_threads=self.num_threads,
-                    download=False,
+                    n_threads=self.num_threads,
+                    allow_download=False,
                 )
-            except Exception:
-                raise ValueError(f"The model at path {self.model_path} is not valid.")
+            except Exception as e:
+                raise e
 
         return Embeddings4AllPortObject(
             self._create_spec(),

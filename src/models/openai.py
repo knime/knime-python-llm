@@ -15,9 +15,13 @@ from .base import (
 )
 
 # Langchain imports
-from langchain.llms.openai import OpenAI
+from langchain_openai import OpenAI
+
+# from langchain.llms.openai import OpenAI
 from langchain.chat_models.openai import ChatOpenAI
-from langchain.embeddings.openai import OpenAIEmbeddings
+
+# from langchain_openai import ChatOpenAI
+from langchain_openai import OpenAIEmbeddings
 
 # Other imports
 import openai
@@ -74,8 +78,16 @@ chat_models = [
     "gpt-4-32k",
 ]
 chat_default = "gpt-3.5-turbo"
-embeddings_models = ["text-embedding-ada-002"]
-embeddings_default = "text-embedding-ada-002"
+embeddings_models = [
+    "text-embedding-3-small",
+    "text-embedding-3-large",
+    "text-embedding-ada-002",
+]
+embeddings_default = "text-embedding-3-small"
+models_w_embed_dims_api = [
+    "text-embedding-3-small",
+    "text-embedding-3-large",
+]
 
 
 class _EnumToStringParameter(knext.StringParameter):
@@ -357,6 +369,16 @@ class EmbeddingsLoaderInputSettings:
             "Capable of straightforward tasks, very fast, and lower cost.",
         )
 
+    class DimensionOption(knext.EnumParameterOptions):
+        AUTO = (
+            "Auto",
+            "Use the default embeddings dimension for the model",
+        )
+        CUSTOM = (
+            "Custom",
+            "Specify a custom value for the embeddings dimension.",
+        )
+
     selection = _get_model_selection_value_switch()
 
     model_name = _EnumToStringParameter(
@@ -372,6 +394,34 @@ class EmbeddingsLoaderInputSettings:
 
     specific_model_name = _create_specific_model_name("Embeddings").rule(
         knext.OneOf(selection, [OpenAIModelOptions.ALL_MODELS.name]),
+        knext.Effect.SHOW,
+    )
+
+    dimension_settings = knext.EnumParameter(
+        "Embeddings Dimension",
+        "Whether to use the model's default embedding dimension or to specify a custom value.",
+        default_value=DimensionOption.AUTO.name,
+        enum=DimensionOption,
+        style=knext.EnumParameter.Style.VALUE_SWITCH,
+        since_version="5.3.0",
+    ).rule(knext.OneOf(model_name, models_w_embed_dims_api), knext.Effect.SHOW)
+
+    dimension = knext.IntParameter(
+        "Embeddings Dimension Size",
+        """Embedding dimensions refer to the size of the vector space into which words or entities 
+        are embedded. Higher dimensions can capture more nuanced relationships between words.
+
+        Find more information about embeddings and maximum dimensions on 
+        [OpenAIs Documentation](https://platform.openai.com/docs/models/embeddings).""",
+        default_value=1536,
+        since_version="5.3.0",
+    ).rule(
+        knext.And(
+            [
+                knext.OneOf(dimension_settings, [DimensionOption.CUSTOM.name]),
+                knext.OneOf(model_name, models_w_embed_dims_api),
+            ]
+        ),
         knext.Effect.SHOW,
     )
 
@@ -750,21 +800,37 @@ class OpenAIEmbeddingsPortObjectSpec(
     OpenAIModelPortObjectSpec, EmbeddingsPortObjectSpec
 ):
     def __init__(
-        self, credentials: OpenAIAuthenticationPortObjectSpec, model_name
+        self,
+        credentials: OpenAIAuthenticationPortObjectSpec,
+        model_name: str,
+        dimensions: int = None,
     ) -> None:
         super().__init__(credentials)
         self._model = model_name
+        self._dimensions = dimensions
 
     @property
-    def model(self):
+    def model(self) -> str:
         return self._model
 
+    @property
+    def dimensions(self) -> int:
+        return self._dimensions
+
     def serialize(self) -> dict:
-        return {**super().serialize(), "model": self._model}
+        return {
+            **super().serialize(),
+            "model": self._model,
+            "dimensions": self._dimensions,
+        }
 
     @classmethod
     def deserialize(cls, data: dict):
-        return cls(cls.deserialize_credentials_spec(data), data["model"])
+        return cls(
+            cls.deserialize_credentials_spec(data),
+            data["model"],
+            data.get("dimensions", None),
+        )
 
 
 class OpenAIEmbeddingsPortObject(EmbeddingsPortObject):
@@ -780,6 +846,7 @@ class OpenAIEmbeddingsPortObject(EmbeddingsPortObject):
             openai_api_key=ctx.get_credentials(self.spec.credentials).password,
             base_url=self.spec.base_url,
             model=self.spec.model,
+            dimensions=self.spec.dimensions,
         )
 
 
@@ -1126,7 +1193,15 @@ class OpenAIEmbeddingsConnector:
         )
         LOGGER.info(f"Selected model: {model_name}")
 
-        return OpenAIEmbeddingsPortObjectSpec(openai_auth_spec, model_name)
+        custom_dimension = (
+            self.input_settings.dimension_settings
+            == EmbeddingsLoaderInputSettings.DimensionOption.CUSTOM.name
+            and self.input_settings.model_name in models_w_embed_dims_api
+        )
+
+        dimensions = self.input_settings.dimension if custom_dimension else None
+
+        return OpenAIEmbeddingsPortObjectSpec(openai_auth_spec, model_name, dimensions)
 
     def _modify_parameters(self, parameters):
         return _set_selection_parameter(parameters)

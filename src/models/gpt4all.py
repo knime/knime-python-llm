@@ -12,15 +12,16 @@ from .base import (
     GeneralSettings,
     LLMChatModelAdapter,
 )
-from requests.exceptions import ConnectionError
-from pydantic import root_validator, BaseModel, ValidationError
-from typing import Any, Dict, List, Optional
-from gpt4all import Embed4All
+
+from pydantic import ValidationError, root_validator
+from typing import Optional, Dict
 import shutil
 import os
+from gpt4all import Embed4All
 
 # Langchain imports
 from langchain_community.llms.gpt4all import GPT4All
+from langchain_community.embeddings import GPT4AllEmbeddings
 from langchain_core.embeddings import Embeddings
 
 gpt4all_icon = "icons/gpt4all.png"
@@ -481,40 +482,6 @@ class GPT4AllChatModelConnector:
 _embeddings4all_model_name = "all-MiniLM-L6-v2.gguf2.f16.gguf"
 
 
-class _Embeddings4All(BaseModel, Embeddings):
-    model_name: str
-    model_path: str
-    num_threads: Optional[int] = None
-    download: bool
-    client: Any  #: :meta private:
-
-    @root_validator
-    def validate_environment(cls, values: Dict) -> Dict:
-        try:
-            values["client"] = Embed4All(
-                model_name=values["model_name"],
-                model_path=values["model_path"],
-                n_threads=values["num_threads"],
-                allow_download=values["download"],
-            )
-            return values
-        except ConnectionError:
-            raise knext.InvalidParametersError(
-                "Connection error. Please ensure that your internet connection is enabled to download the model."
-            )
-
-    def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        embeddings = [self.client.embed(text) for text in texts]
-        return [list(map(float, e)) for e in embeddings]
-
-    def embed_query(self, text: str) -> List[float]:
-        if text is None:
-            raise ValueError("None values are not supported.")
-        elif not text.strip():
-            raise ValueError("Empty documents are not supported.")
-        return self.client.embed(text)
-
-
 class Embeddings4AllPortObjectSpec(EmbeddingsPortObjectSpec):
     """The Embeddings4All port object spec."""
 
@@ -559,11 +526,11 @@ class Embeddings4AllPortObject(EmbeddingsPortObject, FilestorePortObject):
         return super().spec
 
     def create_model(self, ctx) -> Embeddings:
-        return _Embeddings4All(
+        return _GPT4ALLEmbeddings(
             model_name=self._model_name,
             model_path=self._model_path,
             num_threads=self.spec.num_threads,
-            download=False,
+            allow_download=False,
         )
 
     def write_to(self, file_path: str) -> None:
@@ -575,11 +542,11 @@ class Embeddings4AllPortObject(EmbeddingsPortObject, FilestorePortObject):
                 os.path.join(file_path, self._model_name),
             )
         else:
-            _Embeddings4All(
+            _GPT4ALLEmbeddings(
                 model_path=file_path,
                 model_name=_embeddings4all_model_name,
                 num_threads=1,
-                download=True,
+                allow_download=True,
             )
 
     @classmethod
@@ -601,6 +568,33 @@ class ModelRetrievalOptions(knext.EnumParameterOptions):
         "Downloads the model from GPT4All during execution. Requires an internet connection.",
     )
     READ = ("Read", "Reads the model from the local file system.")
+
+
+# TODO: Delete the wrapper once Langchain instantiates 'GPT4AllEmbeddings' with parameters
+class _GPT4ALLEmbeddings(GPT4AllEmbeddings):
+    model_name: str
+    model_path: str
+    num_threads: int | None
+    allow_download: bool
+
+    @root_validator()
+    def validate_environment(cls, values: Dict) -> Dict:
+        """Validate that GPT4All library is installed."""
+
+        try:
+            allow_download = True if values["model_path"] else False
+
+            values["client"] = Embed4All(
+                model_name=values["model_name"],
+                model_path=values["model_path"],
+                n_threads=values.get("num_threads"),
+                allow_download=allow_download,
+            )
+            return values
+        except ConnectionError:
+            raise knext.InvalidParametersError(
+                "Connection error. Please ensure that your internet connection is enabled to download the model."
+            )
 
 
 @knext.node(

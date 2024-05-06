@@ -389,6 +389,7 @@ class LLMPrompter:
                     prompts, llm, n_requests, progress_tracker
                 )
             )
+
             data_frame[output_column_name] = responses
             output_table.append(data_frame)
 
@@ -487,8 +488,7 @@ class ChatModelPrompter:
             ]
 
         chat = chat_model.create_model(ctx)
-
-        answer = chat(conversation_messages)
+        answer = chat.invoke(conversation_messages)
 
         data_frame.loc[f"Row{len(data_frame)}"] = [answer.type, answer.content]
 

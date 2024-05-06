@@ -20,7 +20,7 @@ from .hf_base import (
 
 
 # Langchain imports
-from langchain.llms.huggingface_hub import HuggingFaceHub
+from langchain_community.llms.huggingface_endpoint import HuggingFaceEndpoint
 from langchain.embeddings.huggingface_hub import HuggingFaceHubEmbeddings
 
 # Other imports
@@ -176,6 +176,21 @@ class HFHubLLMPortObjectSpec(LLMPortObjectSpec):
         )
 
 
+class HuggingFaceEndpointWrapper:
+    def __init__(self, base_model):
+        self.base_model = base_model
+
+    async def abatch(self, inputs, config=None, *, return_exceptions=False, **kwargs):
+        try:
+            return await self.base_model.abatch(
+                inputs, config, return_exceptions=return_exceptions, **kwargs
+            )
+        except Exception as e:
+            raise knext.InvalidParametersError(
+                f"There was a problem getting a response from the model. Please try another model. Error: {e}."
+            )
+
+
 class HFHubLLMPortObject(LLMPortObject):
     def __init__(self, spec: HFHubLLMPortObjectSpec) -> None:
         super().__init__(spec)
@@ -184,15 +199,21 @@ class HFHubLLMPortObject(LLMPortObject):
     def spec(self) -> HFHubLLMPortObjectSpec:
         return super().spec
 
-    def create_model(self, ctx) -> HuggingFaceHub:
-        return HuggingFaceHub(
+    def create_model(self, ctx) -> HuggingFaceEndpointWrapper:
+        huggingface_endpoint = HuggingFaceEndpoint(
             huggingfacehub_api_token=ctx.get_credentials(
                 self.spec.credentials
             ).password,
             repo_id=self.spec.repo_id,
             task=self.spec.task,
-            model_kwargs=self.spec.model_kwargs,
+            max_new_tokens=self.spec.model_kwargs.get("max_new_tokens"),
+            top_k=self.spec.model_kwargs.get("top_k"),
+            top_p=self.spec.model_kwargs.get("top_p"),
+            typical_p=self.spec.model_kwargs.get("typical_p"),
+            repetition_penalty=self.spec.model_kwargs.get("repetition_penalty"),
+            temperature=self.spec.model_kwargs.get("temperature"),
         )
+        return HuggingFaceEndpointWrapper(huggingface_endpoint)
 
 
 class HFHubChatModelPortObjectSpec(HFHubLLMPortObjectSpec, ChatModelPortObjectSpec):
@@ -445,6 +466,8 @@ class HFHubConnector:
             "temperature": self.model_settings.temperature,
             "top_p": self.model_settings.top_p,
             "top_k": self.model_settings.top_k,
+            "typical_p": self.model_settings.typical_p,
+            "repetition_penalty": self.model_settings.repetition_penalty,
             "max_new_tokens": self.model_settings.max_new_tokens,
         }
 
@@ -525,6 +548,8 @@ class HFHubChatModelConnector:
             "temperature": self.model_settings.temperature,
             "top_p": self.model_settings.top_p,
             "top_k": self.model_settings.top_k,
+            "typical_p": self.model_settings.typical_p,
+            "repetition_penalty": self.model_settings.repetition_penalty,
             "max_new_tokens": self.model_settings.max_new_tokens,
         }
 

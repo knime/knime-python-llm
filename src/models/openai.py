@@ -437,7 +437,7 @@ class AutomationOptions(knext.EnumParameterOptions):
         "OpenAI will determine a reasonable value for the configuration.",
     )
 
-    MANUAL = ("Custom", "Allows to specify a custom value for the configuration..")
+    MANUAL = ("Custom", "Allows to specify a custom value for the configuration.")
 
 
 @knext.parameter_group(label="Fine-tuning")
@@ -1350,8 +1350,13 @@ class OpenAIFineTuner:
 
         hyperparameters = self._build_hyper_params()
 
+        df = table.to_pandas()
+        conversation_list = self._validate_fine_tune_table(df)
+
         try:
-            training_file: FileObject = self._prepare_training_file(client, table)
+            training_file: FileObject = self._prepare_training_file(
+                client, conversation_list
+            )
 
             response: FineTuningJob = self._run_fine_tuning(
                 client=client,
@@ -1429,11 +1434,7 @@ class OpenAIFineTuner:
             n_epochs=n_epochs,
         )
 
-    def _prepare_training_file(self, client, table: knext.Table) -> FileObject:
-        df = table.to_pandas()
-
-        conversation_list = self._validate_fine_tune_table(df)
-
+    def _prepare_training_file(self, client, conversation_list: List) -> FileObject:
         with tempfile.NamedTemporaryFile(
             delete=False, suffix=".jsonl"
         ) as temp_jsonl_file:
@@ -1452,7 +1453,12 @@ class OpenAIFineTuner:
 
         if len(grouped_ids) < 10:
             raise knext.InvalidParametersError(
-                "Table needs to contain at least 10 conversations."
+                "The fine-tuning data table needs to contain at least 10 conversations."
+            )
+
+        if df[self.file_settings.content_column].isnull().values.any():
+            raise knext.InvalidParametersError(
+                "Missing values in the content column are not allowed."
             )
 
         has_assistant_roles = grouped_ids[self.file_settings.role_column].apply(

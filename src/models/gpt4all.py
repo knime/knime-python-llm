@@ -678,6 +678,15 @@ class Embeddings4AllConnector:
                     allow_download=False,
                 )
             except Exception as e:
+                unsupported_model_exception = (
+                    "Unable to instantiate model: Unsupported model architecture: bert"
+                )
+                if str(e) == unsupported_model_exception:
+                    raise knext.InvalidParametersError(
+                        "Deprecated embeddings model detected. Please download a newer model ."
+                        "More information about available models can be found at "
+                        "https://raw.githubusercontent.com/nomic-ai/gpt4all/main/gpt4all-chat/metadata/models3.json"
+                    )
                 raise e
 
         return Embeddings4AllPortObject(

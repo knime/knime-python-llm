@@ -820,7 +820,7 @@ class OpenAIEmbeddingsPortObjectSpec(
         return cls(
             cls.deserialize_credentials_spec(data),
             data["model"],
-            data.get("dimensions", None),
+            data.get("dimensions"),
         )
 
 
@@ -1290,7 +1290,7 @@ class OpenAIFineTuneDeleter:
         client = OpenAIClient(
             api_key=ctx.get_credentials(llm_spec.credentials).password,
             base_url=llm_spec.base_url,
-        ).models.list()
+        )
 
         response = client.models.retrieve(llm_spec.model)
 

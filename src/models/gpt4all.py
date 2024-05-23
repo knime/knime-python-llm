@@ -482,6 +482,33 @@ class GPT4AllChatModelConnector:
 _embeddings4all_model_name = "all-MiniLM-L6-v2.gguf2.f16.gguf"
 
 
+# TODO: Delete the wrapper once Langchain instantiates 'GPT4AllEmbeddings' with parameters in the validation method
+class _GPT4ALLEmbeddings(GPT4AllEmbeddings):
+    model_name: str
+    model_path: str
+    num_threads: Optional[int] = None
+    allow_download: bool
+
+    @root_validator()
+    def validate_environment(cls, values: Dict) -> Dict:
+        """Validate that GPT4All library is installed."""
+
+        try:
+            allow_download = True if values["model_path"] else False
+
+            values["client"] = Embed4All(
+                model_name=values["model_name"],
+                model_path=values["model_path"],
+                n_threads=values.get("num_threads"),
+                allow_download=allow_download,
+            )
+            return values
+        except ConnectionError:
+            raise knext.InvalidParametersError(
+                "Connection error. Please ensure that your internet connection is enabled to download the model."
+            )
+
+
 class Embeddings4AllPortObjectSpec(EmbeddingsPortObjectSpec):
     """The Embeddings4All port object spec."""
 
@@ -570,33 +597,6 @@ class ModelRetrievalOptions(knext.EnumParameterOptions):
     READ = ("Read", "Reads the model from the local file system.")
 
 
-# TODO: Delete the wrapper once Langchain instantiates 'GPT4AllEmbeddings' with parameters
-class _GPT4ALLEmbeddings(GPT4AllEmbeddings):
-    model_name: str
-    model_path: str
-    num_threads: int | None
-    allow_download: bool
-
-    @root_validator()
-    def validate_environment(cls, values: Dict) -> Dict:
-        """Validate that GPT4All library is installed."""
-
-        try:
-            allow_download = True if values["model_path"] else False
-
-            values["client"] = Embed4All(
-                model_name=values["model_name"],
-                model_path=values["model_path"],
-                n_threads=values.get("num_threads"),
-                allow_download=allow_download,
-            )
-            return values
-        except ConnectionError:
-            raise knext.InvalidParametersError(
-                "Connection error. Please ensure that your internet connection is enabled to download the model."
-            )
-
-
 @knext.node(
     "GPT4All Embeddings Connector",
     knext.NodeType.SOURCE,
@@ -671,7 +671,7 @@ class Embeddings4AllConnector:
                 )
             model_path, model_name = os.path.split(self.model_path)
             try:
-                Embed4All(
+                _GPT4ALLEmbeddings(
                     model_name=model_name,
                     model_path=model_path,
                     n_threads=self.num_threads,
@@ -683,11 +683,11 @@ class Embeddings4AllConnector:
                 )
                 if str(e) == unsupported_model_exception:
                     raise knext.InvalidParametersError(
-                        "Deprecated embeddings model detected. Please download a newer model ."
-                        "More information about available models can be found at "
+                        "An incompatible embeddings mode has been detected. Please obtain a more recent version."
+                        "For additional details on available models, please refer to: "
                         "https://raw.githubusercontent.com/nomic-ai/gpt4all/main/gpt4all-chat/metadata/models3.json"
                     )
-                raise e
+                raise ValueError(f"The model at path {self.model_path} is not valid.")
 
         return Embeddings4AllPortObject(
             self._create_spec(),

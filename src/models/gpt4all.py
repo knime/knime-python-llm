@@ -482,25 +482,23 @@ class GPT4AllChatModelConnector:
 _embeddings4all_model_name = "all-MiniLM-L6-v2.gguf2.f16.gguf"
 
 
-# TODO: Delete the wrapper once Langchain instantiates 'GPT4AllEmbeddings' with parameters in the validation method
+# TODO: Delete the wrapper if Langchain is > 0.2.x and instantiate Embedd4All class
 class _GPT4ALLEmbeddings(GPT4AllEmbeddings):
     model_name: str
     model_path: str
     num_threads: Optional[int] = None
-    allow_download: bool
+    allow_download: bool = False
 
     @root_validator()
     def validate_environment(cls, values: Dict) -> Dict:
         """Validate that GPT4All library is installed."""
 
         try:
-            allow_download = True if values["model_path"] else False
-
             values["client"] = Embed4All(
                 model_name=values["model_name"],
                 model_path=values["model_path"],
                 n_threads=values.get("num_threads"),
-                allow_download=allow_download,
+                allow_download=values["allow_download"],
             )
             return values
         except ConnectionError:

@@ -408,10 +408,8 @@ class EmbeddingsLoaderInputSettings:
         since_version="5.3.0",
     ).rule(
         knext.And(
-            [
-                knext.OneOf(dimension_settings, [DimensionOption.CUSTOM.name]),
-                knext.OneOf(model_name, models_w_embed_dims_api),
-            ]
+            knext.OneOf(dimension_settings, [DimensionOption.CUSTOM.name]),
+            knext.OneOf(model_name, models_w_embed_dims_api),
         ),
         knext.Effect.SHOW,
     )

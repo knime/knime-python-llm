@@ -19,7 +19,7 @@ def create_type_filer(ktype: knext.KnimeType) -> Callable[[knext.Column], bool]:
 ai_icon = "icons/ml.png"
 
 main_category = knext.category(
-    path="/community",
+    path="/labs",
     level_id="kai",
     name="AI",
     description="",

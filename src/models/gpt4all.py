@@ -341,7 +341,7 @@ def is_valid_model(model_path: str):
 
 
 @knext.node(
-    "Local GPT4All LLM Connector",
+    "Local GPT4All LLM Connector (Labs)",
     knext.NodeType.SOURCE,
     gpt4all_icon,
     category=gpt4all_category,
@@ -409,7 +409,7 @@ class GPT4AllLLMConnector:
 
 
 @knext.node(
-    "Local GPT4All Chat Model Connector",
+    "Local GPT4All Chat Model Connector (Labs)",
     knext.NodeType.SOURCE,
     gpt4all_icon,
     category=gpt4all_category,
@@ -608,7 +608,7 @@ class ModelRetrievalOptions(knext.EnumParameterOptions):
 
 
 @knext.node(
-    "GPT4All Embeddings Connector",
+    "GPT4All Embeddings Connector (Labs)",
     knext.NodeType.SOURCE,
     gpt4all_icon,
     gpt4all_category,

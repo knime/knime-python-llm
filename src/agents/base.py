@@ -250,7 +250,7 @@ class LLMAgentCreator:
 
 
 @knext.node(
-    "Agent Prompter",
+    "Agent Prompter (Labs)",
     knext.NodeType.PREDICTOR,
     agent_icon,
     category=agent_category,

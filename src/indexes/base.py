@@ -224,7 +224,7 @@ def get_metadata_columns(
 
 
 @knext.node(
-    "Vector Store Retriever",
+    "Vector Store Retriever (Labs)",
     knext.NodeType.SOURCE,
     store_icon,
     category=store_category,

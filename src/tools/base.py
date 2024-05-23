@@ -118,7 +118,7 @@ tool_list_port_type = knext.port_type(
 
 
 @knext.node(
-    "Tool Concatenator",
+    "Tool Concatenator (Labs)",
     knext.NodeType.SOURCE,
     icon_path="icons/store.png",
     category=store_category,

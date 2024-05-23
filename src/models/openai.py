@@ -850,7 +850,7 @@ openai_embeddings_port_type = knext.port_type(
 
 
 @knext.node(
-    "OpenAI Authenticator",
+    "OpenAI Authenticator (Labs)",
     knext.NodeType.SOURCE,
     openai_icon,
     category=openai_category,
@@ -950,7 +950,7 @@ class OpenAIAuthenticator:
 # TODO: Check proxy settings and add them to configuration
 # TODO: Generate prompts as configuration dialog as seen on langchain llm.generate(["Tell me a joke", "Tell me a poem"]*15)
 @knext.node(
-    "OpenAI LLM Connector",
+    "OpenAI LLM Connector (Labs)",
     knext.NodeType.SOURCE,
     openai_icon,
     category=openai_category,
@@ -1031,7 +1031,7 @@ class OpenAILLMConnector:
 
 
 @knext.node(
-    "OpenAI Chat Model Connector",
+    "OpenAI Chat Model Connector (Labs)",
     knext.NodeType.SOURCE,
     openai_icon,
     category=openai_category,
@@ -1114,7 +1114,7 @@ class OpenAIChatModelConnector:
 
 
 @knext.node(
-    "OpenAI Embeddings Connector",
+    "OpenAI Embeddings Connector (Labs)",
     knext.NodeType.SOURCE,
     openai_icon,
     category=openai_category,
@@ -1197,7 +1197,7 @@ class OpenAIEmbeddingsConnector:
 
 
 @knext.node(
-    "OpenAI DALL-E View",
+    "OpenAI DALL-E View (Labs)",
     node_type=knext.NodeType.VISUALIZER,
     icon_path=openai_icon,
     category=openai_category,
@@ -1270,7 +1270,10 @@ class OpenAIDALLEView:
 
 
 @knext.node(
-    "OpenAI Fine-Tuned Model Deleter", knext.NodeType.SINK, openai_icon, openai_category
+    "OpenAI Fine-Tuned Model Deleter (Labs)",
+    knext.NodeType.SINK,
+    openai_icon,
+    openai_category,
 )
 @knext.input_port(
     "Fine-Tuned OpenAI Model", "A fine-tuned model from OpenAI", llm_port_type
@@ -1316,7 +1319,7 @@ class OpenAIFineTuneDeleter:
 
 
 @knext.node(
-    "OpenAI Chat Model Fine-Tuner",
+    "OpenAI Chat Model Fine-Tuner (Labs)",
     node_type=knext.NodeType.LEARNER,
     icon_path=openai_icon,
     category=openai_category,

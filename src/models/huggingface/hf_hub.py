@@ -301,7 +301,7 @@ hf_authentication_port_type = knext.port_type(
 
 
 @knext.node(
-    "HF Hub Authenticator",
+    "HF Hub Authenticator (Labs)",
     knext.NodeType.SOURCE,
     hf_icon,
     category=hf_hub_category,
@@ -381,7 +381,7 @@ hf_hub_llm_port_type = knext.port_type(
 
 
 @knext.node(
-    "HF Hub LLM Connector",
+    "HF Hub LLM Connector (Labs)",
     knext.NodeType.SOURCE,
     hf_icon,
     category=hf_hub_category,
@@ -466,7 +466,7 @@ hf_hub_chat_model_port_type = knext.port_type(
 
 
 @knext.node(
-    "HF Hub Chat Model Connector",
+    "HF Hub Chat Model Connector (Labs)",
     knext.NodeType.SOURCE,
     hf_icon,
     category=hf_hub_category,
@@ -563,7 +563,7 @@ hf_embeddings_port_type = knext.port_type(
 
 
 @knext.node(
-    "HF Hub Embeddings Connector",
+    "HF Hub Embeddings Connector (Labs)",
     knext.NodeType.SOURCE,
     hf_icon,
     category=hf_hub_category,

@@ -9,23 +9,21 @@ from typing import Any, List, Optional, Sequence, Callable
 from functools import partial
 
 # Langchain imports
-from langchain.schema import HumanMessage, SystemMessage, ChatMessage, AIMessage
-from langchain.embeddings.base import Embeddings
-from langchain.chat_models.base import BaseChatModel
-from langchain.base_language import BaseLanguageModel
-from langchain.llms.base import BaseLLM
-from langchain.schema.messages import (
+from langchain_core.embeddings import Embeddings
+from langchain_core.language_models import BaseLanguageModel, BaseLLM, BaseChatModel
+from langchain_core.messages import (
     BaseMessage,
+    HumanMessage,
+    SystemMessage,
+    ChatMessage,
+    AIMessage,
 )
-
-from langchain.callbacks.manager import (
-    AsyncCallbackManagerForLLMRun,
+from langchain_core.callbacks.manager import (
     CallbackManagerForLLMRun,
+    AsyncCallbackManagerForLLMRun,
 )
-from langchain.schema import (
-    ChatGeneration,
-    ChatResult,
-)
+from langchain_core.outputs import ChatGeneration, ChatResult
+
 
 model_category = knext.category(
     path=util.main_category,

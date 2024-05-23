@@ -376,7 +376,7 @@ class EmbeddingsLoaderInputSettings:
     )
 
 
-@knext.parameter_group(label="OpenAI Chat Model Selection")
+@knext.parameter_group(label="Output")
 class ImagelLoaderInputSettings:
     size = knext.StringParameter(
         "Image Size",

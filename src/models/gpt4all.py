@@ -551,12 +551,24 @@ class Embeddings4AllPortObject(EmbeddingsPortObject, FilestorePortObject):
         return super().spec
 
     def create_model(self, ctx) -> Embeddings:
-        return _GPT4ALLEmbeddings(
-            model_name=self._model_name,
-            model_path=self._model_path,
-            num_threads=self.spec.num_threads,
-            allow_download=False,
-        )
+        try:
+            return _GPT4ALLEmbeddings(
+                model_name=self._model_name,
+                model_path=self._model_path,
+                num_threads=self.spec.num_threads,
+                allow_download=False,
+            )
+        except Exception as e:
+            unsupported_model_exception = (
+                "Unable to instantiate model: Unsupported model architecture: bert"
+            )
+            if str(e) == unsupported_model_exception:
+                raise knext.InvalidParametersError(
+                    "An incompatible embeddings mode has been detected. Please obtain a more recent version."
+                    "For additional details on available models, please refer to: "
+                    "https://raw.githubusercontent.com/nomic-ai/gpt4all/main/gpt4all-chat/metadata/models3.json"
+                )
+            raise ValueError(f"The model at path {self.model_path} is not valid.")
 
     def write_to(self, file_path: str) -> None:
         os.makedirs(file_path)

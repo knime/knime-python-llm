@@ -564,7 +564,9 @@ class Embeddings4AllPortObject(EmbeddingsPortObject, FilestorePortObject):
             )
             if str(e) == unsupported_model_exception:
                 raise knext.InvalidParametersError(
-                    "An incompatible embeddings mode has been detected. Please obtain a more recent version."
+                    "The current embeddings model is incompatible. "
+                    "Please run the GPT4All Embeddings Connector again to download the latest model, "
+                    "or update it manually to a newer version. "
                     "For additional details on available models, please refer to: "
                     "https://raw.githubusercontent.com/nomic-ai/gpt4all/main/gpt4all-chat/metadata/models3.json"
                 )
@@ -693,7 +695,9 @@ class Embeddings4AllConnector:
                 )
                 if str(e) == unsupported_model_exception:
                     raise knext.InvalidParametersError(
-                        "An incompatible embeddings mode has been detected. Please obtain a more recent version."
+                        "The current embeddings model is incompatible. "
+                        "Please run the GPT4All Embeddings Connector again to download the latest model, "
+                        "or update it manually to a newer version. "
                         "For additional details on available models, please refer to: "
                         "https://raw.githubusercontent.com/nomic-ai/gpt4all/main/gpt4all-chat/metadata/models3.json"
                     )

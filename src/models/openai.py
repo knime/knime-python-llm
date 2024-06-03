@@ -226,6 +226,7 @@ def _get_model_selection_value_switch() -> knext.EnumParameter:
         OpenAIModelOptions.DEFAULT_MODELS.name,
         OpenAIModelOptions,
         style=knext.EnumParameter.Style.VALUE_SWITCH,
+        # since_version="5.3.0",
     )
 
 
@@ -239,7 +240,6 @@ def _get_model_name(
 ) -> str:
     if selection_mode == OpenAIModelOptions.ALL_MODELS.name:
         return specific_model
-
     if model not in default_model_list:
         ctx.set_warning(
             f"Configured deprecated model, switching to fallback model: {default_model}"
@@ -249,10 +249,13 @@ def _get_model_name(
 
 
 def _set_selection_parameter(parameters: dict) -> dict:
-    if parameters["input_settings"]["specific_model_name"] != "unselected":
-        parameters["input_settings"]["selection"] = "ALL_MODELS"
-    else:
-        parameters["input_settings"]["selection"] = "DEFAULT_MODELS"
+    input_settings = parameters["input_settings"]
+    if not input_settings.get("selection"):
+        input_settings["selection"] = (
+            "ALL_MODELS"
+            if input_settings["specific_model_name"] != "unselected"
+            else "DEFAULT_MODELS"
+        )
     return parameters
 
 
@@ -1027,6 +1030,7 @@ class OpenAILLMConnector:
         )
 
     def _modify_parameters(self, parameters):
+        print(parameters)
         return _set_selection_parameter(parameters)
 
 

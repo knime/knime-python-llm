@@ -417,6 +417,18 @@ class HuggingFaceHubLLMPortObjectSpec(LLMPortObjectSpec):
         )
 
 
+class HuggingFaceHubWrapper:
+    def __init__(self, base_model) -> None:
+        self.base_model = base_model
+
+    def predict(self, text: str, *, stop=None, **kwargs) -> str:
+        self.base_model.client.api_url = (
+            f"https://api-inference.huggingface.co/models/{self.base_model.repo_id}"
+        )
+
+        return self.base_model.predict(text)
+
+
 class HuggingFaceHubLLMPortObject(LLMPortObject):
     def __init__(self, spec: HuggingFaceHubLLMPortObjectSpec) -> None:
         super().__init__(spec)
@@ -426,7 +438,7 @@ class HuggingFaceHubLLMPortObject(LLMPortObject):
         return super().spec
 
     def create_model(self, ctx):
-        return HuggingFaceHub(
+        huggingface_hub = HuggingFaceHub(
             huggingfacehub_api_token=ctx.get_credentials(
                 self.spec.credentials
             ).password,
@@ -434,6 +446,7 @@ class HuggingFaceHubLLMPortObject(LLMPortObject):
             task=self.spec.task,
             model_kwargs=self.spec.model_kwargs,
         )
+        return HuggingFaceHubWrapper(huggingface_hub)
 
 
 huggingface_hub_llm_port_type = knext.port_type(

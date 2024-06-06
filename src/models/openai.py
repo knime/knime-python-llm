@@ -23,6 +23,7 @@ import io
 import util
 import time
 import json
+import base64
 import requests
 import tempfile
 import pandas as pd
@@ -30,6 +31,7 @@ from typing import Callable, List
 
 from openai import Client as OpenAIClient
 from openai.types import FileObject
+from openai._legacy_response import HttpxBinaryResponseContent
 from openai.types.fine_tuning.fine_tuning_job import Hyperparameters, FineTuningJob
 from openai import (
     NotFoundError,
@@ -1428,6 +1430,8 @@ class OpenAIFineTuner:
                 client, conversation_list
             )
 
+            # This is needed if the request gets canceled before response is 'initialized' through _run_fine_tuning()
+            response = None
             response: FineTuningJob = self._run_fine_tuning(
                 client=client,
                 model_name=model.spec.model,
@@ -1462,8 +1466,9 @@ class OpenAIFineTuner:
         finally:
             client.files.delete(training_file.id)  # deletes the tmp file at openai
 
-            for file in response.result_files:
-                client.files.delete(file)
+            if response:
+                for f in response.result_files:
+                    client.files.delete(f)
 
         return fine_tuned_model, result_df
 
@@ -1600,13 +1605,15 @@ class OpenAIFineTuner:
             time.sleep(self.ft_result_settings.progress_interval)
 
     def _response_to_df(self, client, response: FineTuningJob) -> pd.DataFrame:
-        result_files = [
-            client.files.content(file_id).content for file_id in response.result_files
+        response_list: List[HttpxBinaryResponseContent] = [
+            client.files.content(file_id) for file_id in response.result_files
         ]
 
-        df_list = [pd.read_csv(io.BytesIO(result), header=0) for result in result_files]
+        decoded_df_list = [
+            pd.read_csv(io.BytesIO(base64.b64decode(response.content)), header=0)
+            for response in response_list
+        ]
 
-        df = pd.concat(df_list, ignore_index=True)
+        df = pd.concat(decoded_df_list, ignore_index=True)
         df["step"] = df["step"].astype("int32")
-
         return knext.Table.from_pandas(df)

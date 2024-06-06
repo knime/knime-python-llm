@@ -226,7 +226,7 @@ def _get_model_selection_value_switch() -> knext.EnumParameter:
         OpenAIModelOptions.DEFAULT_MODELS.name,
         OpenAIModelOptions,
         style=knext.EnumParameter.Style.VALUE_SWITCH,
-        # since_version="5.3.0",
+        since_version="5.3.0",
     )
 
 
@@ -1030,7 +1030,6 @@ class OpenAILLMConnector:
         )
 
     def _modify_parameters(self, parameters):
-        print(parameters)
         return _set_selection_parameter(parameters)
 
 

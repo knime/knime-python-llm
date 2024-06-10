@@ -3,7 +3,7 @@ import knime.extension as knext
 import util
 
 # Langchain imports
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.text_splitter import RecursiveCharacterTextSplitter, Language
 
 # Other imports
 import pyarrow as pa
@@ -22,6 +22,48 @@ class OutputColumnSetting(knext.EnumParameterOptions):
         "Append",
         "The text chunks will be appended to the table in a new column.",
     )
+
+
+class SpecifyLanguageSetting(knext.EnumParameterOptions):
+    TEXT = (
+        "Text",
+        "The document will be split at common separators for generic text.",
+    )
+    CODE = (
+        "Code/Markup",
+        "Language-specific syntax will be used to split the document.",
+    )
+
+
+class SplitterLanguage(knext.EnumParameterOptions):
+    """Mirrors the languages provided by langchain.text_splitter.Language. Only implements languages handled
+    by RecursiveTextSplitter.from_language()."""
+
+    CSHARP = ("C#", "C#&#8203; syntax will be used to split the texts.")
+    CPP = ("C++", "C++ syntax will be used to split the texts.")
+    COBOL = ("COBOL", "COBOL syntax will be used to split the texts.")
+    GO = ("Go", "Go syntax will be used to split the texts.")
+    HASKELL = ("Haskell", "Haskell syntax will be used to split the texts.")
+    HTML = ("HTML", "HTML syntax will be used to split the texts.")
+    JAVA = ("Java", "Java syntax will be used to split the texts.")
+    JS = ("JavaScript", "JavaScript syntax will be used to split the texts.")
+    KOTLIN = ("Kotlin", "Kotlin syntax will be used to split the texts.")
+    LATEX = ("LaTeX", "LaTeX syntax will be used to split the texts.")
+    LUA = ("Lua", "Lua syntax will be used to split the texts.")
+    MARKDOWN = (
+        "Markdown",
+        "Markdown syntax will be used to split the texts.",
+    )
+    PHP = ("PHP", "PHP syntax will be used to split the texts.")
+    PROTO = ("Protobuf", "Protobuf syntax will be used to split the texts.")
+    PYTHON = ("Python", "Python syntax will be used to split the texts.")
+    RST = ("RST", "RST syntax will be used to split the texts.")
+    RUBY = ("Ruby", "Ruby syntax will be used to split the texts.")
+    RUST = ("Rust", "Rust syntax will be used to split the texts.")
+    SCALA = ("Scala", "Scala syntax will be used to split the texts.")
+    SOL = ("SOL", "SOL syntax will be used to split the texts.")
+    SWIFT = ("Swift", "Swift syntax will be used to split the texts.")
+    TS = ("TypeScript", "TypeScript syntax will be used to split the texts.")
 
 
 # == Nodes ==
@@ -47,6 +89,10 @@ class TextChunker:
 
     Text chunking is a technique for splitting larger documents into smaller paragraphs. The chunks overlap
     to contain a piece of the context. Chunk size and overlap can be configured.
+
+    For generic texts, the node will try to keep semantic relations by prioritizing to place sentences within
+    a paragraph in the same chunk. If a specific programming or formatting language is specified, the node
+    considers language-specific syntax when splitting the document.
     """
 
     input_col = knext.ColumnParameter(
@@ -69,6 +115,24 @@ class TextChunker:
         "Specify by how many characters the chunks should overlap.",
         200,
         min_value=0,
+    )
+
+    language_mode = knext.EnumParameter(
+        label="Separators",
+        description="Select whether the document will be split based on separators for generic text or code/markup.",
+        default_value=SpecifyLanguageSetting.TEXT.name,
+        enum=SpecifyLanguageSetting,
+        style=knext.EnumParameter.Style.VALUE_SWITCH,
+    )
+
+    selected_language = knext.EnumParameter(
+        label="Language",
+        description="Select the language that will be considered when splitting the text.",
+        default_value=SplitterLanguage.CPP.name,
+        enum=SplitterLanguage,
+    ).rule(
+        knext.OneOf(language_mode, [SpecifyLanguageSetting.CODE.name]),
+        knext.Effect.SHOW,
     )
 
     output_column = knext.EnumParameter(
@@ -165,6 +229,26 @@ class TextChunker:
 
                 pa_col = pa_table.column(self.input_col)
                 df = pd.DataFrame.from_dict({"Chunks": pa_col.to_pandas()})
+
+                # Apply Text Splitter
+                if self.language_mode == SpecifyLanguageSetting.CODE.name:
+                    try:
+                        language = Language[self.selected_language]
+                    except Exception:
+                        raise RuntimeError(
+                            f"""Failed to match the selected separator language "{SplitterLanguage[self.selected_language].label}" to a langchain language."""
+                        )
+
+                    splitter = RecursiveCharacterTextSplitter.from_language(
+                        language=language,
+                        chunk_size=self.chunk_size,
+                        chunk_overlap=self.chunk_overlap,
+                    )
+                else:
+                    splitter = RecursiveCharacterTextSplitter(
+                        chunk_size=self.chunk_size,
+                        chunk_overlap=self.chunk_overlap,
+                    )
 
                 df["Chunks"] = df["Chunks"].apply(
                     lambda row: splitter.split_text(row) if pd.notnull(row) else None

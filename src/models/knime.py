@@ -111,7 +111,7 @@ def _extract_api_base(auth_spec: ks.HubAuthenticationPortObjectSpec) -> str:
     hub_url = auth_spec.hub_url
     parsed_url = urlparse(hub_url)
     # drop params, query and fragment
-    ai_proxy_url = (parsed_url.scheme, parsed_url.netloc, "ai-proxy/v1", "", "", "")
+    ai_proxy_url = (parsed_url.scheme, parsed_url.netloc, "ai-gateway", "", "", "")
     return urlunparse(ai_proxy_url)
 
 
@@ -132,11 +132,7 @@ def _list_models_in_dialog(
 
 
 def _list_models(auth_spec, mode: str) -> list[str]:
-    model_list = [
-        model_data["model_name"]
-        for model_data in _get_model_data(auth_spec)
-        if mode == _get_mode(model_data)
-    ]
+    model_list = [model_data["name"] for model_data in _get_model_data(auth_spec, mode)]
     if len(model_list) == 0:
         model_list.append("")
     else:
@@ -144,16 +140,9 @@ def _list_models(auth_spec, mode: str) -> list[str]:
         return model_list
 
 
-def _get_mode(model_data: dict):
-    model_info: dict = model_data.get("model_info")
-    if model_info:
-        return model_info.get("mode")
-    return None
-
-
-def _get_model_data(auth_spec):
+def _get_model_data(auth_spec, mode: str):
     api_base = _extract_api_base(auth_spec)
-    model_info = api_base + "/model/info"
+    model_info = api_base + "/management/models?mode=" + mode
     response = requests.get(
         url=model_info, headers=_create_authorization_headers(auth_spec)
     )
@@ -162,7 +151,7 @@ def _get_model_data(auth_spec):
             "The AI proxy is not reachable. Is it activated in the connected KNIME Hub?"
         )
     response.raise_for_status()
-    return response.json()["data"]
+    return response.json()["models"]
 
 
 class ModelSettings(GeneralSettings):

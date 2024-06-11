@@ -7,6 +7,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 # Other imports
 import pyarrow as pa
+import pyarrow.compute as pc
 import pandas as pd
 
 util_icon = "icons/ml.png"
@@ -107,57 +108,132 @@ class TextChunker:
                     "The output column name must not be empty."
                 )
 
-            table_spec = table_spec.append(
+            return table_spec.append(
                 knext.Column(
-                    knext.list_(knext.string()),
+                    knext.string(),
                     util.handle_column_name_collision(
                         table_spec.column_names, self.output_name
                     ),
                 )
             )
         else:
-            idx = table_spec.column_names.index(self.input_col)
-            table_spec = table_spec.remove(idx)
-            table_spec = table_spec.insert(
-                knext.Column(knext.list_(knext.string()), self.input_col), idx
-            )
-
-        return table_spec
+            return table_spec
 
     def execute(
         self,
         ctx: knext.ExecutionContext,
         input_table: knext.Table,
     ) -> knext.Table:
-        pa_table = input_table.to_pyarrow()
-
-        # Rename row ID column to avoid error when <RowID> column exists and is selected
-        rowID_name = util.handle_column_name_collision(
-            input_table.schema.column_names, "<RowID>"
-        )
-        pa_table = pa_table.rename_columns([rowID_name] + pa_table.column_names[1:])
-
-        pa_col = pa_table.column(self.input_col)
-        df = pa_col.to_pandas()
-
-        # Apply Text Splitter
         splitter = RecursiveCharacterTextSplitter(
             chunk_size=self.chunk_size,
             chunk_overlap=self.chunk_overlap,
         )
-        df = df.apply(lambda row: splitter.split_text(row) if pd.notnull(row) else None)
 
-        if self.output_column == OutputColumnSetting.APPEND.name:
-            output_table = pa_table.append_column(
+        return knext.BatchOutputTable.from_batches(
+            self._generate_batches(
+                input_table,
+                splitter,
+            ),
+            row_ids="keep",
+        )
+
+    def _generate_batches(
+        self,
+        input_table: knext.Table,
+        splitter: RecursiveCharacterTextSplitter,
+    ):
+        for batch in input_table.batches():
+            pa_batch = batch.to_pyarrow()
+            pa_table = pa.Table.from_batches([pa_batch])
+
+            append_column_field = pa.field(
                 util.handle_column_name_collision(
                     input_table.schema.column_names, self.output_name
                 ),
-                pa.Array.from_pandas(df, type=pa.list_(pa.string())),
+                pa.string(),
             )
-        else:
-            index = pa_table.column_names.index(self.input_col)
-            new_field = pa.field(self.input_col, pa.list_(pa.string()))
-            new_column = pa.Array.from_pandas(df, type=pa.list_(pa.string()))
-            output_table = pa_table.set_column(index, new_field, new_column)
 
-        return knext.Table.from_pyarrow(output_table, row_ids="keep")
+            # Construct empty table if input table is empty to avoid error
+            if pa_table.shape[0] == 0:
+                if self.output_column == OutputColumnSetting.APPEND.name:
+                    empty_array = pa.array([], type=pa.string())
+                    pa_table = pa_table.append_column(append_column_field, empty_array)
+
+                yield knext.Table.from_pyarrow(pa_table)
+            else:
+                # Rename row ID column to avoid error when <RowID> column exists and is selected
+                rowID_name = util.handle_column_name_collision(
+                    input_table.schema.column_names, "<RowID>"
+                )
+                pa_table = pa_table.rename_columns(
+                    [rowID_name] + pa_table.column_names[1:]
+                )
+
+                pa_col = pa_table.column(self.input_col)
+                df = pd.DataFrame.from_dict({"Chunks": pa_col.to_pandas()})
+
+                df["Chunks"] = df["Chunks"].apply(
+                    lambda row: splitter.split_text(row) if pd.notnull(row) else None
+                )
+
+                # Add row ID column to DataFrame to generate new row IDs
+                df[rowID_name] = pa_table.column(rowID_name).to_pandas()
+
+                # Introduce index for chunks within each row to generate new row IDs ("RowXX_YY")
+                df["Internal Index"] = df["Chunks"].apply(
+                    lambda row: list(range(1, len(row) + 1)) if row else [1]
+                )
+
+                ungrouped_df = df.explode(["Chunks", "Internal Index"])
+                ungrouped_df["Chunks"] = ungrouped_df["Chunks"].astype("string")
+
+                # Remove row ID column
+                pa_table = pa_table.remove_column(0)
+
+                # Create new output table with new row IDs ("RowXX_YY")
+                ungrouped_df[rowID_name] = ungrouped_df[
+                    [rowID_name, "Internal Index"]
+                ].apply(
+                    lambda row: f"""{row[rowID_name]}_{row["Internal Index"]}""",
+                    axis=1,
+                )
+                row_ids = pa.Array.from_pandas(ungrouped_df[rowID_name])
+                output_table = pa.Table.from_arrays([row_ids], names=[rowID_name])
+
+                # Manually expand input table columns to match ungrouped column
+                ungroup_indexes = self._create_ungroup_indexes(
+                    ungrouped_df["Internal Index"]
+                )
+
+                for col in pa_table.column_names:
+                    if (
+                        col == self.input_col
+                        and self.output_column == OutputColumnSetting.REPLACE.name
+                    ):
+                        output_table = output_table.append_column(
+                            pa.field(self.input_col, pa.string()),
+                            pa.Array.from_pandas(ungrouped_df["Chunks"]),
+                        )
+                    else:
+                        take = pc.take(pa_table.column(col), ungroup_indexes)
+                        output_table = output_table.append_column(col, take)
+
+                if self.output_column == OutputColumnSetting.APPEND.name:
+                    output_table = output_table.append_column(
+                        append_column_field,
+                        pa.Array.from_pandas(ungrouped_df["Chunks"]),
+                    )
+
+                yield knext.Table.from_pyarrow(output_table, row_ids="keep")
+
+    def _create_ungroup_indexes(self, indexes: pd.Series):
+        """Returns a list of indexes that specifies which elements to take from a column to ungroup it
+        manually."""
+        i = -1
+        ungroup_indexes = []
+
+        for x in indexes:
+            if x == 1:
+                i += 1
+            ungroup_indexes.append(i)
+        return ungroup_indexes

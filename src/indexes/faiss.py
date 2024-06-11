@@ -49,7 +49,11 @@ class FAISSVectorstorePortObject(FilestoreVectorstorePortObject):
         )
 
     def load_vectorstore(self, embeddings, vectorstore_path) -> FAISS:
-        return FAISS.load_local(embeddings=embeddings, folder_path=vectorstore_path)
+        return FAISS.load_local(
+            embeddings=embeddings,
+            folder_path=vectorstore_path,
+            allow_dangerous_deserialization=True,
+        )
 
     def save_vectorstore(self, vectorstore_folder, vectorstore: FAISS):
         vectorstore.save_local(vectorstore_folder)

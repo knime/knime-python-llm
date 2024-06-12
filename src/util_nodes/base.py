@@ -124,24 +124,18 @@ class TextChunker:
         ctx: knext.ExecutionContext,
         input_table: knext.Table,
     ) -> knext.Table:
-        splitter = RecursiveCharacterTextSplitter(
-            chunk_size=self.chunk_size,
-            chunk_overlap=self.chunk_overlap,
-        )
-
         return knext.BatchOutputTable.from_batches(
             self._generate_batches(
                 input_table,
-                splitter,
             ),
             row_ids="keep",
         )
 
-    def _generate_batches(
-        self,
-        input_table: knext.Table,
-        splitter: RecursiveCharacterTextSplitter,
-    ):
+    def _generate_batches(self, input_table: knext.Table):
+        splitter = RecursiveCharacterTextSplitter(
+            chunk_size=self.chunk_size,
+            chunk_overlap=self.chunk_overlap,
+        )
         for batch in input_table.batches():
             pa_batch = batch.to_pyarrow()
             pa_table = pa.Table.from_batches([pa_batch])

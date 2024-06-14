@@ -6,10 +6,10 @@ from knime.extension import ConfigurationContext, ExecutionContext
 from ._base import (
     hub_connector_icon,
     knime_category,
-    _create_authorization_headers,
-    _extract_api_base,
-    _list_models_in_dialog,
-    _list_models,
+    create_authorization_headers,
+    extract_api_base,
+    list_models_in_dialog,
+    list_models,
     validate_auth_spec,
 )
 from typing import List, Optional
@@ -92,9 +92,9 @@ class KnimeHubEmbeddingsPortObject(EmbeddingsPortObject):
         auth_spec = self.spec.auth_spec
         return _OpenAIEmbeddings(
             model=self.spec.model_name,
-            base_url=_extract_api_base(auth_spec),
+            base_url=extract_api_base(auth_spec),
             api_key="placeholder",
-            extra_headers=_create_authorization_headers(auth_spec),
+            extra_headers=create_authorization_headers(auth_spec),
         )
 
 
@@ -131,7 +131,7 @@ class KnimeHubEmbeddingsConnector:
     model_name = knext.StringParameter(
         "Model",
         "Select the model to use.",
-        choices=_list_models_in_dialog("embedding"),
+        choices=list_models_in_dialog("embedding"),
     )
 
     def configure(
@@ -146,7 +146,7 @@ class KnimeHubEmbeddingsConnector:
     def execute(
         self, ctx: knext.ExecutionContext, authentication: knext.PortObject
     ) -> KnimeHubEmbeddingsPortObject:
-        available_models = _list_models(authentication.spec, "embedding")
+        available_models = list_models(authentication.spec, "embedding")
         if self.model_name not in available_models:
             raise knext.InvalidParametersError(
                 f"The selected model {self.model_name} is not served by the connected Hub."

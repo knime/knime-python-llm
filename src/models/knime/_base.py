@@ -16,7 +16,7 @@ knime_category = knext.category(
 )
 
 
-def _create_authorization_headers(
+def create_authorization_headers(
     auth_spec: ks.HubAuthenticationPortObjectSpec,
 ) -> dict[str, str]:
     return {
@@ -31,7 +31,7 @@ def validate_auth_spec(auth_spec: ks.HubAuthenticationPortObjectSpec) -> None:
         )
 
 
-def _extract_api_base(auth_spec: ks.HubAuthenticationPortObjectSpec) -> str:
+def extract_api_base(auth_spec: ks.HubAuthenticationPortObjectSpec) -> str:
     try:
         validate_auth_spec(auth_spec)
     except knext.InvalidParametersError as ex:
@@ -44,13 +44,13 @@ def _extract_api_base(auth_spec: ks.HubAuthenticationPortObjectSpec) -> str:
     return urlunparse(ai_proxy_url)
 
 
-def _list_models_in_dialog(
+def list_models_in_dialog(
     mode: str,
 ) -> Callable[[knext.DialogCreationContext], list[str]]:
     def list_models(ctx: knext.DialogCreationContext) -> list[str]:
         model_list = []
         if (specs := ctx.get_input_specs()) and (auth_spec := specs[0]):
-            model_list = _list_models(auth_spec, mode)
+            model_list = list_models(auth_spec, mode)
         if not model_list:
             model_list = [""]
         return model_list
@@ -58,7 +58,7 @@ def _list_models_in_dialog(
     return list_models
 
 
-def _list_models(auth_spec, mode: str) -> list[str]:
+def list_models(auth_spec, mode: str) -> list[str]:
     model_list = [model_data["name"] for model_data in _get_model_data(auth_spec, mode)]
     if len(model_list) == 0:
         model_list.append("")
@@ -68,10 +68,10 @@ def _list_models(auth_spec, mode: str) -> list[str]:
 
 
 def _get_model_data(auth_spec, mode: str):
-    api_base = _extract_api_base(auth_spec)
+    api_base = extract_api_base(auth_spec)
     model_info = api_base + "/management/models?mode=" + mode
     response = requests.get(
-        url=model_info, headers=_create_authorization_headers(auth_spec)
+        url=model_info, headers=create_authorization_headers(auth_spec)
     )
     if response.status_code == 404:
         raise ValueError(

@@ -6,10 +6,10 @@ from ..base import GeneralSettings
 from ._base import (
     hub_connector_icon,
     knime_category,
-    _create_authorization_headers,
-    _extract_api_base,
-    _list_models_in_dialog,
-    _list_models,
+    create_authorization_headers,
+    extract_api_base,
+    list_models_in_dialog,
+    list_models,
     validate_auth_spec,
 )
 
@@ -88,8 +88,8 @@ class KnimeHubChatModelPortObject(ChatModelPortObject):
         auth_spec = self.spec.auth_spec
         return ChatOpenAI(
             model=self.spec.model_name,
-            default_headers=_create_authorization_headers(auth_spec),
-            openai_api_base=_extract_api_base(auth_spec),
+            default_headers=create_authorization_headers(auth_spec),
+            openai_api_base=extract_api_base(auth_spec),
             openai_api_key="placeholder",
             temperature=self.spec.temperature,
             max_tokens=self.spec.max_tokens,
@@ -153,7 +153,7 @@ class KnimeHubChatModelConnector:
     """
 
     model_name = knext.StringParameter(
-        "Model", "Select the model to use.", choices=_list_models_in_dialog("chat")
+        "Model", "Select the model to use.", choices=list_models_in_dialog("chat")
     )
 
     model_settings = ModelSettings()
@@ -170,7 +170,7 @@ class KnimeHubChatModelConnector:
     def execute(
         self, ctx: knext.ExecutionContext, authentication: knext.PortObject
     ) -> KnimeHubChatModelPortObject:
-        available_models = _list_models(authentication.spec, "chat")
+        available_models = list_models(authentication.spec, "chat")
         if self.model_name not in available_models:
             raise knext.InvalidParametersError(
                 f"The selected model {self.model_name} is not served by the connected Hub."

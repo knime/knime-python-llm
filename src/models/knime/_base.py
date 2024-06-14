@@ -24,7 +24,15 @@ def _create_authorization_headers(
     }
 
 
+def validate_auth_spec(auth_spec: ks.HubAuthenticationPortObjectSpec) -> None:
+    if auth_spec.hub_url is None:
+        raise knext.InvalidParametersError(
+            "KNIME hub connection not available. Please re-execute the node."
+        )
+
+
 def _extract_api_base(auth_spec: ks.HubAuthenticationPortObjectSpec) -> str:
+    validate_auth_spec(auth_spec)
     hub_url = auth_spec.hub_url
     parsed_url = urlparse(hub_url)
     # drop params, query and fragment

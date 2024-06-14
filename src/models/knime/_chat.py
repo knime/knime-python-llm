@@ -1,7 +1,7 @@
 from langchain_openai import ChatOpenAI
 import knime.extension as knext
 import knime.api.schema as ks
-from knime.extension import ExecutionContext
+from knime.extension import ConfigurationContext, ExecutionContext
 from ..base import GeneralSettings
 from ._base import (
     hub_connector_icon,
@@ -10,6 +10,7 @@ from ._base import (
     _extract_api_base,
     _list_models_in_dialog,
     _list_models,
+    validate_auth_spec,
 )
 
 
@@ -73,6 +74,9 @@ class KnimeHubChatModelPortObjectSpec(ChatModelPortObjectSpec):
             data["temperature"],
             data["top_p"],
         )
+
+    def validate_context(self, ctx: ConfigurationContext):
+        validate_auth_spec(self.auth_spec)
 
 
 class KnimeHubChatModelPortObject(ChatModelPortObject):
@@ -159,6 +163,8 @@ class KnimeHubChatModelConnector:
         ctx: knext.ConfigurationContext,
         authentication: ks.HubAuthenticationPortObjectSpec,
     ) -> KnimeHubChatModelPortObjectSpec:
+        # raises exception if the hub authenticator has not been executed
+        validate_auth_spec(authentication)
         return self._create_spec(authentication)
 
     def execute(

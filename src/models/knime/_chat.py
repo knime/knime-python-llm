@@ -1,4 +1,4 @@
-from langchain.chat_models.openai import ChatOpenAI
+from langchain_openai import ChatOpenAI
 import knime.extension as knext
 import knime.api.schema as ks
 from knime.extension import ExecutionContext

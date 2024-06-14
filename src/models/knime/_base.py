@@ -75,7 +75,7 @@ def _get_model_data(auth_spec, mode: str):
     )
     if response.status_code == 404:
         raise ValueError(
-            "The AI proxy is not reachable. Is it activated in the connected KNIME Hub?"
+            "The GenAI gateway is not reachable. Is it activated in the connected KNIME Hub?"
         )
     response.raise_for_status()
     return response.json()["models"]

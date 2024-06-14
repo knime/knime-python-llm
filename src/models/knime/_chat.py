@@ -142,9 +142,9 @@ class ModelSettings(GeneralSettings):
     port_type=knime_chat_model_port_type,
 )
 class KnimeHubChatModelConnector:
-    """Connects to a Chat Model configured in the AI proxy of the connected KNIME Hub.
+    """Connects to a Chat Model configured in the GenAI gateway of the connected KNIME Hub.
 
-    Connects to a Chat Model configured in the AI proxy of the connected KNIME Hub using the authentication
+    Connects to a Chat Model configured in the GenAI gateway of the connected KNIME Hub using the authentication
     provided via the input port.
     """
 

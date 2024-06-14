@@ -166,6 +166,10 @@ class TextChunker:
                 "The chunk overlap must not be larger than the chunk size."
             )
 
+        if self.language_mode == SpecifyLanguageSetting.CODE.name:
+            # raises an InvalidParametersError if the language can't be retrieved
+            self._get_language()
+
         if self.output_column == OutputColumnSetting.APPEND.name:
             if not self.output_name:
                 raise knext.InvalidParametersError(
@@ -282,17 +286,10 @@ class TextChunker:
 
                 yield knext.Table.from_pyarrow(output_table, row_ids="keep")
 
-    def _create_splitter(self):
+    def _create_splitter(self) -> RecursiveCharacterTextSplitter:
         if self.language_mode == SpecifyLanguageSetting.CODE.name:
-            try:
-                language = Language[self.selected_language]
-            except Exception:
-                raise RuntimeError(
-                    f"""Failed to match the selected separator language "{SplitterLanguage[self.selected_language].label}" to a langchain language."""
-                )
-
             return RecursiveCharacterTextSplitter.from_language(
-                language=language,
+                language=self._get_language(),
                 chunk_size=self.chunk_size,
                 chunk_overlap=self.chunk_overlap,
             )
@@ -300,6 +297,14 @@ class TextChunker:
             return RecursiveCharacterTextSplitter(
                 chunk_size=self.chunk_size,
                 chunk_overlap=self.chunk_overlap,
+            )
+
+    def _get_language(self) -> Language:
+        try:
+            return Language[self.selected_language]
+        except KeyError:
+            raise knext.InvalidParametersError(
+                f"""Failed to match the selected separator language "{SplitterLanguage[self.selected_language].label}" to a langchain language."""
             )
 
     def _create_ungroup_indexes(self, indexes: pd.Series):

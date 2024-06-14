@@ -196,10 +196,7 @@ class TextChunker:
         )
 
     def _generate_batches(self, input_table: knext.Table):
-        splitter = RecursiveCharacterTextSplitter(
-            chunk_size=self.chunk_size,
-            chunk_overlap=self.chunk_overlap,
-        )
+        splitter = self._create_splitter()
         for batch in input_table.batches():
             pa_batch = batch.to_pyarrow()
             pa_table = pa.Table.from_batches([pa_batch])
@@ -231,25 +228,6 @@ class TextChunker:
                 df = pd.DataFrame.from_dict({"Chunks": pa_col.to_pandas()})
 
                 # Apply Text Splitter
-                if self.language_mode == SpecifyLanguageSetting.CODE.name:
-                    try:
-                        language = Language[self.selected_language]
-                    except Exception:
-                        raise RuntimeError(
-                            f"""Failed to match the selected separator language "{SplitterLanguage[self.selected_language].label}" to a langchain language."""
-                        )
-
-                    splitter = RecursiveCharacterTextSplitter.from_language(
-                        language=language,
-                        chunk_size=self.chunk_size,
-                        chunk_overlap=self.chunk_overlap,
-                    )
-                else:
-                    splitter = RecursiveCharacterTextSplitter(
-                        chunk_size=self.chunk_size,
-                        chunk_overlap=self.chunk_overlap,
-                    )
-
                 df["Chunks"] = df["Chunks"].apply(
                     lambda row: splitter.split_text(row) if pd.notnull(row) else None
                 )
@@ -303,6 +281,26 @@ class TextChunker:
                     )
 
                 yield knext.Table.from_pyarrow(output_table, row_ids="keep")
+
+    def _create_splitter(self):
+        if self.language_mode == SpecifyLanguageSetting.CODE.name:
+            try:
+                language = Language[self.selected_language]
+            except Exception:
+                raise RuntimeError(
+                    f"""Failed to match the selected separator language "{SplitterLanguage[self.selected_language].label}" to a langchain language."""
+                )
+
+            return RecursiveCharacterTextSplitter.from_language(
+                language=language,
+                chunk_size=self.chunk_size,
+                chunk_overlap=self.chunk_overlap,
+            )
+        else:
+            return RecursiveCharacterTextSplitter(
+                chunk_size=self.chunk_size,
+                chunk_overlap=self.chunk_overlap,
+            )
 
     def _create_ungroup_indexes(self, indexes: pd.Series):
         """Returns a list of indexes that specifies which elements to take from a column to ungroup it

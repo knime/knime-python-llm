@@ -44,9 +44,12 @@ def _list_models_in_dialog(
     mode: str,
 ) -> Callable[[knext.DialogCreationContext], list[str]]:
     def list_models(ctx: knext.DialogCreationContext) -> list[str]:
+        model_list = []
         if (specs := ctx.get_input_specs()) and (auth_spec := specs[0]):
-            return _list_models(auth_spec, mode)
-        return [""]
+            model_list = _list_models(auth_spec, mode)
+        if not model_list:
+            model_list = [""]
+        return model_list
 
     return list_models
 

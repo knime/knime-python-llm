@@ -32,7 +32,11 @@ def validate_auth_spec(auth_spec: ks.HubAuthenticationPortObjectSpec) -> None:
 
 
 def _extract_api_base(auth_spec: ks.HubAuthenticationPortObjectSpec) -> str:
-    validate_auth_spec(auth_spec)
+    try:
+        validate_auth_spec(auth_spec)
+    except knext.InvalidParametersError as ex:
+        # ValueError does not add the exception type to the error message in the dialog
+        raise ValueError(str(ex))
     hub_url = auth_spec.hub_url
     parsed_url = urlparse(hub_url)
     # drop params, query and fragment

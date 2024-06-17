@@ -69,6 +69,8 @@ chat_models = [
     "gpt-3.5-turbo-16k",
     "gpt-4",
     "gpt-4-32k",
+    "gpt-4o",
+    "gpt-4-turbo",
 ]
 chat_default = "gpt-3.5-turbo"
 embeddings_models = [

@@ -44,18 +44,18 @@ def extract_api_base(auth_spec: ks.HubAuthenticationPortObjectSpec) -> str:
     return urlunparse(ai_proxy_url)
 
 
-def list_models_in_dialog(
+def create_model_choice_provider(
     mode: str,
 ) -> Callable[[knext.DialogCreationContext], list[str]]:
-    def list_models(ctx: knext.DialogCreationContext) -> list[str]:
+    def model_choices_provider(ctx: knext.DialogCreationContext) -> list[str]:
         model_list = []
         if (specs := ctx.get_input_specs()) and (auth_spec := specs[0]):
-            model_list = list_models(auth_spec, mode)
+            model_list = model_choices_provider(auth_spec, mode)
         if not model_list:
             model_list = [""]
         return model_list
 
-    return list_models
+    return model_choices_provider
 
 
 def list_models(auth_spec, mode: str) -> list[str]:

@@ -8,7 +8,7 @@ from ._base import (
     knime_category,
     create_authorization_headers,
     extract_api_base,
-    list_models_in_dialog,
+    create_model_choice_provider,
     list_models,
     validate_auth_spec,
 )
@@ -153,7 +153,9 @@ class KnimeHubChatModelConnector:
     """
 
     model_name = knext.StringParameter(
-        "Model", "Select the model to use.", choices=list_models_in_dialog("chat")
+        "Model",
+        "Select the model to use.",
+        choices=create_model_choice_provider("chat"),
     )
 
     model_settings = ModelSettings()

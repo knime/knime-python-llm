@@ -335,6 +335,14 @@ class ChatModelLoaderInputSettings:
             "gpt-4-32k",
             """Same capabilities as the base gpt-4 mode but with 4x the context length.""",
         )
+        GPT_4_O = (
+            "gpt-4o",
+            """Most advanced model that’s cheaper and faster than GPT-4 Turbo.""",
+        )
+        TURBO_4 = (
+            "gpt-4-turbo",
+            """Faster and more cost-effective while maintaining comparable performance to GPT-4.""",
+        )
 
     selection = _get_model_selection_value_switch()
 

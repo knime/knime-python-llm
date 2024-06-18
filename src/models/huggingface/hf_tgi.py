@@ -3,6 +3,7 @@ from typing import Any, Optional
 
 from pydantic import root_validator
 import knime.extension as knext
+from knime.extension.nodes import input_port_group
 from ..base import (
     LLMPortObjectSpec,
     LLMPortObject,
@@ -15,6 +16,11 @@ from .hf_base import (
     hf_icon,
     HFPromptTemplateSettings,
     HFModelSettings,
+)
+from .hf_hub import (
+    HFAuthenticationPortObject,
+    HFAuthenticationPortObjectSpec,
+    hf_authentication_port_type,
 )
 
 # Langchain imports
@@ -109,6 +115,7 @@ class HFTGILLMPortObjectSpec(LLMPortObjectSpec):
         repetition_penalty,
         seed,
         n_requests,
+        hf_hub_auth: Optional[HFAuthenticationPortObjectSpec],
     ) -> None:
         super().__init__()
         self._inference_server_url = inference_server_url
@@ -120,6 +127,7 @@ class HFTGILLMPortObjectSpec(LLMPortObjectSpec):
         self._repetition_penalty = repetition_penalty
         self._seed = seed
         self._n_requests = n_requests
+        self._hf_hub_auth = hf_hub_auth
 
     @property
     def inference_server_url(self):
@@ -157,6 +165,14 @@ class HFTGILLMPortObjectSpec(LLMPortObjectSpec):
     def n_requests(self):
         return self._n_requests
 
+    @property
+    def hf_hub_auth(self) -> Optional[HFAuthenticationPortObjectSpec]:
+        return self._hf_hub_auth
+
+    def validate_context(self, ctx: knext.ConfigurationContext):
+        if self.hf_hub_auth:
+            self.hf_hub_auth.validate_context(ctx)
+
     def serialize(self) -> dict:
         return {
             "inference_server_url": self.inference_server_url,
@@ -168,10 +184,16 @@ class HFTGILLMPortObjectSpec(LLMPortObjectSpec):
             "repetition_penalty": self.repetition_penalty,
             "seed": self.seed,
             "n_requests": self.n_requests,
+            "hf_hub_auth": self._hf_hub_auth.serialize() if self._hf_hub_auth else None,
         }
 
     @classmethod
     def deserialize(cls, data: dict):
+        hub_auth_data = data.get("hf_hub_auth")
+        if hub_auth_data:
+            hub_auth = HFAuthenticationPortObjectSpec.deserialize(hub_auth_data)
+        else:
+            hub_auth = None
         return cls(
             data["inference_server_url"],
             data["max_new_tokens"],
@@ -182,6 +204,7 @@ class HFTGILLMPortObjectSpec(LLMPortObjectSpec):
             data["repetition_penalty"],
             seed=data.get("seed", 0),
             n_requests=data.get("n_requests", 1),
+            hf_hub_auth=hub_auth,
         )
 
 
@@ -193,7 +216,8 @@ class HFTGILLMPortObject(LLMPortObject):
     def spec(self) -> HFTGILLMPortObjectSpec:
         return super().spec
 
-    def create_model(self, ctx) -> HuggingFaceTextGenInference:
+    def create_model(self, ctx: knext.ExecutionContext) -> HuggingFaceTextGenInference:
+        hub_auth = self.spec.hf_hub_auth
         return _HFTGILLM(
             server_url=self.spec.inference_server_url,
             max_new_tokens=self.spec.max_new_tokens,
@@ -203,6 +227,7 @@ class HFTGILLMPortObject(LLMPortObject):
             temperature=self.spec.temperature,
             repetition_penalty=self.spec.repetition_penalty,
             seed=self.spec.seed,
+            hf_api_token=hub_auth.get_token(ctx) if hub_auth else None,
         )
 
 
@@ -231,6 +256,7 @@ class HFTGIChatModelPortObjectSpec(HFTGILLMPortObjectSpec, ChatModelPortObjectSp
             llm_spec.repetition_penalty,
             llm_spec.seed,
             llm_spec.n_requests,
+            llm_spec.hf_hub_auth,
         )
         self._system_prompt_template = system_prompt_template
         self._prompt_template = prompt_template
@@ -300,6 +326,13 @@ huggingface_textGenInference_chat_port_type = knext.port_type(
         "Large Language Model",
     ],
 )
+# TODO switch to knext.input_port_group once change is available on master
+@input_port_group(
+    name="Hugging Face Hub Connection",
+    description="An optional Hugging Face hub connection that can be used to "
+    "access protected Hugging Face inference endpoints.",
+    port_type=hf_authentication_port_type,
+)
 @knext.output_port(
     "Huggingface TGI Configuration",
     "Connection to an LLM hosted on a TGI server.",
@@ -313,8 +346,9 @@ class HFTGILLMConnector:
     is a Rust, Python, and gRPC server specifically designed for text generation inference.
     It can be self-hosted to power LLM APIs and inference widgets.
 
-    Please note that this node does not connect to the Hugging Face Hub,
-    but to a Text Generation Inference Server that can be hosted both locally and remotely.
+    This node can connect to locally or remotely hosted TGI servers which includes
+    [Text Generation Inference Endpoints](https://huggingface.co/docs/inference-endpoints/) of popular
+    text generation models that are deployed via Hugging Face Hub.
 
     For more details and information about integrating with the Hugging Face TextGen Inference
     and setting up a local server, refer to the
@@ -324,16 +358,31 @@ class HFTGILLMConnector:
     settings = HFTGIServerSettings()
     model_settings = HFTGIModelSettings()
 
-    def configure(self, ctx: knext.ConfigurationContext) -> HFTGILLMPortObjectSpec:
+    def configure(
+        self,
+        ctx: knext.ConfigurationContext,
+        hf_hub_auth_group: list[HFAuthenticationPortObjectSpec],
+    ) -> HFTGILLMPortObjectSpec:
         if not self.settings.server_url:
             raise knext.InvalidParametersError("Server URL missing")
 
-        return self.create_spec()
+        hf_hub_auth = hf_hub_auth_group[0] if hf_hub_auth_group else None
+        if hf_hub_auth:
+            hf_hub_auth.validate_context(ctx)
 
-    def execute(self, ctx: knext.ExecutionContext) -> HFTGILLMPortObject:
-        return HFTGILLMPortObject(self.create_spec())
+        return self.create_spec(hf_hub_auth)
 
-    def create_spec(self) -> HFTGILLMPortObjectSpec:
+    def execute(
+        self,
+        ctx: knext.ExecutionContext,
+        hf_hub_auth_group: list[HFAuthenticationPortObject],
+    ) -> HFTGILLMPortObject:
+        hf_hub_auth = hf_hub_auth_group[0].spec if hf_hub_auth_group else None
+        return HFTGILLMPortObject(self.create_spec(), hf_hub_auth)
+
+    def create_spec(
+        self, hf_hub_auth: Optional[HFAuthenticationPortObjectSpec]
+    ) -> HFTGILLMPortObjectSpec:
         seed = None if self.model_settings.seed == 0 else self.model_settings.seed
 
         return HFTGILLMPortObjectSpec(
@@ -346,6 +395,7 @@ class HFTGILLMConnector:
             self.model_settings.repetition_penalty,
             seed=seed,
             n_requests=self.model_settings.n_requests,
+            hf_hub_auth=hf_hub_auth,
         )
 
 
@@ -364,6 +414,13 @@ class HFTGILLMConnector:
         "Text Generation Inference",
     ],
 )
+# TODO switch to knext.input_port_group once change is available on master
+@input_port_group(
+    name="Hugging Face Hub Connection",
+    description="An optional Hugging Face hub connection that can be used to "
+    "access protected Hugging Face inference endpoints.",
+    port_type=hf_authentication_port_type,
+)
 @knext.output_port(
     "Huggingface TGI LLM Connection",
     "Connection to a chat model hosted on a Text Generation Inference server.",
@@ -377,8 +434,9 @@ class HFTGIChatModelConnector:
     is a Rust, Python, and gRPC server specifically designed for text generation inference.
     It can be self-hosted to power LLM APIs and inference widgets.
 
-    Please note that this node does not connect to the Hugging Face Hub,
-    but to a Text Generation Inference Server that can be hosted both locally and remotely.
+    This node can connect to locally or remotely hosted TGI servers which includes
+    [Text Generation Inference Endpoints](https://huggingface.co/docs/inference-endpoints/) of popular
+    text generation models that are deployed via Hugging Face Hub.
 
     For more details and information about integrating with the Hugging Face TextGen Inference
     and setting up a local server, refer to the
@@ -390,17 +448,29 @@ class HFTGIChatModelConnector:
     model_settings = HFTGIModelSettings()
 
     def configure(
-        self, ctx: knext.ConfigurationContext
+        self,
+        ctx: knext.ConfigurationContext,
+        hf_hub_auth_group: list[HFAuthenticationPortObjectSpec],
     ) -> HFTGIChatModelPortObjectSpec:
         if not self.settings.server_url:
             raise knext.InvalidParametersError("Server URL missing")
+        hf_hub_auth = hf_hub_auth_group[0] if hf_hub_auth_group else None
+        if hf_hub_auth:
+            hf_hub_auth.validate_context(ctx)
 
-        return self.create_spec()
+        return self.create_spec(hf_hub_auth)
 
-    def execute(self, ctx: knext.ExecutionContext) -> HFTGIChatModelPortObject:
-        return HFTGIChatModelPortObject(self.create_spec())
+    def execute(
+        self,
+        ctx: knext.ExecutionContext,
+        hf_hub_auth_group: list[HFAuthenticationPortObject],
+    ) -> HFTGIChatModelPortObject:
+        hf_hub_auth = hf_hub_auth_group[0].spec if hf_hub_auth_group else None
+        return HFTGIChatModelPortObject(self.create_spec(hf_hub_auth))
 
-    def create_spec(self) -> HFTGIChatModelPortObjectSpec:
+    def create_spec(
+        self, hf_hub_auth: Optional[HFAuthenticationPortObjectSpec]
+    ) -> HFTGIChatModelPortObjectSpec:
         seed = None if self.model_settings.seed == 0 else self.model_settings.seed
 
         llm_spec = HFTGILLMPortObjectSpec(
@@ -413,6 +483,7 @@ class HFTGIChatModelConnector:
             self.model_settings.repetition_penalty,
             seed=seed,
             n_requests=self.model_settings.n_requests,
+            hf_hub_auth=hf_hub_auth,
         )
 
         return HFTGIChatModelPortObjectSpec(

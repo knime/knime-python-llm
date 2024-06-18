@@ -1,14 +1,20 @@
 # KNIME / own imports
 import knime.extension as knext
+from knime.extension.nodes import input_port_group
 from ..base import EmbeddingsPortObjectSpec, EmbeddingsPortObject
 from .hf_base import hf_category, hf_icon
+from .hf_hub import (
+    hf_authentication_port_type,
+    HFAuthenticationPortObject,
+    HFAuthenticationPortObjectSpec,
+)
 import util
 
 # Langchain imports
 from langchain_community.embeddings import HuggingFaceHubEmbeddings
 
 # Other imports
-from typing import List
+from typing import List, Optional
 
 hf_tei_category = knext.category(
     path=hf_category,
@@ -32,10 +38,16 @@ class _HuggingFaceEmbeddings(HuggingFaceHubEmbeddings):
 
 
 class HFTEIEmbeddingsPortObjectSpec(EmbeddingsPortObjectSpec):
-    def __init__(self, inference_server_url: str, batch_size: int) -> None:
+    def __init__(
+        self,
+        inference_server_url: str,
+        batch_size: int,
+        hf_hub_auth: Optional[HFAuthenticationPortObjectSpec],
+    ) -> None:
         super().__init__()
         self._inference_server_url = inference_server_url
         self._batch_size = batch_size
+        self._hf_hub_auth = hf_hub_auth
 
     @property
     def inference_server_url(self):
@@ -45,15 +57,29 @@ class HFTEIEmbeddingsPortObjectSpec(EmbeddingsPortObjectSpec):
     def batch_size(self):
         return self._batch_size
 
+    @property
+    def hf_hub_auth(self) -> Optional[HFAuthenticationPortObjectSpec]:
+        return self._hf_hub_auth
+
+    def validate_context(self, ctx: knext.ConfigurationContext):
+        if self.hf_hub_auth:
+            self.hf_hub_auth.validate_context(ctx)
+
     def serialize(self) -> dict:
         return {
             "inference_server_url": self.inference_server_url,
             "batch_size": self.batch_size,
+            "hf_hub_auth": self._hf_hub_auth.serialize() if self._hf_hub_auth else None,
         }
 
     @classmethod
     def deserialize(cls, data: dict):
-        return cls(data["inference_server_url"], data["batch_size"])
+        hub_auth_data = data.get("hf_hub_auth")
+        if hub_auth_data:
+            hub_auth = HFAuthenticationPortObjectSpec.deserialize(hub_auth_data)
+        else:
+            hub_auth = None
+        return cls(data["inference_server_url"], data["batch_size"], hub_auth)
 
 
 class HFTEIEmbeddingsPortObject(EmbeddingsPortObject):
@@ -64,9 +90,12 @@ class HFTEIEmbeddingsPortObject(EmbeddingsPortObject):
     def spec(self) -> HFTEIEmbeddingsPortObjectSpec:
         return super().spec
 
-    def create_model(self, ctx) -> HuggingFaceHubEmbeddings:
+    def create_model(self, ctx: knext.ExecutionContext) -> HuggingFaceHubEmbeddings:
+        hub_auth = self.spec.hf_hub_auth
         return _HuggingFaceEmbeddings(
-            model=self.spec.inference_server_url, batch_size=self.spec.batch_size
+            model=self.spec.inference_server_url,
+            batch_size=self.spec.batch_size,
+            huggingfacehub_api_token=hub_auth.get_token(ctx) if hub_auth else None,
         )
 
 
@@ -93,6 +122,13 @@ huggingface_tei_embeddings_port_type = knext.port_type(
         "Retrieval Augmented Generation",
     ],
 )
+# TODO switch to knext.input_port_group once change is available on master
+@input_port_group(
+    name="Hugging Face Hub Connection",
+    description="An optional Hugging Face hub connection that can be used to "
+    "access protected Hugging Face inference endpoints.",
+    port_type=hf_authentication_port_type,
+)
 @knext.output_port(
     "Embeddings Model",
     "Connection to an embeddings model hosted on a Text Embeddings Inference server.",
@@ -105,9 +141,10 @@ class HFTEIEmbeddingsConnector:
     The [Text Embeddings Inference Server](https://github.com/huggingface/text-embeddings-inference)
     is a toolkit for deploying and serving open source text embeddings and sequence classification models.
 
-    This node can connect to locally or remotely hosted TEI servers which includes public
-    [Inference Endpoints](https://huggingface.co/docs/inference-endpoints/) of
+    This node can connect to locally or remotely hosted TEI servers which includes
+    [Text Embedding Inference Endpoints](https://huggingface.co/docs/inference-endpoints/) of
     popular embeddings models that are deployed via Hugging Face Hub.
+    Protected endpoints require to connect a HF Hub Authenticator in order to authenticate with Hugging Face hub.
 
     For more details and information about integrating with the Hugging Face Embeddings Inference
     and setting up a server, refer to
@@ -127,15 +164,30 @@ class HFTEIEmbeddingsConnector:
     )
 
     def configure(
-        self, ctx: knext.ConfigurationContext
+        self,
+        ctx: knext.ConfigurationContext,
+        hf_hub_auth_group: list[HFAuthenticationPortObjectSpec],
     ) -> HFTEIEmbeddingsPortObjectSpec:
         if not self.server_url:
             raise knext.InvalidParametersError("Server URL missing")
 
-        return self.create_spec()
+        hf_hub_auth = hf_hub_auth_group[0] if hf_hub_auth_group else None
+        if hf_hub_auth:
+            hf_hub_auth.validate_context(ctx)
 
-    def execute(self, ctx: knext.ExecutionContext) -> HFTEIEmbeddingsPortObject:
-        return HFTEIEmbeddingsPortObject(self.create_spec())
+        return self.create_spec(hf_hub_auth)
 
-    def create_spec(self) -> HFTEIEmbeddingsPortObjectSpec:
-        return HFTEIEmbeddingsPortObjectSpec(self.server_url, self.batch_size)
+    def execute(
+        self,
+        ctx: knext.ExecutionContext,
+        hf_hub_auth_group: list[HFAuthenticationPortObject],
+    ) -> HFTEIEmbeddingsPortObject:
+        hf_hub_auth = hf_hub_auth_group[0].spec if hf_hub_auth_group else None
+        return HFTEIEmbeddingsPortObject(self.create_spec(hf_hub_auth))
+
+    def create_spec(
+        self, hf_hub_auth: Optional[HFAuthenticationPortObjectSpec]
+    ) -> HFTEIEmbeddingsPortObjectSpec:
+        return HFTEIEmbeddingsPortObjectSpec(
+            self.server_url, self.batch_size, hf_hub_auth
+        )

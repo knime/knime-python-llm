@@ -86,6 +86,9 @@ class HFAuthenticationPortObjectSpec(AIPortObjectSpec):
     def credentials(self) -> str:
         return self._credentials
 
+    def get_token(self, ctx: knext.ExecutionContext):
+        return ctx.get_credentials(self.credentials).password
+
     def validate_context(self, ctx: knext.ConfigurationContext):
         if not self.credentials in ctx.get_credential_names():
             raise knext.InvalidParametersError(

@@ -1,6 +1,5 @@
 # KNIME / own imports
 import knime.extension as knext
-from knime.extension.nodes import input_port_group
 from ..base import EmbeddingsPortObjectSpec, EmbeddingsPortObject
 from .hf_base import hf_category, hf_icon
 from .hf_hub import (
@@ -122,8 +121,7 @@ huggingface_tei_embeddings_port_type = knext.port_type(
         "Retrieval Augmented Generation",
     ],
 )
-# TODO switch to knext.input_port_group once change is available on master
-@input_port_group(
+@knext.input_port_group(
     name="Hugging Face Hub Connection",
     description="An optional Hugging Face hub connection that can be used to "
     "access protected Hugging Face inference endpoints.",

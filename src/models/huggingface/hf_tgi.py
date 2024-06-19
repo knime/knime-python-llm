@@ -3,7 +3,6 @@ from typing import Any, Optional
 
 from pydantic import root_validator
 import knime.extension as knext
-from knime.extension.nodes import input_port_group
 from ..base import (
     LLMPortObjectSpec,
     LLMPortObject,
@@ -24,9 +23,6 @@ from .hf_hub import (
 )
 
 # Langchain imports
-from langchain_community.llms.huggingface_text_gen_inference import (
-    HuggingFaceTextGenInference,
-)
 from langchain_core.language_models import LLM
 from huggingface_hub import InferenceClient
 
@@ -40,6 +36,11 @@ hf_tgi_category = knext.category(
 
 
 class _HFTGILLM(LLM):
+    """Custom implementation backed by huggingface_hub.InferenceClient.
+    We can't use the implementation of langchain_community because it always requires an api token (and is
+    probably going to be deprecated soon) and we also can't use the langchain_huggingface implementation
+    since it has torch as a required dependency."""
+
     server_url: str
     hf_api_token: Optional[str] = None
     max_new_tokens: int = 512
@@ -216,7 +217,7 @@ class HFTGILLMPortObject(LLMPortObject):
     def spec(self) -> HFTGILLMPortObjectSpec:
         return super().spec
 
-    def create_model(self, ctx: knext.ExecutionContext) -> HuggingFaceTextGenInference:
+    def create_model(self, ctx: knext.ExecutionContext) -> _HFTGILLM:
         hub_auth = self.spec.hf_hub_auth
         return _HFTGILLM(
             server_url=self.spec.inference_server_url,
@@ -326,8 +327,7 @@ huggingface_textGenInference_chat_port_type = knext.port_type(
         "Large Language Model",
     ],
 )
-# TODO switch to knext.input_port_group once change is available on master
-@input_port_group(
+@knext.input_port_group(
     name="Hugging Face Hub Connection",
     description="An optional Hugging Face hub connection that can be used to "
     "access protected Hugging Face inference endpoints.",
@@ -415,7 +415,7 @@ class HFTGILLMConnector:
     ],
 )
 # TODO switch to knext.input_port_group once change is available on master
-@input_port_group(
+@knext.input_port_group(
     name="Hugging Face Hub Connection",
     description="An optional Hugging Face hub connection that can be used to "
     "access protected Hugging Face inference endpoints.",

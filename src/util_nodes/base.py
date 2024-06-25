@@ -10,7 +10,7 @@ import pyarrow as pa
 import pyarrow.compute as pc
 import pandas as pd
 
-util_icon = "icons/ml.png"
+text_chunker_icon = "icons/text_chunker.png"
 
 
 class OutputColumnSetting(knext.EnumParameterOptions):
@@ -72,7 +72,7 @@ class SplitterLanguage(knext.EnumParameterOptions):
 @knext.node(
     "Text Chunker (Labs)",
     knext.NodeType.MANIPULATOR,
-    util_icon,
+    text_chunker_icon,
     category=util.main_category,
     keywords=[
         "Text Splitting",

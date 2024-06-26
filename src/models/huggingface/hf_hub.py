@@ -22,6 +22,7 @@ from .hf_base import (
 # Langchain imports
 from langchain_community.llms.huggingface_endpoint import HuggingFaceEndpoint
 from langchain.embeddings.huggingface_hub import HuggingFaceHubEmbeddings
+from langchain_core.language_models import BaseLLM
 
 # Other imports
 import huggingface_hub
@@ -179,9 +180,8 @@ class HFHubLLMPortObjectSpec(LLMPortObjectSpec):
         )
 
 
-class HuggingFaceEndpointWrapper:
-    def __init__(self, base_model):
-        self.base_model = base_model
+class HuggingFaceEndpointWrapper(BaseLLM):
+    base_model: HuggingFaceEndpoint
 
     async def abatch(self, inputs, config=None, *, return_exceptions=False, **kwargs):
         try:
@@ -192,6 +192,12 @@ class HuggingFaceEndpointWrapper:
             raise knext.InvalidParametersError(
                 f"There was a problem getting a response from the model. Please try another model. Error: {e}."
             )
+
+    def _generate(self, inputs, stop=None, run_manager=None, **kwargs):
+        return self.base_model.generate(inputs, stop=stop, **kwargs)
+
+    def _llm_type(self):
+        return "HuggingFaceEndpoint"
 
 
 class HFHubLLMPortObject(LLMPortObject):
@@ -216,7 +222,7 @@ class HFHubLLMPortObject(LLMPortObject):
             repetition_penalty=self.spec.model_kwargs.get("repetition_penalty"),
             temperature=self.spec.model_kwargs.get("temperature"),
         )
-        return HuggingFaceEndpointWrapper(huggingface_endpoint)
+        return HuggingFaceEndpointWrapper(base_model=huggingface_endpoint)
 
 
 class HFHubChatModelPortObjectSpec(HFHubLLMPortObjectSpec, ChatModelPortObjectSpec):
@@ -440,7 +446,7 @@ class HFHubConnector:
 
     For more details and information about integrating LLMs from the Hugging Face Hub, refer to the [LangChain documentation](https://python.langchain.com/docs/modules/model_io/models/llms/integrations/huggingface_hub).
 
-    Please ensure that you have the necessary permissions to access the model and token with write access.
+    Please ensure that you have the necessary permissions to access the model.
     Failures with gated models may occur due to outdated tokens.
     """
 
@@ -531,7 +537,7 @@ class HFHubChatModelConnector:
     [Hugging Face Hub](https://huggingface.co/models)
     as an input.
 
-    Please ensure that you have the necessary permissions to access the model and token with write access.
+    Please ensure that you have the necessary permissions to access the model.
     Failures with gated models may occur due to outdated tokens.
     """
 
@@ -587,7 +593,7 @@ def _validate_repo_id(repo_id):
     except huggingface_hub.utils._errors.GatedRepoError as e:
         raise knext.InvalidParametersError(
             f"""Access to this repository is restricted: {e}. 
-            Please make sure you have the necessary permissions to access the model and token with write access."""
+            Please make sure you have the necessary permissions to access the model and up-to-date token."""
         )
     except Exception as e:
         raise knext.InvalidParametersError(f"Please provide a valid repo ID. {e}")

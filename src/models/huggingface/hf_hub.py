@@ -436,9 +436,12 @@ class HFHubConnector:
     This node establishes a connection to a specific LLM hosted on the Hugging Face Hub.
     To use this node, you need to successfully authenticate with the Hugging Face Hub using the **HF Hub Authenticator node**.
 
-    Provide the name of the desired LLM repository available on the [Hugging Face Hub](https://python.langchain.com/docs/modules/model_io/models/llms/integrations/huggingface_hub) as an input.
+    Provide the name of the desired LLM repository available on the [Hugging Face Hub](https://huggingface.co/models) as an input.
 
     For more details and information about integrating LLMs from the Hugging Face Hub, refer to the [LangChain documentation](https://python.langchain.com/docs/modules/model_io/models/llms/integrations/huggingface_hub).
+
+    Please ensure that you have the necessary permissions to access the model and token with write access.
+    Failures with gated models may occur due to outdated tokens.
     """
 
     hub_settings = HFHubSettings()
@@ -525,8 +528,11 @@ class HFHubChatModelConnector:
     To use this node, you need to successfully authenticate with the Hugging Face Hub using the **HF Hub Authenticator node**.
 
     Provide the name of the desired chat model repository available on the
-    [Hugging Face Hub](https://python.langchain.com/docs/modules/model_io/models/llms/integrations/huggingface_hub)
+    [Hugging Face Hub](https://huggingface.co/models)
     as an input.
+
+    Please ensure that you have the necessary permissions to access the model and token with write access.
+    Failures with gated models may occur due to outdated tokens.
     """
 
     hub_settings = HFHubSettings()
@@ -578,8 +584,13 @@ class HFHubChatModelConnector:
 def _validate_repo_id(repo_id):
     try:
         huggingface_hub.model_info(repo_id)
-    except:
-        raise knext.InvalidParametersError("Please provide a valid repo ID.")
+    except huggingface_hub.utils._errors.GatedRepoError as e:
+        raise knext.InvalidParametersError(
+            f"""Access to this repository is restricted: {e}. 
+            Please make sure you have the necessary permissions to access the model and token with write access."""
+        )
+    except Exception as e:
+        raise knext.InvalidParametersError(f"Please provide a valid repo ID. {e}")
 
 
 hf_embeddings_port_type = knext.port_type(

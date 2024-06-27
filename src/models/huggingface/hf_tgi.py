@@ -378,7 +378,7 @@ class HFTGILLMConnector:
         hf_hub_auth_group: list[HFAuthenticationPortObject],
     ) -> HFTGILLMPortObject:
         hf_hub_auth = hf_hub_auth_group[0].spec if hf_hub_auth_group else None
-        return HFTGILLMPortObject(self.create_spec(), hf_hub_auth)
+        return HFTGILLMPortObject(self.create_spec(hf_hub_auth))
 
     def create_spec(
         self, hf_hub_auth: Optional[HFAuthenticationPortObjectSpec]

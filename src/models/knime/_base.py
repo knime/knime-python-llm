@@ -50,7 +50,7 @@ def create_model_choice_provider(
     def model_choices_provider(ctx: knext.DialogCreationContext) -> list[str]:
         model_list = []
         if (specs := ctx.get_input_specs()) and (auth_spec := specs[0]):
-            model_list = model_choices_provider(auth_spec, mode)
+            model_list = list_models(auth_spec, mode)
         if not model_list:
             model_list = [""]
         return model_list

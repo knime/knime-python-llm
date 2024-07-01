@@ -2,6 +2,7 @@
 from typing import Any, Optional
 
 from pydantic import root_validator
+import requests
 import knime.extension as knext
 from ..base import (
     model_category,
@@ -114,12 +115,17 @@ class HFLLM(LLM):
         **kwargs: Any,
     ) -> str:
         client: InferenceClient = self.client
-        return client.text_generation(
-            prompt,
-            max_new_tokens=self.max_new_tokens,
-            repetition_penalty=self.repetition_penalty,
-            top_k=self.top_k,
-            top_p=self.top_p,
-            typical_p=self.typical_p,
-            seed=self.seed,
-        )
+        try:
+            return client.text_generation(
+                prompt,
+                max_new_tokens=self.max_new_tokens,
+                repetition_penalty=self.repetition_penalty,
+                top_k=self.top_k,
+                top_p=self.top_p,
+                typical_p=self.typical_p,
+                seed=self.seed,
+            )
+        except requests.exceptions.ProxyError:
+            raise RuntimeError("Failed to establish connection due to a proxy error.")
+        except requests.exceptions.Timeout:
+            raise RuntimeError("The connection to Hugging Face Hub timed out.")

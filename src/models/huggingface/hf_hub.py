@@ -16,13 +16,12 @@ from .hf_base import (
     hf_icon,
     HFPromptTemplateSettings,
     HFModelSettings,
+    HFLLM,
 )
 
 
 # Langchain imports
-from langchain_community.llms.huggingface_endpoint import HuggingFaceEndpoint
 from langchain.embeddings.huggingface_hub import HuggingFaceHubEmbeddings
-from langchain_core.language_models import BaseLLM
 
 # Other imports
 import huggingface_hub
@@ -141,8 +140,8 @@ class HFHubLLMPortObjectSpec(LLMPortObjectSpec):
         return self._credentials.validate_context(ctx)
 
     @property
-    def credentials(self) -> str:
-        return self._credentials.credentials
+    def credentials(self) -> HFAuthenticationPortObjectSpec:
+        return self._credentials
 
     @property
     def repo_id(self):
@@ -208,13 +207,10 @@ class HFHubLLMPortObject(LLMPortObject):
     def spec(self) -> HFHubLLMPortObjectSpec:
         return super().spec
 
-    def create_model(self, ctx) -> HuggingFaceEndpointWrapper:
-        huggingface_endpoint = HuggingFaceEndpoint(
-            huggingfacehub_api_token=ctx.get_credentials(
-                self.spec.credentials
-            ).password,
-            repo_id=self.spec.repo_id,
-            task=self.spec.task,
+    def create_model(self, ctx) -> HFLLM:
+        return HFLLM(
+            model=self.spec.repo_id,
+            hf_api_token=self.spec.credentials.get_token(ctx),
             max_new_tokens=self.spec.model_kwargs.get("max_new_tokens"),
             top_k=self.spec.model_kwargs.get("top_k"),
             top_p=self.spec.model_kwargs.get("top_p"),
@@ -222,7 +218,6 @@ class HFHubLLMPortObject(LLMPortObject):
             repetition_penalty=self.spec.model_kwargs.get("repetition_penalty"),
             temperature=self.spec.model_kwargs.get("temperature"),
         )
-        return HuggingFaceEndpointWrapper(base_model=huggingface_endpoint)
 
 
 class HFHubChatModelPortObjectSpec(HFHubLLMPortObjectSpec, ChatModelPortObjectSpec):

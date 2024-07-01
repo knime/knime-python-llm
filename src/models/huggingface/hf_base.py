@@ -1,9 +1,15 @@
 # KNIME / own imports
+from typing import Any, Optional
+
+from pydantic import root_validator
 import knime.extension as knext
 from ..base import (
     model_category,
     GeneralRemoteSettings,
 )
+
+from huggingface_hub import InferenceClient
+from langchain_core.language_models import LLM
 
 
 hf_icon = "icons/huggingface.png"
@@ -70,3 +76,50 @@ class HFPromptTemplateSettings:
         Refer to the Hugging Face Hub model card for information on the correct prompt template.""",
         default_value="%1",
     )
+
+
+class HFLLM(LLM):
+    """Custom implementation backed by huggingface_hub.InferenceClient.
+    We can't use the implementation of langchain_community because it always requires an api token (and is
+    probably going to be deprecated soon) and we also can't use the langchain_huggingface implementation
+    since it has torch as a required dependency."""
+
+    model: str
+    """Can be a repo id on hugging face hub or the url of a TGI server."""
+    hf_api_token: Optional[str] = None
+    max_new_tokens: int = 512
+    top_k: Optional[int] = None
+    top_p: Optional[float] = 0.95
+    typical_p: Optional[float] = 0.95
+    temperature: Optional[float] = 0.8
+    repetition_penalty: Optional[float] = None
+    client: Any
+    seed: Optional[int] = None
+
+    def _llm_type(self):
+        return "hfllm"
+
+    @root_validator()
+    def validate_values(cls, values: dict) -> dict:
+        values["client"] = InferenceClient(
+            model=values["model"], timeout=120, token=values.get("hf_api_token")
+        )
+        return values
+
+    def _call(
+        self,
+        prompt: str,
+        stop: Optional[list[str]] = None,
+        run_manager=None,
+        **kwargs: Any,
+    ) -> str:
+        client: InferenceClient = self.client
+        return client.text_generation(
+            prompt,
+            max_new_tokens=self.max_new_tokens,
+            repetition_penalty=self.repetition_penalty,
+            top_k=self.top_k,
+            top_p=self.top_p,
+            typical_p=self.typical_p,
+            seed=self.seed,
+        )

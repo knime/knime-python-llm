@@ -1,7 +1,6 @@
 # KNIME / own imports
-from typing import Any, Optional
+from typing import Optional
 
-from pydantic import root_validator
 import knime.extension as knext
 from ..base import (
     LLMPortObjectSpec,
@@ -15,16 +14,13 @@ from .hf_base import (
     hf_icon,
     HFPromptTemplateSettings,
     HFModelSettings,
+    HFLLM,
 )
 from .hf_hub import (
     HFAuthenticationPortObject,
     HFAuthenticationPortObjectSpec,
     hf_authentication_port_type,
 )
-
-# Langchain imports
-from langchain_core.language_models import LLM
-from huggingface_hub import InferenceClient
 
 hf_tgi_category = knext.category(
     path=hf_category,
@@ -33,52 +29,6 @@ hf_tgi_category = knext.category(
     description="Contains nodes that connect to Hugging Face's text generation inference server.",
     icon=hf_icon,
 )
-
-
-class _HFTGILLM(LLM):
-    """Custom implementation backed by huggingface_hub.InferenceClient.
-    We can't use the implementation of langchain_community because it always requires an api token (and is
-    probably going to be deprecated soon) and we also can't use the langchain_huggingface implementation
-    since it has torch as a required dependency."""
-
-    server_url: str
-    hf_api_token: Optional[str] = None
-    max_new_tokens: int = 512
-    top_k: Optional[int] = None
-    top_p: Optional[float] = 0.95
-    typical_p: Optional[float] = 0.95
-    temperature: Optional[float] = 0.8
-    repetition_penalty: Optional[float] = None
-    client: Any
-    seed: Optional[int] = None
-
-    def _llm_type(self):
-        return "hftgillm"
-
-    @root_validator()
-    def validate_values(cls, values: dict) -> dict:
-        values["client"] = InferenceClient(
-            model=values["server_url"], timeout=120, token=values.get("hf_api_token")
-        )
-        return values
-
-    def _call(
-        self,
-        prompt: str,
-        stop: Optional[list[str]] = None,
-        run_manager=None,
-        **kwargs: Any,
-    ) -> str:
-        client: InferenceClient = self.client
-        return client.text_generation(
-            prompt,
-            max_new_tokens=self.max_new_tokens,
-            repetition_penalty=self.repetition_penalty,
-            top_k=self.top_k,
-            top_p=self.top_p,
-            typical_p=self.typical_p,
-            seed=self.seed,
-        )
 
 
 @knext.parameter_group(label="Hugging Face TextGen Inference Server Settings")
@@ -217,10 +167,10 @@ class HFTGILLMPortObject(LLMPortObject):
     def spec(self) -> HFTGILLMPortObjectSpec:
         return super().spec
 
-    def create_model(self, ctx: knext.ExecutionContext) -> _HFTGILLM:
+    def create_model(self, ctx: knext.ExecutionContext) -> HFLLM:
         hub_auth = self.spec.hf_hub_auth
-        return _HFTGILLM(
-            server_url=self.spec.inference_server_url,
+        return HFLLM(
+            model=self.spec.inference_server_url,
             max_new_tokens=self.spec.max_new_tokens,
             top_k=self.spec.top_k,
             top_p=self.spec.top_p,

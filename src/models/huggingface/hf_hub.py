@@ -113,7 +113,7 @@ class HFAuthenticationPortObjectSpec(AIPortObjectSpec):
         return ctx.get_credentials(self.credentials).password
 
     def validate_context(self, ctx: knext.ConfigurationContext):
-        if not self.credentials in ctx.get_credential_names():
+        if self.credentials not in ctx.get_credential_names():
             raise knext.InvalidParametersError(
                 f"The selected credentials '{self.credentials}' holding the Hugging Face Hub API token are not present."
             )
@@ -200,26 +200,6 @@ class HFHubLLMPortObjectSpec(LLMPortObjectSpec):
             data.get("n_requests", 1),
             data["model_kwargs"],
         )
-
-
-class HuggingFaceEndpointWrapper(BaseLLM):
-    base_model: HuggingFaceEndpoint
-
-    async def abatch(self, inputs, config=None, *, return_exceptions=False, **kwargs):
-        try:
-            return await self.base_model.abatch(
-                inputs, config, return_exceptions=return_exceptions, **kwargs
-            )
-        except Exception as e:
-            raise knext.InvalidParametersError(
-                f"There was a problem getting a response from the model. Please try another model. Error: {e}."
-            )
-
-    def _generate(self, inputs, stop=None, run_manager=None, **kwargs):
-        return self.base_model.generate(inputs, stop=stop, **kwargs)
-
-    def _llm_type(self):
-        return "HuggingFaceEndpoint"
 
 
 class HFHubLLMPortObject(LLMPortObject):

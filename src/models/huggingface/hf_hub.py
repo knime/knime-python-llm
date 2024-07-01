@@ -479,7 +479,9 @@ class HFHubConnector:
         if not self.hub_settings.repo_id:
             raise knext.InvalidParametersError("Please enter a repo ID.")
         huggingface_auth_spec.validate_context(ctx)
-        _validate_repo_id(self.hub_settings.repo_id)
+        _validate_repo_id(
+            self.hub_settings.repo_id, huggingface_auth_spec.get_token(ctx)
+        )
         return self.create_spec(huggingface_auth_spec)
 
     def execute(
@@ -571,7 +573,7 @@ class HFHubChatModelConnector:
         auth.validate_context(ctx)
         if not self.hub_settings.repo_id:
             raise knext.InvalidParametersError("Please enter a repo ID.")
-        _validate_repo_id(self.hub_settings.repo_id)
+        _validate_repo_id(self.hub_settings.repo_id, auth.get_token(ctx))
         return self._create_spec(auth)
 
     def _create_spec(
@@ -605,13 +607,13 @@ class HFHubChatModelConnector:
         return HFHubChatModelPortObject(self._create_spec(auth.spec))
 
 
-def _validate_repo_id(repo_id):
+def _validate_repo_id(repo_id: str, token: str):
     try:
-        huggingface_hub.model_info(repo_id)
+        huggingface_hub.model_info(repo_id, token=token)
     except huggingface_hub.utils._errors.GatedRepoError as e:
         raise knext.InvalidParametersError(
             f"""Access to this repository is restricted: {e}. 
-            Please make sure you have the necessary permissions to access the model and up-to-date token."""
+            Please make sure you have the necessary permissions to access the model and an up-to-date token."""
         )
     except Exception as e:
         raise knext.InvalidParametersError(f"Please provide a valid repo ID. {e}")
@@ -671,8 +673,8 @@ class HFHubEmbeddingsConnector:
     ) -> HFHubEmbeddingsPortObjectSpec:
         if not self.repo_id:
             raise knext.InvalidParametersError("Please enter a repo ID.")
-        _validate_repo_id(self.repo_id)
         authentication_spec.validate_context(ctx)
+        _validate_repo_id(self.repo_id, authentication_spec.get_token(ctx))
         return self.create_spec(authentication_spec)
 
     def create_spec(

@@ -125,7 +125,19 @@ class HFLLM(LLM):
                 typical_p=self.typical_p,
                 seed=self.seed,
             )
-        except requests.exceptions.ProxyError:
-            raise RuntimeError("Failed to establish connection due to a proxy error.")
-        except requests.exceptions.Timeout:
-            raise RuntimeError("The connection to Hugging Face Hub timed out.")
+        except Exception as ex:
+            raise_for(ex)
+
+
+def raise_for(exception: Exception, default: Optional[Exception] = None):
+    if isinstance(exception, requests.exceptions.ProxyError):
+        raise RuntimeError(
+            "Failed to establish connection due to a proxy error. Validate your proxy settings."
+        ) from exception
+    if isinstance(exception, requests.exceptions.Timeout):
+        raise RuntimeError(
+            "The connection to Hugging Face Hub timed out."
+        ) from exception
+    if default:
+        raise default from exception
+    raise exception

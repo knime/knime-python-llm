@@ -17,6 +17,7 @@ from .hf_base import (
     HFPromptTemplateSettings,
     HFModelSettings,
     HFLLM,
+    raise_for,
 )
 
 
@@ -389,12 +390,8 @@ class HFHubAuthenticator:
                     self.credentials_settings.credentials_param
                 ).password
             )
-        except requests.exceptions.ProxyError:
-            raise RuntimeError("Failed to establish connection due to a proxy error.")
-        except requests.exceptions.Timeout:
-            raise RuntimeError("The connection to Hugging Face Hub timed out.")
-        except Exception:
-            raise knext.InvalidParametersError("Invalid API Key.")
+        except Exception as e:
+            raise_for(e, knext.InvalidParametersError("Invalid API Key."))
 
         return HFAuthenticationPortObject(self.create_spec())
 
@@ -594,17 +591,15 @@ class HFHubChatModelConnector:
 def _validate_repo_id(repo_id: str, token: str):
     try:
         huggingface_hub.model_info(repo_id, token=token)
-    except requests.exceptions.ProxyError:
-        raise RuntimeError("Failed to establish connection due to a proxy error.")
-    except requests.exceptions.Timeout:
-        raise RuntimeError("The connection to Hugging Face Hub timed out.")
     except huggingface_hub.utils._errors.GatedRepoError as e:
         raise knext.InvalidParametersError(
             f"""Access to this repository is restricted: {e}. 
             Please make sure you have the necessary permissions to access the model and an up-to-date token."""
         )
     except Exception as e:
-        raise knext.InvalidParametersError(f"Please provide a valid repo ID. {e}")
+        raise_for(
+            e, knext.InvalidParametersError(f"Please provide a valid repo ID. {e}")
+        )
 
 
 hf_embeddings_port_type = knext.port_type(

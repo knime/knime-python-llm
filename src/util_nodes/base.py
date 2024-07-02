@@ -220,13 +220,7 @@ class TextChunker:
 
                 yield knext.Table.from_pyarrow(pa_table)
             else:
-                # Rename row ID column to avoid error when <RowID> column exists and is selected
-                rowID_name = util.handle_column_name_collision(
-                    input_table.schema.column_names, "<RowID>"
-                )
-                pa_table = pa_table.rename_columns(
-                    [rowID_name] + pa_table.column_names[1:]
-                )
+                rowID_name = pa_table.column_names[0]
 
                 pa_col = pa_table.column(self.input_col)
                 df = pd.DataFrame.from_dict({"Chunks": pa_col.to_pandas()})

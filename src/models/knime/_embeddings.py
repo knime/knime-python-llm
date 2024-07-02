@@ -106,7 +106,7 @@ knime_embeddings_port_type = knext.port_type(
 
 
 @knext.node(
-    name="KNIME Hub Embeddings Connector (Labs)",
+    name="KNIME Hub Embeddings Connector",
     node_type=knext.NodeType.SOURCE,
     icon_path=hub_connector_icon,
     category=knime_category,

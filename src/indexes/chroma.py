@@ -115,7 +115,7 @@ local_chroma_vector_store_port_type = knext.port_type(
 
 
 @knext.node(
-    "Chroma Vector Store Creator (Labs)",
+    "Chroma Vector Store Creator",
     knext.NodeType.SOURCE,
     chroma_icon,
     category=chroma_category,
@@ -241,7 +241,7 @@ class ChromaVectorStoreCreator:
 
 
 @knext.node(
-    "Chroma Vector Store Reader (Labs)",
+    "Chroma Vector Store Reader",
     knext.NodeType.SOURCE,
     chroma_icon,
     category=chroma_category,

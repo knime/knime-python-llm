@@ -106,7 +106,7 @@ huggingface_tei_embeddings_port_type = knext.port_type(
 
 
 @knext.node(
-    "HF TEI Embeddings Connector (Labs)",
+    "HF TEI Embeddings Connector",
     knext.NodeType.SOURCE,
     hf_icon,
     hf_tei_category,

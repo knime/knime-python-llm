@@ -130,7 +130,7 @@ class ModelSettings(GeneralSettings):
 
 
 @knext.node(
-    name="KNIME Hub Chat Model Connector (Labs)",
+    name="KNIME Hub Chat Model Connector",
     node_type=knext.NodeType.SOURCE,
     icon_path=hub_connector_icon,
     category=knime_category,

@@ -266,7 +266,7 @@ embeddings_model_port_type = knext.port_type(
 
 
 @knext.node(
-    "LLM Prompter (Labs)",
+    "LLM Prompter",
     knext.NodeType.PREDICTOR,
     "icons/ml.png",
     model_category,
@@ -397,7 +397,7 @@ class LLMPrompter:
 
 
 @knext.node(
-    "Chat Model Prompter (Labs)",
+    "Chat Model Prompter",
     knext.NodeType.PREDICTOR,
     "icons/ml.png",
     model_category,
@@ -500,7 +500,7 @@ def _string_col_filter(column: knext.Column):
 
 
 @knext.node(
-    "Text Embedder (Labs)",
+    "Text Embedder",
     knext.NodeType.PREDICTOR,
     util.ai_icon,
     model_category,

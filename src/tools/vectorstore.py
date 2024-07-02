@@ -258,7 +258,7 @@ _filestore_vector_tool_port_type = knext.port_type(
 
 
 @knext.node(
-    "Vector Store to Tool (Labs)",
+    "Vector Store to Tool",
     knext.NodeType.MANIPULATOR,
     icon_path="icons/store.png",
     category=store_category,

@@ -78,7 +78,7 @@ openai_functions_agent_port_type = knext.port_type(
 
 
 @knext.node(
-    "OpenAI Functions Agent Creator (Labs)",
+    "OpenAI Functions Agent Creator",
     knext.NodeType.SOURCE,
     openai_icon,
     agent_category,

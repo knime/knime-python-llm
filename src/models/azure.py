@@ -287,7 +287,7 @@ class AzureDeploymentSettings:
 
 
 @knext.node(
-    "Azure OpenAI Authenticator (Labs)",
+    "Azure OpenAI Authenticator",
     knext.NodeType.SOURCE,
     azure_icon,
     category=azure_openai_category,
@@ -386,7 +386,7 @@ class AzureOpenAIAuthenticator:
 
 
 @knext.node(
-    "Azure OpenAI LLM Connector (Labs)",
+    "Azure OpenAI LLM Connector",
     knext.NodeType.SOURCE,
     azure_icon,
     category=azure_openai_category,
@@ -470,7 +470,7 @@ class AzureOpenAILLMConnector:
 
 
 @knext.node(
-    "Azure OpenAI Chat Model Connector (Labs)",
+    "Azure OpenAI Chat Model Connector",
     knext.NodeType.SOURCE,
     azure_icon,
     category=azure_openai_category,
@@ -549,7 +549,7 @@ class AzureOpenAIChatModelConnector:
 
 
 @knext.node(
-    "Azure OpenAI Embeddings Connector (Labs)",
+    "Azure OpenAI Embeddings Connector",
     knext.NodeType.SOURCE,
     azure_icon,
     category=azure_openai_category,

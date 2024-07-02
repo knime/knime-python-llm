@@ -65,7 +65,7 @@ faiss_vector_store_port_type = knext.port_type(
 
 
 @knext.node(
-    "FAISS Vector Store Creator (Labs)",
+    "FAISS Vector Store Creator",
     knext.NodeType.SOURCE,
     faiss_icon,
     category=faiss_category,
@@ -186,7 +186,7 @@ class FAISSVectorStoreCreator:
 
 
 @knext.node(
-    "FAISS Vector Store Reader (Labs)",
+    "FAISS Vector Store Reader",
     knext.NodeType.SOURCE,
     faiss_icon,
     category=faiss_category,

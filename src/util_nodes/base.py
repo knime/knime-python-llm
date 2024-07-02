@@ -70,7 +70,7 @@ class SplitterLanguage(knext.EnumParameterOptions):
 
 
 @knext.node(
-    "Text Chunker (Labs)",
+    "Text Chunker",
     knext.NodeType.MANIPULATOR,
     text_chunker_icon,
     category=util.main_category,

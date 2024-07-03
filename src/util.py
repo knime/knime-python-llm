@@ -5,6 +5,7 @@ import re
 import pandas as pd
 import pyarrow as pa
 import pyarrow.compute as pc
+from dataclasses import dataclass
 
 
 def is_nominal(column: knext.Column) -> bool:
@@ -291,3 +292,28 @@ class ProgressTracker:
         check_canceled(self.ctx)
         self.current_progress += batch_size
         self.ctx.set_progress(self.current_progress / self.total_rows)
+
+
+@dataclass
+class OutputColumn:
+    """Stores information on an output column of a node."""
+
+    default_name: str
+    knime_type: knext.KnimeType
+    pa_type: pa.DataType
+
+
+def create_empty_table(
+    table: knext.Table, output_columns: List[OutputColumn]
+) -> knext.Table:
+    """Constructs an empty KNIME Table with the correct output columns."""
+    pa_table = table.to_pyarrow()
+    for col in output_columns:
+        output_column_name = handle_column_name_collision(
+            table.schema.column_names, col.default_name
+        )
+        pa_table = pa_table.append_column(
+            output_column_name,
+            pa.array([], col.pa_type),
+        )
+    return knext.Table.from_pyarrow(pa_table)

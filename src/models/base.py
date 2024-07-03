@@ -387,6 +387,10 @@ class LLMPrompter:
             )
 
             data_frame[output_column_name] = responses
+            if len(data_frame) == 0:
+                data_frame[output_column_name] = data_frame[output_column_name].astype(
+                    "string"
+                )
             output_table.append(data_frame)
 
         return output_table
@@ -597,6 +601,20 @@ class TextEmbedder:
         embeddings_model = embeddings_obj.create_model(ctx)
         output_table = knext.BatchOutputTable.create()
         num_rows = table.num_rows
+
+        if num_rows == 0:
+            output_columns = [
+                util.OutputColumn(
+                    self.embeddings_column_name,
+                    knext.list_(knext.double()),
+                    pa.list_(pa.float64()),
+                )
+            ]
+            return util.create_empty_table(
+                table,
+                output_columns,
+            )
+
         i = 0
         output_column_name = util.handle_column_name_collision(
             table.schema.column_names, self.embeddings_column_name

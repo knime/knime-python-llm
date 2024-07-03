@@ -4,7 +4,7 @@ import util
 import pandas as pd
 from base import AIPortObjectSpec
 from typing import Any, List, Optional, Sequence
-
+import pyarrow as pa
 
 # Langchain imports
 from langchain.schema import HumanMessage, SystemMessage, ChatMessage, AIMessage
@@ -310,6 +310,11 @@ class LLMPrompter:
                 i += 1
 
             data_frame[self.response_column_name] = responses
+            if len(data_frame) == 0:
+                data_frame[self.response_column_name] = data_frame[
+                    self.response_column_name
+                ].astype("string")
+
             output_table.append(data_frame)
 
         return output_table
@@ -474,6 +479,20 @@ class TextEmbedder:
         embeddings_model = embeddings_obj.create_model(ctx)
         output_table = knext.BatchOutputTable.create()
         num_rows = table.num_rows
+
+        if num_rows == 0:
+            output_columns = [
+                util.OutputColumn(
+                    self.embeddings_column_name,
+                    knext.list_(knext.double()),
+                    pa.list_(pa.float64()),
+                )
+            ]
+            return util.create_empty_table(
+                table,
+                output_columns,
+            )
+
         i = 0
         for batch in table.batches():
             util.check_canceled(ctx)
@@ -554,9 +573,11 @@ class LLMChatModelAdapter(BaseChatModel):
             if "%1" in template:
                 message = template.replace(
                     "%1",
-                    m.content
-                    if isinstance(m, (HumanMessage, SystemMessage))
-                    else m.content,
+                    (
+                        m.content
+                        if isinstance(m, (HumanMessage, SystemMessage))
+                        else m.content
+                    ),
                 )
             else:
                 message = m.content

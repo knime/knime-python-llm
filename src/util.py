@@ -1,5 +1,7 @@
 import knime.extension as knext
-from typing import Callable
+from typing import Callable, List
+from dataclasses import dataclass
+import pyarrow as pa
 
 
 def is_nominal(column: knext.Column) -> bool:
@@ -45,7 +47,7 @@ def check_column(
     """
     Raises an InvalidParametersError if a column named column_name is not contained in input_table or has the wrong KnimeType.
     """
-    if not column_name in input_table.column_names:
+    if column_name not in input_table.column_names:
         raise knext.InvalidParametersError(
             f"The {column_purpose} column '{column_name}' is missing in the input table."
         )
@@ -54,3 +56,25 @@ def check_column(
         raise knext.InvalidParametersError(
             f"The {column_purpose} column '{column_name}' is of type {str(ktype)} but should be of type {str(expected_type)}."
         )
+
+
+@dataclass
+class OutputColumn:
+    """Stores information on an output column of a node."""
+
+    default_name: str
+    knime_type: knext.KnimeType
+    pa_type: pa.DataType
+
+
+def create_empty_table(
+    table: knext.Table, output_columns: List[OutputColumn]
+) -> knext.Table:
+    """Constructs an empty KNIME Table with the correct output columns."""
+    pa_table = table.to_pyarrow()
+    for col in output_columns:
+        pa_table = pa_table.append_column(
+            col.default_name,
+            pa.array([], col.pa_type),
+        )
+    return knext.Table.from_pyarrow(pa_table)

@@ -14,9 +14,10 @@ from models.base import (
     EmbeddingsPortObjectSpec,
 )
 from base import AIPortObjectSpec
+import util
 
 import pandas as pd
-import util
+import pyarrow as pa
 from typing import Optional, Any
 import os
 import shutil
@@ -364,6 +365,9 @@ class VectorStoreRetriever:
         i = 0
         output_table: knext.BatchOutputTable = knext.BatchOutputTable.create()
 
+        if input_table.num_rows == 0:
+            return self._create_empty_table(input_table, vectorstore)
+
         for batch in input_table.batches():
             doc_collection = []
             metadata_dict = {}
@@ -417,3 +421,27 @@ class VectorStoreRetriever:
                     knext.Column(knext.ListType(knext.string()), column_name)
                 )
         return result_columns
+
+    def _create_empty_table(
+        self, table: knext.Table, vectorstore: VectorstorePortObject
+    ) -> knext.Table:
+        """Constructs an empty KNIME Table with the correct output columns."""
+        output_columns = [
+            util.OutputColumn(
+                self.retrieved_docs_column_name,
+                knext.ListType(knext.string()),
+                pa.list_(pa.string()),
+            )
+        ]
+
+        if self.retrieve_metadata:
+            for column_name in vectorstore.spec.metadata_column_names:
+                output_columns.append(
+                    util.OutputColumn(
+                        column_name,
+                        knext.ListType(knext.string()),
+                        pa.list_(pa.string()),
+                    )
+                )
+
+        return util.create_empty_table(table, output_columns)

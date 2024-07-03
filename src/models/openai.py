@@ -120,7 +120,7 @@ class _EnumToStringParameter(knext.StringParameter):
         )
         self._options = options
 
-    def _set_value(self, obj, value, name):
+    def _set_value(self, obj, value, name, exclude_validations):
         try:
             value = self._options[value].value[0]
         except KeyError:

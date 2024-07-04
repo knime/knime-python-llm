@@ -23,7 +23,7 @@ class ToolPortObjectSpec(AIPortObjectSpec):
         return {"name": self._name, "description": self._description}
 
     @classmethod
-    def deserialize(cls, data: dict):
+    def deserialize(cls, data: dict, java_callback):
         return cls(data["name"], data["description"])
 
 
@@ -63,10 +63,10 @@ class ToolListPortObjectSpec(AIPortObjectSpec):
         }
 
     @classmethod
-    def deserialize(cls, data) -> "ToolListPortObjectSpec":
+    def deserialize(cls, data, java_callback) -> "ToolListPortObjectSpec":
         tool_specs = [
             get_port_type_for_id(spec_data["port_type"]).spec_class.deserialize(
-                spec_data["spec"]
+                spec_data["spec"], java_callback
             )
             for spec_data in data["tool_specs"]
         ]

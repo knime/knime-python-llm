@@ -115,13 +115,18 @@ class FilestoreVectorstorePortObjectSpec(VectorstorePortObjectSpec):
         }
 
     @classmethod
-    def deserialize(cls, data: dict):
+    def deserialize(cls, data: dict, java_callback):
         embeddings_port_type: PortType = get_port_type_for_id(
             data["embeddings_port_type"]
         )
-        embeddings_spec = embeddings_port_type.spec_class.deserialize(
-            data["embeddings_spec"]
-        )
+        try:
+            embeddings_spec = embeddings_port_type.spec_class.deserialize(
+                data["embeddings_spec"], java_callback
+            )
+        except TypeError:
+            embeddings_spec = embeddings_port_type.spec_class.deserialize(
+                data["embeddings_spec"]
+            )
         return cls(embeddings_spec, data.get("metadata_column_names"))
 
 

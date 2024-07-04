@@ -31,8 +31,10 @@ class OpenAIFunctionsAgentPortObjectSpec(AgentPortObjectSpec):
         return data
 
     @classmethod
-    def deserialize(cls, data) -> "OpenAIFunctionsAgentPortObjectSpec":
-        return cls(cls.deserialize_llm_spec(data), data["system_message"])
+    def deserialize(cls, data, java_callback) -> "OpenAIFunctionsAgentPortObjectSpec":
+        return cls(
+            cls.deserialize_llm_spec(data, java_callback), data["system_message"]
+        )
 
 
 class OpenAiFunctionsAgentPortObject(AgentPortObject):

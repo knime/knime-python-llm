@@ -242,7 +242,9 @@ class FAISSVectorStoreReader:
     ) -> FAISSVectorstorePortObject:
         # TODO: Add check if .fiass and .pkl files are in the directory instead of instatiating as check
         db = FAISS.load_local(
-            self.persist_directory, embeddings_port_object.create_model(ctx)
+            self.persist_directory,
+            embeddings_port_object.create_model(ctx),
+            allow_dangerous_deserialization=True,
         )
 
         document_list = db.similarity_search("a", k=1)

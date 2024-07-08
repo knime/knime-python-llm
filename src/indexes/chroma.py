@@ -23,6 +23,12 @@ import util
 
 from langchain.vectorstores import Chroma
 from langchain.docstore.document import Document
+from chromadb.errors import IDAlreadyExistsError
+
+import os
+import shutil
+import tempfile
+import gc
 
 chroma_icon = "icons/chroma.png"
 chroma_category = knext.category(
@@ -43,6 +49,37 @@ class LocalChromaVectorstorePortObjectSpec(
 ):
     """Spec for local chroma instances run within this process."""
 
+    def __init__(
+        self,
+        embeddings_spec: EmbeddingsPortObjectSpec,
+        metadata_column_names: Optional[list[str]] = None,
+        collection_name: str = Chroma._LANGCHAIN_DEFAULT_COLLECTION_NAME,
+    ) -> None:
+        super().__init__(embeddings_spec, metadata_column_names)
+        self._collection_name = collection_name
+
+    @property
+    def collection_name(self) -> str:
+        return self._collection_name
+
+    @property
+    def temp_dir(self) -> str:
+        return self._temp_dir
+
+    def serialize(self):
+        data = super().serialize()
+        data["collection_name"] = self.collection_name
+        return data
+
+    @classmethod
+    def deserialize(cls, data: dict, java_callback):
+        super_cls = super().deserialize(data=data, java_callback=java_callback)
+        return cls(
+            super_cls.embeddings_spec,
+            super_cls.metadata_column_names,
+            data["collection_name"],
+        )
+
 
 class ChromaVectorstorePortObject(VectorstorePortObject):
     """Super type of Chroma vector stores"""
@@ -62,8 +99,10 @@ class LocalChromaVectorstorePortObject(
         embeddings_port_object: EmbeddingsPortObject,
         folder_path: Optional[str] = None,
         vectorstore: Optional[Chroma] = None,
+        temp_dir: Optional[tempfile.TemporaryDirectory] = None,
     ) -> None:
         super().__init__(spec, embeddings_port_object, folder_path, vectorstore)
+        self._temp_dir = temp_dir
 
     def save_vectorstore(self, vectorstore_folder: str, vectorstore: Chroma):
         if (
@@ -74,11 +113,13 @@ class LocalChromaVectorstorePortObject(
             import chromadb
             import chromadb.config
 
+            print(vectorstore_folder)
             settings = chromadb.config.Settings(
-                chroma_db_impl="duckdb+parquet", persist_directory=vectorstore_folder
+                is_persistent=True,
+                persist_directory=vectorstore_folder,
             )
             existing_collection = vectorstore._collection
-            client = chromadb.Client(settings)
+            client = chromadb.Client(settings=settings)
             new_collection = client.get_or_create_collection(
                 name=existing_collection.name,
                 metadata=existing_collection.metadata,
@@ -93,7 +134,17 @@ class LocalChromaVectorstorePortObject(
                 if entry is None:
                     existing_entries["metadatas"][i] = {}
 
-            new_collection.add(**existing_entries)
+            if "data" in existing_entries.keys():
+                del existing_entries["data"]
+            if "included" in existing_entries.keys():
+                del existing_entries["included"]
+
+            try:
+                new_collection.add(**existing_entries)
+            except ValueError:
+                raise knext.InvalidParametersError(
+                    f"No Chroma collection named '{existing_collection.name}' was found in the specified directory."
+                )
             vectorstore = Chroma(
                 embedding_function=vectorstore._embedding_function,
                 persist_directory=vectorstore_folder,
@@ -101,10 +152,21 @@ class LocalChromaVectorstorePortObject(
                 collection_metadata=existing_collection.metadata,
                 client=client,
             )
-        vectorstore.persist()
+
+        # Delete temp vector store copy created for the Chroma Vector Store Reader to handle older versions
+        if self._temp_dir is not None:
+            self._temp_dir.cleanup()
 
     def load_vectorstore(self, embeddings, vectorstore_path) -> Chroma:
         return Chroma(embedding_function=embeddings, persist_directory=vectorstore_path)
+
+    def export_to_local_dir(self, db: Chroma, path: str):
+        try:
+            self.save_vectorstore(path, db)
+        except IDAlreadyExistsError:
+            raise knext.InvalidParametersError(
+                "The local directory already contains a collection with the same name."
+            )
 
 
 local_chroma_vector_store_port_type = knext.port_type(
@@ -289,15 +351,30 @@ class ChromaVectorStoreReader:
         embeddings_spec.validate_context(ctx)
         if not self.persist_directory:
             raise knext.InvalidParametersError("No vector store directory specified.")
-        return LocalChromaVectorstorePortObjectSpec(embeddings_spec)
+
+        if self.collection_name == "":
+            raise knext.InvalidParametersError("The collection name must not be empty.")
+
+        return LocalChromaVectorstorePortObjectSpec(
+            embeddings_spec,
+            collection_name=self.collection_name,
+        )
 
     def execute(
         self,
         ctx: knext.ExecutionContext,
         embeddings_port_object: EmbeddingsPortObject,
     ) -> ChromaVectorstorePortObject:
+        temp_dir = tempfile.TemporaryDirectory()
+        shutil.copytree(
+            self.persist_directory, os.path.join(temp_dir.name, "vectorstore")
+        )
+        temp_dir_path = os.path.join(temp_dir.name, "vectorstore")
+
         chroma = Chroma(
-            self.persist_directory, embeddings_port_object.create_model(ctx)
+            self.collection_name,
+            embeddings_port_object.create_model(ctx),
+            temp_dir_path,
         )
 
         document_list = chroma.similarity_search("a", k=1)
@@ -307,8 +384,11 @@ class ChromaVectorStoreReader:
 
         return LocalChromaVectorstorePortObject(
             LocalChromaVectorstorePortObjectSpec(
-                embeddings_port_object.spec, metadata_keys
+                embeddings_port_object.spec,
+                metadata_keys,
+                self.collection_name,
             ),
             embeddings_port_object,
             vectorstore=chroma,
+            temp_dir=temp_dir,
         )

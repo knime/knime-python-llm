@@ -80,6 +80,9 @@ class VectorstorePortObject(knext.PortObject):
     def load_store(self, ctx):
         raise NotImplementedError()
 
+    def export_to_local_dir(self, db: Any, path: str):
+        raise NotImplementedError()
+
 
 vector_store_port_type = knext.port_type(
     "Vectorstore", VectorstorePortObject, VectorstorePortObjectSpec
@@ -457,3 +460,57 @@ class VectorStoreRetriever:
             )
 
         return result_columns
+
+
+@knext.node(
+    "Vector Store Writer",
+    knext.NodeType.SINK,
+    store_icon,
+    category=store_category,
+    keywords=[
+        "RAG",
+        "Retrieval Augmented Generation",
+        "Embeddings",
+    ],
+)
+@knext.input_port(
+    "Vector Store",
+    "A vector store containing document embeddings.",
+    vector_store_port_type,
+)
+class VectorStoreWriter:
+    """
+    Exports a vector store to a local directory.
+
+    This node allows you to export a vector store to a local directory.
+    """
+
+    store_directory = knext.StringParameter(
+        "Vector store directory",
+        """The local directory in which the vector store will be stored.""",
+    )
+
+    def configure(
+        self,
+        ctx: knext.ConfigurationContext,
+        vectorstore_spec: VectorstorePortObjectSpec,
+    ):
+        vectorstore_spec.validate_context(ctx)
+        self._validate_path()
+
+    def execute(
+        self,
+        ctx: knext.ExecutionContext,
+        vectorstore: VectorstorePortObject,
+    ):
+        db = vectorstore.load_store(ctx)
+        vectorstore.export_to_local_dir(db, self.store_directory)
+
+    def _validate_path(self) -> bool:
+        if not self.store_directory:
+            raise knext.InvalidParametersError("Path to local directory is missing")
+
+        if not os.path.isdir(self.store_directory):
+            raise knext.InvalidParametersError(
+                f"No directory found at path: {self.store_directory}"
+            )

@@ -1,5 +1,5 @@
 import knime.extension as knext
-from typing import Optional
+from typing import Any, Optional
 
 from models.base import (
     EmbeddingsPortObjectSpec,
@@ -20,6 +20,7 @@ import util
 
 from langchain.vectorstores.faiss import FAISS
 from langchain.docstore.document import Document
+import os
 
 faiss_icon = "icons/ml.png"
 faiss_category = knext.category(
@@ -57,6 +58,17 @@ class FAISSVectorstorePortObject(FilestoreVectorstorePortObject):
 
     def save_vectorstore(self, vectorstore_folder, vectorstore: FAISS):
         vectorstore.save_local(vectorstore_folder)
+
+    def export_to_local_dir(self, db: Any, path: str):
+        dir_list = os.listdir(path)
+        index_name = self.spec.index_name
+        if any(f"{index_name}.faiss" in dir for dir in dir_list) or any(
+            "index_name.pkl" in dir for dir in dir_list
+        ):
+            raise knext.InvalidParametersError(
+                f"The specified directory already contains a vector store with index name '{index_name}'."
+            )
+        self.save_vectorstore(path, db)
 
 
 faiss_vector_store_port_type = knext.port_type(

@@ -196,6 +196,13 @@ class ChromaVectorStoreCreator:
         column_filter=util.create_type_filer(knext.string()),
     )
 
+    collection_name = knext.StringParameter(
+        "Collection name",
+        "Specify the collection name of the vector store.",
+        default_collection_name,
+        since_version="5.3.2",
+    )
+
     missing_value_handling = knext.EnumParameter(
         "Handle missing values in the document column",
         """Define whether missing values in the document column should be skipped or whether the 
@@ -222,6 +229,9 @@ class ChromaVectorStoreCreator:
         else:
             self.document_column = util.pick_default_column(input_table, knext.string())
 
+        if self.collection_name == "":
+            raise knext.InvalidParametersError("The collection name must not be empty.")
+
         metadata_cols = get_metadata_columns(
             self.metadata_settings.metadata_columns, self.document_column, input_table
         )
@@ -229,6 +239,7 @@ class ChromaVectorStoreCreator:
         return LocalChromaVectorstorePortObjectSpec(
             embeddings_spec=embeddings_spec,
             metadata_column_names=metadata_cols,
+            collection_name=self.collection_name,
         )
 
     def execute(
@@ -270,10 +281,13 @@ class ChromaVectorStoreCreator:
         db = Chroma.from_documents(
             documents=documents,
             embedding=embeddings.create_model(ctx),
+            collection_name=self.collection_name,
         )
 
         return LocalChromaVectorstorePortObject(
-            LocalChromaVectorstorePortObjectSpec(embeddings.spec, meta_data_columns),
+            LocalChromaVectorstorePortObjectSpec(
+                embeddings.spec, meta_data_columns, self.collection_name
+            ),
             embeddings,
             vectorstore=db,
         )

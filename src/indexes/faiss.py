@@ -33,8 +33,32 @@ faiss_category = knext.category(
 
 
 class FAISSVectorstorePortObjectSpec(FilestoreVectorstorePortObjectSpec):
-    # placeholder to enable use to add FAISS specific stuff later on
-    pass
+    def __init__(
+        self,
+        embeddings_spec: EmbeddingsPortObjectSpec,
+        metadata_column_names: Optional[list[str]] = None,
+        index_name: str = "index",
+    ) -> None:
+        super().__init__(embeddings_spec, metadata_column_names)
+        self._index_name = index_name
+
+    @property
+    def index_name(self) -> str:
+        return self._index_name
+
+    def serialize(self) -> dict:
+        data = super().serialize()
+        data["index_name"] = self.index_name
+        return data
+
+    @classmethod
+    def deserialize(cls, data: dict, java_callback):
+        super_cls = super().deserialize(data=data, java_callback=java_callback)
+        return cls(
+            super_cls.embeddings_spec,
+            super_cls.metadata_column_names,
+            data["index_name"],
+        )
 
 
 class FAISSVectorstorePortObject(FilestoreVectorstorePortObject):
@@ -52,12 +76,13 @@ class FAISSVectorstorePortObject(FilestoreVectorstorePortObject):
     def load_vectorstore(self, embeddings, vectorstore_path) -> FAISS:
         return FAISS.load_local(
             embeddings=embeddings,
+            index_name=self.spec.index_name,
             folder_path=vectorstore_path,
             allow_dangerous_deserialization=True,
         )
 
     def save_vectorstore(self, vectorstore_folder, vectorstore: FAISS):
-        vectorstore.save_local(vectorstore_folder)
+        vectorstore.save_local(vectorstore_folder, self.spec.index_name)
 
     def export_to_local_dir(self, db: Any, path: str):
         dir_list = os.listdir(path)
@@ -119,6 +144,13 @@ class FAISSVectorStoreCreator:
         column_filter=util.create_type_filer(knext.string()),
     )
 
+    index_name = knext.StringParameter(
+        "Index name",
+        "Specify the index name of the vector store. The name will be used as filename when exporting the vector store.",
+        "index",
+        since_version="5.4.0",
+    )
+
     missing_value_handling = knext.EnumParameter(
         "Handle missing values in the document column",
         """Define whether missing values in the document column should be skipped or whether the 
@@ -146,12 +178,16 @@ class FAISSVectorStoreCreator:
         else:
             self.document_column = util.pick_default_column(input_table, knext.string())
 
+        if self.index_name == "":
+            raise knext.InvalidParametersError("The index name must not be empty.")
+
         metadata_cols = get_metadata_columns(
             self.metadata_settings.metadata_columns, self.document_column, input_table
         )
         return FAISSVectorstorePortObjectSpec(
             embeddings_spec=embeddings_spec,
             metadata_column_names=metadata_cols,
+            index_name=self.index_name,
         )
 
     def execute(
@@ -191,7 +227,9 @@ class FAISSVectorStoreCreator:
         )
 
         return FAISSVectorstorePortObject(
-            FAISSVectorstorePortObjectSpec(embeddings.spec, meta_data_columns),
+            FAISSVectorstorePortObjectSpec(
+                embeddings.spec, meta_data_columns, self.index_name
+            ),
             embeddings,
             vectorstore=db,
         )
@@ -237,6 +275,13 @@ class FAISSVectorStoreReader:
         "The local directory in which the vector store is stored.",
     )
 
+    index_name = knext.StringParameter(
+        "Index name",
+        "Specify the index name of the vector store. The index name is the filename without the extension.",
+        "index",
+        since_version="5.4.0",
+    )
+
     def configure(
         self,
         ctx: knext.ConfigurationContext,
@@ -245,17 +290,25 @@ class FAISSVectorStoreReader:
         embeddings_spec.validate_context(ctx)
         if not self.persist_directory:
             raise knext.InvalidParametersError("Select the vector store directory.")
-        return FAISSVectorstorePortObjectSpec(embeddings_spec)
+        if self.index_name == "":
+            raise knext.InvalidParametersError("The index name must not be empty.")
+        return FAISSVectorstorePortObjectSpec(embeddings_spec, self.index_name)
 
     def execute(
         self,
         ctx: knext.ExecutionContext,
         embeddings_port_object: EmbeddingsPortObject,
     ) -> FAISSVectorstorePortObject:
-        # TODO: Add check if .fiass and .pkl files are in the directory instead of instatiating as check
+        if not self._files_exist_in_path():
+            raise knext.InvalidParametersError(
+                "The specified directory does not contain a FAISS vector store with the specified index name."
+                f" Files '{self.index_name}.faiss' and '{self.index_name}.pkl' are required."
+            )
+
         db = FAISS.load_local(
             self.persist_directory,
             embeddings_port_object.create_model(ctx),
+            index_name=self.index_name,
             allow_dangerous_deserialization=True,
         )
 
@@ -265,7 +318,15 @@ class FAISSVectorStoreReader:
         )
 
         return FAISSVectorstorePortObject(
-            FAISSVectorstorePortObjectSpec(embeddings_port_object.spec, metadata_keys),
+            FAISSVectorstorePortObjectSpec(
+                embeddings_port_object.spec, metadata_keys, self.index_name
+            ),
             embeddings_port_object,
             vectorstore=db,
+        )
+
+    def _files_exist_in_path(self) -> bool:
+        dir_list = os.listdir(self.persist_directory)
+        return any(f"{self.index_name}.faiss" in dir for dir in dir_list) and any(
+            f"{self.index_name}.pkl" in dir for dir in dir_list
         )

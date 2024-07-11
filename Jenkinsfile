@@ -80,28 +80,32 @@ try {
                     }
 
                 }
-            workflowTests.runTests(
-                dependencies: [
-                    repositories: [
-                        'knime-python',
-                        'knime-python-types',
-                        'knime-core-columnar',
-                        'knime-testing-internal',
-                        'knime-python-legacy',
-                        'knime-conda',
-                        'knime-python-bundling',
-                        'knime-credentials-base',
-                        'knime-gateway',
-                        'knime-base',
-                        'knime-productivity-oss',
-                        'knime-json',
-                        'knime-javasnippet',
-                        'knime-reporting',
-                        'knime-filehandling',
-                        repositoryName
-                        ],
-                ],
-            )
+            withCredentials([string(credentialsId: 'openai-api-key', variable: 'OPENAI_API_KEY')]) {
+                workflowTests.runTests(
+                    dependencies: [
+                        repositories: [
+                            'knime-python',
+                            'knime-python-types',
+                            'knime-core-columnar',
+                            'knime-testing-internal',
+                            'knime-python-legacy',
+                            'knime-conda',
+                            'knime-python-bundling',
+                            'knime-credentials-base',
+                            'knime-gateway',
+                            'knime-base',
+                            'knime-productivity-oss',
+                            'knime-json',
+                            'knime-javasnippet',
+                            'knime-reporting',
+                            'knime-filehandling',
+                            'knime-scripting-editor',
+                            'knime-kerberos',
+                            repositoryName
+                            ],
+                    ],
+                )
+            }
         }
     }
 } catch (ex) {

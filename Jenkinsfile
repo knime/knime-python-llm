@@ -100,6 +100,7 @@ try {
                             'knime-reporting',
                             'knime-filehandling',
                             'knime-scripting-editor',
+                            'knime-kerberos',
                             repositoryName
                             ],
                     ],

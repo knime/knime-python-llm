@@ -354,7 +354,7 @@ class HFHubAuthenticator:
 
     This node provides the authentication for all Hugging Face Hub models.
 
-    It allows you to select the credentials that contain a valid OpenAI API key in their *password* field (the *username* is ignored).
+    It allows you to select the credentials that contain a valid Hugging Face Hub API key in their *password* field (the *username* is ignored).
     Credentials can be set on the workflow level or created inside the workflow e.g. with the [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
     and fed into this node via flow variable.
 

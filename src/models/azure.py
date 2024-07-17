@@ -16,9 +16,7 @@ from models.openai import (
 )
 
 # Langchain imports
-from langchain.llms.openai import AzureOpenAI
-from langchain.chat_models import AzureChatOpenAI
-from langchain.embeddings import AzureOpenAIEmbeddings
+from langchain_openai import AzureOpenAI, AzureChatOpenAI, AzureOpenAIEmbeddings
 
 
 # Other imports

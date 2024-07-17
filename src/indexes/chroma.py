@@ -35,6 +35,9 @@ chroma_category = knext.category(
     icon=chroma_icon,
 )
 
+# Keeps the Chroma._LANGCHAIN_DEFAULT_COLLECTION_NAME value consistent for backwards compatibility
+default_collection_name = "langchain"
+
 
 class ChromaVectorstorePortObjectSpec(VectorstorePortObjectSpec):
     """Super type of the spec of local and remote Chroma vector stores."""
@@ -289,7 +292,9 @@ class ChromaVectorStoreReader:
         embeddings_port_object: EmbeddingsPortObject,
     ) -> ChromaVectorstorePortObject:
         chroma = Chroma(
-            self.persist_directory, embeddings_port_object.create_model(ctx)
+            default_collection_name,
+            embeddings_port_object.create_model(ctx),
+            self.persist_directory,
         )
 
         document_list = chroma.similarity_search("a", k=1)

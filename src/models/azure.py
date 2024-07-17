@@ -214,10 +214,18 @@ class AzureOpenAIEmbeddingsPortObjectSpec(
     AzureOpenAIModelPortObjectSpec, OpenAIEmbeddingsPortObjectSpec
 ):
     def __init__(
-        self, credentials: AzureOpenAIAuthenticationPortObjectSpec, model_name
+        self,
+        credentials: AzureOpenAIAuthenticationPortObjectSpec,
+        model_name,
     ) -> None:
         super().__init__(credentials)
         self._model = model_name
+
+    def serialize(self) -> dict:
+        return {
+            **self._credentials.serialize(),
+            "model": self._model,
+        }
 
     @classmethod
     def deserialize(cls, data: dict):
@@ -558,7 +566,7 @@ class AzureOpenAIChatModelConnector:
         "OpenAI",
         "Azure",
         "RAG",
-        "Retrieval Assisted Geeration",
+        "Retrieval Assisted Generation",
     ],
 )
 @knext.input_port(

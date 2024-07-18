@@ -22,3 +22,5 @@ import tools.base
 import tools.vectorstore
 
 import util_nodes.base
+
+import giskard_nodes.base

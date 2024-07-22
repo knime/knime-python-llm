@@ -110,6 +110,14 @@ knime_embeddings_port_type = knext.port_type(
     node_type=knext.NodeType.SOURCE,
     icon_path=hub_connector_icon,
     category=knime_category,
+    keywords=[
+        "GenAI",
+        "Gen AI",
+        "Generative AI",
+        "GenAI Gateway",
+        "RAG",
+        "Retrieval Augmented Generation",
+    ],
 )
 @knext.input_port(
     name="KNIME Hub Credential",

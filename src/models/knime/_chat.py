@@ -166,10 +166,12 @@ class ModelSettings(GeneralSettings):
     port_type=knime_chat_model_port_type,
 )
 class KnimeHubChatModelConnector:
-    """Connects to a Chat Model configured in the GenAI gateway of the connected KNIME Hub.
+    """Connects to a Chat Model configured in the GenAI Gateway of the connected KNIME Hub.
 
-    Connects to a Chat Model configured in the GenAI gateway of the connected KNIME Hub using the authentication
+    Connects to a Chat Model configured in the GenAI Gateway of the connected KNIME Hub using the authentication
     provided via the input port.
+
+    Use this node to generate text, answer questions, summarize content or perform other text-based tasks.
     """
 
     model_name = knext.StringParameter(

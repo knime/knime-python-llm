@@ -28,6 +28,7 @@ class KnimeHubChatModelPortObjectSpec(ChatModelPortObjectSpec):
         max_tokens: int,
         temperature: float,
         top_p: float,
+        n_requests: int,
     ) -> None:
         super().__init__()
         self._auth_spec = auth_spec
@@ -35,6 +36,7 @@ class KnimeHubChatModelPortObjectSpec(ChatModelPortObjectSpec):
         self._max_tokens = max_tokens
         self._temperature = temperature
         self._top_p = top_p
+        self._n_requests = n_requests
 
     @property
     def auth_spec(self) -> ks.HubAuthenticationPortObjectSpec:
@@ -44,6 +46,10 @@ class KnimeHubChatModelPortObjectSpec(ChatModelPortObjectSpec):
     def model_name(self) -> str:
         return self._model_name
 
+    @property
+    def n_requests(self) -> int:
+        return self._n_requests
+
     def serialize(self) -> dict:
         return {
             "auth": self.auth_spec.serialize(),
@@ -51,6 +57,7 @@ class KnimeHubChatModelPortObjectSpec(ChatModelPortObjectSpec):
             "max_tokens": self._max_tokens,
             "temperature": self._temperature,
             "top_p": self._top_p,
+            "n_requests": self._n_requests,
         }
 
     @property
@@ -73,6 +80,7 @@ class KnimeHubChatModelPortObjectSpec(ChatModelPortObjectSpec):
             data["max_tokens"],
             data["temperature"],
             data["top_p"],
+            n_requests=data.get("n_requests", 1),
         )
 
     def validate_context(self, ctx: ConfigurationContext):
@@ -126,6 +134,18 @@ class ModelSettings(GeneralSettings):
         default_value=0.2,
         min_value=0.0,
         max_value=2.0,
+    )
+
+    n_requests = knext.IntParameter(
+        label="Number of concurrent requests",
+        description="""Maximum number of concurrent requests a single node (typically the LLM Prompter) can make to the GenAI Gateway.
+        The more requests a node can make in parallel the faster it executes but too many requests might get rate limitted by some
+        GenAI providers.
+        """,
+        default_value=1,
+        min_value=1,
+        is_advanced=True,
+        since_version="5.3.1",
     )
 
 
@@ -188,4 +208,5 @@ class KnimeHubChatModelConnector:
             max_tokens=self.model_settings.max_tokens,
             temperature=self.model_settings.temperature,
             top_p=self.model_settings.top_p,
+            n_requests=self.model_settings.n_requests,
         )

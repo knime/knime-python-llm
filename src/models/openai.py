@@ -70,9 +70,10 @@ chat_models = [
     "gpt-4",
     "gpt-4-32k",
     "gpt-4o",
+    "gpt-4o-mini",
     "gpt-4-turbo",
 ]
-chat_default = "gpt-3.5-turbo"
+chat_default = "gpt-4o-mini"
 embeddings_models = [
     "text-embedding-3-small",
     "text-embedding-3-large",
@@ -338,6 +339,10 @@ class ChatModelLoaderInputSettings:
         GPT_4_O = (
             "gpt-4o",
             """Most advanced model that’s cheaper and faster than GPT-4 Turbo.""",
+        )
+        GPT_4_O_MINI = (
+            "gpt-4o-mini",
+            """Cheaper and more capable than GPT-3.5 Turbo but just as fast.""",
         )
         TURBO_4 = (
             "gpt-4-turbo",

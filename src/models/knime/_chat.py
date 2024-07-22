@@ -154,6 +154,7 @@ class ModelSettings(GeneralSettings):
     node_type=knext.NodeType.SOURCE,
     icon_path=hub_connector_icon,
     category=knime_category,
+    keywords=["GenAI", "Gen AI", "Generative AI", "GenAI Gateway", "Chat model", "LLM"],
 )
 @knext.input_port(
     name="KNIME Hub Credential",

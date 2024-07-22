@@ -122,10 +122,15 @@ knime_embeddings_port_type = knext.port_type(
     port_type=knime_embeddings_port_type,
 )
 class KnimeHubEmbeddingsConnector:
-    """Connects to an embeddings model configured in the GenAI gateway of the connected KNIME Hub.
+    """Connects to an embeddings model configured in the GenAI Gateway of the connected KNIME Hub.
 
-    Connects to an Embeddings Model configured in the GenAI gateway of the connected KNIME Hub using the authentication
+    Connects to an Embeddings Model configured in the GenAI Gateway of the connected KNIME Hub using the authentication
     provided via the input port.
+
+    Use this node to generate embeddings, which are dense vector representations of text input data.
+    Embeddings are useful for tasks like similarity search, e.g. in a retrieval augmented generation (RAG) system but
+    can also be used for clustering, classification and other machine learning applications.
+
     """
 
     model_name = knext.StringParameter(

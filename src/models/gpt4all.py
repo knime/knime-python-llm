@@ -356,9 +356,11 @@ class GPT4AllLLMConnector:
     Connects to a locally installed GPT4All LLM.
 
     This connector allows you to connect to a local GPT4All LLM. To get started,
-    you need to download a specific model from the [GPT4All](https://gpt4all.io/index.html) model explorer on the website.
-    It is not needed to install the GPT4All software. Once you have downloaded the model, specify its file path in the
+    you need to download a specific model either through the [GPT4All client](https://gpt4all.io)
+    or by dowloading a GGUF model from [Hugging Face Hub](https://huggingface.co/).
+    Once you have downloaded the model, specify its file path in the
     configuration dialog to use it.
+    It is not necessary to install the GPT4All client to execute the node.
 
     Some models (e.g. Llama 2) have been fine-tuned for chat applications,
     so they might behave unexpectedly if their prompts don't follow a chat like structure:
@@ -418,9 +420,11 @@ class GPT4AllChatModelConnector:
     Connects to a locally installed GPT4All LLM.
 
     This connector allows you to connect to a local GPT4All LLM. To get started,
-    you need to download a specific model from the [GPT4All](https://gpt4all.io/index.html) model explorer on the website.
-    It is not needed to install the GPT4All software. Once you have downloaded the model, specify its file path in the
+    you need to download a specific model either through the [GPT4All client](https://gpt4all.io)
+    or by dowloading a GGUF model from [Hugging Face Hub](https://huggingface.co/).
+    Once you have downloaded the model, specify its file path in the
     configuration dialog to use it.
+    It is not necessary to install the GPT4All client to execute the node.
 
     It is recommended to use models (e.g. Llama 2) that have been fine-tuned for chat applications. For model specifications
     including prompt templates, see [GPT4All model list](https://raw.githubusercontent.com/nomic-ai/gpt4all/main/gpt4all-chat/metadata/models2.json).
@@ -608,10 +612,7 @@ class Embeddings4AllConnector:
     Connects to an embeddings model that runs on the local machine.
 
     Connect to an embeddings model that runs on the local machine via GPT4All.
-    The default model was trained on sentences and short paragrpahs of English text.
-    It ignores special characters like 'ß' i.e. the embeddings for 'Schloß' are the same as for 'Schlo'.
-    If downstream nodes fail with 'Execute failed: Error while sending a command.', then this is likely
-    caused by an input that consists entirely of characters the model doesn't support.
+    The default model was trained on sentences and short paragraphs of English text.
 
     Note: Unlike the other GPT4All nodes, this node can be used on the KNIME Hub.
     """

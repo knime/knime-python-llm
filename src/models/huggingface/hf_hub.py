@@ -62,43 +62,17 @@ hf_hub_category = knext.category(
 def _create_repo_id_parameter() -> knext.StringParameter:
     return knext.StringParameter(
         label="Repo ID",
-        description="""The model name to be used, in the format `<organization_name>/<model_name>`. For example, `Writer/camel-5b-hf`.
-                    You can find available models at the [Hugging Face Models repository](https://huggingface.co/models).""",
+        description="""The model name to be used, in the format `<organization_name>/<model_name>`. For example, 
+        `mistralai/Mistral-7B-Instruct-v0.3` for text generation, or `sentence-transformers/all-MiniLM-L6-v2`
+        for embeddings model.
+        You can find available models at the [Hugging Face Models repository](https://huggingface.co/models).""",
         default_value="",
-    )
-
-
-class HFHubTask(knext.EnumParameterOptions):
-    TEXT_GENERATION = (
-        "text-generation",
-        """A popular variant of Text Generation where the model predicts the next word given a sequence of words.
-        GPT-based models, such as GPT-3, are commonly used for this task. [Available text generation models](https://huggingface.co/models?pipeline_tag=text-generation)
-        """,
-    )
-    TEXT2TEXT_GENERATION = (
-        "text2text-generation",
-        "Task used for mapping between pairs of texts, such as translation from one language to another. [Available text-to-text generation models](https://huggingface.co/models?pipeline_tag=text2text-generation)",
-    )
-    SUMMARIZATION = (
-        "summarization",
-        "Task used for generating text summaries. [Available summarization models](https://huggingface.co/models?pipeline_tag=summarization)",
     )
 
 
 @knext.parameter_group(label="Hugging Face Hub Settings")
 class HFHubSettings:
     repo_id = _create_repo_id_parameter()
-
-    task = knext.EnumParameter(
-        "Model Task",
-        """
-        Task type for a given model.
-
-        Please ensure that the model capabilities align with the chosen task.
-        """,
-        HFHubTask.TEXT_GENERATION.name,
-        HFHubTask,
-    )
 
 
 class HFAuthenticationPortObjectSpec(AIPortObjectSpec):
@@ -149,14 +123,12 @@ class HFHubLLMPortObjectSpec(LLMPortObjectSpec):
         self,
         credentials: HFAuthenticationPortObjectSpec,
         repo_id,
-        task,
         n_requests,
         model_kwargs,
     ) -> None:
         super().__init__()
         self._credentials = credentials
         self._repo_id = repo_id
-        self._task = task
         self._n_requests = n_requests
         self._model_kwargs = model_kwargs
 
@@ -172,10 +144,6 @@ class HFHubLLMPortObjectSpec(LLMPortObjectSpec):
         return self._repo_id
 
     @property
-    def task(self):
-        return self._task
-
-    @property
     def n_requests(self):
         return self._n_requests
 
@@ -187,7 +155,6 @@ class HFHubLLMPortObjectSpec(LLMPortObjectSpec):
         return {
             **self._credentials.serialize(),
             "repo_id": self._repo_id,
-            "task": self._task,
             "n_requests": self._n_requests,
             "model_kwargs": self._model_kwargs,
         }
@@ -197,7 +164,6 @@ class HFHubLLMPortObjectSpec(LLMPortObjectSpec):
         return cls(
             HFAuthenticationPortObjectSpec.deserialize(data),
             data["repo_id"],
-            data["task"],
             data.get("n_requests", 1),
             data["model_kwargs"],
         )
@@ -234,7 +200,6 @@ class HFHubChatModelPortObjectSpec(HFHubLLMPortObjectSpec, ChatModelPortObjectSp
         super().__init__(
             llm_spec._credentials,
             llm_spec.repo_id,
-            llm_spec.task,
             llm_spec.n_requests,
             llm_spec.model_kwargs,
         )
@@ -487,7 +452,6 @@ class HFHubConnector:
         return HFHubLLMPortObjectSpec(
             huggingface_auth_spec,
             self.hub_settings.repo_id,
-            HFHubTask[self.hub_settings.task].label,
             self.model_settings.n_requests,
             model_kwargs,
         )
@@ -572,7 +536,6 @@ class HFHubChatModelConnector:
         llm_spec = HFHubLLMPortObjectSpec(
             auth,
             self.hub_settings.repo_id,
-            HFHubTask[self.hub_settings.task].label,
             self.model_settings.n_requests,
             model_kwargs,
         )

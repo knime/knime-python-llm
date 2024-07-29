@@ -1,6 +1,10 @@
 import knime.extension as knext
 import util
-from models.base import LLMPortObject, LLMPortObjectSpec, llm_port_type
+from models.base import (
+    LLMPortObject,
+    LLMPortObjectSpec,
+    llm_port_type,
+)
 
 import pandas as pd
 import numpy as np
@@ -18,6 +22,8 @@ from ._base import (
     _get_schema_from_workflow_spec,
     ScannerColumn,
     KnimeLLMClient,
+    _validate_prediction_workflow_spec,
+    _pick_default_workflow_column,
 )
 
 
@@ -138,9 +144,11 @@ class GiskardLLMScanner:
     ) -> knext.Schema:
         llm_spec.validate_context(ctx)
 
-        self._validate_prediction_workflow_spec(prediction_workflow_spec)
+        _validate_prediction_workflow_spec(prediction_workflow_spec)
 
-        self._pick_default_response_column(prediction_workflow_spec)
+        self.response_column = _pick_default_workflow_column(
+            prediction_workflow_spec, self.response_column, False
+        )
 
         self._validate_selected_params(prediction_workflow_spec, dataset_spec)
 
@@ -295,17 +303,6 @@ class GiskardLLMScanner:
             )
         return dataset_df
 
-    def _validate_prediction_workflow_spec(self, workflow_spec) -> None:
-        if len(workflow_spec.inputs) != 1:
-            raise knext.InvalidParametersError(
-                "Prediction workflow must have exactly one input table."
-            )
-
-        if len(workflow_spec.outputs) != 1:
-            raise knext.InvalidParametersError(
-                "Prediction workflow must produce exactly one output table."
-            )
-
     def _validate_feature_columns(self, workflow_spec, dataset_spec) -> None:
         """Checks if the feature columns exist in the workflow input table and in the optional dataset table."""
         prediction_workflow_table = _get_schema_from_workflow_spec(
@@ -353,15 +350,6 @@ class GiskardLLMScanner:
             "response",
             "workflow input table",
         )
-
-    def _pick_default_response_column(self, workflow_spec) -> None:
-        if not self.response_column:
-            prediction_workflow_output_schema = _get_schema_from_workflow_spec(
-                workflow_spec, return_input_schema=False
-            )
-            self.response_column = util.pick_default_column(
-                prediction_workflow_output_schema, knext.string()
-            )
 
     def _enforce_string_data_types(self, df: pd.DataFrame) -> pd.DataFrame:
         for column in df.columns:

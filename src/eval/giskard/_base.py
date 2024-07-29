@@ -37,6 +37,30 @@ def _get_workflow_schema(
     return _get_schema_from_workflow_spec(ctx.get_input_specs()[port], input)
 
 
+def _validate_prediction_workflow_spec(workflow_spec) -> None:
+    if len(workflow_spec.inputs) != 1:
+        raise knext.InvalidParametersError(
+            "Prediction workflow must have exactly one input table."
+        )
+
+    if len(workflow_spec.outputs) != 1:
+        raise knext.InvalidParametersError(
+            "Prediction workflow must produce exactly one output table."
+        )
+
+
+def _pick_default_workflow_column(workflow_spec, column_name: str, input: bool) -> str:
+    if not column_name:
+        prediction_workflow_schema = _get_schema_from_workflow_spec(
+            workflow_spec, return_input_schema=input
+        )
+        column_name = util.pick_default_column(
+            prediction_workflow_schema, knext.string()
+        )
+
+    return column_name
+
+
 class KnimeLLMClient(LLMClient):
     def __init__(self, port_object: LLMPortObject, ctx: knext.ExecutionContext):
         self._model = port_object

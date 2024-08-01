@@ -195,6 +195,7 @@ def _create_specific_model_name(api_name: str) -> knext.StringParameter:
         model_list = []
         if (specs := ctx.get_input_specs()) and (auth_spec := specs[0]):
             model_list = auth_spec.get_model_list(ctx)
+            model_list.sort()
         return model_list
 
     return knext.StringParameter(

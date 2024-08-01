@@ -171,11 +171,7 @@ class ChatConversationSettings:
 class CredentialsSettings:
     def __init__(self, label, description):
         def _get_default_credentials(identifier):
-            result = knext.DialogCreationContext.get_credential_names(identifier)
-            if not result:
-                # single choice with an empty string to still render the configuration dialogue if no credentials are provided
-                return [""]
-            return result
+            return knext.DialogCreationContext.get_credential_names(identifier)
 
         self.credentials_param = knext.StringParameter(
             label=label,

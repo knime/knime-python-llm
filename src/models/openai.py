@@ -192,12 +192,10 @@ class OpenAIGeneralSettings(GeneralRemoteSettings):
 
 def _create_specific_model_name(api_name: str) -> knext.StringParameter:
     def list_models(ctx: knext.DialogCreationContext) -> list[str]:
+        model_list = []
         if (specs := ctx.get_input_specs()) and (auth_spec := specs[0]):
-            models = auth_spec.get_model_list(ctx)
-        else:
-            models = []
-        models.append("unselected")
-        return models
+            model_list = auth_spec.get_model_list(ctx)
+        return model_list
 
     return knext.StringParameter(
         label="Specific Model ID",
@@ -607,7 +605,6 @@ class OpenAIAuthenticationPortObjectSpec(AIPortObjectSpec):
     def get_model_list(self, ctx: knext.ConfigurationContext) -> list[str]:
         key = ctx.get_credentials(self.credentials).password
         base_url = self.base_url
-
         try:
             model_list = [
                 model.id

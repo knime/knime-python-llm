@@ -51,20 +51,13 @@ def create_model_choice_provider(
         model_list = []
         if (specs := ctx.get_input_specs()) and (auth_spec := specs[0]):
             model_list = list_models(auth_spec, mode)
-        if not model_list:
-            model_list = [""]
         return model_list
 
     return model_choices_provider
 
 
 def list_models(auth_spec, mode: str) -> list[str]:
-    model_list = [model_data["name"] for model_data in _get_model_data(auth_spec, mode)]
-    if len(model_list) == 0:
-        model_list.append("")
-    else:
-        model_list.sort()
-        return model_list
+    return [model_data["name"] for model_data in _get_model_data(auth_spec, mode)]
 
 
 def _get_model_data(auth_spec, mode: str):

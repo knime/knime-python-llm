@@ -337,7 +337,7 @@ class VectorStoreToTool:
             specs.metadata_column_names
             if (specs := ctx.get_input_specs()[1])
             and len(specs.metadata_column_names) >= 1
-            else [""]
+            else []
         ),
         since_version="5.2.0",
     ).rule(knext.OneOf(retrieve_sources, [True]), knext.Effect.SHOW)

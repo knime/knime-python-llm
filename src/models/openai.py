@@ -204,7 +204,6 @@ def _create_specific_model_name(api_name: str) -> knext.StringParameter:
             The model chosen has to be compatible with OpenAI's {api_name} API.
             This configuration will **overwrite** the default model configurations when set.""",
         choices=list_models,
-        default_value="unselected",
     )
 
 

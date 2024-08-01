@@ -73,3 +73,10 @@ def _get_model_data(auth_spec, mode: str):
         )
     response.raise_for_status()
     return response.json()["models"]
+
+
+def list_models_with_descriptions(auth_spec, mode: str) -> list[tuple[str, str, str]]:
+    return [
+        (data.get("name"), data.get("mode"), data.get("description"))
+        for data in _get_model_data(auth_spec, mode)
+    ]

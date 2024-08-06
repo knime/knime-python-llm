@@ -302,15 +302,23 @@ class OutputColumn:
     knime_type: knext.KnimeType
     pa_type: pa.DataType
 
+    def to_knime_column(self):
+        column = knext.Column(self.knime_type, self.default_name)
+        return column
+
 
 def create_empty_table(
     table: knext.Table, output_columns: List[OutputColumn]
 ) -> knext.Table:
     """Constructs an empty KNIME Table with the correct output columns."""
-    pa_table = table.to_pyarrow()
+    if table is None:
+        pa_table = pa.table([])
+    else:
+        pa_table = table.to_pyarrow()
+
     for col in output_columns:
         output_column_name = handle_column_name_collision(
-            table.schema.column_names, col.default_name
+            table.schema.column_names if table is not None else [], col.default_name
         )
         pa_table = pa_table.append_column(
             output_column_name,

@@ -150,7 +150,7 @@ class ScannerColumn:
 )
 @knext.input_table_group(
     "Dataset",
-    "Dataset containing prompts that are used to enhance the LLM-assisted detectors.",
+    "Dataset that is used to enhance the LLM-assisted detectors.",
 )
 @knext.output_table("Giskard report data", "The Giskard scan report as table.")
 @knext.output_view("Giskard report", "The Giskard scan report as HTML.")
@@ -161,7 +161,7 @@ class GiskardLLMScanner:
     This node provides an open-source framework for detecting potential vulnerabilites in LLM models provided
     as a workflow. It evaluates LLM models by combining heuristics-based and LLM-assisted detectors.
     The creation of domain-specific probes by the LLM-assisted detectors can be enhanced by connecting a
-    table containing sample prompts to the dynamic port.
+    dataset to the dynamic port.
 
     In order to perform tasks with LLM-assisted detectors, Giskard sends the following information to the
     language model provider:
@@ -171,8 +171,6 @@ class GiskardLLMScanner:
     - Model name and description
 
     Note that this does not apply if a self-hosted model is used.
-
-
 
     This node does not utilize Giskard's
     LLMCharsInjectionDetector. More information on Giskard can be found in the
@@ -197,9 +195,10 @@ class GiskardLLMScanner:
         "model description",
     )
 
-    prompt_column = knext.ColumnParameter(
-        "Prompt column",
-        "The column of your dataset that contains the prompts for the model.",
+    feature_columns = knext.ColumnFilterParameter(
+        "Feature columns",
+        "The columns of your dataset that are used as features by the prediction workflow. Feature columns "
+        "must be of type string.",
         schema_provider=lambda ctx: _get_workflow_schema(ctx, 1, True),
         column_filter=lambda column: column.ktype == knext.string(),
     )
@@ -261,9 +260,10 @@ class GiskardLLMScanner:
         llm = llm_port.create_model(ctx)
         set_default_client(KnimeLLMClient(llm))
 
-        feature_names = [self.prompt_column]
+        workflow_table_spec = _get_schema_from_workflow_spec(workflow.spec, True)
+        feature_names = self.feature_columns.apply(workflow_table_spec).column_names
 
-        prompt_df = self._create_giskard_compatible_df(dataset)
+        prompt_df = self._create_giskard_compatible_df(dataset, workflow_table_spec)
 
         giskard_dataset = gk.Dataset(
             df=prompt_df,
@@ -370,7 +370,9 @@ class GiskardLLMScanner:
             knext.view_html(html=html_report),
         )
 
-    def _create_giskard_compatible_df(self, dataset: List[knext.Table]):
+    def _create_giskard_compatible_df(
+        self, dataset: List[knext.Table], workflow_table_spec
+    ):
         if dataset:
             dataset_df = dataset[0].to_pandas()
             # giskard expects string columns to be of type object
@@ -378,7 +380,14 @@ class GiskardLLMScanner:
                 if col.ktype == knext.string():
                     dataset_df[col.name] = dataset_df[col.name].astype("object")
         else:
-            dataset_df = pd.DataFrame({self.prompt_column: pd.Series(dtype="object")})
+            dataset_df = pd.DataFrame(
+                {
+                    col: pd.Series(dtype="object")
+                    for col in self.feature_columns.apply(
+                        workflow_table_spec
+                    ).column_names
+                }
+            )
         return dataset_df
 
     def _validate_prediction_workflow_spec(self, workflow_spec) -> None:
@@ -392,30 +401,32 @@ class GiskardLLMScanner:
                 "Prediction workflow must produce exactly one output table."
             )
 
-    def _validate_prompt_column(
-        self, workflow_spec, dataset_spec: knext.Schema
-    ) -> None:
-        """Validates whether the prompt column exists in the input of the workflow and in the optional dataset
-        table. Selects a default if no column is specified."""
+    def _validate_feature_columns(self, workflow_spec, dataset_spec) -> None:
+        """Checks if the feature columns exist in the workflow input table and in the optional dataset table."""
         prediction_workflow_table = _get_schema_from_workflow_spec(
             workflow_spec, return_input_schema=True
         )
+        prediction_workflow_input_cols = prediction_workflow_table.column_names
 
-        if not self.prompt_column:
-            self.prompt_column = util.pick_default_column(
-                prediction_workflow_table, knext.string()
+        feature_names = set(
+            self.feature_columns.apply(prediction_workflow_table).column_names
+        )
+
+        if not feature_names.issubset(prediction_workflow_input_cols):
+            raise knext.InvalidParametersError(
+                "Selected feature columns have to be in the input table of the prediction workflow."
             )
 
         if dataset_spec:
-            if self.prompt_column not in dataset_spec[0].column_names:
+            if not feature_names.issubset(dataset_spec[0].column_names):
                 raise knext.InvalidParametersError(
-                    "Selected prompt column of the prediction workflow must also be in the dataset table."
+                    "Selected feature columns have to be in the dataset table."
                 )
 
     def _validate_selected_params(
         self, workflow_spec, dataset_spec: knext.Schema
     ) -> None:
-        self._validate_prompt_column(workflow_spec, dataset_spec)
+        self._validate_feature_columns(workflow_spec, dataset_spec)
         self._validate_response_column(workflow_spec)
 
         if self.dataset_name == "":
@@ -428,17 +439,15 @@ class GiskardLLMScanner:
             raise knext.InvalidParametersError(
                 "The model description must not be empty, as it is used to create domain-specific probes."
             )
-        if not self.prompt_column:
-            raise knext.InvalidParametersError("The prompt column must be specified.")
+        if not self.feature_columns.apply(
+            _get_schema_from_workflow_spec(workflow_spec, return_input_schema=True)
+        ).column_names:
+            raise knext.InvalidParametersError(
+                "At least one feature column must be specified."
+            )
         if not self.response_column:
             raise knext.InvalidParametersError("The response column must be specified.")
 
-        _check_workflow_column(
-            _get_schema_from_workflow_spec(workflow_spec, return_input_schema=True),
-            self.prompt_column,
-            knext.string(),
-            "prompt",
-        )
         _check_workflow_column(
             _get_schema_from_workflow_spec(workflow_spec, return_input_schema=False),
             self.response_column,

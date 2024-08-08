@@ -374,7 +374,7 @@ class ChatModelLoaderInputSettings:
         Models that support JSON Mode: gpt-3.5-turbo, gpt-4o, gpt-4o-mini, gpt-4-turbo.
         """,
         default_value=False,
-        since_version="5.4.0",
+        since_version="5.3.2",
         is_advanced=True,
     )
 

@@ -56,13 +56,14 @@ def check_column(
     column_name: str,
     expected_type: knext.KnimeType,
     column_purpose: str,
+    table_name: str = "input table",
 ) -> None:
     """
     Raises an InvalidParametersError if a column named column_name is not contained in input_table or has the wrong KnimeType.
     """
     if column_name not in input_table.column_names:
         raise knext.InvalidParametersError(
-            f"The {column_purpose} column '{column_name}' is missing in the input table."
+            f"The {column_purpose} column '{column_name}' is missing in the {table_name}."
         )
     ktype = input_table[column_name].ktype
     if ktype != expected_type:

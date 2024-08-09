@@ -23,4 +23,4 @@ import tools.vectorstore
 
 import util_nodes.base
 
-import giskard_nodes.base
+import eval.giskard

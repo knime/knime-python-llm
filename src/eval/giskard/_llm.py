@@ -4,120 +4,26 @@ from models.base import LLMPortObject, LLMPortObjectSpec, llm_port_type
 
 import os
 
+# on some systems anyio.abc has issues
 os.environ["GSK_DISABLE_SENTRY"] = "True"
 
 import pandas as pd
 import numpy as np
-from dataclasses import dataclass
-from typing import Sequence, Optional, List
+from typing import List
 from json.decoder import JSONDecodeError
-from langchain_core.language_models import BaseLanguageModel, BaseChatModel
-from langchain_core.messages import HumanMessage, AIMessage, ChatMessage, SystemMessage
 
 import giskard as gk
 from giskard.llm.client import set_default_client
-from giskard.llm.client.base import LLMClient
 from giskard.llm.errors import LLMGenerationError
 
-
-tortoise_icon = "icons/tortoise_icon.png"
-
-
-eval_category = knext.category(
-    path=util.main_category,
-    level_id="evaluation",
-    name="Evaluation",
-    description="",
-    icon=tortoise_icon,
+from ._base import (
+    tortoise_icon,
+    eval_category,
+    _get_workflow_schema,
+    _get_schema_from_workflow_spec,
+    ScannerColumn,
+    KnimeLLMClient,
 )
-
-
-def _get_schema_from_workflow_spec(
-    workflow_spec, return_input_schema: bool
-) -> knext.Schema:
-    if workflow_spec is None:
-        raise ValueError("Workflow spec is not available. Execute predecessor nodes.")
-    if return_input_schema:
-        return next(iter(workflow_spec.inputs.values())).schema
-    else:
-        return next(iter(workflow_spec.outputs.values())).schema
-
-
-def _get_workflow_schema(
-    ctx: knext.DialogCreationContext, port: int, input: bool
-) -> knext.Schema:
-    return _get_schema_from_workflow_spec(ctx.get_input_specs()[port], input)
-
-
-def _check_workflow_column(
-    input_table: knext.Schema,
-    column_name: str,
-    expected_type: knext.KnimeType,
-    column_purpose: str,
-) -> None:
-    """
-    Raises an InvalidParametersError if a column named column_name is not contained in the table of a workflow or has the wrong KnimeType.
-    """
-    if column_name not in input_table.column_names:
-        raise knext.InvalidParametersError(
-            f"The {column_purpose} column '{column_name}' is missing in the prediction workflow table."
-        )
-    ktype = input_table[column_name].ktype
-    if ktype != expected_type:
-        raise knext.InvalidParametersError(
-            f"The {column_purpose} column '{column_name}' is of type {str(ktype)} but should be of type {str(expected_type)}."
-        )
-
-
-class KnimeLLMClient(LLMClient):
-    def __init__(self, model: BaseLanguageModel):
-        self._model = model
-
-    def complete(
-        self,
-        messages: Sequence[ChatMessage],
-        temperature: float = 1,
-        max_tokens: Optional[int] = None,
-        caller_id: Optional[str] = None,
-        seed: Optional[int] = None,
-        format=None,
-    ) -> ChatMessage:
-        """Prompts the model to generate domain-specific probes. Uses the parameters of the model instead of
-        the function parameters."""
-
-        converted_messages = self._convert_messages(messages)
-        answer = self._model.invoke(converted_messages)
-        if isinstance(self._model, BaseChatModel):
-            answer = answer.content
-        return ChatMessage(role="assistant", content=answer)
-
-    _role_to_message_type = {
-        "ai": AIMessage,
-        "assistant": AIMessage,
-        "user": HumanMessage,
-        "human": HumanMessage,
-        "system": SystemMessage,
-    }
-
-    def _create_message(self, role: str, content: str):
-        if not role:
-            raise RuntimeError("Giskard did not specify a message role.")
-        message_type = self._role_to_message_type.get(role.lower(), None)
-        if message_type:
-            return message_type(content=content)
-        else:
-            # fallback
-            return ChatMessage(content=content, role=role)
-
-    def _convert_messages(self, messages: Sequence[ChatMessage]):
-        return [self._create_message(msg.role, msg.content) for msg in messages]
-
-
-@dataclass
-class ScannerColumn:
-    name: str
-    knime_type: knext.KnimeType
-    pd_type: type
 
 
 # == Nodes ==
@@ -161,7 +67,8 @@ class GiskardLLMScanner:
     This node provides an open-source framework for detecting potential vulnerabilites in LLM models provided
     as a workflow. It evaluates LLM models by combining heuristics-based and LLM-assisted detectors.
     The creation of domain-specific probes by the LLM-assisted detectors can be enhanced by connecting a
-    dataset to the dynamic port.
+    dataset to the dynamic port. Giskard uses the provided LLM for the evaluation but applies different model
+    parameters for some of the detectors.
 
     In order to perform tasks with LLM-assisted detectors, Giskard sends the following information to the
     language model provider:
@@ -238,6 +145,8 @@ class GiskardLLMScanner:
 
         self._validate_prediction_workflow_spec(prediction_workflow_spec)
 
+        self._pick_default_response_column(prediction_workflow_spec)
+
         self._validate_selected_params(prediction_workflow_spec, dataset_spec)
 
         return knext.Schema.from_columns(
@@ -257,8 +166,7 @@ class GiskardLLMScanner:
         workflow,
         dataset: List[knext.Table],
     ):
-        llm = llm_port.create_model(ctx)
-        set_default_client(KnimeLLMClient(llm))
+        set_default_client(KnimeLLMClient(llm_port, ctx))
 
         workflow_table_spec = _get_schema_from_workflow_spec(workflow.spec, True)
         feature_names = self.feature_columns.apply(workflow_table_spec).column_names
@@ -406,16 +314,10 @@ class GiskardLLMScanner:
         prediction_workflow_table = _get_schema_from_workflow_spec(
             workflow_spec, return_input_schema=True
         )
-        prediction_workflow_input_cols = prediction_workflow_table.column_names
 
         feature_names = set(
             self.feature_columns.apply(prediction_workflow_table).column_names
         )
-
-        if not feature_names.issubset(prediction_workflow_input_cols):
-            raise knext.InvalidParametersError(
-                "Selected feature columns have to be in the input table of the prediction workflow."
-            )
 
         if dataset_spec:
             if not feature_names.issubset(dataset_spec[0].column_names):
@@ -427,7 +329,6 @@ class GiskardLLMScanner:
         self, workflow_spec, dataset_spec: knext.Schema
     ) -> None:
         self._validate_feature_columns(workflow_spec, dataset_spec)
-        self._validate_response_column(workflow_spec)
 
         if self.dataset_name == "":
             raise knext.InvalidParametersError("The dataset name must not be empty.")
@@ -448,14 +349,15 @@ class GiskardLLMScanner:
         if not self.response_column:
             raise knext.InvalidParametersError("The response column must be specified.")
 
-        _check_workflow_column(
+        util.check_column(
             _get_schema_from_workflow_spec(workflow_spec, return_input_schema=False),
             self.response_column,
             knext.string(),
             "response",
+            "workflow input table",
         )
 
-    def _validate_response_column(self, workflow_spec) -> None:
+    def _pick_default_response_column(self, workflow_spec) -> None:
         if not self.response_column:
             prediction_workflow_output_schema = _get_schema_from_workflow_spec(
                 workflow_spec, return_input_schema=False

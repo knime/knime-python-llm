@@ -101,6 +101,10 @@ try {
                             'knime-filehandling',
                             'knime-scripting-editor',
                             'knime-kerberos',
+                            'knime-buildworkflows',
+                            'knime-server-client',
+                            'knime-js-base',
+                            'knime-cef',
                             repositoryName
                             ],
                     ],

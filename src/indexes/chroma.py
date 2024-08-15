@@ -1,3 +1,5 @@
+import uuid
+import pandas as pd
 import knime.extension as knext
 from typing import Optional
 
@@ -21,8 +23,11 @@ from .base import (
 
 import util
 
+from langchain_core.embeddings import Embeddings
 from langchain.vectorstores import Chroma
 from langchain.docstore.document import Document
+
+from chromadb import Client
 
 chroma_icon = "icons/chroma.png"
 chroma_category = knext.category(
@@ -196,6 +201,15 @@ class ChromaVectorStoreCreator:
         column_filter=util.create_type_filer(knext.string()),
     )
 
+    embeddings_column = knext.ColumnParameter(
+        "Embeddings column",
+        "Select the column containing existing embeddings if available.",
+        port_index=1,
+        column_filter=util.create_type_filer(knext.list_(knext.double())),
+        include_none_column=True,
+        since_version="5.3.2",
+    )
+
     collection_name = knext.StringParameter(
         "Collection name",
         "Specify the collection name of the vector store.",
@@ -229,6 +243,17 @@ class ChromaVectorStoreCreator:
         else:
             self.document_column = util.pick_default_column(input_table, knext.string())
 
+        if self.embeddings_column is None:
+            self.embeddings_column = "<none>"
+
+        if self.embeddings_column != "<none>":
+            util.check_column(
+                input_table,
+                self.embeddings_column,
+                knext.list_(knext.double()),
+                "embeddings",
+            )
+
         if self.collection_name == "":
             raise knext.InvalidParametersError("The collection name must not be empty.")
 
@@ -256,7 +281,11 @@ class ChromaVectorStoreCreator:
 
         document_column = self.document_column
 
-        df = input_table[[document_column] + meta_data_columns].to_pandas()
+        required_columns = [document_column] + meta_data_columns
+        if self.embeddings_column != "<none>":
+            required_columns.append(self.embeddings_column)
+
+        df = input_table[required_columns].to_pandas()
 
         def to_document(row) -> Document:
             metadata = {name: row[name] for name in meta_data_columns}
@@ -276,13 +305,23 @@ class ChromaVectorStoreCreator:
         # types are string, integer, float or bool
         df = handle_missing_metadata_values(df, meta_data_columns)
 
-        documents = df.apply(to_document, axis=1).tolist()
+        embeddings_model = embeddings.create_model(ctx)
+        if self.embeddings_column != "<none>":
+            db = self._with_existing_embeddings(
+                df,
+                missing_value_handling_setting,
+                ctx,
+                meta_data_columns,
+                embeddings_model,
+            )
+        else:
+            documents = df.apply(to_document, axis=1).tolist()
 
-        db = Chroma.from_documents(
-            documents=documents,
-            embedding=embeddings.create_model(ctx),
-            collection_name=self.collection_name,
-        )
+            db = Chroma.from_documents(
+                documents=documents,
+                embedding=embeddings_model,
+                collection_name=self.collection_name,
+            )
 
         return LocalChromaVectorstorePortObject(
             LocalChromaVectorstorePortObjectSpec(
@@ -291,6 +330,42 @@ class ChromaVectorStoreCreator:
             embeddings,
             vectorstore=db,
         )
+
+    def _with_existing_embeddings(
+        self,
+        df: pd.DataFrame,
+        missing_value_handling_setting,
+        ctx,
+        meta_data_columns,
+        embeddings_model: Embeddings,
+    ) -> Chroma:
+        df = util.handle_missing_and_empty_values(
+            df,
+            self.embeddings_column,
+            missing_value_handling_setting,
+            ctx,
+            check_empty_values=False,
+        )
+        metadatas = None
+        if meta_data_columns:
+            metadatas = df[meta_data_columns].to_dict(orient="records")
+
+        chroma = Chroma(
+            collection_name=self.collection_name, embedding_function=embeddings_model
+        )
+
+        ids = [str(uuid.uuid4()) for _ in range(len(df))]
+        embeddings = [arr.tolist() for arr in df[self.embeddings_column]]
+        documents = df[self.document_column].to_list()
+
+        chroma._collection.add(
+            documents=documents,
+            embeddings=embeddings,
+            ids=ids,
+            metadatas=metadatas,
+        )
+
+        return chroma
 
 
 @knext.node(

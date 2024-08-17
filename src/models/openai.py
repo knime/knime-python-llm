@@ -12,6 +12,7 @@ from .base import (
     model_category,
     GeneralRemoteSettings,
     CredentialsSettings,
+    OutputModeOptions,
 )
 
 
@@ -749,6 +750,59 @@ openai_llm_port_type = knext.port_type(
 )
 
 
+class _ChatOpenAI(BaseChatModel):
+    client: ChatOpenAI
+    response_format: str = None
+
+    def _prepare_kwargs(self, kwargs: Dict[str, Any]) -> Dict[str, Any]:
+        if self.response_format == OutputModeOptions.JsonMode.name:
+            kwargs["response_format"] = {"type": "json_object"}
+        return kwargs
+
+    async def _agenerate(
+        self,
+        messages: List[BaseMessage],
+        stop: Optional[List[str]] = None,
+        run_manager: Optional[Any] = None,
+        **kwargs: Any,
+    ) -> ChatResult:
+        kwargs = self._prepare_kwargs(kwargs)
+        return await self.client._agenerate(
+            messages, stop=stop, run_manager=run_manager, **kwargs
+        )
+
+    def _generate(
+        self,
+        messages: List[BaseMessage],
+        stop: Optional[List[str]] = None,
+        run_manager: Optional[Any] = None,
+        **kwargs: Any,
+    ) -> ChatResult:
+        kwargs = self._prepare_kwargs(kwargs)
+        return self.client._generate(
+            messages, stop=stop, run_manager=run_manager, **kwargs
+        )
+
+    async def abatch(
+        self, sub_batch: List[Any], stop: Optional[List[str]] = None, **kwargs: Any
+    ) -> List[Any]:
+        kwargs = self._prepare_kwargs(kwargs)
+        return await super().abatch(sub_batch, stop=stop, **kwargs)
+
+    def invoke(
+        self,
+        input: LanguageModelInput,
+        config: Optional[Dict[str, Any]] = None,
+        **kwargs: Any,
+    ) -> BaseMessage:
+        kwargs = self._prepare_kwargs(kwargs)
+        return super().invoke(input, config, **kwargs)
+
+    @property
+    def _llm_type(self) -> str:
+        return "wrapper-chat-openai"
+
+
 class OpenAIChatModelPortObjectSpec(OpenAILLMPortObjectSpec, ChatModelPortObjectSpec):
     """Spec of an OpenAI chat model."""
 
@@ -758,10 +812,10 @@ class OpenAIChatModelPortObject(ChatModelPortObject):
     def spec(self) -> OpenAIChatModelPortObjectSpec:
         return super().spec
 
-    def create_model(self, ctx: knext.ExecutionContext):
-        from langchain_openai import ChatOpenAI
-
-        return ChatOpenAI(
+    def create_model(
+        self, ctx: knext.ExecutionContext, response_format: Optional[str] = None
+    ) -> _ChatOpenAI:
+        openai_chat_client = ChatOpenAI(
             openai_api_key=ctx.get_credentials(self.spec.credentials).password,
             base_url=self.spec.base_url,
             model=self.spec.model,
@@ -769,6 +823,8 @@ class OpenAIChatModelPortObject(ChatModelPortObject):
             max_tokens=self.spec.max_tokens,
             seed=self.spec.seed,
         )
+
+        return _ChatOpenAI(client=openai_chat_client, response_format=response_format)
 
 
 openai_chat_port_type = knext.port_type(
@@ -1106,6 +1162,7 @@ class OpenAIChatModelConnector:
             chat_models,
             chat_default,
         )
+
         LOGGER.info(f"Selected model: {model_name}")
 
         seed = None if self.model_settings.seed == 0 else self.model_settings.seed

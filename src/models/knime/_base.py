@@ -77,6 +77,6 @@ def _get_model_data(auth_spec, mode: str):
 
 def list_models_with_descriptions(auth_spec, mode: str) -> list[tuple[str, str, str]]:
     return [
-        (data.get("name"), data.get("mode"), data.get("description"))
+        (data.get("name"), data.get("mode"), data.get("description") or None)
         for data in _get_model_data(auth_spec, mode)
     ]

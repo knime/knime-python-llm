@@ -11,6 +11,21 @@ import pandas as pd
 import pyarrow as pa
 
 
+@knext.parameter_group("Model types")
+class ModelTypeSettings:
+    chat_models = knext.BoolParameter(
+        "Chat Models",
+        "List available chat models.",
+        True,
+    )
+
+    embedding_models = knext.BoolParameter(
+        "Embedding Models",
+        "List available embedding models.",
+        True,
+    )
+
+
 @knext.node(
     name="KNIME Hub AI Model Lister",
     node_type=knext.NodeType.SOURCE,
@@ -35,17 +50,7 @@ class KnimeHubAIModelLister:
     Use this node to retrieve the available models with their name, type and description.
     """
 
-    chat_models = knext.BoolParameter(
-        "Chat Models",
-        "List available chat models.",
-        False,
-    )
-
-    embedding_models = knext.BoolParameter(
-        "Embedding Models",
-        "List available embedding models.",
-        False,
-    )
+    model_types = ModelTypeSettings()
 
     # Name, KNIME type, and PyArrow type of the columns to output
     column_list = [
@@ -69,15 +74,14 @@ class KnimeHubAIModelLister:
     def execute(
         self, ctx: knext.ExecutionContext, authentication: knext.PortObject
     ) -> knext.Table:
-
         available_models = []
 
-        if self.chat_models:
+        if self.model_types.chat_models:
             available_models.extend(
                 list_models_with_descriptions(authentication.spec, "chat")
             )
 
-        if self.embedding_models:
+        if self.model_types.embedding_models:
             available_models.extend(
                 list_models_with_descriptions(authentication.spec, "embedding")
             )

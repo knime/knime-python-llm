@@ -172,6 +172,7 @@ class TestSetGenerator:
                 agent_description=self.test_set_params.description,
             ).to_pandas()
 
+        # wrap conversation_history in order for KNIME to correctly convert it to JSON
         testset["conversation_history"] = testset["conversation_history"].apply(
             lambda row: {"conversation_history": row}
         )

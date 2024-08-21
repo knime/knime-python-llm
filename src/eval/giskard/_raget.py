@@ -123,6 +123,15 @@ class TestSetGenerator:
     input_data = InputDataParameters()
     test_set_params = TestSetParameters()
 
+    name_mapping = {
+        "id": "ID",
+        "question": "Question",
+        "reference_answer": "Reference Answer",
+        "reference_context": "Reference Context",
+        "conversation_history": "Conversation History",
+        "metadata": "Metadata",
+    }
+
     def configure(
         self,
         ctx: knext.ConfigurationContext,
@@ -138,12 +147,12 @@ class TestSetGenerator:
 
         return knext.Schema.from_columns(
             [
-                knext.Column(knext.string(), "id"),
-                knext.Column(knext.string(), "question"),
-                knext.Column(knext.string(), "reference_answer"),
-                knext.Column(knext.string(), "reference_context"),
-                knext.Column(knext.logical(dict), "conversation_history"),
-                knext.Column(knext.logical(dict), "metadata"),
+                knext.Column(knext.string(), "ID"),
+                knext.Column(knext.string(), "Question"),
+                knext.Column(knext.string(), "Reference Answer"),
+                knext.Column(knext.string(), "Reference Context"),
+                knext.Column(knext.logical(dict), "Conversation History"),
+                knext.Column(knext.logical(dict), "Metadata"),
             ]
         )
 
@@ -178,7 +187,7 @@ class TestSetGenerator:
         )
 
         testset = testset.reset_index()
-        testset = testset.rename(columns={"ID": "id"})
+        testset = testset.rename(columns=self.name_mapping)
 
         return knext.Table.from_pandas(testset)
 

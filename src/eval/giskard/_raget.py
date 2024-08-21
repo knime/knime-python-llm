@@ -36,14 +36,11 @@ class _KnowledgeBase(KnowledgeBase):
         super().__init__(
             data=data, columns=[documents_col], embedding_model=embeddings_model
         )
-        self._vectors = data[embeddings_col]
-
-    @property
-    def _embeddings(self):
-        self._embeddings_inst = np.array([np.array(vec) for vec in self._vectors])
+        # initialize embeddings so they don't get recalculated in the _embeddings property
+        vectors = data[embeddings_col]
+        self._embeddings_inst = np.array([np.array(vec) for vec in vectors])
         for doc, emb in zip(self._documents, self._embeddings_inst):
             doc.embeddings = emb
-        return self._embeddings_inst
 
 
 @knext.parameter_group("Data")

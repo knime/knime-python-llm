@@ -124,11 +124,11 @@ class TestSetGenerator:
 
     def configure(
         self,
-        ctx,
+        ctx: knext.ConfigurationContext,
         chat_model_spec: ChatModelPortObjectSpec,
         embed_model_spec: EmbeddingsPortObjectSpec,
         table_spec: knext.Schema,
-    ):
+    ) -> knext.Schema:
         chat_model_spec.validate_context(ctx)
         embed_model_spec.validate_context(ctx)
 
@@ -148,11 +148,11 @@ class TestSetGenerator:
 
     def execute(
         self,
-        ctx,
+        ctx: knext.ExecutionContext,
         chat_model_port_object: ChatModelPortObject,
         embed_model_port_object: EmbeddingsPortObject,
         input_table: knext.Table,
-    ):
+    ) -> knext.Table:
         set_default_client(KnimeLLMClient(chat_model_port_object, ctx))
 
         df = input_table.to_pandas()
@@ -179,7 +179,7 @@ class TestSetGenerator:
 
         return knext.Table.from_pandas(testset)
 
-    def _check_column_types_exist(self, table_spec):
+    def _check_column_types_exist(self, table_spec: knext.Schema) -> None:
         has_string_column = False
         has_vector_column = False
 
@@ -202,7 +202,7 @@ class TestSetGenerator:
                 "The knowledge base must contain at least one vector column. A list of doubles is expected."
             )
 
-    def _set_default_columns(self, table_spec):
+    def _set_default_columns(self, table_spec: knext.Schema) -> None:
         if not self.input_data.documents_col:
             self.input_data.documents_col = util.pick_default_column(
                 table_spec, knext.string()

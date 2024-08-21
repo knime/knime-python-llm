@@ -72,7 +72,7 @@ class TestSetParameters:
     n_questions = knext.IntParameter(
         "Number of Questions",
         "Specifies the number of test questions to generate.",
-        10,
+        120,
         min_value=1,
     )
 

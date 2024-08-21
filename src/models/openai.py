@@ -27,7 +27,7 @@ import base64
 import requests
 import tempfile
 import pandas as pd
-from typing import Callable, List, Optional
+from typing import Callable, List
 
 from openai import Client as OpenAIClient
 from openai.types import FileObject
@@ -367,19 +367,6 @@ class ChatModelLoaderInputSettings:
         knext.Effect.SHOW,
     )
 
-    json_mode = knext.BoolParameter(
-        "Enable JSON Mode",
-        """When JSON mode is enabled, the model is constrained to only generate strings 
-        that parse into valid JSON object. When using JSON mode, always instruct the model 
-        to produce JSON via some message in the conversation, for example via your system message.
-
-        Models that support JSON Mode: gpt-3.5-turbo, gpt-4o, gpt-4o-mini, gpt-4-turbo.
-        """,
-        default_value=False,
-        since_version="5.4.0",
-        is_advanced=True,
-    )
-
 
 @knext.parameter_group(label="OpenAI Embeddings Selection")
 class EmbeddingsLoaderInputSettings:
@@ -705,7 +692,6 @@ class OpenAILLMPortObjectSpec(OpenAIModelPortObjectSpec, LLMPortObjectSpec):
         n: int,
         seed: int,
         n_requests: int,
-        response_format: Optional[dict] = None,
     ) -> None:
         super().__init__(credentials)
         self._model = model_name
@@ -715,7 +701,6 @@ class OpenAILLMPortObjectSpec(OpenAIModelPortObjectSpec, LLMPortObjectSpec):
         self._n = n
         self._seed = seed
         self._n_requests = n_requests
-        self._response_format = response_format
 
     @property
     def model(self) -> str:
@@ -745,12 +730,8 @@ class OpenAILLMPortObjectSpec(OpenAIModelPortObjectSpec, LLMPortObjectSpec):
     def n_requests(self) -> int:
         return self._n_requests
 
-    @property
-    def response_format(self) -> Optional[dict]:
-        return self._response_format
-
     def serialize(self) -> dict:
-        serialized = {
+        return {
             **super().serialize(),
             "model": self._model,
             "temperature": self._temperature,
@@ -760,9 +741,6 @@ class OpenAILLMPortObjectSpec(OpenAIModelPortObjectSpec, LLMPortObjectSpec):
             "seed": self._seed,
             "n_requests": self._n_requests,
         }
-        if self._response_format is not None:
-            serialized["response_format"] = self._response_format
-        return serialized
 
     @classmethod
     def deserialize(cls, data: dict):
@@ -775,7 +753,6 @@ class OpenAILLMPortObjectSpec(OpenAIModelPortObjectSpec, LLMPortObjectSpec):
             data["n"],
             seed=data.get("seed", 0),
             n_requests=data.get("n_requests", 1),
-            response_format=data.get("response_format", None),
         )
 
 
@@ -820,7 +797,6 @@ class OpenAIChatModelPortObject(ChatModelPortObject):
             max_tokens=self.spec.max_tokens,
             n=self.spec.n,
             seed=self.spec.seed,
-            response_format=self.spec.response_format,
         )
 
 
@@ -1109,13 +1085,6 @@ class OpenAIChatModelConnector:
     input_settings = ChatModelLoaderInputSettings()
     model_settings = OpenAIGeneralSettings()
 
-    json_mode_supported_models: List[str] = [
-        "gpt-3.5-turbo",
-        "gpt-4o",
-        "gpt-4-turbo",
-        "gpt-4o-mini",
-    ]
-
     def configure(
         self,
         ctx: knext.ConfigurationContext,
@@ -1145,18 +1114,6 @@ class OpenAIChatModelConnector:
             chat_models,
             chat_default,
         )
-
-        if self.input_settings.json_mode and not self._supports_response_format(
-            model_name
-        ):
-            raise ValueError(
-                f"Model '{model_name}' does not support JSON mode. Supported models are: {', '.join(self.json_mode_supported_models)}"
-            )
-
-        response_format = (
-            {"type": "json_object"} if self.input_settings.json_mode else None
-        )
-
         LOGGER.info(f"Selected model: {model_name}")
 
         seed = None if self.model_settings.seed == 0 else self.model_settings.seed
@@ -1170,16 +1127,10 @@ class OpenAIChatModelConnector:
             self.model_settings.n,
             seed=seed,
             n_requests=self.model_settings.n_requests,
-            response_format=response_format,
         )
 
     def _modify_parameters(self, parameters):
         return _set_selection_parameter(parameters)
-
-    def _supports_response_format(self, model_name: str) -> bool:
-        return model_name.lower() in (
-            model.lower() for model in self.json_mode_supported_models
-        )
 
 
 @knext.node(

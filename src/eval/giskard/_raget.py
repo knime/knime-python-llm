@@ -10,6 +10,7 @@ from models.base import (
 )
 
 from ._base import tortoise_icon, KnimeLLMClient
+from ._tqdm import override_tqdm_with_ctx
 
 import pandas as pd
 import numpy as np
@@ -164,11 +165,12 @@ class TestSetGenerator:
             embeddings_model=embed_model_port_object.create_model(ctx),
         )
 
-        testset = generate_testset(
-            knowledge_base=kb,
-            num_questions=self.test_set_params.n_questions,
-            agent_description=self.test_set_params.description,
-        ).to_pandas()
+        with override_tqdm_with_ctx(ctx):
+            testset = generate_testset(
+                knowledge_base=kb,
+                num_questions=self.test_set_params.n_questions,
+                agent_description=self.test_set_params.description,
+            ).to_pandas()
 
         testset["conversation_history"] = testset["conversation_history"].apply(
             lambda row: {"conversation_history": row}

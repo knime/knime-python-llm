@@ -11,15 +11,11 @@ from models.base import (
 
 from ._base import tortoise_icon, KnimeLLMClient
 
-import os
 import pandas as pd
 import numpy as np
 
 from giskard.llm.client import set_default_client
 from giskard.rag.testset_generation import generate_testset, KnowledgeBase
-
-
-os.environ["GSK_DISABLE_SENTRY"] = "True"
 
 
 class _KnowledgeBase(KnowledgeBase):

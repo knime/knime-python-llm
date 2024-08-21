@@ -2,11 +2,6 @@ import knime.extension as knext
 import util
 from models.base import LLMPortObject, LLMPortObjectSpec, llm_port_type
 
-import os
-
-# on some systems anyio.abc has issues
-os.environ["GSK_DISABLE_SENTRY"] = "True"
-
 import pandas as pd
 import numpy as np
 from typing import List

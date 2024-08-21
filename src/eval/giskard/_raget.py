@@ -65,7 +65,7 @@ class TestSetParameters:
     description = knext.StringParameter(
         "Agent Description",
         """A brief description of the agent to be evaluated. This information will be 
-        used to generate appropriate test questions tailored to this system.""",
+        used to generate appropriate test questions tailored to the system.""",
     )
 
     n_questions = knext.IntParameter(
@@ -108,21 +108,14 @@ class TestSetParameters:
 )
 @knext.output_table("Test Set", "The generated test set.")
 class TestSetGenerator:
-    """Generates a test set for a RAG system.
-
-    This node generates a test set for a RAG system based on the provided knowledge
-    base and description of the agents task. The test set can be used to evaluate
-    the RAG system's performance.
-    """
-
     """
     Generates a test set for evaluating a RAG system.
 
-    This node utilizes the provided knowledge base and the task description of the RAG agent 
-    to automatically generate a diverse set of test questions, reference answers, and reference 
-    contexts. The generated test set is designed to assess the performance of various components 
-    of the RAG system, such as the retriever, generator, and knowledge base quality. The 
-    questions target specific aspects of the RAG system, helping to identify potential 
+    This node utilizes the provided knowledge base and the task description of the RAG agent
+    to automatically generate a diverse set of test questions, reference answers, and reference
+    contexts. The generated test set is designed to assess the performance of various components
+    of the RAG system, such as the retriever, generator, and knowledge base quality. The
+    questions target specific aspects of the RAG system, helping to identify potential
     weaknesses and areas for improvement.
     """
 

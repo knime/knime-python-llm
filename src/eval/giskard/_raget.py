@@ -147,7 +147,6 @@ class TestSetGenerator:
 
         return knext.Schema.from_columns(
             [
-                knext.Column(knext.string(), "ID"),
                 knext.Column(knext.string(), "Question"),
                 knext.Column(knext.string(), "Reference Answer"),
                 knext.Column(knext.string(), "Reference Context"),
@@ -188,6 +187,7 @@ class TestSetGenerator:
 
         testset = testset.reset_index()
         testset = testset.rename(columns=self.name_mapping)
+        testset = testset.drop("ID", axis=1)
 
         return knext.Table.from_pandas(testset)
 

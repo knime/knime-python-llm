@@ -20,6 +20,8 @@ from .base import (
 from langchain_core.embeddings import Embeddings
 from langchain.vectorstores.faiss import FAISS
 from langchain.docstore.document import Document
+import faiss
+from numpy import ndarray
 
 faiss_icon = "icons/ml.png"
 faiss_category = knext.category(
@@ -57,6 +59,16 @@ class FAISSVectorstorePortObject(FilestoreVectorstorePortObject):
 
     def save_vectorstore(self, vectorstore_folder, vectorstore: FAISS):
         vectorstore.save_local(vectorstore_folder)
+
+    def get_documents(
+        self, ctx: knext.ExecutionContext
+    ) -> tuple[list[Document], ndarray]:
+        store: FAISS = self.load_store(ctx)
+        docs = [store.docstore.search(id) for id in store.index_to_docstore_id.values()]
+        embeddings = [
+            store.index.reconstruct(id) for id in store.index_to_docstore_id.keys()
+        ]
+        return docs, embeddings
 
 
 faiss_vector_store_port_type = knext.port_type(

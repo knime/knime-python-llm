@@ -24,6 +24,7 @@ import os
 import shutil
 import logging
 from langchain.docstore.document import Document
+import numpy as np
 
 LOGGER = logging.getLogger(__name__)
 
@@ -77,11 +78,22 @@ class VectorstorePortObject(knext.PortObject):
         self._embeddings_model = embeddings_model
 
     @property
-    def embeddings_model(self):
+    def spec(self) -> VectorstorePortObjectSpec:
+        return super().spec
+
+    @property
+    def embeddings_model(self) -> EmbeddingsPortObject:
         return self._embeddings_model
 
+    @abstractmethod
     def load_store(self, ctx):
         raise NotImplementedError()
+
+    @abstractmethod
+    def get_documents(
+        self, ctx: knext.ExecutionContext
+    ) -> tuple[list[Document], np.ndarray]:
+        """Retrieves the documents and embeddings"""
 
 
 vector_store_port_type = knext.port_type(
@@ -635,3 +647,59 @@ class VectorStoreRetriever:
             )
 
         return util.create_empty_table(table, output_columns)
+
+
+@knext.node(
+    name="Vector Store Data Extractor",
+    node_type=knext.NodeType.OTHER,
+    icon_path=store_icon,
+    category=store_category,
+    keywords=[
+        "GenAI",
+        "Generative AI",
+        "Retrieval Augmented Generation",
+        "RAG",
+        "Vector Store to Table",
+    ],
+)
+@knext.input_port(
+    name="Vector store",
+    description="The vector store to extract data from.",
+    port_type=vector_store_port_type,
+)
+@knext.output_table(
+    name="Extracted data", description="The data stored inside of the vector store"
+)
+class VectorStoreDataExtractor:
+    """Extracts the documents, embeddings and metadata from a vector store."""
+
+    def configure(
+        self,
+        ctx: knext.ConfigurationContext,
+        vector_store_spec: VectorstorePortObjectSpec,
+    ) -> knext.Schema:
+        columns = [
+            knext.Column(knext.string(), "Text"),
+            knext.Column(knext.list_(knext.double()), "Embedding"),
+        ]
+        columns += [
+            knext.Column(
+                knext.string(),
+                util.handle_column_name_collision(["Text", "Embedding"], meta_col_name),
+            )
+            for meta_col_name in vector_store_spec.metadata_column_names
+        ]
+        return knext.Schema.from_columns(columns)
+
+    def execute(
+        self, ctx: knext.ExecutionContext, vector_store: VectorstorePortObject
+    ) -> knext.Table:
+        documents, embeddings = vector_store.get_documents(ctx)
+        df = pd.DataFrame()
+        df["Text"] = pd.Series([doc.page_content for doc in documents])
+        df["Embedding"] = pd.Series([np.array(row) for row in embeddings])
+        for metadata_name in vector_store.spec.metadata_column_names:
+            df[
+                util.handle_column_name_collision(["Text", "Embedding"], metadata_name)
+            ] = pd.Series([doc.metadata[metadata_name] for doc in documents])
+        return knext.Table.from_pandas(df)

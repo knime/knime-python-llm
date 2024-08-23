@@ -1,4 +1,5 @@
 import uuid
+import numpy as np
 import pandas as pd
 import knime.extension as knext
 from typing import Optional
@@ -19,7 +20,6 @@ from .base import (
     store_category,
 )
 
-from langchain_core.embeddings import Embeddings
 from langchain.vectorstores import Chroma
 from langchain.docstore.document import Document
 
@@ -144,6 +144,17 @@ class LocalChromaVectorstorePortObject(
             embedding_function=embeddings,
             persist_directory=vectorstore_path,
         )
+
+    def get_documents(
+        self, ctx: knext.ExecutionContext
+    ) -> tuple[list[Document], np.ndarray]:
+        store: Chroma = self.load_store(ctx)
+        content = store.get(include=["embeddings", "metadatas", "documents"])
+        documents = [
+            Document(page_content=doc, metadata=metadata)
+            for doc, metadata in zip(content["documents"], content["metadatas"])
+        ]
+        return documents, np.array(content["embeddings"])
 
 
 local_chroma_vector_store_port_type = knext.port_type(

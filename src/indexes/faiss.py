@@ -1,7 +1,9 @@
 import pandas as pd
+from indexes.base import VectorstorePortObjectSpec
 import knime.extension as knext
 from typing import Optional
 
+from knime.extension import ExecutionContext
 from models.base import (
     EmbeddingsPortObjectSpec,
     EmbeddingsPortObject,
@@ -9,15 +11,11 @@ from models.base import (
 )
 
 from .base import (
+    BaseVectorStoreCreator,
     FilestoreVectorstorePortObjectSpec,
     FilestoreVectorstorePortObject,
-    MetadataSettings,
     store_category,
-    get_metadata_columns,
-    validate_creator_document_column,
 )
-
-import util
 
 from langchain_core.embeddings import Embeddings
 from langchain.vectorstores.faiss import FAISS
@@ -91,7 +89,7 @@ faiss_vector_store_port_type = knext.port_type(
     "The created FAISS vector store.",
     faiss_vector_store_port_type,
 )
-class FAISSVectorStoreCreator:
+class FAISSVectorStoreCreator(BaseVectorStoreCreator):
     """
     Creates a FAISS vector store from a string column and an embeddings model.
 
@@ -102,155 +100,44 @@ class FAISSVectorStoreCreator:
     semantic meaning when given a query.
     """
 
-    document_column = knext.ColumnParameter(
-        "Document column",
-        """Select the column containing the documents to be embedded.""",
-        port_index=1,
-        column_filter=util.create_type_filer(knext.string()),
-    )
-
-    embeddings_column = knext.ColumnParameter(
-        "Embeddings column",
-        "Select the column containing existing embeddings if available.",
-        port_index=1,
-        column_filter=util.create_type_filer(knext.list_(knext.double())),
-        include_none_column=True,
-        since_version="5.3.2",
-    )
-
-    missing_value_handling = knext.EnumParameter(
-        "Handle missing values in the document column",
-        """Define whether missing values in the document column should be skipped or whether the 
-        node execution should fail on missing values.""",
-        default_value=lambda v: util.MissingValueHandlingOptions.Fail.name
-        if v < knext.Version(5, 2, 0)
-        else util.MissingValueHandlingOptions.SkipRow.name,
-        enum=util.MissingValueHandlingOptions,
-        style=knext.EnumParameter.Style.VALUE_SWITCH,
-        since_version="5.2.0",
-    )
-
-    metadata_settings = MetadataSettings(since_version="5.2.0")
-
-    def configure(
+    def _configure(
         self,
-        ctx: knext.ConfigurationContext,
         embeddings_spec: EmbeddingsPortObjectSpec,
-        input_table: knext.Schema,
+        metadata_column_names: list[str],
     ) -> FAISSVectorstorePortObjectSpec:
-        embeddings_spec.validate_context(ctx)
-
-        if self.document_column:
-            validate_creator_document_column(input_table, self.document_column)
-        else:
-            self.document_column = util.pick_default_column(input_table, knext.string())
-
-        if self.embeddings_column:
-            util.check_column(
-                input_table,
-                self.embeddings_column,
-                knext.list_(knext.double()),
-                "embeddings",
-            )
-
-        metadata_cols = get_metadata_columns(
-            self.metadata_settings.metadata_columns, self.document_column, input_table
-        )
         return FAISSVectorstorePortObjectSpec(
             embeddings_spec=embeddings_spec,
-            metadata_column_names=metadata_cols,
+            metadata_column_names=metadata_column_names,
         )
 
-    def execute(
+    def _create_port_object(
         self,
         ctx: knext.ExecutionContext,
-        embeddings: EmbeddingsPortObject,
-        input_table: knext.Table,
+        embeddings_obj: EmbeddingsPortObject,
+        documents: list[Document],
+        metadata_column_names: list[str],
+        embeddings: pd.Series | None,
     ) -> FAISSVectorstorePortObject:
-        meta_data_columns = get_metadata_columns(
-            self.metadata_settings.metadata_columns,
-            self.document_column,
-            input_table.schema,
-        )
-
-        df = self._get_relevant_df(input_table, meta_data_columns)
-
-        # Skip rows with missing values if "SkipRow" option is selected
-        # or fail execution if "Fail" is selected and there are missing documents
-        missing_value_handling_setting = util.MissingValueHandlingOptions[
-            self.missing_value_handling
-        ]
-
-        df = util.handle_missing_and_empty_values(
-            df, self.document_column, missing_value_handling_setting, ctx
-        )
-
-        embeddings_model = embeddings.create_model(ctx)
-
-        if self.embeddings_column:
-            db = self._with_existing_embeddings(
-                df,
-                missing_value_handling_setting,
-                ctx,
-                meta_data_columns,
-                embeddings_model,
+        embeddings_model = embeddings_obj.create_model(ctx)
+        if embeddings is None:
+            db = FAISS.from_documents(
+                documents=documents,
+                embedding=embeddings_model,
             )
         else:
-            db = self._with_new_embeddings(df, meta_data_columns, embeddings_model)
+            docs = [doc.page_content for doc in documents]
+            text_embeddings = zip(docs, embeddings)
+            metadatas = [doc.metadata for doc in documents]
+            db = FAISS.from_embeddings(
+                embedding=embeddings_model,
+                text_embeddings=text_embeddings,
+                metadatas=metadatas,
+            )
 
         return FAISSVectorstorePortObject(
-            FAISSVectorstorePortObjectSpec(embeddings.spec, meta_data_columns),
-            embeddings,
+            FAISSVectorstorePortObjectSpec(embeddings_obj.spec, metadata_column_names),
+            embeddings_obj,
             vectorstore=db,
-        )
-
-    def _get_relevant_df(self, input_table: knext.Table, meta_data_columns: list[str]):
-        relevant_columns = [self.document_column] + meta_data_columns
-        if self.embeddings_column != "<none>":
-            relevant_columns.append(self.embeddings_column)
-
-        return input_table[relevant_columns].to_pandas()
-
-    def _with_existing_embeddings(
-        self,
-        df: pd.DataFrame,
-        missing_value_handling_setting,
-        ctx: knext.ExecutionContext,
-        meta_data_columns: list[str],
-        embeddings_model: Embeddings,
-    ) -> FAISS:
-        df = util.handle_missing_and_empty_values(
-            df,
-            self.embeddings_column,
-            missing_value_handling_setting,
-            ctx,
-            check_empty_values=False,
-        )
-        text_embeddings = zip(df[self.document_column], df[self.embeddings_column])
-        metadatas = None
-        if meta_data_columns:
-            metadatas = df[meta_data_columns].to_dict(orient="records")
-        return FAISS.from_embeddings(
-            embedding=embeddings_model,
-            text_embeddings=text_embeddings,
-            metadatas=metadatas,
-        )
-
-    def _with_new_embeddings(
-        self,
-        df: pd.DataFrame,
-        meta_data_columns: list[str],
-        embeddings_model: Embeddings,
-    ) -> FAISS:
-        def to_document(row) -> Document:
-            metadata = {name: row[name] for name in meta_data_columns}
-            return Document(page_content=row[self.document_column], metadata=metadata)
-
-        documents = df.apply(to_document, axis=1).tolist()
-
-        return FAISS.from_documents(
-            documents=documents,
-            embedding=embeddings_model,
         )
 
 

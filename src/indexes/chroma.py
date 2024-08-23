@@ -3,6 +3,7 @@ import pandas as pd
 import knime.extension as knext
 from typing import Optional
 
+from knime.extension import ExecutionContext
 from models.base import (
     EmbeddingsPortObjectSpec,
     EmbeddingsPortObject,
@@ -10,24 +11,18 @@ from models.base import (
 )
 
 from .base import (
+    BaseVectorStoreCreator,
     VectorstorePortObjectSpec,
     VectorstorePortObject,
     FilestoreVectorstorePortObjectSpec,
     FilestoreVectorstorePortObject,
-    MetadataSettings,
     store_category,
-    get_metadata_columns,
-    handle_missing_metadata_values,
-    validate_creator_document_column,
 )
-
-import util
 
 from langchain_core.embeddings import Embeddings
 from langchain.vectorstores import Chroma
 from langchain.docstore.document import Document
 
-from chromadb import Client
 
 chroma_icon = "icons/chroma.png"
 chroma_category = knext.category(
@@ -183,7 +178,7 @@ local_chroma_vector_store_port_type = knext.port_type(
     "The created Chroma vector store.",
     local_chroma_vector_store_port_type,
 )
-class ChromaVectorStoreCreator:
+class ChromaVectorStoreCreator(BaseVectorStoreCreator):
     """
     Creates a Chroma vector store from a string column and an embeddings model.
 
@@ -194,21 +189,10 @@ class ChromaVectorStoreCreator:
     semantic meaning when given a query.
     """
 
-    document_column = knext.ColumnParameter(
-        "Document column",
-        """Select the column containing the documents to be embedded.""",
-        port_index=1,
-        column_filter=util.create_type_filer(knext.string()),
-    )
+    # redefined here to enforce the parameter order in the dialog
+    document_column = BaseVectorStoreCreator.document_column
 
-    embeddings_column = knext.ColumnParameter(
-        "Embeddings column",
-        "Select the column containing existing embeddings if available.",
-        port_index=1,
-        column_filter=util.create_type_filer(knext.list_(knext.double())),
-        include_none_column=True,
-        since_version="5.3.2",
-    )
+    embeddings_column = BaseVectorStoreCreator.embeddings_column
 
     collection_name = knext.StringParameter(
         "Collection name",
@@ -217,155 +201,56 @@ class ChromaVectorStoreCreator:
         since_version="5.3.2",
     )
 
-    missing_value_handling = knext.EnumParameter(
-        "Handle missing values in the document column",
-        """Define whether missing values in the document column should be skipped or whether the 
-        node execution should fail on missing values.""",
-        default_value=lambda v: util.MissingValueHandlingOptions.Fail.name
-        if v < knext.Version(5, 2, 0)
-        else util.MissingValueHandlingOptions.SkipRow.name,
-        enum=util.MissingValueHandlingOptions,
-        style=knext.EnumParameter.Style.VALUE_SWITCH,
-        since_version="5.2.0",
-    )
-
-    metadata_settings = MetadataSettings(since_version="5.2.0")
-
-    def configure(
+    def _configure(
         self,
-        ctx: knext.ConfigurationContext,
         embeddings_spec: EmbeddingsPortObjectSpec,
-        input_table: knext.Schema,
+        metadata_column_names: list[str],
     ) -> LocalChromaVectorstorePortObjectSpec:
-        embeddings_spec.validate_context(ctx)
-        if self.document_column:
-            validate_creator_document_column(input_table, self.document_column)
-        else:
-            self.document_column = util.pick_default_column(input_table, knext.string())
-
-        if self.embeddings_column is None:
-            self.embeddings_column = "<none>"
-
-        if self.embeddings_column != "<none>":
-            util.check_column(
-                input_table,
-                self.embeddings_column,
-                knext.list_(knext.double()),
-                "embeddings",
-            )
-
         if self.collection_name == "":
             raise knext.InvalidParametersError("The collection name must not be empty.")
-
-        metadata_cols = get_metadata_columns(
-            self.metadata_settings.metadata_columns, self.document_column, input_table
-        )
-
         return LocalChromaVectorstorePortObjectSpec(
             embeddings_spec=embeddings_spec,
-            metadata_column_names=metadata_cols,
+            metadata_column_names=metadata_column_names,
             collection_name=self.collection_name,
         )
 
-    def execute(
+    def _create_port_object(
         self,
-        ctx: knext.ExecutionContext,
-        embeddings: EmbeddingsPortObject,
-        input_table: knext.Table,
-    ) -> ChromaVectorstorePortObject:
-        meta_data_columns = get_metadata_columns(
-            self.metadata_settings.metadata_columns,
-            self.document_column,
-            input_table.schema,
-        )
-
-        document_column = self.document_column
-
-        required_columns = [document_column] + meta_data_columns
-        if self.embeddings_column != "<none>":
-            required_columns.append(self.embeddings_column)
-
-        df = input_table[required_columns].to_pandas()
-
-        def to_document(row) -> Document:
-            metadata = {name: row[name] for name in meta_data_columns}
-            return Document(page_content=row[document_column], metadata=metadata)
-
-        # Skip rows with missing values if "SkipRow" option is selected
-        # or fail execution if "Fail" is selected and there are missing documents
-        missing_value_handling_setting = util.MissingValueHandlingOptions[
-            self.missing_value_handling
-        ]
-
-        df = util.handle_missing_and_empty_values(
-            df, self.document_column, missing_value_handling_setting, ctx
-        )
-
-        # Replaces missing values with empty string since the allowed metadata value
-        # types are string, integer, float or bool
-        df = handle_missing_metadata_values(df, meta_data_columns)
-
-        embeddings_model = embeddings.create_model(ctx)
-        if self.embeddings_column != "<none>":
-            db = self._with_existing_embeddings(
-                df,
-                missing_value_handling_setting,
-                ctx,
-                meta_data_columns,
-                embeddings_model,
-            )
-        else:
-            documents = df.apply(to_document, axis=1).tolist()
-
+        ctx: ExecutionContext,
+        embeddings_obj: EmbeddingsPortObject,
+        documents: list[Document],
+        metadata_column_names: list[str],
+        embeddings: pd.Series | None,
+    ) -> LocalChromaVectorstorePortObject:
+        embeddings_model = embeddings_obj.create_model(ctx)
+        if embeddings is None:
             db = Chroma.from_documents(
                 documents=documents,
                 embedding=embeddings_model,
                 collection_name=self.collection_name,
             )
+        else:
+            db = Chroma(
+                collection_name=self.collection_name,
+                embedding_function=embeddings_model,
+            )
+
+            db._collection.add(
+                documents=[doc.page_content for doc in documents],
+                embeddings=[arr.tolist() for arr in embeddings],
+                ids=[str(uuid.uuid4()) for _ in range(len(documents))],
+                metadatas=[doc.metadata for doc in documents],
+            )
 
         return LocalChromaVectorstorePortObject(
             LocalChromaVectorstorePortObjectSpec(
-                embeddings.spec, meta_data_columns, self.collection_name
+                embeddings_spec=embeddings_obj.spec,
+                metadata_column_names=metadata_column_names,
+                collection_name=self.collection_name,
             ),
-            embeddings,
+            embeddings_port_object=embeddings_obj,
             vectorstore=db,
         )
-
-    def _with_existing_embeddings(
-        self,
-        df: pd.DataFrame,
-        missing_value_handling_setting,
-        ctx,
-        meta_data_columns,
-        embeddings_model: Embeddings,
-    ) -> Chroma:
-        df = util.handle_missing_and_empty_values(
-            df,
-            self.embeddings_column,
-            missing_value_handling_setting,
-            ctx,
-            check_empty_values=False,
-        )
-        metadatas = None
-        if meta_data_columns:
-            metadatas = df[meta_data_columns].to_dict(orient="records")
-
-        chroma = Chroma(
-            collection_name=self.collection_name, embedding_function=embeddings_model
-        )
-
-        ids = [str(uuid.uuid4()) for _ in range(len(df))]
-        embeddings = [arr.tolist() for arr in df[self.embeddings_column]]
-        documents = df[self.document_column].to_list()
-
-        chroma._collection.add(
-            documents=documents,
-            embeddings=embeddings,
-            ids=ids,
-            metadatas=metadatas,
-        )
-
-        return chroma
 
 
 @knext.node(

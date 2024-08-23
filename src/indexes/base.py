@@ -1,4 +1,5 @@
 # KNIME / own imports
+from abc import ABC, abstractmethod
 import knime.extension as knext
 import util
 from knime.extension.nodes import (
@@ -22,6 +23,7 @@ from typing import Optional, Any
 import os
 import shutil
 import logging
+from langchain.docstore.document import Document
 
 LOGGER = logging.getLogger(__name__)
 
@@ -227,6 +229,146 @@ def get_metadata_columns(
     except:
         pass
     return meta_data_columns
+
+
+class BaseVectorStoreCreator(ABC):
+    document_column = knext.ColumnParameter(
+        "Document column",
+        """Select the column containing the documents to be embedded.""",
+        port_index=1,
+        column_filter=util.create_type_filer(knext.string()),
+    )
+
+    embeddings_column = knext.ColumnParameter(
+        "Embeddings column",
+        "Select the column containing existing embeddings if available.",
+        port_index=1,
+        column_filter=util.create_type_filer(knext.list_(knext.double())),
+        include_none_column=True,
+        since_version="5.3.2",
+    )
+
+    missing_value_handling = knext.EnumParameter(
+        "Handle missing values in the document column",
+        """Define whether missing values in the document column should be skipped or whether the 
+        node execution should fail on missing values.""",
+        default_value=lambda v: util.MissingValueHandlingOptions.Fail.name
+        if v < knext.Version(5, 2, 0)
+        else util.MissingValueHandlingOptions.SkipRow.name,
+        enum=util.MissingValueHandlingOptions,
+        style=knext.EnumParameter.Style.VALUE_SWITCH,
+        since_version="5.2.0",
+    )
+
+    metadata_settings = MetadataSettings(since_version="5.2.0")
+
+    def configure(
+        self,
+        ctx: knext.ConfigurationContext,
+        embeddings_spec: EmbeddingsPortObjectSpec,
+        input_table: knext.Schema,
+    ) -> VectorstorePortObjectSpec:
+        embeddings_spec.validate_context(ctx)
+
+        if self.document_column:
+            validate_creator_document_column(input_table, self.document_column)
+        else:
+            self.document_column = util.pick_default_column(input_table, knext.string())
+
+        if self.embeddings_column is None:
+            self.embeddings_column = "<none>"
+
+        if self.embeddings_column != "<none>":
+            util.check_column(
+                input_table,
+                self.embeddings_column,
+                knext.list_(knext.double()),
+                "embeddings",
+            )
+
+        metadata_cols = get_metadata_columns(
+            self.metadata_settings.metadata_columns, self.document_column, input_table
+        )
+        return self._configure(embeddings_spec, metadata_cols)
+
+    @abstractmethod
+    def _configure(
+        self,
+        embeddings_spec: EmbeddingsPortObjectSpec,
+        metadata_column_names: list[str],
+    ) -> VectorstorePortObjectSpec:
+        """Creates the output spec"""
+
+    def execute(
+        self,
+        ctx: knext.ExecutionContext,
+        embeddings: EmbeddingsPortObject,
+        input_table: knext.Table,
+    ) -> VectorstorePortObject:
+        metadata_columns = get_metadata_columns(
+            self.metadata_settings.metadata_columns,
+            self.document_column,
+            input_table.schema,
+        )
+
+        df = self._get_relevant_df(input_table, metadata_columns)
+
+        # Skip rows with missing values if "SkipRow" option is selected
+        # or fail execution if "Fail" is selected and there are missing documents
+        missing_value_handling_setting = util.MissingValueHandlingOptions[
+            self.missing_value_handling
+        ]
+
+        df = util.handle_missing_and_empty_values(
+            df, self.document_column, missing_value_handling_setting, ctx
+        )
+
+        embeddings_series = None
+        if self.embeddings_column and self.embeddings_column != "<none>":
+            df = util.handle_missing_and_empty_values(
+                df,
+                self.embeddings_column,
+                missing_value_handling_setting,
+                ctx,
+                check_empty_values=False,
+            )
+            embeddings_series = df[self.embeddings_column]
+
+        def to_document(row) -> Document:
+            metadata = {name: row[name] for name in metadata_columns}
+            return Document(page_content=row[self.document_column], metadata=metadata)
+
+        documents = df.apply(to_document, axis=1).tolist()
+
+        return self._create_port_object(
+            ctx,
+            embeddings,
+            documents=documents,
+            metadata_column_names=metadata_columns,
+            embeddings=embeddings_series,
+        )
+
+    def _get_relevant_df(
+        self,
+        input_table: knext.Table,
+        metadata_columns: list[str],
+    ):
+        relevant_columns = [self.document_column] + metadata_columns
+        if self.embeddings_column != "<none>":
+            relevant_columns.append(self.embeddings_column)
+
+        return input_table[relevant_columns].to_pandas()
+
+    @abstractmethod
+    def _create_port_object(
+        self,
+        ctx: knext.ExecutionContext,
+        embeddings_obj: EmbeddingsPortObject,
+        documents: list[Document],
+        metadata_column_names: list[str],
+        embeddings: Optional[pd.Series],
+    ) -> VectorstorePortObject:
+        """Creates the vectorstore port object"""
 
 
 @knext.node(

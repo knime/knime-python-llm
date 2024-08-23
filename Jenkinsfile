@@ -80,7 +80,7 @@ try {
                     }
 
                 }
-            withCredentials([string(credentialsId: 'openai-api-key', variable: 'OPENAI_API_KEY')]) {
+            withCredentials([string(credentialsId: 'openai-api-key', variable: 'OPENAI_API_KEY'), string(credentialsId: 'huggingface-api-key', variable: 'TEST_API_KEY_HUGGINGFACE')]) {
                 workflowTests.runTests(
                     dependencies: [
                         repositories: [

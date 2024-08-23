@@ -151,6 +151,7 @@ def handle_missing_and_empty_values(
     input_column: str,
     missing_value_handling_setting: MissingValueHandlingOptions,
     ctx: knext.ExecutionContext,
+    check_empty_values: bool = True,
 ):
     # Drops rows if SkipRow option is selected, otherwise fails
     # if there are any missing values in the input column (=Fail option is selected)
@@ -169,12 +170,13 @@ def handle_missing_and_empty_values(
     if df.empty:
         raise ValueError("All rows are skipped due to missing values.")
 
-    # Check for empty values
-    for id, value in df[input_column].items():
-        if not value.strip():
-            raise ValueError(
-                f"Empty values are not supported. See row ID {id} for the first empty value."
-            )
+    if check_empty_values:
+        # Check for empty values
+        for id, value in df[input_column].items():
+            if not value.strip():
+                raise ValueError(
+                    f"Empty values are not supported. See row ID {id} for the first empty value."
+                )
 
     return df
 

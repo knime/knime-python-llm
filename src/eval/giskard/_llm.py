@@ -265,6 +265,8 @@ class GiskardLLMScanner:
         df = self._enforce_string_data_types(scan_result.to_dataframe())
 
         html_report = scan_result.to_html()
+        # The unicode character is not displayed on some Windows machines
+        html_report = html_report.replace("\xa0", "&nbsp;")
 
         df = self._catch_empty_dataframe(df)
 

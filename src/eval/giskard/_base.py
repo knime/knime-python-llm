@@ -49,16 +49,11 @@ def _validate_prediction_workflow_spec(workflow_spec) -> None:
         )
 
 
-def _pick_default_workflow_column(workflow_spec, column_name: str, input: bool) -> str:
-    if not column_name:
-        prediction_workflow_schema = _get_schema_from_workflow_spec(
-            workflow_spec, return_input_schema=input
-        )
-        column_name = util.pick_default_column(
-            prediction_workflow_schema, knext.string()
-        )
-
-    return column_name
+def _pick_default_workflow_column(workflow_spec, input: bool) -> str:
+    prediction_workflow_schema = _get_schema_from_workflow_spec(
+        workflow_spec, return_input_schema=input
+    )
+    return util.pick_default_column(prediction_workflow_schema, knext.string())
 
 
 class KnimeLLMClient(LLMClient):

@@ -145,10 +145,10 @@ class GiskardLLMScanner:
         llm_spec.validate_context(ctx)
 
         _validate_prediction_workflow_spec(prediction_workflow_spec)
-
-        self.response_column = _pick_default_workflow_column(
-            prediction_workflow_spec, self.response_column, False
-        )
+        if not self.response_column:
+            self.response_column = _pick_default_workflow_column(
+                prediction_workflow_spec, False
+            )
 
         self._validate_selected_params(prediction_workflow_spec, dataset_spec)
 

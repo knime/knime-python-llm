@@ -251,10 +251,11 @@ class TestSetGenerator:
     category=eval_category,
     keywords=[
         "Model evaluation",
-        "Machine learning",
+        "GenAI",
+        "Generative AI",
+        "LLM",
         "RAG",
         "Retrieval Augmented Generation",
-        "Embeddings",
     ],
 )
 @knext.input_port(

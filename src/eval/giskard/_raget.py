@@ -332,12 +332,12 @@ class GiskardRAGETEvaluator:
         _validate_prediction_workflow_spec(rag_workflow_spec)
         self._validate_test_set(test_set_spec)
 
-        self.prompt_column = _pick_default_workflow_column(
-            rag_workflow_spec, self.prompt_column, True
-        )
-        self.response_column = _pick_default_workflow_column(
-            rag_workflow_spec, self.response_column, False
-        )
+        if not self.prompt_column:
+            self.prompt_column = _pick_default_workflow_column(rag_workflow_spec, True)
+        if not self.response_column:
+            self.response_column = _pick_default_workflow_column(
+                rag_workflow_spec, False
+            )
 
         self._validate_selected_params(rag_workflow_spec)
 

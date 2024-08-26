@@ -299,7 +299,7 @@ class GiskardRAGETEvaluator:
         **TestSetGenerator().name_mapping,
         "agent_answer": "Agent Answer",
         "correctness": "Correctness",
-        "correctness_reason": "Correctnes Reason",
+        "correctness_reason": "Correctness Reason",
     }
 
     output_columns = [
@@ -318,7 +318,7 @@ class GiskardRAGETEvaluator:
         ),
         ScannerColumn("Agent Answer", knext.string(), pd.StringDtype()),
         ScannerColumn("Correctness", knext.bool_(), pd.BooleanDtype()),
-        ScannerColumn("Correctnes Reason", knext.string(), pd.StringDtype()),
+        ScannerColumn("Correctness Reason", knext.string(), pd.StringDtype()),
     ]
 
     def configure(

@@ -404,6 +404,8 @@ class GiskardRAGETEvaluator:
 
         html_report = report.to_html()
         html_report = self._remove_empty_html_sections(html_report)
+        # The unicode character is not displayed on some Windows machines
+        html_report = html_report.replace("\xa0", "&nbsp;")
 
         report_table = self._report_to_knime_table(report)
 

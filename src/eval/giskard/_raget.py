@@ -461,12 +461,10 @@ class GiskardRAGETEvaluator:
 
         for section in soup.find_all("div", class_="section-container"):
             section_title = section.find("div", class_="section-title")
-            if section_title and section_title.text.strip() == "SELECTED METRICS":
-                section.decompose()
-            if (
-                section_title
-                and section_title.text.strip() == "KNOWLEDGE BASE OVERVIEW"
-            ):
+            if section_title and section_title.text.strip() in [
+                "SELECTED METRICS",
+                "KNOWLEDGE BASE OVERVIEW",
+            ]:
                 section.decompose()
 
         return soup.decode()

@@ -673,19 +673,36 @@ class VectorStoreRetriever:
 class VectorStoreDataExtractor:
     """Extracts the documents, embeddings and metadata from a vector store."""
 
+    document_column_name = knext.StringParameter(
+        "Document column name",
+        "The name of the output column holding the documents.",
+        "Document",
+    )
+
+    embedding_column_name = knext.StringParameter(
+        "Embedding column name",
+        "The name of the output column holding the embeddings.",
+        "Embedding",
+    )
+
     def configure(
         self,
         ctx: knext.ConfigurationContext,
         vector_store_spec: VectorstorePortObjectSpec,
     ) -> knext.Schema:
+        if self.document_column_name == self.embedding_column_name:
+            raise knext.InvalidParametersError(
+                f"Same name ({self.document_column_name}) used for the document and embedding column. Select unique names."
+            )
         columns = [
-            knext.Column(knext.string(), "Text"),
-            knext.Column(knext.list_(knext.double()), "Embedding"),
+            knext.Column(knext.string(), self.document_column_name),
+            knext.Column(knext.list_(knext.double()), self.embedding_column_name),
         ]
+        existing_names = [self.document_column_name, self.embedding_column_name]
         columns += [
             knext.Column(
                 knext.string(),
-                util.handle_column_name_collision(["Text", "Embedding"], meta_col_name),
+                util.handle_column_name_collision(existing_names, meta_col_name),
             )
             for meta_col_name in vector_store_spec.metadata_column_names
         ]
@@ -696,10 +713,15 @@ class VectorStoreDataExtractor:
     ) -> knext.Table:
         documents, embeddings = vector_store.get_documents(ctx)
         df = pd.DataFrame()
-        df["Text"] = pd.Series([doc.page_content for doc in documents])
-        df["Embedding"] = pd.Series([np.array(row) for row in embeddings])
+        df[self.document_column_name] = pd.Series(
+            [doc.page_content for doc in documents]
+        )
+        df[self.embedding_column_name] = pd.Series(
+            [np.array(row) for row in embeddings]
+        )
+        existing_names = [self.document_column_name, self.embedding_column_name]
         for metadata_name in vector_store.spec.metadata_column_names:
-            df[
-                util.handle_column_name_collision(["Text", "Embedding"], metadata_name)
-            ] = pd.Series([doc.metadata[metadata_name] for doc in documents])
+            df[util.handle_column_name_collision(existing_names, metadata_name)] = (
+                pd.Series([doc.metadata[metadata_name] for doc in documents])
+            )
         return knext.Table.from_pandas(df)

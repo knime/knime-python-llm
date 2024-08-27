@@ -668,10 +668,14 @@ class VectorStoreRetriever:
     port_type=vector_store_port_type,
 )
 @knext.output_table(
-    name="Extracted data", description="The data stored inside of the vector store"
+    name="Extracted data", description="The data stored inside of the vector store."
 )
 class VectorStoreDataExtractor:
-    """Extracts the documents, embeddings and metadata from a vector store."""
+    """Extracts the documents, embeddings and metadata from a vector store into a table.
+
+    Extracts the documents, embeddings and metadata from a vector store into a table.
+    This table can be combined with tables extracted from other vector stores to merge multiple
+    vector stores into one by creating a new vector store from the combined table."""
 
     document_column_name = knext.StringParameter(
         "Document column name",

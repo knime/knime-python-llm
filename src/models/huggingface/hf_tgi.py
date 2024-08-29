@@ -277,11 +277,12 @@ huggingface_textGenInference_chat_port_type = knext.port_type(
         "Large Language Model",
     ],
 )
-@knext.input_port_group(
+@knext.input_port(
     name="Hugging Face Hub Connection",
     description="An optional Hugging Face hub connection that can be used to "
     "access protected Hugging Face inference endpoints.",
     port_type=hf_authentication_port_type,
+    optional=True,
 )
 @knext.output_port(
     "Huggingface TGI Configuration",
@@ -311,12 +312,11 @@ class HFTGILLMConnector:
     def configure(
         self,
         ctx: knext.ConfigurationContext,
-        hf_hub_auth_group: list[HFAuthenticationPortObjectSpec],
+        hf_hub_auth: Optional[HFAuthenticationPortObjectSpec],
     ) -> HFTGILLMPortObjectSpec:
         if not self.settings.server_url:
             raise knext.InvalidParametersError("Server URL missing")
 
-        hf_hub_auth = hf_hub_auth_group[0] if hf_hub_auth_group else None
         if hf_hub_auth:
             hf_hub_auth.validate_context(ctx)
 
@@ -325,9 +325,9 @@ class HFTGILLMConnector:
     def execute(
         self,
         ctx: knext.ExecutionContext,
-        hf_hub_auth_group: list[HFAuthenticationPortObject],
+        hf_hub_auth: Optional[HFAuthenticationPortObject],
     ) -> HFTGILLMPortObject:
-        hf_hub_auth = hf_hub_auth_group[0].spec if hf_hub_auth_group else None
+        hf_hub_auth = hf_hub_auth.spec if hf_hub_auth else None
         return HFTGILLMPortObject(self.create_spec(hf_hub_auth))
 
     def create_spec(
@@ -364,12 +364,12 @@ class HFTGILLMConnector:
         "Text Generation Inference",
     ],
 )
-# TODO switch to knext.input_port_group once change is available on master
-@knext.input_port_group(
+@knext.input_port(
     name="Hugging Face Hub Connection",
     description="An optional Hugging Face hub connection that can be used to "
     "access protected Hugging Face inference endpoints.",
     port_type=hf_authentication_port_type,
+    optional=True,
 )
 @knext.output_port(
     "Huggingface TGI LLM Connection",
@@ -400,11 +400,10 @@ class HFTGIChatModelConnector:
     def configure(
         self,
         ctx: knext.ConfigurationContext,
-        hf_hub_auth_group: list[HFAuthenticationPortObjectSpec],
+        hf_hub_auth: Optional[HFAuthenticationPortObjectSpec],
     ) -> HFTGIChatModelPortObjectSpec:
         if not self.settings.server_url:
             raise knext.InvalidParametersError("Server URL missing")
-        hf_hub_auth = hf_hub_auth_group[0] if hf_hub_auth_group else None
         if hf_hub_auth:
             hf_hub_auth.validate_context(ctx)
 
@@ -413,9 +412,9 @@ class HFTGIChatModelConnector:
     def execute(
         self,
         ctx: knext.ExecutionContext,
-        hf_hub_auth_group: list[HFAuthenticationPortObject],
+        hf_hub_auth: Optional[HFAuthenticationPortObject],
     ) -> HFTGIChatModelPortObject:
-        hf_hub_auth = hf_hub_auth_group[0].spec if hf_hub_auth_group else None
+        hf_hub_auth = hf_hub_auth.spec if hf_hub_auth else None
         return HFTGIChatModelPortObject(self.create_spec(hf_hub_auth))
 
     def create_spec(

@@ -121,11 +121,12 @@ huggingface_tei_embeddings_port_type = knext.port_type(
         "Retrieval Augmented Generation",
     ],
 )
-@knext.input_port_group(
+@knext.input_port(
     name="Hugging Face Hub Connection",
     description="An optional Hugging Face hub connection that can be used to "
     "access protected Hugging Face inference endpoints.",
     port_type=hf_authentication_port_type,
+    optional=True,
 )
 @knext.output_port(
     "Embeddings Model",
@@ -164,12 +165,11 @@ class HFTEIEmbeddingsConnector:
     def configure(
         self,
         ctx: knext.ConfigurationContext,
-        hf_hub_auth_group: list[HFAuthenticationPortObjectSpec],
+        hf_hub_auth: Optional[HFAuthenticationPortObjectSpec],
     ) -> HFTEIEmbeddingsPortObjectSpec:
         if not self.server_url:
             raise knext.InvalidParametersError("Server URL missing")
 
-        hf_hub_auth = hf_hub_auth_group[0] if hf_hub_auth_group else None
         if hf_hub_auth:
             hf_hub_auth.validate_context(ctx)
 
@@ -178,9 +178,9 @@ class HFTEIEmbeddingsConnector:
     def execute(
         self,
         ctx: knext.ExecutionContext,
-        hf_hub_auth_group: list[HFAuthenticationPortObject],
+        hf_hub_auth: Optional[HFAuthenticationPortObject],
     ) -> HFTEIEmbeddingsPortObject:
-        hf_hub_auth = hf_hub_auth_group[0].spec if hf_hub_auth_group else None
+        hf_hub_auth = hf_hub_auth.spec if hf_hub_auth else None
         return HFTEIEmbeddingsPortObject(self.create_spec(hf_hub_auth))
 
     def create_spec(

@@ -102,15 +102,15 @@ class GiskardLLMScanner:
     """
 
     model_name = knext.StringParameter(
-        "Model name",
-        "The model name. Used to generate domain-specific probes and included in the generated report.",
-        "model",
+        "Workflow name",
+        "A descriptive name for the workflow under evaluation. Used to generate domain-specific probes and included in the generated report.",
+        "Workflow",
     )
 
     model_description = knext.StringParameter(
-        "Model decription",
-        "The model description. Used to generate domain-specific probes.",
-        "model description",
+        "Workflow decription",
+        "A more detailed description of the evaluated workflow that explains its purpose. Used to generate domain-specific probes.",
+        "Workflow description",
     )
 
     feature_columns = knext.ColumnFilterParameter(

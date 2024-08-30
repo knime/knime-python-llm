@@ -8,7 +8,7 @@ from models.base import (
 
 import pandas as pd
 import numpy as np
-from typing import List
+from typing import Optional
 from json.decoder import JSONDecodeError
 
 import giskard as gk
@@ -55,9 +55,10 @@ from ._base import (
     "The generative workflow to analyze with Giskard.",
     knext.PortType.WORKFLOW,
 )
-@knext.input_table_group(
+@knext.input_table(
     "Dataset",
     "Dataset that is used to enhance the LLM-assisted detectors.",
+    optional=True,
 )
 @knext.output_table("Giskard report data", "The Giskard scan report as table.")
 @knext.output_view("Giskard report", "The Giskard scan report as HTML.")
@@ -150,7 +151,7 @@ class GiskardLLMScanner:
         ctx,
         llm_spec: LLMPortObjectSpec,
         prediction_workflow_spec,
-        dataset_spec: List[knext.Schema],
+        dataset_spec: Optional[knext.Schema],
     ) -> knext.Schema:
         llm_spec.validate_context(ctx)
 
@@ -177,7 +178,7 @@ class GiskardLLMScanner:
         ctx: knext.ExecutionContext,
         llm_port: LLMPortObject,
         workflow,
-        dataset: List[knext.Table],
+        dataset: Optional[knext.Table],
     ):
         set_default_client(KnimeLLMClient(llm_port, ctx))
 
@@ -293,12 +294,12 @@ class GiskardLLMScanner:
         )
 
     def _create_giskard_compatible_df(
-        self, dataset: List[knext.Table], workflow_table_spec
+        self, dataset: Optional[knext.Table], workflow_table_spec
     ):
         if dataset:
-            dataset_df = dataset[0].to_pandas()
+            dataset_df = dataset.to_pandas()
             # giskard expects string columns to be of type object
-            for col in dataset[0].schema:
+            for col in dataset.schema:
                 if col.ktype == knext.string():
                     dataset_df[col.name] = dataset_df[col.name].astype("object")
         else:
@@ -312,7 +313,9 @@ class GiskardLLMScanner:
             )
         return dataset_df
 
-    def _validate_feature_columns(self, workflow_spec, dataset_spec) -> None:
+    def _validate_feature_columns(
+        self, workflow_spec, dataset_spec: Optional[knext.Schema]
+    ) -> None:
         """Checks if the feature columns exist in the workflow input table and in the optional dataset table."""
         prediction_workflow_table = _get_schema_from_workflow_spec(
             workflow_spec, return_input_schema=True
@@ -323,13 +326,13 @@ class GiskardLLMScanner:
         )
 
         if dataset_spec:
-            if not feature_names.issubset(dataset_spec[0].column_names):
+            if not feature_names.issubset(dataset_spec.column_names):
                 raise knext.InvalidParametersError(
                     "Selected feature columns have to be in the dataset table."
                 )
 
     def _validate_selected_params(
-        self, workflow_spec, dataset_spec: knext.Schema
+        self, workflow_spec, dataset_spec: Optional[knext.Schema]
     ) -> None:
         self._validate_feature_columns(workflow_spec, dataset_spec)
 

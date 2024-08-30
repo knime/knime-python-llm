@@ -296,9 +296,10 @@ class GiskardRAGETEvaluator:
     Evaluates a RAG system with Giskard.
 
     This node allows to identify potential weaknesses and areas for improvement in a RAG system provided as a
-    workflow by evaluating the correctness of the answers. An LLM compares the model's answers to the
+    workflow by evaluating the correctness of the answers. An LLM is used to compare the workflow's answers to the
     reference answers of the test set. The test set can be generated with the
     **Giskard RAGET Test Set Generator** node.
+    For more details see the [Giskard documentation](https://docs.giskard.ai/en/stable/open_source/testset_generation/rag_evaluation/).
     """
 
     prompt_column = knext.ColumnParameter(

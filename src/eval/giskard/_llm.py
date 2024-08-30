@@ -101,12 +101,6 @@ class GiskardLLMScanner:
     [documentation](https://docs.giskard.ai/en/stable/open_source/scan/scan_llm/index.html).
     """
 
-    dataset_name = knext.StringParameter(
-        "Dataset name",
-        "The name of the dataset. Used in the generated report.",
-        "dataset",
-    )
-
     model_name = knext.StringParameter(
         "Model name",
         "The model name. Used to generate domain-specific probes and included in the generated report.",
@@ -195,7 +189,6 @@ class GiskardLLMScanner:
         giskard_dataset = gk.Dataset(
             df=prompt_df,
             target=None,
-            name=self.dataset_name,
         )
 
         input_key = next(iter(workflow.spec.inputs))
@@ -340,8 +333,6 @@ class GiskardLLMScanner:
     ) -> None:
         self._validate_feature_columns(workflow_spec, dataset_spec)
 
-        if self.dataset_name == "":
-            raise knext.InvalidParametersError("The dataset name must not be empty.")
         if self.model_name == "":
             raise knext.InvalidParametersError(
                 "The model name must not be empty, as it is used to create domain-specific probes."

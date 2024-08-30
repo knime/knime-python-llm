@@ -115,8 +115,8 @@ class GiskardLLMScanner:
 
     feature_columns = knext.ColumnFilterParameter(
         "Feature columns",
-        "The columns of your dataset that are used as features by the prediction workflow. Feature columns "
-        "must be of type string.",
+        "The columns used as features by the generative workflow. Feature columns "
+        "must be of type string. These columns must exist in the dataset if one is provided.",
         schema_provider=lambda ctx: _get_workflow_schema(ctx, 1, True),
         column_filter=lambda column: column.ktype == knext.string(),
     )

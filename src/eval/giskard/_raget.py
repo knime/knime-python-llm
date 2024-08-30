@@ -83,8 +83,8 @@ class InputDataParameters:
 @knext.parameter_group("Test Set")
 class TestSetParameters:
     description = knext.StringParameter(
-        "Agent Description",
-        """A brief description of the agent to be evaluated. This information will be 
+        "RAG System Description",
+        """A brief description of the RAG system to be evaluated. This information will be 
         used to generate appropriate test questions tailored to the system.""",
     )
 
@@ -131,12 +131,32 @@ class TestSetGenerator:
     """
     Generates a test set for evaluating a RAG system.
 
-    This node utilizes the provided knowledge base and the task description of the RAG agent
-    to automatically generate a diverse set of test questions, reference answers, and reference
-    contexts. The generated test set is designed to assess the performance of various components
-    of the RAG system, such as the retriever, generator, and knowledge base quality. The
-    questions target specific aspects of the RAG system, helping to identify potential
+    This node utilizes the provided knowledge base and the task description of the RAG system
+    to automatically generate a diverse set of test questions that are designed to assess
+    the performance of various components of the RAG system, such as the retriever,
+    generator, and knowledge base quality.
+    The questions target specific aspects of the RAG system, helping to identify potential
     weaknesses and areas for improvement.
+
+    The different types of questions include
+
+    - *Simple questions*: Simple questions generated from an excerpt of the knowledge base.
+    - *Complex questions*: More complex questions that use paraphrasing.
+    - *Distracting questions*: Questions containing distracting information to test the retrieval part of the RAG system.
+    - *Situational questions*: Questions that include context information to evaluate if the system can produce answers relevant to the context.
+    - *Double questions*: Questions consisting of two separate parts.
+    - *Conversational questions*: Questions posed in a conversational style where the first message describes the context and the second poses the actual question.
+
+    For more details and examples refer to the
+    [Giskard documentation](https://docs.giskard.ai/en/stable/open_source/testset_generation/testset_generation/index.html#what-does-raget-do-exactly)
+
+    The output table has the columns
+
+    - *Question*: The generated question.
+    - *Reference Answer*: A reference answer to the question.
+    - *Reference Context*: The context used to create the reference answer.
+    - *Conversation History*: The conversation with the system. Only relevant for conversational questions and otherwise empty.
+    - *Metadata*: Additional information specific to the type of question.
     """
 
     input_data = InputDataParameters()

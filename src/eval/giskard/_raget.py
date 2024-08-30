@@ -1,4 +1,3 @@
-from typing import List
 import knime.extension as knext
 import knime.api.schema as ks
 import util
@@ -265,18 +264,6 @@ class TestSetGenerator:
             )
 
 
-class ModelTypeOptions(knext.EnumParameterOptions):
-    LLM = (
-        "LLM",
-        "The workflow contains an LLM Prompter. The workflow input is a table where each row is a prompt.",
-    )
-
-    CHAT = (
-        "Chat",
-        "The workflow contains a Chat Model Prompter. The workflow input is a table containing the conversation.",
-    )
-
-
 @knext.node(
     "Giskard RAGET Evaluator",
     knext.NodeType.OTHER,
@@ -314,22 +301,11 @@ class GiskardRAGETEvaluator:
     **Giskard RAGET Test Set Generator** node.
     """
 
-    model_type = knext.EnumParameter(
-        "Model type",
-        """If set to 'Chat', the workflow receives a conversation as input instead of individual prompts.""",
-        default_value=ModelTypeOptions.LLM.name,
-        enum=ModelTypeOptions,
-        style=knext.EnumParameter.Style.VALUE_SWITCH,
-    )
-
     prompt_column = knext.ColumnParameter(
         "Prompt column",
         "The column in the input table of the workflow that represents the questions for the RAG system.",
         schema_provider=lambda ctx: _get_workflow_schema(ctx, 1, True),
         column_filter=lambda column: column.ktype == knext.string(),
-    ).rule(
-        knext.OneOf(model_type, [ModelTypeOptions.LLM.name]),
-        knext.Effect.SHOW,
     )
 
     response_column = knext.ColumnParameter(
@@ -337,31 +313,6 @@ class GiskardRAGETEvaluator:
         "The column in the output table of the workflow that represents the LLM responses.",
         schema_provider=lambda ctx: _get_workflow_schema(ctx, 1, False),
         column_filter=lambda column: column.ktype == knext.string(),
-    ).rule(
-        knext.OneOf(model_type, [ModelTypeOptions.LLM.name]),
-        knext.Effect.SHOW,
-    )
-
-    role_column = knext.ColumnParameter(
-        "Message role",
-        "Column in the input table of the workflow that specifies the sender role of the messages. The usual "
-        "values are Human and AI.",
-        schema_provider=lambda ctx: _get_workflow_schema(ctx, 1, True),
-        column_filter=lambda column: column.ktype == knext.string(),
-    ).rule(
-        knext.OneOf(model_type, [ModelTypeOptions.CHAT.name]),
-        knext.Effect.SHOW,
-    )
-
-    content_column = knext.ColumnParameter(
-        "Messages",
-        "Column in the input table of the workflow containing the message contents that have been sent to and "
-        "from the model. The last row contains the prompt.",
-        schema_provider=lambda ctx: _get_workflow_schema(ctx, 1, True),
-        column_filter=lambda column: column.ktype == knext.string(),
-    ).rule(
-        knext.OneOf(model_type, [ModelTypeOptions.CHAT.name]),
-        knext.Effect.SHOW,
     )
 
     name_mapping = {
@@ -401,7 +352,12 @@ class GiskardRAGETEvaluator:
         _validate_prediction_workflow_spec(rag_workflow_spec)
         self._validate_test_set(test_set_spec)
 
-        self._pick_default_columns(rag_workflow_spec)
+        if not self.prompt_column:
+            self.prompt_column = _pick_default_workflow_column(rag_workflow_spec, True)
+        if not self.response_column:
+            self.response_column = _pick_default_workflow_column(
+                rag_workflow_spec, False
+            )
 
         self._validate_selected_params(rag_workflow_spec)
 
@@ -459,49 +415,10 @@ class GiskardRAGETEvaluator:
 
             return answer
 
-        # wraps Chat models
-        def get_answer_chat(question: str, history: List[dict] = None) -> str:
-            if ctx.is_canceled():
-                raise RuntimeError("Execution canceled.")
-
-            nonlocal question_number
-            nonlocal total_questions
-
-            ctx.set_progress(question_number / total_questions)
-
-            # Create conversation dataframe
-            df = pd.DataFrame(
-                {
-                    self.role_column: pd.Series(dtype="string"),
-                    self.content_column: pd.Series(dtype="string"),
-                }
-            )
-
-            history_length = len(history)
-            for i in range(history_length):
-                df.loc[i] = [history[i]["role"], history[i]["content"]]
-
-            df.loc[history_length] = ["human", question]
-
-            table = knext.Table.from_pandas(df)
-
-            outputs, _ = rag_workflow.execute({input_key: table})
-            answer = outputs[0][self.content_column].to_pandas()
-            answer = answer[self.content_column].iloc[-1]
-
-            question_number = question_number + 1
-
-            return answer
-
         testset = self._dataframe_to_testset(testset_df)
 
-        if self.model_type == ModelTypeOptions.LLM.name:
-            generate_response = get_answer_llm
-        else:
-            generate_response = get_answer_chat
-
         report = evaluate(
-            generate_response,
+            get_answer_llm,
             testset=testset,
         )
 
@@ -542,12 +459,6 @@ class GiskardRAGETEvaluator:
             )
 
     def _validate_selected_params(self, workflow_spec) -> None:
-        if self.model_type == ModelTypeOptions.LLM.name:
-            self._validate_llm_params(workflow_spec)
-        else:
-            self._validate_chat_params(workflow_spec)
-
-    def _validate_llm_params(self, workflow_spec) -> None:
         util.check_column(
             _get_schema_from_workflow_spec(workflow_spec, return_input_schema=True),
             self.prompt_column,
@@ -560,53 +471,6 @@ class GiskardRAGETEvaluator:
             self.response_column,
             knext.string(),
             "response",
-            "workflow output table",
-        )
-
-    def _validate_chat_params(self, workflow_spec) -> None:
-        # Validate that columns are not same
-        if self.role_column == self.content_column:
-            raise knext.InvalidParametersError(
-                "The role and content column can not be the same."
-            )
-
-        # Validate that columns exist in workflow input with correct type
-        input_table_schema = _get_schema_from_workflow_spec(
-            workflow_spec, return_input_schema=True
-        )
-
-        util.check_column(
-            input_table_schema,
-            self.role_column,
-            knext.string(),
-            "message role",
-            "workflow input table",
-        )
-        util.check_column(
-            input_table_schema,
-            self.content_column,
-            knext.string(),
-            "message",
-            "workflow output table",
-        )
-
-        # Validate that columns exist in workflow output with correct type
-        output_table_schema = _get_schema_from_workflow_spec(
-            workflow_spec, return_input_schema=False
-        )
-
-        util.check_column(
-            output_table_schema,
-            self.role_column,
-            knext.string(),
-            "message role",
-            "workflow output table",
-        )
-        util.check_column(
-            output_table_schema,
-            self.content_column,
-            knext.string(),
-            "message",
             "workflow output table",
         )
 
@@ -658,31 +522,3 @@ class GiskardRAGETEvaluator:
             df[col.name] = df[col.name].astype(col.pd_type)
 
         return knext.Table.from_pandas(df)
-
-    def _pick_default_columns(self, workflow_spec) -> None:
-        if self.model_type == ModelTypeOptions.LLM.name:
-            if not self.prompt_column:
-                self.prompt_column = _pick_default_workflow_column(workflow_spec, True)
-            if not self.response_column:
-                self.response_column = _pick_default_workflow_column(
-                    workflow_spec, False
-                )
-        else:
-            if not self.content_column:
-                self.content_column = _pick_default_workflow_column(workflow_spec, True)
-
-            if not self.role_column:
-                input_table_schema = _get_schema_from_workflow_spec(
-                    workflow_spec, return_input_schema=True
-                )
-                spec_without_content = knext.Schema.from_columns(
-                    [c for c in input_table_schema if c.name != self.content_column]
-                )
-                columns = [c for c in spec_without_content if c.ktype == knext.string()]
-
-                if len(columns) == 0:
-                    raise knext.InvalidParametersError(
-                        "The workflow input table must contain at least two string columns."
-                    )
-
-                self.role_column = columns[-1].name

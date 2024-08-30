@@ -51,8 +51,8 @@ from ._base import (
     llm_port_type,
 )
 @knext.input_port(
-    "Prediction workflow",
-    "The prediction workflow to analyze with Giskard.",
+    "Generative workflow",
+    "The generative workflow to analyze with Giskard.",
     knext.PortType.WORKFLOW,
 )
 @knext.input_table_group(
@@ -63,13 +63,30 @@ from ._base import (
 @knext.output_view("Giskard report", "The Giskard scan report as HTML.")
 class GiskardLLMScanner:
     """
-    Evaluate LLM Model Performance with Giskard.
+    Evaluate the performance of GenAI workflows with Giskard.
 
-    This node provides an open-source framework for detecting potential vulnerabilites in LLM models provided
-    as a workflow. It evaluates LLM models by combining heuristics-based and LLM-assisted detectors.
-    The creation of domain-specific probes by the LLM-assisted detectors can be enhanced by connecting a
-    dataset to the dynamic port. Giskard uses the provided LLM for the evaluation but applies different model
-    parameters for some of the detectors.
+    This node provides an open-source framework for detecting potential vulnerabilites in the provided
+    as GenAI workflow. It evaluates the workflow by combining heuristics-based and LLM-assisted detectors.
+    Giskard uses the provided LLM for the evaluation but applies different model parameters for some of the detectors.
+    The viability of the LLM-assisted detectors can be improved by providing an optional
+    input table with common example prompts for the workflow.
+
+    The node uses detectors for the following vulnerabilities:
+
+    - *Prompt Injection*: Detects if the workflow's behavior can be altered via a variety of prompt injection techniques.
+    - *Sycophancy*: Detects if the workflow is prone to agree with biased prompts.
+    - *Implausible Output*: Attempts to cause the workflow to produce implausible outputs.
+    - *Harmful Content*: Detects if the workflow is prone to produce content that is unethical, illegal or otherwise harmful.
+    - *Stereotypes*: Detects stereotype-based discrimination in the workflow responses.
+    - *Information disclosure*: Attempts to cause the workflow to disclose sensitive information such as
+    secrets or personally identifiable information. Might produce false-positives if the workflow is required to output information
+    that can be considered sensitive such as contact information for a business.
+    - *Output Formatting*: Checks that the workflow output is consistent with the format requirements indicated in the model description,
+    if such instructions are provided.
+
+    This node does not utilize Giskard's LLMCharsInjectionDetector.
+    For more details on the available detectors refer to the
+    [Giskard documentation](https://docs.giskard.ai/en/stable/reference/scan/llm_detectors.html#detectors-for-llm-models)
 
     In order to perform tasks with LLM-assisted detectors, Giskard sends the following information to the
     language model provider:
@@ -80,8 +97,7 @@ class GiskardLLMScanner:
 
     Note that this does not apply if a self-hosted model is used.
 
-    This node does not utilize Giskard's
-    LLMCharsInjectionDetector. More information on Giskard can be found in the
+    More information on Giskard can be found in the
     [documentation](https://docs.giskard.ai/en/stable/open_source/scan/scan_llm/index.html).
     """
 

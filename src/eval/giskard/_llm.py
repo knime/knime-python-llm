@@ -73,10 +73,9 @@ class GiskardLLMScanner:
 
     The node uses detectors for the following vulnerabilities:
 
-    - *Prompt Injection*: Detects if the workflow's behavior can be altered via a variety of prompt injection techniques.
-    - *Sycophancy*: Detects if the workflow is prone to agree with biased prompts.
-    - *Implausible Output*: Attempts to cause the workflow to produce implausible outputs.
+    - *Hallucination and Misinformation*: Detects if the workflow is prone to generate fabricated or false information.
     - *Harmful Content*: Detects if the workflow is prone to produce content that is unethical, illegal or otherwise harmful.
+    - *Prompt Injection*: Detects if the workflow's behavior can be altered via a variety of prompt injection techniques.
     - *Stereotypes*: Detects stereotype-based discrimination in the workflow responses.
     - *Information disclosure*: Attempts to cause the workflow to disclose sensitive information such as
     secrets or personally identifiable information. Might produce false-positives if the workflow is required to output information
@@ -85,8 +84,8 @@ class GiskardLLMScanner:
     if such instructions are provided.
 
     This node does not utilize Giskard's LLMCharsInjectionDetector.
-    For more details on the available detectors refer to the
-    [Giskard documentation](https://docs.giskard.ai/en/stable/reference/scan/llm_detectors.html#detectors-for-llm-models)
+    For more details on LLM vulnerabilities refer to the
+    [Giskard documentation](https://docs.giskard.ai/en/stable/knowledge/llm_vulnerabilities/index.html)
 
     In order to perform tasks with LLM-assisted detectors, Giskard sends the following information to the
     language model provider:

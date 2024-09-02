@@ -76,6 +76,7 @@ class GiskardLLMScanner:
     - *Hallucination and Misinformation*: Detects if the workflow is prone to generate fabricated or false information.
     - *Harmful Content*: Detects if the workflow is prone to produce content that is unethical, illegal or otherwise harmful.
     - *Prompt Injection*: Detects if the workflow's behavior can be altered via a variety of prompt injection techniques.
+    - *Robustness*: Detects if the workflow is sensitive to small perturbations in the input that result in inconsistent responses.
     - *Stereotypes*: Detects stereotype-based discrimination in the workflow responses.
     - *Information disclosure*: Attempts to cause the workflow to disclose sensitive information such as
     secrets or personally identifiable information. Might produce false-positives if the workflow is required to output information

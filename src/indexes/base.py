@@ -258,6 +258,7 @@ class BaseVectorStoreCreator(ABC):
         column_filter=util.create_type_filer(knext.list_(knext.double())),
         include_none_column=True,
         since_version="5.3.2",
+        default_value=knext.ColumnParameter.NONE,
     )
 
     missing_value_handling = knext.EnumParameter(
@@ -287,10 +288,7 @@ class BaseVectorStoreCreator(ABC):
         else:
             self.document_column = util.pick_default_column(input_table, knext.string())
 
-        if self.embeddings_column is None:
-            self.embeddings_column = "<none>"
-
-        if self.embeddings_column != "<none>":
+        if self.embeddings_column != knext.ColumnParameter.NONE:
             util.check_column(
                 input_table,
                 self.embeddings_column,
@@ -336,7 +334,10 @@ class BaseVectorStoreCreator(ABC):
         )
 
         embeddings_series = None
-        if self.embeddings_column and self.embeddings_column != "<none>":
+        if (
+            self.embeddings_column
+            and self.embeddings_column != knext.ColumnParameter.NONE
+        ):
             df = util.handle_missing_and_empty_values(
                 df,
                 self.embeddings_column,
@@ -366,7 +367,7 @@ class BaseVectorStoreCreator(ABC):
         metadata_columns: list[str],
     ):
         relevant_columns = [self.document_column] + metadata_columns
-        if self.embeddings_column != "<none>":
+        if self.embeddings_column != knext.ColumnParameter.NONE:
             relevant_columns.append(self.embeddings_column)
 
         return input_table[relevant_columns].to_pandas()

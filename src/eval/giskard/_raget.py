@@ -106,7 +106,7 @@ class TestSetParameters:
     "Giskard RAGET Test Set Generator",
     knext.NodeType.OTHER,
     tortoise_icon,
-    category=util.main_category,
+    category=eval_category,
     keywords=[
         "GenAI",
         "Gen AI",

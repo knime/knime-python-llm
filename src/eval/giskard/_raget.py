@@ -33,6 +33,13 @@ from giskard.rag.testset_generation import generate_testset, KnowledgeBase
 from giskard.rag import evaluate
 from giskard.rag.testset import QATestset
 from giskard.rag.report import RAGReport
+from giskard.rag.question_generators import (
+    simple_questions,
+    complex_questions,
+    distracting_questions,
+    situational_questions,
+    double_questions,
+)
 
 from bs4 import BeautifulSoup
 
@@ -144,7 +151,8 @@ class TestSetGenerator:
     - *Distracting questions*: Questions containing distracting information to test the retrieval part of the RAG system.
     - *Situational questions*: Questions that include context information to evaluate if the system can produce answers relevant to the context.
     - *Double questions*: Questions consisting of two separate parts.
-    - *Conversational questions*: Questions posed in a conversational style where the first message describes the context and the second poses the actual question.
+
+    This node does not support Giskard's conversational questions yet.
 
     For more details and examples refer to the
     [Giskard documentation](https://docs.giskard.ai/en/stable/open_source/testset_generation/testset_generation/index.html#what-does-raget-do-exactly)
@@ -154,7 +162,6 @@ class TestSetGenerator:
     - *Question*: The generated question.
     - *Reference Answer*: A reference answer to the question.
     - *Reference Context*: The context used to create the reference answer.
-    - *Conversation History*: The conversation with the system. Only relevant for conversational questions and otherwise empty.
     - *Metadata*: Additional information specific to the type of question.
     """
 
@@ -166,7 +173,6 @@ class TestSetGenerator:
         "question": "Question",
         "reference_answer": "Reference Answer",
         "reference_context": "Reference Context",
-        "conversation_history": "Conversation History",
         "metadata": "Metadata",
     }
 
@@ -188,7 +194,6 @@ class TestSetGenerator:
                 knext.Column(knext.string(), "Question"),
                 knext.Column(knext.string(), "Reference Answer"),
                 knext.Column(knext.string(), "Reference Context"),
-                knext.Column(knext.logical(dict), "Conversation History"),
                 knext.Column(knext.logical(dict), "Metadata"),
             ]
         )
@@ -216,12 +221,17 @@ class TestSetGenerator:
                 knowledge_base=kb,
                 num_questions=self.test_set_params.n_questions,
                 agent_description=self.test_set_params.description,
+                question_generators=[
+                    simple_questions,
+                    complex_questions,
+                    distracting_questions,
+                    situational_questions,
+                    double_questions,
+                ],
             ).to_pandas()
 
-        # wrap conversation_history in order for KNIME to correctly convert it to JSON
-        testset["conversation_history"] = testset["conversation_history"].apply(
-            lambda row: {"conversation_history": row}
-        )
+        # Remove conversation history as we currently do not support conversational agents
+        testset = testset.drop("conversation_history", axis=1)
 
         testset = testset.reset_index()
         testset = testset.rename(columns=self.name_mapping)
@@ -328,11 +338,6 @@ class GiskardRAGETEvaluator:
         ScannerColumn("Reference Answer", knext.string(), pd.StringDtype()),
         ScannerColumn("Reference Context", knext.string(), pd.StringDtype()),
         ScannerColumn(
-            "Conversation History",
-            knext.logical(dict),
-            ks.logical(dict).to_pandas(),
-        ),
-        ScannerColumn(
             "Metadata",
             knext.logical(dict),
             ks.logical(dict).to_pandas(),
@@ -436,7 +441,7 @@ class GiskardRAGETEvaluator:
         )
 
     def _validate_test_set(self, test_set: knext.Schema):
-        expected_columns = self.output_columns[0:5]
+        expected_columns = self.output_columns[0:4]
 
         # Check if all expected columns exist in the test set with correct types
         for col in expected_columns:
@@ -492,13 +497,11 @@ class GiskardRAGETEvaluator:
 
     def _dataframe_to_testset(self, df: pd.DataFrame) -> QATestset:
         """Transforms the DataFrame obtained from the input table into a QATestset."""
-        # Unwrap Conversation History
-        df["Conversation History"] = df["Conversation History"].apply(
-            lambda row: row["conversation_history"]
-        )
-
         # Rename columns
         df = df.rename(columns={v: k for k, v in self.name_mapping.items()})
+
+        # Create Conversation History column as the Test Set Generator currently excludes it
+        df["conversation_history"] = [[] for _ in range(len(df))]
 
         # Insert id column
         df = df.reset_index()
@@ -510,10 +513,8 @@ class GiskardRAGETEvaluator:
         """Creates a KNIME Table from the report DataFrame."""
         df = report.to_pandas()
 
-        # wrap conversation_history in order for KNIME to correctly convert it to JSON
-        df["conversation_history"] = df["conversation_history"].apply(
-            lambda row: {"conversation_history": row}
-        )
+        # drop conversation_history as it is currently always empty
+        df = df.drop("conversation_history", axis=1)
 
         df = df.reset_index()
         df = df.rename(columns=self.name_mapping)

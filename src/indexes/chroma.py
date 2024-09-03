@@ -193,10 +193,13 @@ class ChromaVectorStoreCreator(BaseVectorStoreCreator):
     """
     Creates a Chroma vector store from a string column and an embeddings model.
 
-    The node generates a Chroma vector store by processing a string column containing documents
-    with the provided embeddings model. For each document, the embeddings model extracts a numerical vector that represents
-    the semantic meaning of the document. These embeddings are then stored in the vector store, along with their corresponding
-    documents. Downstream nodes, such as the **Vector Store Retriever node**, utilize the vector store to find documents with similar
+    The node generates a Chroma vector store that uses the given embeddings model to map documents to a numerical vector that captures
+    the semantic meaning of the document.
+
+    By default, the node embeds the selected documents using the embeddings model but it is also possible to create the vector store
+    from existing embeddings by specifying the corresponding embeddings column in the node dialog.
+
+    Downstream nodes, such as the **Vector Store Retriever**, utilize the vector store to find documents with similar
     semantic meaning when given a query.
     """
 

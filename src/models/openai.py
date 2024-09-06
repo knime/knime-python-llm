@@ -417,8 +417,10 @@ class EmbeddingsLoaderInputSettings:
 
     dimension = knext.IntParameter(
         "Embeddings Dimension Size",
-        """Embedding dimensions refer to the size of the vector space into which words or entities 
-        are embedded. Higher dimensions can capture more nuanced relationships between words.
+        """Embedding dimensions refer to the size of the vector space into which documents 
+        are embedded.
+        Lower dimensional embeddings capture less details of the documents but require less 
+        memory space to store and are faster to process.
 
         Find more information about embeddings and maximum dimensions on 
         [OpenAIs Documentation](https://platform.openai.com/docs/models/embeddings).""",

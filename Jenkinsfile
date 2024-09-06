@@ -1,116 +1,48 @@
 #!groovy
 def BN = (BRANCH_NAME == 'master' || BRANCH_NAME.startsWith('releases/')) ? BRANCH_NAME : 'releases/2024-12'
 
-def repositoryName = "knime-python-llm"
-
-def extensionPath = "./" // Path to knime.yml file
-def outputPath = "output"
+def repositoryName = 'knime-python-llm'
 
 library "knime-pipeline@$BN"
 
-knimeVersion = KNIMEConstants.getAPReleaseForBranch(BN)
-
 properties([
-    parameters(
-        [p2Tools.getP2pruningParameter()] + \
-        workflowTests.getConfigurationsAsParameters() + \
-        condaHelpers.getForceCondaBuildParameter() + \
-        condaHelpers.getGenerateSBOMForCondaParameter()
-    ),
+    parameters(knimetools.getPythonExtensionParameters()),
     buildDiscarder(logRotator(numToKeepStr: '5')),
     disableConcurrentBuilds()
 ])
 
 try {
-    timeout(time: 100, unit: 'MINUTES') {
-        node('workflow-tests && ubuntu22.04 && java17') {
-            stage("Checkout Sources") {
-                env.lastStage = env.STAGE_NAME
-                checkout scm
-            }
+    knimetools.defaultPythonExtensionBuild()
 
-            stage("Create Conda Env"){
-                env.lastStage = env.STAGE_NAME
-                prefixPath = "${WORKSPACE}/${repositoryName}"
-                condaHelpers.createCondaEnv(prefixPath: prefixPath, pythonVersion:'3.9', packageNames: ["knime-extension-bundling=${knimeVersion}", 'jake'])
-            }
-            stage("Build Python Extension") {
-                env.lastStage = env.STAGE_NAME
-                force_conda_build = params?.FORCE_CONDA_BUILD ? "--force-new-timestamp" : ""
-                buildSboms = ""
-                if (params.SBOM_FOR_CONDA) {
-                    binaryFile = condaHelpers.downloadAndPrepareCycloneDX()
-                    buildSboms = "--generate-sbom --cyclonedx-binary ${binaryFile}"
-
-
-                }
-                def buildPath = "build"
-
-                withMavenJarsignerCredentials(options: [artifactsPublisher(disabled: true)], skipJarsigner: false) {
-                    withEnv([ "MVN_OPTIONS=-Dknime.p2.repo=https://jenkins.devops.knime.com/p2/knime/" ]) {
-                        withCredentials([usernamePassword(credentialsId: 'ARTIFACTORY_CREDENTIALS', passwordVariable: 'ARTIFACTORY_PASSWORD', usernameVariable: 'ARTIFACTORY_LOGIN'),
-                        ]) {
-                            sh """
-                            micromamba run -p ${prefixPath} build_python_extension.py ${extensionPath} ${outputPath} --render-folder ${buildPath} -f --knime-build --excluded-files ${prefixPath} ${force_conda_build} ${buildSboms}
-                            """
-                        }
-                        if (params.SBOM_FOR_CONDA) {
-                            echo "Sending SBOMs to OWASP"
-                            knimeYML = readYaml file: 'knime.yml'
-                            projectVersion = knimeYML.version
-                            owasp.sendCondaSBOMs(projectVersion)
-                        }
-                        sh"""
-                          rm -r ${buildPath}
-                        """
-                    }
-                }
-            }
-            stage("Deploy p2") {
-                    env.lastStage = env.STAGE_NAME
-                    p2Tools.deploy(outputPath)
-                    println("Deployed")
-                    try {
-                        build job: "ap-composites/${env.BRANCH_NAME.replace('/', '%2F')}", parameters: [
-                            string(name: 'REPOSITORY', value: repositoryName)
-                        ], wait: false
-                    } catch (ex) {
-                        // Happens if ap-composites doesn't have a corresponding branch
-                        echo ex.toString()
-                    }
-
-                }
-            withCredentials([string(credentialsId: 'openai-api-key', variable: 'OPENAI_API_KEY'), string(credentialsId: 'huggingface-api-key', variable: 'TEST_API_KEY_HUGGINGFACE')]) {
-                workflowTests.runTests(
-                    dependencies: [
-                        repositories: [
-                            'knime-python',
-                            'knime-python-types',
-                            'knime-core-columnar',
-                            'knime-testing-internal',
-                            'knime-python-legacy',
-                            'knime-conda',
-                            'knime-python-bundling',
-                            'knime-credentials-base',
-                            'knime-gateway',
-                            'knime-base',
-                            'knime-productivity-oss',
-                            'knime-json',
-                            'knime-javasnippet',
-                            'knime-reporting',
-                            'knime-filehandling',
-                            'knime-scripting-editor',
-                            'knime-kerberos',
-                            'knime-buildworkflows',
-                            'knime-server-client',
-                            'knime-js-base',
-                            'knime-cef',
-                            repositoryName
-                            ],
+    withCredentials([string(credentialsId: 'openai-api-key', variable: 'OPENAI_API_KEY'), string(credentialsId: 'huggingface-api-key', variable: 'TEST_API_KEY_HUGGINGFACE')]) {
+        workflowTests.runTests(
+            dependencies: [
+                repositories: [
+                    'knime-python',
+                    'knime-python-types',
+                    'knime-core-columnar',
+                    'knime-testing-internal',
+                    'knime-python-legacy',
+                    'knime-conda',
+                    'knime-python-bundling',
+                    'knime-credentials-base',
+                    'knime-gateway',
+                    'knime-base',
+                    'knime-productivity-oss',
+                    'knime-json',
+                    'knime-javasnippet',
+                    'knime-reporting',
+                    'knime-filehandling',
+                    'knime-scripting-editor',
+                    'knime-kerberos',
+                    'knime-buildworkflows',
+                    'knime-server-client',
+                    'knime-js-base',
+                    'knime-cef',
+                    repositoryName
                     ],
-                )
-            }
-        }
+            ],
+        )
     }
 } catch (ex) {
     currentBuild.result = 'FAILURE'

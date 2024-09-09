@@ -57,7 +57,7 @@ class CredentialsSettings:
 @knext.parameter_group(label="Prompt Settings")
 class ChatMessageSettings:
     message = knext.MultilineStringParameter(
-        "Message", "The (next) message to send to the agent."
+        "New message", "Specify the new message to be sent to the agent."
     )
 
 
@@ -270,9 +270,8 @@ class LLMAgentCreator:
 @knext.input_port("Tools", "The tools the agent can use.", tool_list_port_type)
 @knext.input_table(
     "Conversation",
-    """Table containing the conversation that was held so far with the agent. 
-                    Has to contain at least two string columns.
-                    A content column containing the content of previous messages and a role column specifying who the message is from (values hould be either AI or Human).
+    """Table containing the conversation history. 
+                    Has to contain at least two string columns, which can be empty if this is the beginning of the conversation.
                     """,
 )
 @knext.output_table(
@@ -284,26 +283,25 @@ class LLMAgentCreator:
 )
 class AgentPrompter:
     """
-    Combines an agent with a set of tools and prompts it with a user provided prompt.
+    Combines an agent with a set of tools and prompts it with a user-provided prompt.
 
-    This node combines an agent with a set of tools and prompts it with a user provided prompt
-    and the conversation history in the input table.
+    This node supplies an LLM agent with a set of tools and the conversation history, and
+    prompts it with the user-provided query.
 
     The conversation table is expected to have at least two string columns that define previous conversation.
-    It can be empty if this is the start of the conversation.
+    If this is the start of the conversation, the conversation table can be empty.
 
-    The agent always receives the full conversation table as context which can slow down
-    agent execution for long conversations or even lead to execution failures if the context becomes
-    too large for the underlying LLM.
-    If you experience such issues, you can truncate the conversation table by only keeping the last
-    few messages, or even use a large language model to create a summary of the conversation held so far.
+    The agent always receives the full conversation table as context, which can lead to
+    slower execution times for longer conversations, or execution failures if the context
+    becomes too large for the LLM. If you experience such issues, you can truncate the conversation
+    table by only keeping the last few messages, or use an LLM to summarize the conversation held so far.
     """
 
     conversation_settings = ChatConversationSettings(port_index=2)
     message_settings = ChatMessageSettings()
     enable_debug_output = knext.BoolParameter(
         "Enable debug output",
-        "If checked activates prints the output of LangChain's debug mode to the console.",
+        "If checked, prints the output of LangChain's debug mode to the console.",
         False,
         is_advanced=True,
     )

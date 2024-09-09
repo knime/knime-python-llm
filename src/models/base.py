@@ -84,19 +84,19 @@ class GeneralRemoteSettings(GeneralSettings):
     )
 
 
-@knext.parameter_group(label="Conversation Settings")
+@knext.parameter_group(label="Conversation settings")
 class ChatConversationSettings:
     def __init__(self, port_index=1) -> None:
         self.role_column = knext.ColumnParameter(
-            "Message role",
-            "Column that specifies the sender role of the messages. The usual values are Human and AI.",
+            "Message roles column",
+            "Select the column that specifies the alternating sender roles assigned to each message. Example values are 'Human' and 'AI'.",
             port_index=port_index,
             column_filter=util.create_type_filer(knext.string()),
         )
 
         self.content_column = knext.ColumnParameter(
-            "Messages",
-            "Column containing the message contents that have been sent to and from the model.",
+            "Messages column",
+            "Select the column containing the messages composing the conversation history.",
             port_index=port_index,
             column_filter=util.create_type_filer(knext.string()),
         )
@@ -284,8 +284,8 @@ class LLMPrompter:
     """
     Prompts a Large Language Model.
 
-    For each row in the input table, the LLM Prompter sends one prompt to the LLM and receives a corresponding response.
-    Rows are treated independently i.e. the LLM can not *remember* the content of previous rows or how it responded to them.
+    For each row in the input table, this node sends one prompt to the LLM and receives a corresponding response.
+    Rows and the corresponding prompts are treated in isolation, i.e. the LLM can not remember the contents of the previous rows or how it responded to them.
     """
 
     prompt_column = knext.ColumnParameter(
@@ -408,23 +408,23 @@ class LLMPrompter:
         "Large Language Model",
     ],
 )
-@knext.input_port("Chat Model Port", "A chat model model.", chat_model_port_type)
+@knext.input_port("Chat Model", "A chat model.", chat_model_port_type)
 @knext.input_table(
-    "Conversation", "A table containing an empty or filled conversation."
+    "Existing conversation",
+    "A table containing the conversation history, or an empty table.",
 )
-@knext.output_table("Conversation", "A table containing the conversation history.")
+@knext.output_table(
+    "Extended conversation", "A table containing the updated conversation history."
+)
 class ChatModelPrompter:
     """
     Prompts a Chat Model.
 
-    The Chat Model Prompter takes a statement (prompt) and the conversation
-    history with human and AI messages. It then generates a response for the prompt with the knowledge of the previous
-    conversation.
+    This node prompts a chat model using the provided user message, with an existing conversation history as context.
 
-    If you want to reduce the amount of tokens being used, consider reducing
+    If you want to reduce the amount of consumed tokens, consider reducing
     the conversation table length to a reasonable (e.g. 5 conversation steps) length
-    before feeding it into the Chat Model Prompter.
-
+    before feeding it into the node.
     """
 
     system_message = knext.MultilineStringParameter(
@@ -439,8 +439,8 @@ class ChatModelPrompter:
     )
 
     chat_message = knext.MultilineStringParameter(
-        "Message",
-        "The (next) message that will be added to the conversation",
+        "New message",
+        "The new message to be added to the conversation.",
         default_value="",
     )
 
@@ -515,7 +515,7 @@ def _string_col_filter(column: knext.Column):
     ],
 )
 @knext.input_port(
-    "Embeddings Model",
+    "Embedding Model",
     "Used to embed the texts from the input table into numerical vectors.",
     embeddings_model_port_type,
 )
@@ -527,13 +527,14 @@ class TextEmbedder:
     """
     Embeds text in a string column using an embedding model.
 
-    This node applies the provided embeddings model to create embeddings for the texts contained in a string column of the input table.
-    At its core, a text embedding is a dense vector of floating point values capturing the semantic meaning of the text.
-    Thus these embeddings are often used to find semantically similar documents e.g. in vector stores.
-    How exactly the embeddings are derived depends on the used embeddings model but typically the embeddings are the internal representations
-    used by deep language models e.g. GPTs.
-    If this node fails to execute and gives an unhelpful error message such as 'Execute failed: Error while sending a command.', then refer to the
-    description of the node that provided the embeddings model.
+    This node applies the provided embedding model to create embeddings of the texts contained in a string column of the input table.
+
+    A *text embedding* is a dense vector of floating point values capturing the semantic meaning of the text by mapping it to a high-dimensional space.
+    Similarities between embedded entities are then derived by how close they are to each other in said space. These embeddings are often used to find
+    semantically similar documents e.g. in vector stores.
+
+    Different embedding models encode text differently, resulting in incomparable embeddings. If this node fails to execute with
+    'Execute failed: Error while sending a command.', refer to the description of the node that provided the embedding model.
     """
 
     text_column = knext.ColumnParameter(

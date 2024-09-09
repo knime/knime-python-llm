@@ -93,7 +93,7 @@ openai_functions_agent_port_type = knext.port_type(
 )
 @knext.output_port(
     "OpenAI Functions Agent",
-    "A agent that can use OpenAI functions.",
+    "An agent that can use OpenAI functions.",
     openai_functions_agent_port_type,
 )
 class OpenAIFunctionsAgentCreator:
@@ -101,25 +101,25 @@ class OpenAIFunctionsAgentCreator:
     Creates an agent that utilizes the function calling feature of (Azure) OpenAI chat models.
 
     This node creates an agent based on (Azure) OpenAI chat models that support function calling
-    (e.g. the 0613 models) and can be primed with a custom system message. The system message plays an essential
-    role in defining the behavior of the agent and how it interacts with users and tools. Best practice is to alter
-    the system message before tampering with model settings because the message has the most significant impact
-    on the behavior of the agent.
+    (e.g. the 0613 models) and can be primed with a custom system message.
 
-    For Azure: Make sure to use the correct API, since function calling is only available since API version
+    The *system message* plays an essential role in defining the behavior of the agent and how it interacts with users and tools.
+    Before adjusting other model settings, it is recommended to experiment with the system message first, as it has
+    the most significant impact on the behavior of the agent.
+
+    An *agent* is an LLM that is configured to pick a tool from
+    a set of tools to best answer the user prompts, when appropriate.
+
+    **For Azure**: make sure to use the correct API, since function calling is only available since API version
     '2023-07-01-preview'. For more information, check the
     [Microsoft Documentation](https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/function-calling?tabs=python)
 
-    In general an agent is an LLM that is configured to, if necessary, dynamically pick a tool from
-    a set of tools to best answer the user prompts.
-
-    Note that these agents do not support tools with whitespaces in their names.
+    **Note**: These agents do not support tools with whitespaces in their names.
     """
 
     system_message = knext.MultilineStringParameter(
         "System message",
-        """The system message is a pivotal component in shaping an agent's behavior.
-        Defines the general behavior of the agent.""",
+        """Specify the system message defining the behavior of the agent.""",
         """You are a helpful AI assistant. Never solely rely on your own knowledge, but use tools to get information before answering. """,
     )
 

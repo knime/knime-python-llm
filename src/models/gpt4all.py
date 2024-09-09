@@ -39,13 +39,13 @@ class GPT4AllInputSettings:
     local_path = knext.LocalPathParameter(
         label="Model path",
         description="""Path to the pre-trained GPT4All model file eg. my/path/model.gguf.
-        You can find the folder through settings -> application in the gpt4all desktop application.""",
+        You can find the folder through settings -> application in the GPT4All desktop application.""",
     )
 
     n_threads = knext.IntParameter(
         label="Thread Count",
-        description="""Number of CPU threads used by GPT4All. Default is 0, then the number of threads 
-        are determined automatically. 
+        description="""Number of CPU threads used by GPT4All. If set to 0, the number of threads 
+        is determined automatically. 
         """,
         default_value=0,
         min_value=0,
@@ -56,12 +56,11 @@ class GPT4AllInputSettings:
 
 class GPT4AllModelParameterSettings(GeneralSettings):
     max_token = knext.IntParameter(
-        label="Maximum Response Length (token)",
+        label="Maximum response length (token)",
         description="""
         The maximum number of tokens to generate.
 
-        The token count of your prompt plus 
-        max_tokens cannot exceed the model's context length.
+        This value, plus the token count of your prompt, cannot exceed the model's context length.
         """,
         default_value=250,
         min_value=1,
@@ -70,10 +69,12 @@ class GPT4AllModelParameterSettings(GeneralSettings):
     temperature = knext.DoubleParameter(
         label="Temperature",
         description="""
-        Sampling temperature to use, between 0.0 and 1.0. 
-        Higher values means the model will take more risks. 
+        Sampling temperature to use, between 0.0 and 1.0.
+
+        Higher values will lead to less deterministic answers.
+
         Try 0.9 for more creative applications, and 0 for ones with a well-defined answer.
-        It is generally recommend altering this or top_p but not both.
+        It is generally recommended altering this, or Top-p, but not both.
         """,
         default_value=0.2,
         min_value=0.0,
@@ -94,7 +95,8 @@ class GPT4AllModelParameterSettings(GeneralSettings):
     prompt_batch_size = knext.IntParameter(
         label="Prompt batch size",
         description="""Amount of prompt tokens to process at once. 
-                    NOTE: On CPU higher values can speed up reading prompts but will also use more RAM.
+
+                    **NOTE**: On CPU, higher values can speed up reading prompts but will also use more RAM.
                     On GPU, a batch size of 1 has outperformed other batch sizes in our experiments.""",
         default_value=128,
         min_value=1,
@@ -112,7 +114,7 @@ class GPT4AllModelParameterSettings(GeneralSettings):
         Alternatively, a specific GPU name can also be provided, and the model will run on the GPU that matches the name if it's available. 
         Default is "cpu".
 
-        Note: If a selected GPU device does not have sufficient RAM to accommodate the model, an error will be thrown.
+        **Note**: If a selected GPU device does not have sufficient RAM to accommodate the model, an error will be thrown.
         It's advised to ensure the device has enough memory before initiating the model.""",
         default_value="cpu",
         is_advanced=True,
@@ -122,7 +124,7 @@ class GPT4AllModelParameterSettings(GeneralSettings):
 @knext.parameter_group(label="Prompt Templates")
 class GPT4AllPromptSettings:
     system_prompt_template = knext.MultilineStringParameter(
-        "System Prompt Template",
+        "System prompt template",
         """ Model specific system template. Defaults to "%1". Refer to the 
         [GPT4All model list](https://raw.githubusercontent.com/nomic-ai/gpt4all/main/gpt4all-chat/metadata/models2.json) 
         for the correct template for your model:
@@ -133,7 +135,7 @@ class GPT4AllPromptSettings:
     )
 
     prompt_template = knext.MultilineStringParameter(
-        "Prompt Template",
+        "Prompt template",
         """ Model specific prompt template. Defaults to "%1". Refer to the 
         [GPT4All model list](https://raw.githubusercontent.com/nomic-ai/gpt4all/main/gpt4all-chat/metadata/models2.json) 
         for the correct template for your model:
@@ -361,11 +363,12 @@ class GPT4AllLLMConnector:
     """
     Connects to a locally installed GPT4All LLM.
 
-    This connector allows you to connect to a local GPT4All LLM. To get started,
+    This node allows you to connect to a local GPT4All LLM. To get started,
     you need to download a specific model either through the [GPT4All client](https://gpt4all.io)
     or by dowloading a GGUF model from [Hugging Face Hub](https://huggingface.co/).
     Once you have downloaded the model, specify its file path in the
     configuration dialog to use it.
+
     It is not necessary to install the GPT4All client to execute the node.
 
     Some models (e.g. Llama 2) have been fine-tuned for chat applications,
@@ -382,7 +385,7 @@ class GPT4AllLLMConnector:
 
     For more information and detailed instructions on downloading compatible models, please visit the [GPT4All GitHub repository](https://github.com/nomic-ai/gpt4all).
 
-    Note: This node can not be used on the KNIME Hub, as the models can't be embedded into the workflow due to their large size.
+    **Note**: This node can not be used on the KNIME Hub, as the models can't be embedded into the workflow due to their large size.
     """
 
     settings = GPT4AllInputSettings()
@@ -431,11 +434,12 @@ class GPT4AllChatModelConnector:
     """
     Connects to a locally installed GPT4All LLM.
 
-    This connector allows you to connect to a local GPT4All LLM. To get started,
+    This node allows you to connect to a local GPT4All LLM. To get started,
     you need to download a specific model either through the [GPT4All client](https://gpt4all.io)
     or by dowloading a GGUF model from [Hugging Face Hub](https://huggingface.co/).
     Once you have downloaded the model, specify its file path in the
     configuration dialog to use it.
+
     It is not necessary to install the GPT4All client to execute the node.
 
     It is recommended to use models (e.g. Llama 2) that have been fine-tuned for chat applications. For model specifications
@@ -446,7 +450,7 @@ class GPT4AllChatModelConnector:
     For more information and detailed instructions on downloading compatible models, please visit the
     [GPT4All GitHub repository](https://github.com/nomic-ai/gpt4all).
 
-    Note: This node can not be used on the KNIME Hub, as the models can't be embedded into the workflow due to their large size.
+    **Note**: This node can not be used on the KNIME Hub, as the models can't be embedded into the workflow due to their large size.
     """
 
     settings = GPT4AllInputSettings()
@@ -627,18 +631,19 @@ class ModelRetrievalOptions(knext.EnumParameterOptions):
     ],
 )
 @knext.output_port(
-    "GPT4All Embeddings model",
-    "A GPT4All Embeddings model that calculates embeddings on the local machine.",
+    "GPT4All Embedding model",
+    "A GPT4All Embedding model that calculates embeddings on the local machine.",
     embeddings4all_port_type,
 )
 class Embeddings4AllConnector:
     """
-    Connects to an embeddings model that runs on the local machine.
+    Connects to an embedding model that runs on the local machine.
 
-    Connect to an embeddings model that runs on the local machine via GPT4All.
+    This node connect to an embedding model that runs on the local machine via GPT4All.
+
     The default model was trained on sentences and short paragraphs of English text.
 
-    Note: Unlike the other GPT4All nodes, this node can be used on the KNIME Hub.
+    **Note**: Unlike the other GPT4All nodes, this node can be used on the KNIME Hub.
     """
 
     model_retrieval = knext.EnumParameter(
@@ -660,7 +665,8 @@ class Embeddings4AllConnector:
         "Number of threads",
         """The number of threads the model uses. 
         More threads may reduce the runtime of queries to the model.
-        Default is 0, then the number of threads are determined automatically.""",
+
+        If set to 0, the number of threads is determined automatically.""",
         0,
         min_value=0,
         is_advanced=True,

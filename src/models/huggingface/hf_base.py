@@ -65,15 +65,15 @@ class HFModelSettings(GeneralRemoteSettings):
 @knext.parameter_group(label="Prompt Templates")
 class HFPromptTemplateSettings:
     system_prompt_template = knext.MultilineStringParameter(
-        "System Prompt Template",
-        """ Model specific system prompt template. Defaults to "%1".
+        "System prompt template",
+        """Model specific system prompt template. Defaults to "%1".
         Refer to the Hugging Face Hub model card for information on the correct prompt template.""",
         default_value="%1",
     )
 
     prompt_template = knext.MultilineStringParameter(
-        "Prompt Template",
-        """ Model specific prompt template. Defaults to "%1". 
+        "Prompt template",
+        """Model specific prompt template. Defaults to "%1". 
         Refer to the Hugging Face Hub model card for information on the correct prompt template.""",
         default_value="%1",
     )

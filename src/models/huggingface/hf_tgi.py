@@ -34,7 +34,7 @@ hf_tgi_category = knext.category(
 @knext.parameter_group(label="Hugging Face TextGen Inference Server Settings")
 class HFTGIServerSettings:
     server_url = knext.StringParameter(
-        label="Inference Server URL",
+        label="Inference server URL",
         description="The URL of the inference server to use, e.g. `http://localhost:8010/`.",
         default_value="",
     )
@@ -46,6 +46,7 @@ class HFTGIModelSettings(HFModelSettings):
         description="""
         Set the seed parameter to any integer of your choice and use the same value across requests
         to have reproducible outputs. 
+
         The default value of 0 means that no seed is specified.
         """,
         default_value=0,
@@ -293,13 +294,13 @@ class HFTGILLMConnector:
     """
     Connects to a dedicated Text Generation Inference Server.
 
-    The [Text Generation Inference](https://github.com/huggingface/text-generation-inference)
-    is a Rust, Python, and gRPC server specifically designed for text generation inference.
-    It can be self-hosted to power LLM APIs and inference widgets.
-
     This node can connect to locally or remotely hosted TGI servers which includes
     [Text Generation Inference Endpoints](https://huggingface.co/docs/inference-endpoints/) of popular
     text generation models that are deployed via Hugging Face Hub.
+
+    The [Text Generation Inference](https://github.com/huggingface/text-generation-inference)
+    is a Rust, Python, and gRPC server specifically designed for text generation inference.
+    It can be self-hosted to power LLM APIs and inference widgets.
 
     For more details and information about integrating with the Hugging Face TextGen Inference
     and setting up a local server, refer to the
@@ -380,13 +381,13 @@ class HFTGIChatModelConnector:
     """
     Connects to a dedicated Text Generation Inference Server.
 
-    The [Text Generation Inference](https://github.com/huggingface/text-generation-inference)
-    is a Rust, Python, and gRPC server specifically designed for text generation inference.
-    It can be self-hosted to power LLM APIs and inference widgets.
-
     This node can connect to locally or remotely hosted TGI servers which includes
     [Text Generation Inference Endpoints](https://huggingface.co/docs/inference-endpoints/) of popular
     text generation models that are deployed via Hugging Face Hub.
+
+    The [Text Generation Inference](https://github.com/huggingface/text-generation-inference)
+    is a Rust, Python, and gRPC server specifically designed for text generation inference.
+    It can be self-hosted to power LLM APIs and inference widgets.
 
     For more details and information about integrating with the Hugging Face TextGen Inference
     and setting up a local server, refer to the

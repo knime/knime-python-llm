@@ -72,14 +72,14 @@ class _KnowledgeBase(KnowledgeBase):
 @knext.parameter_group("Data")
 class InputDataParameters:
     documents_col = knext.ColumnParameter(
-        "Documents",
+        "Documents column",
         "The column containing the documents in the knowledge base.",
         port_index=2,
         column_filter=lambda c: c.ktype == knext.string(),
     )
 
     embeddings_col = knext.ColumnParameter(
-        "Embeddings",
+        "Embeddings column",
         "The column containing the embeddings in the knowledge base.",
         port_index=2,
         column_filter=lambda c: c.ktype == knext.ListType(knext.double()),
@@ -89,14 +89,14 @@ class InputDataParameters:
 @knext.parameter_group("Test Set")
 class TestSetParameters:
     description = knext.StringParameter(
-        "RAG System Description",
+        "RAG system description",
         """A brief description of the RAG system to be evaluated. This information will be 
         used to generate appropriate test questions tailored to the system.""",
     )
 
     n_questions = knext.IntParameter(
-        "Number of Questions",
-        "Specifies the number of test questions to generate.",
+        "Number of questions",
+        "The number of test questions to generate.",
         120,
         min_value=1,
     )
@@ -120,7 +120,7 @@ class TestSetParameters:
 )
 @knext.input_port(
     "Chat Model",
-    """A configured Chat Model used to generate question from the provided knowledge base.""",
+    """A configured Chat Model used to generate questions from the provided knowledge base.""",
     chat_model_port_type,
 )
 @knext.input_port(
@@ -152,12 +152,12 @@ class TestSetGenerator:
     - *Situational questions*: Questions that include context information to evaluate if the system can produce answers relevant to the context.
     - *Double questions*: Questions consisting of two separate parts.
 
-    This node does not support Giskard's conversational questions yet.
+    This node does not support Giskard's conversational questions.
 
     For more details and examples refer to the
-    [Giskard documentation](https://docs.giskard.ai/en/stable/open_source/testset_generation/testset_generation/index.html#what-does-raget-do-exactly)
+    [Giskard documentation](https://docs.giskard.ai/en/stable/open_source/testset_generation/testset_generation/index.html#what-does-raget-do-exactly).
 
-    The output table has the columns
+    The output table will contain the following columns:
 
     - *Question*: The generated question.
     - *Reference Answer*: A reference answer to the question.
@@ -309,6 +309,7 @@ class GiskardRAGETEvaluator:
     workflow by evaluating the correctness of the answers. An LLM is used to compare the workflow's answers to the
     reference answers of the test set. The test set can be generated with the
     **Giskard RAGET Test Set Generator** node.
+
     For more details see the [Giskard documentation](https://docs.giskard.ai/en/stable/open_source/testset_generation/rag_evaluation/).
     """
 
@@ -397,7 +398,7 @@ class GiskardRAGETEvaluator:
         # raise error if test set is empty
         if total_questions == 0:
             raise RuntimeError(
-                "The execution failed because the provided test set is empty."
+                "Execution failed because the provided test set is empty."
             )
 
         # wraps LLM models
@@ -482,7 +483,8 @@ class GiskardRAGETEvaluator:
 
     def _remove_empty_html_sections(self, html_report: str) -> str:
         """If the evaluation is done with no knowledge base or metrics specified, the corresponding section in
-        the HTML report is shown but shows None or is empty. This function removes both sections from the report."""
+        the HTML report is shown but shows None or is empty. This function removes both sections from the report.
+        """
         soup = BeautifulSoup(html_report, "html.parser")
 
         for section in soup.find_all("div", class_="section-container"):

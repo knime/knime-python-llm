@@ -266,16 +266,16 @@ class AzureSettings:
     api_base = knext.StringParameter(
         label="Azure Resource Endpoint",
         description="""The Azure OpenAI Resource Endpoint e.g. https://<myResource>.openai.azure.com/ which can be
-        found on the [Azure Portal](https://portal.azure.com/)
+        found on the [Azure Portal](https://portal.azure.com/).
         """,
         default_value="",
     )
 
     api_version = knext.StringParameter(
         label="Azure API Version",
-        description="""The API version you want to use. Note that the latest API versions could support more functionality such
+        description="""The API version you want to use. Note that the latest API versions could support more functionality, such
         as function calling. Find the available API versions here:
-        [API versions](https://learn.microsoft.com/en-us/azure/ai-services/openai/reference#completions)""",
+        [API versions](https://learn.microsoft.com/en-us/azure/ai-services/openai/reference#completions).""",
         default_value="2023-07-01-preview",
     )
 
@@ -310,14 +310,15 @@ class AzureOpenAIAuthenticator:
 
     This node provides the authentication for all Azure OpenAI models.
     It allows you to select the credentials that contain a valid Azure OpenAI API key in their *password* field (the *username* is ignored).
+
     Credentials can be set on the workflow level or created inside the workflow e.g. with the
     [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
-    and fed into this node via flow variable.
+    and fed into this node via a flow variable.
 
     To find your Azure OpenAI API key, navigate to your Azure OpenAI Resource on the [Azure Portal](https://portal.azure.com/) and copy one of the keys and the endpoint from
     'Resource Management - Keys and Endpoints'.
 
-    [Available API versions](https://learn.microsoft.com/en-us/azure/ai-services/openai/reference#completions)
+    [Available API versions](https://learn.microsoft.com/en-us/azure/ai-services/openai/reference#completions).
     """
 
     credentials_settings = CredentialsSettings(
@@ -331,7 +332,7 @@ class AzureOpenAIAuthenticator:
 
     verify_settings = knext.BoolParameter(
         "Verify settings",
-        "Whether to verify the settings by calling the list models endpoint.",
+        "Whether to verify the settings by calling the *list models* endpoint.",
         True,
         since_version="5.2.1",
         is_advanced=True,
@@ -420,11 +421,11 @@ class AzureOpenAILLMConnector:
     Connects to an Azure OpenAI Large Language Model.
 
     This node establishes a connection with an Azure OpenAI Large Language Model (LLM).
-    After successfully authenticating using the **Azure OpenAI Authenticator node**, enter the deployment name of
+    After successfully authenticating using the **Azure OpenAI Authenticator** node, enter the deployment name of
     the model you want to use. You can find the models on the [Azure AI Studio](https://oai.azure.com) at
     'Management - Deployments'. Note that only models compatible with Azure OpenAI's Completions API will work with this node.
 
-    If you a looking for gpt-3.5-turbo (the model behind ChatGPT) or gpt-4, check out the **Azure OpenAI Chat Model Connector** node.
+    **Note**: See the **Azure OpenAI Chat Model Connector** node for LLMs optimized for chat-specific usecases.
     """
 
     deployment = AzureDeploymentSettings()
@@ -497,12 +498,12 @@ class AzureOpenAIChatModelConnector:
     Connects to an Azure OpenAI Chat Model.
 
     This node establishes a connection with an Azure OpenAI Chat Model.
-    After successfully authenticating using the **Azure OpenAI Authenticator node**, enter the deployment name of
+    After successfully authenticating using the **Azure OpenAI Authenticator** node, enter the deployment name of
     the model you want to use. You can find the models on the [Azure AI Studio](https://oai.azure.com) at
     'Management - Deployments'.
 
-    Note that chat models can also be used as LLMs because they are actually a subcategory of LLMs that are optimized
-    for chat-like applications.
+    **Note**: Chat models are LLMs that have been fine-tuned for chat-based usecases. As such, these models can also be
+     used in other applications as well.
     """
 
     deployment = AzureDeploymentSettings()
@@ -584,7 +585,7 @@ class AzureOpenAIEmbeddingsConnector:
     Connects to an Azure OpenAI Embeddings Model.
 
     This node establishes a connection with an Azure OpenAI Embeddings Model. After successfully authenticating
-    using the **Azure OpenAI Authenticator node**, you need to provide the name of a deployed embeddings model
+    using the **Azure OpenAI Authenticator** node, you need to provide the name of a deployed embeddings model
     found on the [Azure AI Studio](https://oai.azure.com).
     """
 

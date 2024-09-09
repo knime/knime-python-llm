@@ -64,7 +64,8 @@ def _create_repo_id_parameter() -> knext.StringParameter:
         label="Repo ID",
         description="""The model name to be used, in the format `<organization_name>/<model_name>`. For example, 
         `mistralai/Mistral-7B-Instruct-v0.3` for text generation, or `sentence-transformers/all-MiniLM-L6-v2`
-        for embeddings model.
+        for embedding model.
+
         You can find available models at the [Hugging Face Models repository](https://huggingface.co/models).""",
         default_value="",
     )
@@ -320,7 +321,8 @@ class HFHubAuthenticator:
     This node provides the authentication for all Hugging Face Hub models.
 
     It allows you to select the credentials that contain a valid Hugging Face Hub API key in their *password* field (the *username* is ignored).
-    Credentials can be set on the workflow level or created inside the workflow e.g. with the [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
+    Credentials can be set on the workflow level or created inside the workflow e.g. with the
+    [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
     and fed into this node via flow variable.
 
     If you don't have a Hugging Face API key yet, you can generate one by visiting [Hugging Face](https://huggingface.co/settings/tokens).
@@ -328,7 +330,7 @@ class HFHubAuthenticator:
     """
 
     credentials_settings = CredentialsSettings(
-        label="Hugging Face API Key",
+        label="Hugging Face API key",
         description="""
             The credentials containing the Hugging Face Hub API key in its *password* field (the *username* is ignored).
             """,
@@ -404,11 +406,12 @@ class HFHubConnector:
     Connects to an LLM hosted on the Hugging Face Hub.
 
     This node establishes a connection to a specific LLM hosted on the Hugging Face Hub.
-    To use this node, you need to successfully authenticate with the Hugging Face Hub using the **HF Hub Authenticator node**.
+    To use this node, you need to successfully authenticate with the Hugging Face Hub using the **HF Hub Authenticator** node.
 
     Provide the name of the desired LLM repository available on the [Hugging Face Hub](https://huggingface.co/models) as an input.
 
-    For more details and information about integrating LLMs from the Hugging Face Hub, refer to the [LangChain documentation](https://python.langchain.com/docs/modules/model_io/models/llms/integrations/huggingface_hub).
+    For more details and information about integrating LLMs from the Hugging Face Hub, refer to the
+    [LangChain documentation](https://python.langchain.com/docs/modules/model_io/models/llms/integrations/huggingface_hub).
 
     Please ensure that you have the necessary permissions to access the model.
     Failures with gated models may occur due to outdated tokens.
@@ -495,8 +498,9 @@ class HFHubChatModelConnector:
 
     This node establishes a connection to a specific chat model hosted on the Hugging Face Hub.
     The difference to the HF Hub LLM Connector is that this node allows you to provide prompt templates which are crucial for
-    obtaining the best output from many models that have been fine-tuned for chatting.
-    To use this node, you need to successfully authenticate with the Hugging Face Hub using the **HF Hub Authenticator node**.
+    obtaining the best output from many models that have been fine-tuned for chat-based usecases.
+
+    To use this node, you need to successfully authenticate with the Hugging Face Hub using the **HF Hub Authenticator** node.
 
     Provide the name of the desired chat model repository available on the
     [Hugging Face Hub](https://huggingface.co/models)
@@ -601,13 +605,13 @@ hf_embeddings_port_type = knext.port_type(
 )
 class HFHubEmbeddingsConnector:
     """
-    Connects to an Embeddings model hosted on the Hugging Face Hub.
+    Connects to an Embedding model hosted on the Hugging Face Hub.
 
-    This node establishes a connection to a specific Embeddings model hosted on the Hugging Face Hub.
-    To use this node, you need to successfully authenticate with the Hugging Face Hub using the **HF Hub Authenticator node**.
+    This node establishes a connection to a specific Embedding model hosted on the Hugging Face Hub.
+
+    To use this node, you need to successfully authenticate with the Hugging Face Hub using the **HF Hub Authenticator** node.
 
     Provide the name of the desired Embeddings repository available on the [Hugging Face Hub](https://huggingface.co/) as an input.
-
     """
 
     repo_id = _create_repo_id_parameter()

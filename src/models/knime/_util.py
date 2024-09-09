@@ -14,13 +14,13 @@ import pyarrow as pa
 @knext.parameter_group("Model types")
 class ModelTypeSettings:
     chat_models = knext.BoolParameter(
-        "Chat Models",
+        "Chat models",
         "List available chat models.",
         True,
     )
 
     embedding_models = knext.BoolParameter(
-        "Embedding Models",
+        "Embedding models",
         "List available embedding models.",
         True,
     )
@@ -44,6 +44,8 @@ class ModelTypeSettings:
 )
 class KnimeHubAIModelLister:
     """
+    Lists available models in the GenAI Gateway of the connected KNIME Hub.
+
     Lists available models in the GenAI Gateway of the connected KNIME Hub using the
     authentication provided via the input port.
 

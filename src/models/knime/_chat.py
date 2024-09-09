@@ -111,12 +111,11 @@ knime_chat_model_port_type = knext.port_type(
 
 class ModelSettings(GeneralSettings):
     max_tokens = knext.IntParameter(
-        label="Maximum Response Length (token)",
+        label="Maximum response length (token)",
         description="""
         The maximum number of tokens to generate.
 
-        The token count of your prompt plus 
-        max_tokens cannot exceed the model's context length.
+        This value, plus the token count of your prompt, cannot exceed the model's context length.
         """,
         default_value=200,
         min_value=1,
@@ -126,10 +125,12 @@ class ModelSettings(GeneralSettings):
     temperature = knext.DoubleParameter(
         label="Temperature",
         description="""
-        Sampling temperature to use, between 0.0 and 2.0. 
-        Higher values means the model will take more risks. 
+        Sampling temperature to use, between 0.0 and 2.0.
+
+        Higher values will lead to less deterministic answers.
+
         Try 0.9 for more creative applications, and 0 for ones with a well-defined answer.
-        It is generally recommend altering this or top_p but not both.
+        It is generally recommended altering this, or Top-p, but not both.
         """,
         default_value=0.2,
         min_value=0.0,
@@ -139,7 +140,7 @@ class ModelSettings(GeneralSettings):
     n_requests = knext.IntParameter(
         label="Number of concurrent requests",
         description="""Maximum number of concurrent requests a single node (typically the LLM Prompter) can make to the GenAI Gateway.
-        The more requests a node can make in parallel the faster it executes but too many requests might get rate limitted by some
+        The more requests a node can make in parallel, the faster it executes. Too many requests might get rate limitted by some
         GenAI providers.
         """,
         default_value=1,
@@ -167,7 +168,8 @@ class ModelSettings(GeneralSettings):
     port_type=knime_chat_model_port_type,
 )
 class KnimeHubChatModelConnector:
-    """Connects to a Chat Model configured in the GenAI Gateway of the connected KNIME Hub.
+    """
+    Connects to a Chat Model configured in the GenAI Gateway of the connected KNIME Hub.
 
     Connects to a Chat Model configured in the GenAI Gateway of the connected KNIME Hub using the authentication
     provided via the input port.

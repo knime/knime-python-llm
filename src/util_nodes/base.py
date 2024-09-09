@@ -87,6 +87,8 @@ class TextChunker:
     """
     Splits large texts into smaller overlapping chunks.
 
+    This node splits large texts into smaller overlapping chunks.
+
     Text chunking is a technique for splitting larger documents into smaller paragraphs. The chunks overlap
     to contain a piece of the context. Chunk size and overlap can be configured.
 

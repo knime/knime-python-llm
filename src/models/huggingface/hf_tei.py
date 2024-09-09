@@ -136,13 +136,14 @@ class HFTEIEmbeddingsConnector:
     """
     Connects to a dedicated Text Embeddings Inference Server.
 
-    The [Text Embeddings Inference Server](https://github.com/huggingface/text-embeddings-inference)
-    is a toolkit for deploying and serving open source text embeddings and sequence classification models.
-
     This node can connect to locally or remotely hosted TEI servers which includes
     [Text Embedding Inference Endpoints](https://huggingface.co/docs/inference-endpoints/) of
-    popular embeddings models that are deployed via Hugging Face Hub.
-    Protected endpoints require to connect a HF Hub Authenticator in order to authenticate with Hugging Face hub.
+    popular embedding models that are deployed via Hugging Face Hub.
+
+    Protected endpoints require a connection with a **HF Hub Authenticator** node in order to authenticate with Hugging Face hub.
+
+    The [Text Embeddings Inference Server](https://github.com/huggingface/text-embeddings-inference)
+    is a toolkit for deploying and serving open source text embeddings and sequence classification models.
 
     For more details and information about integrating with the Hugging Face Embeddings Inference
     and setting up a server, refer to
@@ -150,7 +151,7 @@ class HFTEIEmbeddingsConnector:
     """
 
     server_url = knext.StringParameter(
-        "Text Embeddings Inference Server URL",
+        "Text Embeddings Inference server URL",
         "The URL where the Text Embeddings Inference server is hosted e.g. `http://localhost:8080/`.",
     )
 

@@ -196,7 +196,7 @@ class ChromaVectorStoreCreator(BaseVectorStoreCreator):
     The node generates a Chroma vector store that uses the given embeddings model to map documents to a numerical vector that captures
     the semantic meaning of the document.
 
-    By default, the node embeds the selected documents using the embeddings model but it is also possible to create the vector store
+    By default, the node embeds the selected documents using the embeddings model, but it is also possible to create the vector store
     from existing embeddings by specifying the corresponding embeddings column in the node dialog.
 
     Downstream nodes, such as the **Vector Store Retriever**, utilize the vector store to find documents with similar
@@ -292,13 +292,14 @@ class ChromaVectorStoreReader:
     """
     Reads a Chroma vector store created with LangChain from a local path.
 
-    This node allows you to read a Chroma vector store created with [LangChain](https://python.langchain.com/docs/integrations/vectorstores/chroma) from a local path. If you want to create a new vector store, use the Chroma Vector Store Creator instead.
+    This node allows you to read a Chroma vector store created with [LangChain](https://python.langchain.com/docs/integrations/vectorstores/chroma)
+    from a local path. If you want to create a new vector store, use the **Chroma Vector Store Creator** instead.
 
-    A vector store is a data structure or storage mechanism that stores a collection of numerical vectors
+    A *vector store* is a data structure or storage mechanism that stores a collection of numerical vectors
     along with their corresponding documents. The vector store enables efficient storage, retrieval, and similarity
     search operations on these vectors and their associated data.
 
-    If the vector store was created with LangChain in Python, the embeddings model is not stored with the vectorstore, so it has to be provided separately via the matching Embeddings Model Connector node.
+    If the vector store was created with LangChain in Python, the embeddings model is not stored with the vectorstore, so it has to be provided separately via the matching **Embeddings Model Connector** node.
 
     On execution, the node will extract a document from the store to obtain information about the document's metadata. This assumes that each document in the vector store has the same kind of metadata attached to it.
     """

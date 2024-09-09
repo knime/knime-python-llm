@@ -265,9 +265,11 @@ class BaseVectorStoreCreator(ABC):
         "Handle missing values in the document column",
         """Define whether missing values in the document column should be skipped or whether the 
         node execution should fail on missing values.""",
-        default_value=lambda v: util.MissingValueHandlingOptions.Fail.name
-        if v < knext.Version(5, 2, 0)
-        else util.MissingValueHandlingOptions.SkipRow.name,
+        default_value=lambda v: (
+            util.MissingValueHandlingOptions.Fail.name
+            if v < knext.Version(5, 2, 0)
+            else util.MissingValueHandlingOptions.SkipRow.name
+        ),
         enum=util.MissingValueHandlingOptions,
         style=knext.EnumParameter.Style.VALUE_SWITCH,
         since_version="5.2.0",
@@ -397,34 +399,31 @@ class BaseVectorStoreCreator(ABC):
 )
 @knext.input_port(
     "Vector Store",
-    "A vector store containing document embeddings.",
+    "Vector store containing document embeddings.",
     vector_store_port_type,
 )
 @knext.input_table(
     "Queries", "Table containing a string column with the queries for the vector store."
 )
 @knext.output_table(
-    "Result table", "Table containing the queries and their closest match from the db."
+    "Result table",
+    "Table containing the queries and their closest match from the vector store.",
 )
 class VectorStoreRetriever:
     """
     Performs a similarity search on a vector store.
 
-    A vector store retriever is a component or module that specializes in retrieving vectors
-    from a vector store based on user queries. It works in conjunction with a vector store to
-    facilitate efficient vector retrieval and similarity search operations.
+    This node specializes in retrieving embeddings from a vector store based on their relevance to user queries.
 
-    Note on dissimilarity scores:
-    Dissimilarity scores calculated using FAISS or Chroma with L2 distance are not bound to a
+    **Note**: *Dissimilarity scores* calculated using FAISS or Chroma with L2 distance are not bound to a
     specific range, therefore allowing only for ordinal comparison of scores. These scores also depend
     on the embeddings model used to generate the embeddings, as different models produce embeddings
     with varying scales and distributions. Therefore, understanding or comparing similarity across
     different models or spaces without contextual normalization is not meaningful.
-
     """
 
     query_column = knext.ColumnParameter(
-        "Queries",
+        "Queries column",
         "Column containing the queries.",
         port_index=1,
         column_filter=util.create_type_filer(knext.string()),
@@ -444,7 +443,7 @@ class VectorStoreRetriever:
 
     retrieve_metadata = knext.BoolParameter(
         "Retrieve metadata from documents",
-        "Whether or not to retrieve document metadata if provided.",
+        "Whether or not to retrieve document metadata, if provided.",
         default_value=False,
         since_version="5.2.0",
     )
@@ -672,21 +671,23 @@ class VectorStoreRetriever:
     name="Extracted data", description="The data stored inside of the vector store."
 )
 class VectorStoreDataExtractor:
-    """Extracts the documents, embeddings and metadata from a vector store into a table.
+    """
+    Extracts the documents, embeddings and metadata from a vector store into a table.
 
     Extracts the documents, embeddings and metadata from a vector store into a table.
     This table can be combined with tables extracted from other vector stores to merge multiple
-    vector stores into one by creating a new vector store from the combined table."""
+    vector stores into one by creating a new vector store from the combined table.
+    """
 
     document_column_name = knext.StringParameter(
         "Document column name",
-        "The name of the output column holding the documents.",
+        "Specify the name of the output column holding the documents.",
         "Document",
     )
 
     embedding_column_name = knext.StringParameter(
         "Embedding column name",
-        "The name of the output column holding the embeddings.",
+        "Specify the name of the output column holding the embeddings.",
         "Embeddings",
     )
 

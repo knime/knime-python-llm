@@ -146,10 +146,12 @@ tool_list_port_type = knext.port_type(
 )
 class ToolCombiner:
     """
-    Concatinates two Tools.
+    Concatenates two lists of LLM agent tools.
 
-    A agent can be provided with a list of tools to choose from. Use this
-    node to concatinate existing tools into a list and provide an agent with the tool list.
+    This node concatenates two lists of LLM agent tools.
+
+    An agent can be provided with a list of tools to choose from. Use this
+    node to concatenate existing tools into a list, which can then be provided to an agent.
     """
 
     def configure(

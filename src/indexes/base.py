@@ -687,7 +687,7 @@ class VectorStoreDataExtractor:
     embedding_column_name = knext.StringParameter(
         "Embedding column name",
         "The name of the output column holding the embeddings.",
-        "Embedding",
+        "Embeddings",
     )
 
     def configure(

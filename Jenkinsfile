@@ -3,7 +3,8 @@ def BN = (BRANCH_NAME == 'master' || BRANCH_NAME.startsWith('releases/')) ? BRAN
 
 def repositoryName = 'knime-python-llm'
 
-library "knime-pipeline@$BN"
+// library "knime-pipeline@$BN"
+library "knime-pipeline@enh/AP-23222-include-packages-and-delete-after-use"
 
 properties([
     parameters(knimetools.getPythonExtensionParameters()),
@@ -12,7 +13,7 @@ properties([
 ])
 
 try {
-    knimetools.defaultPythonExtensionBuild()
+    knimetools.defaultPythonExtensionBuild(useNightlyBundlingChannel: true) // Remove this flag before merging
 
     withCredentials([string(credentialsId: 'openai-api-key', variable: 'OPENAI_API_KEY'), string(credentialsId: 'huggingface-api-key', variable: 'TEST_API_KEY_HUGGINGFACE')]) {
         workflowTests.runTests(

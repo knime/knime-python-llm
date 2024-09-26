@@ -20,6 +20,9 @@ for more information on how to build pure-Python nodes for KNIME.
     $ ruff format .
   ```
 
-## Join the Community
+### Who do I talk to? ###
 
+* [team-rakete@knime.com](mailto:team-rakete@knime.com)
+
+## Join the Community
 * [KNIME Forum](https://forum.knime.com/)

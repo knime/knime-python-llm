@@ -261,6 +261,24 @@ embeddings_model_port_type = knext.port_type(
 )
 
 
+class SystemMessageHandling(knext.EnumParameterOptions):
+    NONE = (
+        "None",
+        "No system message will precede the prompts.",
+    )
+    SINGLE = (
+        "Include",  # TODO with AP-23374: rename to 'Single' or similar label
+        "A specifiable system message will precede each prompt.",
+    )
+
+
+def _isinstance_of_port_object(
+    ctx: knext.DialogCreationContext, port: int, spec: knext.PortObjectSpec
+) -> bool:
+    """Returns true if the port object spec is an instance of a specific knext.PortObjectSpec."""
+    return isinstance(ctx.get_input_specs()[port], spec)
+
+
 @knext.node(
     "LLM Prompter",
     knext.NodeType.PREDICTOR,
@@ -287,6 +305,41 @@ class LLMPrompter:
     For each row in the input table, this node sends one prompt to the LLM and receives a corresponding response.
     Rows and the corresponding prompts are treated in isolation, i.e. the LLM can not remember the contents of the previous rows or how it responded to them.
     """
+
+    system_message_handling = knext.EnumParameter(
+        "Add system message",
+        "Specify whether a customizable system message is prepended to each prompt. This option is only "
+        "available for chat models.",
+        default_value=SystemMessageHandling.NONE.name,
+        enum=SystemMessageHandling,
+        style=knext.EnumParameter.Style.VALUE_SWITCH,
+        since_version="5.4.0",
+    ).rule(
+        knext.DialogContextCondition(
+            lambda ctx: _isinstance_of_port_object(ctx, 0, ChatModelPortObjectSpec)
+        ),
+        knext.Effect.SHOW,
+    )
+
+    system_message = knext.MultilineStringParameter(
+        "System message",
+        """
+        The first message given to the model describing how it should behave.
+
+        Example: You are a helpful assistant that has to answer questions truthfully, and
+        if you do not know an answer to a question, you should state that.
+        """,
+        default_value="",
+        since_version="5.4.0",
+    ).rule(
+        knext.And(
+            knext.DialogContextCondition(
+                lambda ctx: _isinstance_of_port_object(ctx, 0, ChatModelPortObjectSpec)
+            ),
+            knext.OneOf(system_message_handling, [SystemMessageHandling.SINGLE.name]),
+        ),
+        knext.Effect.SHOW,
+    )
 
     prompt_column = knext.ColumnParameter(
         "Prompt column",
@@ -317,7 +370,7 @@ class LLMPrompter:
 
     async def aprocess_batches_concurrently(
         self,
-        prompts: List[str],
+        prompts: List[str] | List[List[BaseMessage]],
         llm: BaseLanguageModel,
         n_requests: int,
         progress_tracker: Callable[[int], None],
@@ -380,6 +433,13 @@ class LLMPrompter:
             data_frame = batch.to_pandas()
             prompts = data_frame[self.prompt_column].tolist()
 
+            if (
+                isinstance(llm, BaseChatModel)
+                and self.system_message_handling == SystemMessageHandling.SINGLE.name
+                and self.system_message
+            ):
+                prompts = self._add_system_message(prompts)
+
             responses = asyncio.run(
                 self.aprocess_batches_concurrently(
                     prompts, llm, n_requests, progress_tracker
@@ -394,6 +454,15 @@ class LLMPrompter:
             output_table.append(data_frame)
 
         return output_table
+
+    def _add_system_message(self, prompts: List[str]) -> List[List[BaseMessage]]:
+        return [
+            [
+                SystemMessage(self.system_message),
+                HumanMessage(x),
+            ]
+            for x in prompts
+        ]
 
 
 @knext.node(

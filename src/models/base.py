@@ -256,8 +256,12 @@ class SystemMessageHandling(knext.EnumParameterOptions):
         "No system message will precede the prompts.",
     )
     SINGLE = (
-        "Include",  # TODO with AP-23374: rename to 'Single' or similar label
+        "Global",
         "A specifiable system message will precede each prompt.",
+    )
+    COLUMN = (
+        "Column",
+        "Each prompt includes an individual system message specified in a column.",
     )
 
 
@@ -330,6 +334,23 @@ class LLMPrompter:
         knext.Effect.SHOW,
     )
 
+    system_message_column = knext.ColumnParameter(
+        "System message column",
+        """
+        The column containing the system message for each prompt.
+        """,
+        port_index=1,
+        since_version="5.4.0",
+    ).rule(
+        knext.And(
+            knext.DialogContextCondition(
+                lambda ctx: _isinstance_of_port_object(ctx, 0, ChatModelPortObjectSpec)
+            ),
+            knext.OneOf(system_message_handling, [SystemMessageHandling.COLUMN.name]),
+        ),
+        knext.Effect.SHOW,
+    )
+
     prompt_column = knext.ColumnParameter(
         "Prompt column",
         "Column containing prompts for the LLM.",
@@ -386,12 +407,41 @@ class LLMPrompter:
                 input_table_spec, knext.string()
             )
 
-        if (
-            isinstance(llm_spec, ChatModelPortObjectSpec)
-            and self.system_message_handling == SystemMessageHandling.SINGLE.name
-            and self.system_message == ""
-        ):
-            raise knext.InvalidParametersError("The system message must not be empty.")
+        if isinstance(llm_spec, ChatModelPortObjectSpec):
+            if (
+                self.system_message_handling == SystemMessageHandling.SINGLE.name
+                and self.system_message == ""
+            ):
+                raise knext.InvalidParametersError(
+                    "The system message must not be empty."
+                )
+
+            if self.system_message_handling == SystemMessageHandling.COLUMN.name:
+                if self.system_message_column:
+                    util.check_column(
+                        input_table_spec,
+                        self.system_message_column,
+                        knext.string(),
+                        "system message",
+                    )
+                else:
+                    spec_without_prompts = knext.Schema.from_columns(
+                        [c for c in input_table_spec if c.name != self.prompt_column]
+                    )
+                    try:
+                        self.system_message_column = util.pick_default_column(
+                            spec_without_prompts, knext.string()
+                        )
+                    except Exception:
+                        raise knext.InvalidParametersError(
+                            "When using system messages from a column, the input table must contain at least "
+                            "two string columns. One for the system messages and one for the prompts."
+                        )
+
+                if self.prompt_column == self.system_message_column:
+                    raise knext.InvalidParametersError(
+                        "The prompt and system message column can not be the same."
+                    )
 
         llm_spec.validate_context(ctx)
 
@@ -414,8 +464,6 @@ class LLMPrompter:
         llm_port: LLMPortObject,
         input_table: knext.Table,
     ):
-        from langchain_core.language_models import BaseChatModel
-
         llm = llm_port.create_model(ctx)
         num_rows = input_table.num_rows
 
@@ -432,13 +480,11 @@ class LLMPrompter:
             responses = []
             util.check_canceled(ctx)
             data_frame = batch.to_pandas()
-            prompts = data_frame[self.prompt_column].tolist()
 
-            if (
-                isinstance(llm, BaseChatModel)
-                and self.system_message_handling == SystemMessageHandling.SINGLE.name
-            ):
-                prompts = self._add_system_message(prompts)
+            if data_frame[self.prompt_column].isnull().values.any():
+                raise RuntimeError("The prompt column contains a missing value.")
+
+            prompts = self._include_system_messages(llm, data_frame)
 
             responses = asyncio.run(
                 self.aprocess_batches_concurrently(
@@ -455,7 +501,39 @@ class LLMPrompter:
 
         return output_table
 
-    def _add_system_message(self, prompts: List[str]) -> List[List]:
+    def _include_system_messages(self, llm, data_frame) -> List[str] | List[List]:
+        import langchain_core.messages as lcm
+        from langchain_core.language_models import BaseChatModel
+
+        if (
+            not isinstance(llm, BaseChatModel)
+            or self.system_message_handling == SystemMessageHandling.NONE.name
+        ):
+            prompts = data_frame[self.prompt_column].tolist()
+        else:
+            if self.system_message_handling == SystemMessageHandling.SINGLE.name:
+                prompts = data_frame[self.prompt_column].tolist()
+                prompts = self._add_global_system_message(prompts)
+            elif self.system_message_handling == SystemMessageHandling.COLUMN.name:
+                if data_frame[self.system_message_column].isnull().values.any():
+                    raise RuntimeError(
+                        "The system message column contains a missing value."
+                    )
+                prompts = data_frame.apply(
+                    lambda row: [
+                        lcm.SystemMessage(row[self.system_message_column]),
+                        lcm.HumanMessage(row[self.prompt_column]),
+                    ],
+                    axis=1,
+                ).tolist()
+            else:
+                raise NotImplementedError(
+                    f"System messages handled via '{SystemMessageHandling[self.system_message_handling].label}' are not implemented yet."
+                )
+
+        return prompts
+
+    def _add_global_system_message(self, prompts: List[str]) -> List[List]:
         import langchain_core.messages as lcm
 
         return [

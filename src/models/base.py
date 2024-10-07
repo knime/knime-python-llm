@@ -5,7 +5,7 @@ import util
 import pandas as pd
 import asyncio
 from base import AIPortObjectSpec
-from typing import Any, List, Optional, Sequence, Callable
+from typing import Any, List, Optional, Sequence, Callable, Type
 from functools import partial
 
 # Langchain imports
@@ -273,10 +273,10 @@ class SystemMessageHandling(knext.EnumParameterOptions):
 
 
 def _isinstance_of_port_object(
-    ctx: knext.DialogCreationContext, port: int, spec: knext.PortObjectSpec
+    ctx: knext.DialogCreationContext, port: int, spec_class: Type[knext.PortObjectSpec]
 ) -> bool:
     """Returns true if the port object spec is an instance of a specific knext.PortObjectSpec."""
-    return isinstance(ctx.get_input_specs()[port], spec)
+    return isinstance(ctx.get_input_specs()[port], spec_class)
 
 
 @knext.node(
@@ -308,7 +308,7 @@ class LLMPrompter:
 
     system_message_handling = knext.EnumParameter(
         "Add system message",
-        "Specify whether a customizable system message is prepended to each prompt. This option is only "
+        "Specify whether a customizable system message is included in each prompt. This option is only "
         "available for chat models.",
         default_value=SystemMessageHandling.NONE.name,
         enum=SystemMessageHandling,
@@ -394,6 +394,13 @@ class LLMPrompter:
                 input_table_spec, knext.string()
             )
 
+        if (
+            isinstance(llm_spec, ChatModelPortObjectSpec)
+            and self.system_message_handling == SystemMessageHandling.SINGLE.name
+            and self.system_message == ""
+        ):
+            raise knext.InvalidParametersError("The system message must not be empty.")
+
         llm_spec.validate_context(ctx)
 
         if not self.response_column_name:
@@ -436,7 +443,6 @@ class LLMPrompter:
             if (
                 isinstance(llm, BaseChatModel)
                 and self.system_message_handling == SystemMessageHandling.SINGLE.name
-                and self.system_message
             ):
                 prompts = self._add_system_message(prompts)
 

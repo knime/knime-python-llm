@@ -605,13 +605,13 @@ hf_embeddings_port_type = knext.port_type(
 )
 class HFHubEmbeddingsConnector:
     """
-    Connects to an Embedding model hosted on the Hugging Face Hub.
+    Connects to an embedding model hosted on the Hugging Face Hub.
 
-    This node establishes a connection to a specific Embedding model hosted on the Hugging Face Hub.
+    This node establishes a connection to a specific embedding model hosted on the Hugging Face Hub.
 
     To use this node, you need to successfully authenticate with the Hugging Face Hub using the **HF Hub Authenticator** node.
 
-    Provide the name of the desired Embeddings repository available on the [Hugging Face Hub](https://huggingface.co/) as an input.
+    Provide the name of the desired embeddings repository available on the [Hugging Face Hub](https://huggingface.co/) as an input.
     """
 
     repo_id = _create_repo_id_parameter()

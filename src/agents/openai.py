@@ -110,7 +110,7 @@ class OpenAIFunctionsAgentCreator:
     An *agent* is an LLM that is configured to pick a tool from
     a set of tools to best answer the user prompts, when appropriate.
 
-    **For Azure**: make sure to use the correct API, since function calling is only available since API version
+    **For Azure**: Make sure to use the correct API, since function calling is only available since API version
     '2023-07-01-preview'. For more information, check the
     [Microsoft Documentation](https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/function-calling?tabs=python)
 

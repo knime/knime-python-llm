@@ -382,7 +382,7 @@ class EmbeddingsLoaderInputSettings:
     class DimensionOption(knext.EnumParameterOptions):
         AUTO = (
             "Auto",
-            "Use the default embedding dimension for the model",
+            "Use the default embedding dimension for the model.",
         )
         CUSTOM = (
             "Custom",

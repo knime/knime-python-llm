@@ -143,18 +143,6 @@ class OpenAIGeneralSettings(GeneralRemoteSettings):
         max_value=2.0,
     )
 
-    n = knext.IntParameter(
-        label="Completions generation",
-        description="""
-        How many chat completion choices to generate for each input message.
-
-        **Note**: This parameter can quickly consume your token quota.
-        """,
-        default_value=1,
-        min_value=1,
-        is_advanced=True,
-    )
-
     seed = knext.IntParameter(
         label="Seed",
         description="""
@@ -676,7 +664,6 @@ class OpenAILLMPortObjectSpec(OpenAIModelPortObjectSpec, LLMPortObjectSpec):
         temperature: float,
         top_p: float,
         max_tokens: int,
-        n: int,
         seed: int,
         n_requests: int,
     ) -> None:
@@ -685,7 +672,6 @@ class OpenAILLMPortObjectSpec(OpenAIModelPortObjectSpec, LLMPortObjectSpec):
         self._temperature = temperature
         self._top_p = top_p
         self._max_tokens = max_tokens
-        self._n = n
         self._seed = seed
         self._n_requests = n_requests
 
@@ -706,10 +692,6 @@ class OpenAILLMPortObjectSpec(OpenAIModelPortObjectSpec, LLMPortObjectSpec):
         return self._max_tokens
 
     @property
-    def n(self) -> int:
-        return self._n
-
-    @property
     def seed(self) -> int:
         return self._seed
 
@@ -724,7 +706,6 @@ class OpenAILLMPortObjectSpec(OpenAIModelPortObjectSpec, LLMPortObjectSpec):
             "temperature": self._temperature,
             "top_p": self._top_p,
             "max_tokens": self._max_tokens,
-            "n": self._n,
             "seed": self._seed,
             "n_requests": self._n_requests,
         }
@@ -737,7 +718,6 @@ class OpenAILLMPortObjectSpec(OpenAIModelPortObjectSpec, LLMPortObjectSpec):
             data["temperature"],
             data["top_p"],
             data["max_tokens"],
-            data["n"],
             seed=data.get("seed", 0),
             n_requests=data.get("n_requests", 1),
         )
@@ -758,7 +738,6 @@ class OpenAILLMPortObject(LLMPortObject):
             temperature=self.spec.temperature,
             top_p=self.spec.top_p,
             max_tokens=self.spec.max_tokens,
-            n=self.spec.n,
             seed=self.spec.seed,
         )
 
@@ -786,7 +765,6 @@ class OpenAIChatModelPortObject(ChatModelPortObject):
             model=self.spec.model,
             temperature=self.spec.temperature,
             max_tokens=self.spec.max_tokens,
-            n=self.spec.n,
             seed=self.spec.seed,
         )
 
@@ -1043,7 +1021,6 @@ class OpenAILLMConnector:
             self.model_settings.temperature,
             self.model_settings.top_p,
             self.model_settings.max_tokens,
-            self.model_settings.n,
             seed=seed,
             n_requests=self.model_settings.n_requests,
         )
@@ -1125,7 +1102,6 @@ class OpenAIChatModelConnector:
             self.model_settings.temperature,
             self.model_settings.top_p,
             self.model_settings.max_tokens,
-            self.model_settings.n,
             seed=seed,
             n_requests=self.model_settings.n_requests,
         )
@@ -1486,7 +1462,6 @@ class OpenAIFineTuner:
                     temperature=model.spec.temperature,
                     top_p=model.spec.top_p,
                     max_tokens=model.spec.max_tokens,
-                    n=model.spec.n,
                     seed=model.spec.seed,
                     n_requests=model.spec.n_requests,
                 )

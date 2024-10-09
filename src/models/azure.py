@@ -115,7 +115,6 @@ class AzureOpenAILLMPortObjectSpec(
         temperature: float,
         top_p: float,
         max_tokens: int,
-        n: int,
         seed: int,
         n_requests: int,
     ) -> None:
@@ -124,7 +123,6 @@ class AzureOpenAILLMPortObjectSpec(
         self._temperature = temperature
         self._top_p = top_p
         self._max_tokens = max_tokens
-        self._n = n
         self._seed = seed
         self._n_requests = n_requests
 
@@ -136,7 +134,6 @@ class AzureOpenAILLMPortObjectSpec(
             data["temperature"],
             data["top_p"],
             data["max_tokens"],
-            data["n"],
             data.get("seed", 0),
             data.get("n_requests", 1),
         )
@@ -162,7 +159,6 @@ class AzureOpenAILLMPortObject(OpenAILLMPortObject):
             temperature=self.spec.temperature,
             top_p=self.spec.top_p,
             max_tokens=self.spec.max_tokens,
-            n=self.spec.n,
             seed=self.spec.seed,
         )
 
@@ -197,7 +193,6 @@ class AzureOpenAIChatModelPortObject(OpenAIChatModelPortObject):
             temperature=self.spec.temperature,
             model_kwargs=model_kwargs,
             max_tokens=self.spec.max_tokens,
-            n=self.spec.n,
             seed=self.spec.seed,
         )
 
@@ -473,7 +468,6 @@ class AzureOpenAILLMConnector:
             self.model_settings.temperature,
             self.model_settings.top_p,
             self.model_settings.max_tokens,
-            self.model_settings.n,
             self.model_settings.seed,
             self.model_settings.n_requests,
         )
@@ -552,7 +546,6 @@ class AzureOpenAIChatModelConnector:
             self.model_settings.temperature,
             self.model_settings.top_p,
             self.model_settings.max_tokens,
-            self.model_settings.n,
             self.model_settings.seed,
             self.model_settings.n_requests,
         )

@@ -639,7 +639,7 @@ class Embeddings4AllConnector:
     """
     Connects to an embedding model that runs on the local machine.
 
-    This node connect to an embedding model that runs on the local machine via GPT4All.
+    This node connects to an embedding model that runs on the local machine via GPT4All.
 
     The default model was trained on sentences and short paragraphs of English text.
 

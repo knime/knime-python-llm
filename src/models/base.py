@@ -297,6 +297,12 @@ class LLMPrompter:
 
     For each row in the input table, this node sends one prompt to the LLM and receives a corresponding response.
     Rows and the corresponding prompts are treated in isolation, i.e. the LLM can not remember the contents of the previous rows or how it responded to them.
+
+    **Note**: If you use the
+    [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
+    and don't select "Save password in configuration (weakly encrypted)" option for passing the API key for the LLM connector node,
+    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable won't be passed to downstream nodes.
+    In this case, this node will show a warning message.
     """
 
     system_message_handling = knext.EnumParameter(
@@ -574,6 +580,12 @@ class ChatModelPrompter:
     If you want to reduce the amount of consumed tokens, consider reducing
     the conversation table length to a reasonable (e.g. 5 conversation steps) length
     before feeding it into the node.
+
+    **Note**: If you use the
+    [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
+    and don't select "Save password in configuration (weakly encrypted)" option for passing the API key for the chat model connector node,
+    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable won't be passed to downstream nodes.
+    In this case, this node will show a warning message.
     """
 
     system_message = knext.MultilineStringParameter(

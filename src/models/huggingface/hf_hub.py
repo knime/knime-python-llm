@@ -296,9 +296,9 @@ class HFHubAuthenticator:
     This node provides the authentication for all Hugging Face Hub models.
 
     It allows you to select the credentials that contain a valid Hugging Face Hub API key in their *password* field (the *username* is ignored).
-    Credentials can be set on the workflow level or created inside the workflow e.g. with the
-    [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
-    and fed into this node via flow variable.
+    Credentials can be set on the workflow level (right-click the workflow in the KNIME Explorer and click "Workflow Credentials")
+    or created inside the workflow e.g. with the
+    [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory) and fed into this node via a flow variable.
 
     If you don't have a Hugging Face API key yet, you can generate one by visiting [Hugging Face](https://huggingface.co/settings/tokens).
     Follow the instructions provided to generate your API key.
@@ -393,6 +393,11 @@ class HFHubConnector:
 
     Please ensure that you have the necessary permissions to access the model.
     Failures with gated models may occur due to outdated tokens.
+
+    **Note**: If you use the [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
+    and don't select "Save password in configuration (weakly encrypted)" option for passing the API key,
+    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable won't
+    be passed to downstream nodes. In this case, this node will show a warning message.
     """
 
     hub_settings = HFHubSettings()
@@ -486,6 +491,12 @@ class HFHubChatModelConnector:
 
     Please ensure that you have the necessary permissions to access the model.
     Failures with gated models may occur due to outdated tokens.
+
+    **Note**: If you use the
+    [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
+    and don't select "Save password in configuration (weakly encrypted)" option for passing the API key,
+    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable won't
+    be passed to downstream nodes. In this case, this node will show a warning message.
     """
 
     hub_settings = HFHubSettings()
@@ -593,6 +604,12 @@ class HFHubEmbeddingsConnector:
     To use this node, you need to successfully authenticate with the Hugging Face Hub using the **HF Hub Authenticator** node.
 
     Provide the name of the desired embeddings repository available on the [Hugging Face Hub](https://huggingface.co/) as an input.
+
+    **Note**: If you use the
+    [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
+    and don't select "Save password in configuration (weakly encrypted)" option for passing the API key,
+    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable won't
+    be passed to downstream nodes. In this case, this node will show a warning message.
     """
 
     repo_id = _create_repo_id_parameter()

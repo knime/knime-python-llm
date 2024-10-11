@@ -115,6 +115,12 @@ class OpenAIFunctionsAgentCreator:
     [Microsoft Documentation](https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/function-calling?tabs=python)
 
     **Note**: These agents do not support tools with whitespaces in their names.
+
+    **Note**: If you use the
+    [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
+    and don't select "Save password in configuration (weakly encrypted)" option for passing the API key for the chat model,
+    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable won't be passed to downstream nodes.
+    In this case, this node will show a warning message.
     """
 
     system_message = knext.MultilineStringParameter(

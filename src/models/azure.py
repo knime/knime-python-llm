@@ -424,6 +424,12 @@ class AzureOpenAILLMConnector:
     'Management - Deployments'. Note that only models compatible with Azure OpenAI's Completions API will work with this node.
 
     **Note**: See the **Azure OpenAI Chat Model Connector** node for LLMs optimized for chat-specific usecases.
+
+    **Note**: If you use the
+    [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
+    and don't select "Save password in configuration (weakly encrypted)" option for passing the API key,
+    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable won't
+    be passed to downstream nodes. In this case, this node will show a warning message.
     """
 
     deployment = AzureDeploymentSettings()
@@ -500,7 +506,13 @@ class AzureOpenAIChatModelConnector:
     'Management - Deployments'.
 
     **Note**: Chat models are LLMs that have been fine-tuned for chat-based usecases. As such, these models can also be
-     used in other applications as well.
+    used in other applications as well.
+
+    **Note**: If you use the
+    [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
+    and don't select "Save password in configuration (weakly encrypted)" option for passing the API key,
+    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable won't
+    be passed to downstream nodes. In this case, this node will show a warning message.
     """
 
     deployment = AzureDeploymentSettings()
@@ -583,6 +595,12 @@ class AzureOpenAIEmbeddingsConnector:
     This node establishes a connection with an Azure OpenAI Embeddings Model. After successfully authenticating
     using the **Azure OpenAI Authenticator** node, you need to provide the name of a deployed embeddings model
     found on the [Azure AI Studio](https://oai.azure.com).
+
+    **Note**: If you use the
+    [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
+    and don't select "Save password in configuration (weakly encrypted)" option for passing the API key,
+    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable won't
+    be passed to downstream nodes. In this case, this node will show a warning message.
     """
 
     deployment = AzureDeploymentSettings()

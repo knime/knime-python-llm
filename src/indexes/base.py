@@ -418,6 +418,12 @@ class VectorStoreRetriever:
     on the embeddings model used to generate the embeddings, as different models produce embeddings
     with varying scales and distributions. Therefore, understanding or comparing similarity across
     different models or spaces without contextual normalization is not meaningful.
+
+    **Note**: If you use the
+    [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
+    and don't select "Save password in configuration (weakly encrypted)" option for passing the API key for the embeddings connector node,
+    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable won't be passed to downstream nodes.
+    In this case, this node will show a warning message.
     """
 
     query_column = knext.ColumnParameter(
@@ -675,6 +681,12 @@ class VectorStoreDataExtractor:
     Extracts the documents, embeddings and metadata from a vector store into a table.
     This table can be combined with tables extracted from other vector stores to merge multiple
     vector stores into one by creating a new vector store from the combined table.
+
+    **Note**: If you use the
+    [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
+    and don't select "Save password in configuration (weakly encrypted)" option for passing the API key for the embeddings connector node,
+    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable won't be passed to downstream nodes.
+    In this case, this node will show a warning message.
     """
 
     document_column_name = knext.StringParameter(

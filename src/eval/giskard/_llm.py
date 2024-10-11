@@ -94,6 +94,12 @@ class GiskardLLMScanner:
 
     More information on Giskard can be found in the
     [documentation](https://docs.giskard.ai/en/stable/open_source/scan/scan_llm/index.html).
+
+    **Note**: If you use the
+    [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
+    and don't select "Save password in configuration (weakly encrypted)" option for passing the API key for the LLM connector node,
+    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable won't be passed to downstream nodes.
+    In this case, this node will show a warning message.
     """
 
     model_name = knext.StringParameter(

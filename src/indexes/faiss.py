@@ -108,6 +108,12 @@ class FAISSVectorStoreCreator(BaseVectorStoreCreator):
 
     Downstream nodes, such as the **Vector Store Retriever**, utilize the vector store to find documents with similar
     semantic meaning when given a query.
+
+    **Note**: If you use the
+    [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
+    and don't select "Save password in configuration (weakly encrypted)" option for passing the API key for the embeddings connector node,
+    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable won't be passed to downstream nodes.
+    In this case, this node will show a warning message.
     """
 
     def _configure(
@@ -186,6 +192,12 @@ class FAISSVectorStoreReader:
     If the vector store was created with LangChain in Python, the embeddings model is not stored with the vectorstore, so it has to be provided separately via the matching **Embeddings Model Connector** node.
 
     On execution, the node will extract a document from the store to obtain information about the document's metadata. This assumes that each document in the vector store has the same kind of metadata attached to it.
+
+    **Note**: If you use the
+    [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
+    and don't select "Save password in configuration (weakly encrypted)" option for passing the API key for the embeddings connector node,
+    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable won't be passed to downstream nodes.
+    In this case, this node will show a warning message.
     """
 
     persist_directory = knext.StringParameter(

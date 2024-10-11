@@ -119,6 +119,12 @@ class TestSetGenerator:
     - *Reference Answer*: A reference answer to the question.
     - *Reference Context*: The context used to create the reference answer.
     - *Metadata*: Additional information specific to the type of question.
+
+    **Note**: If you use the
+    [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
+    and don't select "Save password in configuration (weakly encrypted)" option for passing the API key for the chat model or embeddings connector node(s),
+    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable won't be passed to downstream nodes.
+    In this case, this node will show a warning message.
     """
 
     input_data = InputDataParameters()
@@ -281,6 +287,12 @@ class GiskardRAGETEvaluator:
     **Giskard RAGET Test Set Generator** node.
 
     For more details see the [Giskard documentation](https://docs.giskard.ai/en/stable/open_source/testset_generation/rag_evaluation/).
+
+    **Note**: If you use the
+    [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
+    and don't select "Save password in configuration (weakly encrypted)" option for passing the API key for the LLM connector node,
+    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable won't be passed to downstream nodes.
+    In this case, this node will show a warning message.
     """
 
     prompt_column = knext.ColumnParameter(

@@ -288,6 +288,12 @@ class AgentPrompter:
     slower execution times for longer conversations, or execution failures if the context
     becomes too large for the LLM. If you experience such issues, you can truncate the conversation
     table by only keeping the last few messages, or use an LLM to summarize the conversation held so far.
+
+    **Note**: If you use the
+    [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
+    and don't select "Save password in configuration (weakly encrypted)" option for passing the API key for the LLM,
+    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable won't be passed to downstream nodes.
+    In this case, this node will show a warning message.
     """
 
     conversation_settings = ChatConversationSettings(port_index=2)

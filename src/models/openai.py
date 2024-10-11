@@ -858,8 +858,9 @@ class OpenAIAuthenticator:
 
     This node provides the authentication for all OpenAI models.
     It allows you to select the credentials that contain a valid OpenAI API key in their *password* field (the *username* is ignored).
-    Credentials can be set on the workflow level or created inside the workflow e.g. with the [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
-    and fed into this node via flow variable.
+    Credentials can be set on the workflow level (right-click the workflow in the KNIME Explorer and click "Workflow Credentials")
+    or created inside the workflow e.g. with the
+    [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory) and fed into this node via a flow variable.
 
     When this node is run, it validates the OpenAI key by sending a request to the https://api.openai.com/v1/models endpoint.
     This request does not take up any tokens.
@@ -977,6 +978,11 @@ class OpenAILLMConnector:
     Find documentation about all models at [OpenAI](https://platform.openai.com/docs/models/models).
 
     If you are looking for gpt-3.5-turbo or gpt-4, check out the **OpenAI Chat Model Connector** node.
+
+    **Note**: If you use the [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
+    and don't select "Save password in configuration (weakly encrypted)" option for passing the API key,
+    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable won't
+    be passed to downstream nodes. In this case, this node will show a warning message.
     """
 
     input_settings = LLMLoaderInputSettings()
@@ -1058,6 +1064,12 @@ class OpenAIChatModelConnector:
 
     **Note**: Chat models are LLMs that have been fine-tuned for chat-based usecases. As such, these models can also be
      used in other applications as well. Find documentation about the latest models at [OpenAI](https://platform.openai.com/docs/models/models).
+
+    **Note**: If you use the
+    [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
+    and don't select "Save password in configuration (weakly encrypted)" option for passing the API key,
+    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable won't
+    be passed to downstream nodes. In this case, this node will show a warning message.
     """
 
     input_settings = ChatModelLoaderInputSettings()
@@ -1144,6 +1156,12 @@ class OpenAIEmbeddingsConnector:
 
     If OpenAI releases a new embedding model that is not contained in the predefined list, you can select it from
     the list in the advanced settings which contains all OpenAI models available for your OpenAI API key.
+
+    **Note**: If you use the
+    [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
+    and don't select "Save password in configuration (weakly encrypted)" option for passing the API key,
+    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable won't
+    be passed to downstream nodes. In this case, this node will show a warning message.
     """
 
     input_settings = EmbeddingsLoaderInputSettings()
@@ -1215,6 +1233,12 @@ class OpenAIDALLEView:
 
     **Note**: Generating images is **significantly more expensive** than text generation. Please see
     [OpenAI](https://openai.com/pricing) for pricing information.
+
+    **Note**: If you use the
+    [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
+    and don't select "Save password in configuration (weakly encrypted)" option for passing the API key,
+    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable won't
+    be passed to downstream nodes. In this case, this node will show a warning message.
     """
 
     prompt = knext.MultilineStringParameter(
@@ -1291,6 +1315,12 @@ class OpenAIFineTuneDeleter:
 
     If the provided API key possesses the necessary permissions, the model will then be irreversibly removed from the
     authenticated OpenAI account.
+
+    **Note**: If you use the
+    [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
+    and don't select "Save password in configuration (weakly encrypted)" option for passing the API key,
+    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable won't
+    be passed to downstream nodes. In this case, this node will show a warning message.
     """
 
     def configure(self, ctx: knext.ConfigurationContext, llm_spec: LLMPortObjectSpec):
@@ -1384,6 +1414,12 @@ class OpenAIFineTuner:
 
     For a training file with 100,000 tokens trained over 3 epochs, the expected cost would be ~$2.40 USD. For
     more information, visit [OpenAI](https://platform.openai.com/docs/guides/fine-tuning/estimate-costs)
+
+    **Note**: If you use the
+    [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
+    and don't select "Save password in configuration (weakly encrypted)" option for passing the API key,
+    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable won't
+    be passed to downstream nodes. In this case, this node will show a warning message.
     """
 
     file_settings = FineTuneFileSettings()

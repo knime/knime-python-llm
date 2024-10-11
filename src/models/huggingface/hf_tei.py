@@ -110,7 +110,7 @@ huggingface_tei_embeddings_port_type = knext.port_type(
 )
 @knext.input_port(
     name="Hugging Face Hub Connection",
-    description="An optional Hugging Face hub connection that can be used to "
+    description="An optional Hugging Face Hub connection that can be used to "
     "access protected Hugging Face inference endpoints.",
     port_type=hf_authentication_port_type,
     optional=True,
@@ -128,7 +128,7 @@ class HFTEIEmbeddingsConnector:
     [Text Embedding Inference Endpoints](https://huggingface.co/docs/inference-endpoints/) of
     popular embedding models that are deployed via Hugging Face Hub.
 
-    Protected endpoints require a connection with a **HF Hub Authenticator** node in order to authenticate with Hugging Face hub.
+    Protected endpoints require a connection with a **HF Hub Authenticator** node in order to authenticate with Hugging Face Hub.
 
     The [Text Embeddings Inference Server](https://github.com/huggingface/text-embeddings-inference)
     is a toolkit for deploying and serving open source text embeddings and sequence classification models.
@@ -139,8 +139,8 @@ class HFTEIEmbeddingsConnector:
 
     **Note**: If you use the
     [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
-    and don't select "Save password in configuration (weakly encrypted)" option for passing the API key via the **HF Hub Authenticator** node,
-    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable won't be passed to downstream nodes.
+    and do not select "Save password in configuration (weakly encrypted)" option for passing the API key via the **HF Hub Authenticator** node,
+    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable will not be passed to downstream nodes.
     In this case, this node will show a warning message.
     """
 

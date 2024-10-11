@@ -862,10 +862,10 @@ class OpenAIAuthenticator:
     or created inside the workflow e.g. with the
     [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory) and fed into this node via a flow variable.
 
-    When this node is run, it validates the OpenAI key by sending a request to the https://api.openai.com/v1/models endpoint.
-    This request does not take up any tokens.
+    When this node is executed, it validates the OpenAI API key by sending a request to the https://api.openai.com/v1/models endpoint.
+    This request does not consume any tokens.
 
-    If you don't have an OpenAI API key yet, you can generate one at
+    If you do not have an OpenAI API key yet, you can generate one at
     [OpenAI](https://platform.openai.com/account/api-keys).
     """
 
@@ -967,9 +967,9 @@ class OpenAIAuthenticator:
 )
 class OpenAILLMConnector:
     """
-    Connects to an OpenAI Large Language Model.
+    Connects to an OpenAI Large Language Model (LLM).
 
-    This node establishes a connection with an OpenAI Large Language Model (LLM).
+    This node establishes a connection with an OpenAI LLM.
 
     After successfully authenticating using the **OpenAI Authenticator node**, you can select an LLM from a predefined list
     or explore advanced options to get a list of all models available for your API key (including fine-tunes).
@@ -980,8 +980,8 @@ class OpenAILLMConnector:
     If you are looking for gpt-3.5-turbo or gpt-4, check out the **OpenAI Chat Model Connector** node.
 
     **Note**: If you use the [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
-    and don't select "Save password in configuration (weakly encrypted)" option for passing the API key,
-    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable won't
+    and do not select "Save password in configuration (weakly encrypted)" option for passing the API key,
+    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable will not
     be passed to downstream nodes. In this case, this node will show a warning message.
     """
 
@@ -1067,8 +1067,8 @@ class OpenAIChatModelConnector:
 
     **Note**: If you use the
     [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
-    and don't select "Save password in configuration (weakly encrypted)" option for passing the API key,
-    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable won't
+    and do not select "Save password in configuration (weakly encrypted)" option for passing the API key,
+    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable will not
     be passed to downstream nodes. In this case, this node will show a warning message.
     """
 
@@ -1159,8 +1159,8 @@ class OpenAIEmbeddingsConnector:
 
     **Note**: If you use the
     [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
-    and don't select "Save password in configuration (weakly encrypted)" option for passing the API key,
-    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable won't
+    and do not select "Save password in configuration (weakly encrypted)" option for passing the API key,
+    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable will not
     be passed to downstream nodes. In this case, this node will show a warning message.
     """
 
@@ -1236,8 +1236,8 @@ class OpenAIDALLEView:
 
     **Note**: If you use the
     [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
-    and don't select "Save password in configuration (weakly encrypted)" option for passing the API key,
-    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable won't
+    and do not select "Save password in configuration (weakly encrypted)" option for passing the API key,
+    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable will not
     be passed to downstream nodes. In this case, this node will show a warning message.
     """
 
@@ -1259,7 +1259,7 @@ class OpenAIDALLEView:
 
         if len(self.prompt) > 4000:
             knext.InvalidParametersError(
-                f"Prompt can not exceed a length of 4000 characters. Prompt length is {len(self.prompt)}."
+                f"Prompt cannot exceed a length of 4000 characters. Prompt length is {len(self.prompt)}."
             )
 
         return knext.ImagePortObjectSpec(knext.ImageFormat.PNG)
@@ -1318,8 +1318,8 @@ class OpenAIFineTuneDeleter:
 
     **Note**: If you use the
     [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
-    and don't select "Save password in configuration (weakly encrypted)" option for passing the API key,
-    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable won't
+    and do not select "Save password in configuration (weakly encrypted)" option for passing the API key,
+    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable will not
     be passed to downstream nodes. In this case, this node will show a warning message.
     """
 
@@ -1337,7 +1337,7 @@ class OpenAIFineTuneDeleter:
 
         if response.owned_by in owned_by_openai:
             raise knext.InvalidParametersError(
-                f"This model is owned by OpenAI ('{response.owned_by}') and can not be deleted."
+                f"This model is owned by OpenAI ('{response.owned_by}') and cannot be deleted."
             )
 
     def execute(self, ctx: knext.ExecutionContext, model: LLMPortObject):
@@ -1417,8 +1417,8 @@ class OpenAIFineTuner:
 
     **Note**: If you use the
     [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
-    and don't select "Save password in configuration (weakly encrypted)" option for passing the API key,
-    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable won't
+    and do not select "Save password in configuration (weakly encrypted)" option for passing the API key,
+    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable will not
     be passed to downstream nodes. In this case, this node will show a warning message.
     """
 

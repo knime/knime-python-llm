@@ -98,7 +98,7 @@ knime_embeddings_port_type = knext.port_type(
 )
 @knext.output_port(
     name="KNIME Hub Embeddings",
-    description="An embeddings model that connects to a KNIME hub to embed documents.",
+    description="An embeddings model that connects to a KNIME Hub to embed documents.",
     port_type=knime_embeddings_port_type,
 )
 class KnimeHubEmbeddingsConnector:

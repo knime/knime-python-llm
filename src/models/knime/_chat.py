@@ -165,7 +165,7 @@ class ModelSettings(GeneralSettings):
 )
 @knext.output_port(
     name="KNIME Hub Chat Model",
-    description="A chat model that connects to the KNIME hub to make requests.",
+    description="A chat model that connects to the KNIME Hub to make requests.",
     port_type=knime_chat_model_port_type,
 )
 class KnimeHubChatModelConnector:

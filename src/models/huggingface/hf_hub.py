@@ -300,7 +300,7 @@ class HFHubAuthenticator:
     or created inside the workflow e.g. with the
     [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory) and fed into this node via a flow variable.
 
-    If you don't have a Hugging Face API key yet, you can generate one by visiting [Hugging Face](https://huggingface.co/settings/tokens).
+    If you do not have a Hugging Face API key yet, you can generate one by visiting [Hugging Face](https://huggingface.co/settings/tokens).
     Follow the instructions provided to generate your API key.
     """
 
@@ -395,8 +395,8 @@ class HFHubConnector:
     Failures with gated models may occur due to outdated tokens.
 
     **Note**: If you use the [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
-    and don't select "Save password in configuration (weakly encrypted)" option for passing the API key,
-    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable won't
+    and do not select "Save password in configuration (weakly encrypted)" option for passing the API key,
+    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable will not
     be passed to downstream nodes. In this case, this node will show a warning message.
     """
 
@@ -494,8 +494,8 @@ class HFHubChatModelConnector:
 
     **Note**: If you use the
     [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
-    and don't select "Save password in configuration (weakly encrypted)" option for passing the API key,
-    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable won't
+    and do not select "Save password in configuration (weakly encrypted)" option for passing the API key,
+    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable will not
     be passed to downstream nodes. In this case, this node will show a warning message.
     """
 
@@ -607,8 +607,8 @@ class HFHubEmbeddingsConnector:
 
     **Note**: If you use the
     [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
-    and don't select "Save password in configuration (weakly encrypted)" option for passing the API key,
-    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable won't
+    and do not select "Save password in configuration (weakly encrypted)" option for passing the API key,
+    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable will not
     be passed to downstream nodes. In this case, this node will show a warning message.
     """
 

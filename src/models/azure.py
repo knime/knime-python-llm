@@ -307,9 +307,9 @@ class AzureOpenAIAuthenticator:
     This node provides the authentication for all Azure OpenAI models.
     It allows you to select the credentials that contain a valid Azure OpenAI API key in their *password* field (the *username* is ignored).
 
-    Credentials can be set on the workflow level or created inside the workflow e.g. with the
+    Credentials can be set on the workflow level (right-click the workflow in the KNIME Explorer and click "Workflow Credentials") or created inside the workflow e.g. with the
     [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
-    and fed into this node via a flow variable.
+    and fed into this node via flow variable.
 
     To find your Azure OpenAI API key, navigate to your Azure OpenAI Resource on the [Azure Portal](https://portal.azure.com/) and copy one of the keys and the endpoint from
     'Resource Management - Keys and Endpoints'.
@@ -427,8 +427,8 @@ class AzureOpenAILLMConnector:
 
     **Note**: If you use the
     [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
-    and don't select "Save password in configuration (weakly encrypted)" option for passing the API key,
-    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable won't
+    and do not select "Save password in configuration (weakly encrypted)" option for passing the API key,
+    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable will not
     be passed to downstream nodes. In this case, this node will show a warning message.
     """
 
@@ -510,8 +510,8 @@ class AzureOpenAIChatModelConnector:
 
     **Note**: If you use the
     [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
-    and don't select "Save password in configuration (weakly encrypted)" option for passing the API key,
-    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable won't
+    and do not select "Save password in configuration (weakly encrypted)" option for passing the API key,
+    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable will not
     be passed to downstream nodes. In this case, this node will show a warning message.
     """
 
@@ -598,8 +598,8 @@ class AzureOpenAIEmbeddingsConnector:
 
     **Note**: If you use the
     [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
-    and don't select "Save password in configuration (weakly encrypted)" option for passing the API key,
-    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable won't
+    and do not select "Save password in configuration (weakly encrypted)" option for passing the API key,
+    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable will not
     be passed to downstream nodes. In this case, this node will show a warning message.
     """
 

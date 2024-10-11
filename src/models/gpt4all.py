@@ -370,7 +370,7 @@ class GPT4AllLLMConnector:
     It is not necessary to install the GPT4All client to execute the node.
 
     Some models (e.g. Llama 2) have been fine-tuned for chat applications,
-    so they might behave unexpectedly if their prompts don't follow a chat like structure:
+    so they might behave unexpectedly if their prompts do not follow a chat like structure:
 
         User: <The prompt you want to send to the model>
         Assistant:
@@ -383,7 +383,7 @@ class GPT4AllLLMConnector:
 
     For more information and detailed instructions on downloading compatible models, please visit the [GPT4All GitHub repository](https://github.com/nomic-ai/gpt4all).
 
-    **Note**: This node can not be used on the KNIME Hub, as the models can't be embedded into the workflow due to their large size.
+    **Note**: This node cannot be used on the KNIME Hub, as the models cannot be embedded into the workflow due to their large size.
     """
 
     settings = GPT4AllInputSettings()
@@ -448,7 +448,7 @@ class GPT4AllChatModelConnector:
     For more information and detailed instructions on downloading compatible models, please visit the
     [GPT4All GitHub repository](https://github.com/nomic-ai/gpt4all).
 
-    **Note**: This node can not be used on the KNIME Hub, as the models can't be embedded into the workflow due to their large size.
+    **Note**: This node cannot be used on the KNIME Hub, as the models cannot be embedded into the workflow due to their large size.
     """
 
     settings = GPT4AllInputSettings()

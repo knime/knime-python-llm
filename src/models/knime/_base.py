@@ -26,7 +26,7 @@ def create_authorization_headers(
 def validate_auth_spec(auth_spec: ks.HubAuthenticationPortObjectSpec) -> None:
     if auth_spec.hub_url is None:
         raise knext.InvalidParametersError(
-            "KNIME hub connection not available. Please re-execute the node."
+            "KNIME Hub connection not available. Please re-execute the node."
         )
 
 

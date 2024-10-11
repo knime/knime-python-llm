@@ -1,4 +1,3 @@
-from agents.base import AgentPortObjectSpec
 from models.openai import (
     OpenAIChatModelPortObject,
     OpenAIChatModelPortObjectSpec,
@@ -9,9 +8,6 @@ import knime.extension as knext
 from .base import AgentPortObject, AgentPortObjectSpec
 from .base import agent_category
 
-from langchain.agents import OpenAIFunctionsAgent
-from langchain.prompts import MessagesPlaceholder
-from langchain.schema import SystemMessage
 
 import re
 
@@ -62,6 +58,10 @@ class OpenAiFunctionsAgentPortObject(AgentPortObject):
         return tools
 
     def create_agent(self, ctx, tools):
+        from langchain.agents import OpenAIFunctionsAgent
+        from langchain.prompts import MessagesPlaceholder
+        from langchain.schema import SystemMessage
+
         llm = self.llm.create_model(ctx)
         tools = self.validate_tools(tools)
         return OpenAIFunctionsAgent.from_llm_and_tools(

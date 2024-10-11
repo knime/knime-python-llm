@@ -2,13 +2,9 @@
 import knime.extension as knext
 import util
 
-# Langchain imports
-from langchain.text_splitter import RecursiveCharacterTextSplitter, Language
-
 # Other imports
 import pyarrow as pa
 import pyarrow.compute as pc
-import pandas as pd
 
 text_chunker_icon = "icons/text_chunker.png"
 
@@ -202,6 +198,8 @@ class TextChunker:
         )
 
     def _generate_batches(self, input_table: knext.Table):
+        import pandas as pd
+
         splitter = self._create_splitter()
         for batch in input_table.batches():
             pa_batch = batch.to_pyarrow()
@@ -282,7 +280,9 @@ class TextChunker:
 
                 yield knext.Table.from_pyarrow(output_table, row_ids="keep")
 
-    def _create_splitter(self) -> RecursiveCharacterTextSplitter:
+    def _create_splitter(self):
+        from langchain.text_splitter import RecursiveCharacterTextSplitter
+
         if self.language_mode == SpecifyLanguageSetting.CODE.name:
             return RecursiveCharacterTextSplitter.from_language(
                 language=self._get_language(),
@@ -295,7 +295,9 @@ class TextChunker:
                 chunk_overlap=self.chunk_overlap,
             )
 
-    def _get_language(self) -> Language:
+    def _get_language(self):
+        from langchain.text_splitter import Language
+
         try:
             return Language[self.selected_language]
         except KeyError:
@@ -303,7 +305,7 @@ class TextChunker:
                 f"""Failed to match the selected separator language "{SplitterLanguage[self.selected_language].label}" to a langchain language."""
             )
 
-    def _create_ungroup_indexes(self, indexes: pd.Series):
+    def _create_ungroup_indexes(self, indexes):
         """Returns a list of indexes that specifies which elements to take from a column to ungroup it
         manually."""
         i = -1

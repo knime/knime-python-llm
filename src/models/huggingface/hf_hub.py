@@ -8,7 +8,6 @@ from ..base import (
     EmbeddingsPortObjectSpec,
     EmbeddingsPortObject,
     CredentialsSettings,
-    LLMChatModelAdapter,
     AIPortObjectSpec,
 )
 from .hf_base import (
@@ -16,39 +15,9 @@ from .hf_base import (
     hf_icon,
     HFPromptTemplateSettings,
     HFModelSettings,
-    HFLLM,
     raise_for,
 )
 
-
-# Langchain imports
-from langchain.embeddings.huggingface_hub import HuggingFaceHubEmbeddings
-
-# Other imports
-import huggingface_hub
-import requests
-
-
-class _TimeoutSession(requests.Session):
-    """By default Session does not use a timeout for requests unless one is provided.
-    This means that requests can potentially wait forever which in our case can freeze the
-    entire application."""
-
-    def __init__(self, timeout=None):
-        super().__init__()
-        self.default_timeout = timeout
-
-    def request(self, method, url, **kwargs):
-        if "timeout" not in kwargs and self.default_timeout is not None:
-            kwargs["timeout"] = self.default_timeout
-        return super().request(method, url, **kwargs)
-
-
-def _http_backend_factory() -> requests.Session:
-    return _TimeoutSession(5)
-
-
-huggingface_hub.configure_http_backend(_http_backend_factory)
 
 hf_hub_category = knext.category(
     path=hf_category,
@@ -178,7 +147,9 @@ class HFHubLLMPortObject(LLMPortObject):
     def spec(self) -> HFHubLLMPortObjectSpec:
         return super().spec
 
-    def create_model(self, ctx) -> HFLLM:
+    def create_model(self, ctx):
+        from ._hf_llm import HFLLM
+
         return HFLLM(
             model=self.spec.repo_id,
             hf_api_token=self.spec.credentials.get_token(ctx),
@@ -236,7 +207,9 @@ class HFHubChatModelPortObject(HFHubLLMPortObject, ChatModelPortObject):
     def spec(self) -> HFHubChatModelPortObjectSpec:
         return super().spec
 
-    def create_model(self, ctx) -> LLMChatModelAdapter:
+    def create_model(self, ctx):
+        from .._adapter import LLMChatModelAdapter
+
         llm = super().create_model(ctx)
         return LLMChatModelAdapter(
             llm=llm,
@@ -280,7 +253,9 @@ class HFHubEmbeddingsPortObject(EmbeddingsPortObject):
     def spec(self) -> HFHubEmbeddingsPortObjectSpec:
         return super().spec
 
-    def create_model(self, ctx) -> HuggingFaceHubEmbeddings:
+    def create_model(self, ctx):
+        from langchain.embeddings.huggingface_hub import HuggingFaceHubEmbeddings
+
         hub_api_token = ctx.get_credentials(self.spec.hub_credentials_name).password
         return HuggingFaceHubEmbeddings(
             repo_id=self.spec.repo_id, huggingfacehub_api_token=hub_api_token
@@ -351,6 +326,9 @@ class HFHubAuthenticator:
         return spec
 
     def execute(self, ctx: knext.ExecutionContext) -> HFAuthenticationPortObject:
+        # import from _session to ensure that it is configured with the timeout
+        from ._session import huggingface_hub
+
         try:
             huggingface_hub.whoami(
                 ctx.get_credentials(
@@ -556,6 +534,9 @@ class HFHubChatModelConnector:
 
 
 def _validate_repo_id(repo_id: str, token: str):
+    # import from _session to ensure that it is configured with the timeout
+    from ._session import huggingface_hub
+
     try:
         huggingface_hub.model_info(repo_id, token=token)
     except huggingface_hub.utils._errors.GatedRepoError as e:

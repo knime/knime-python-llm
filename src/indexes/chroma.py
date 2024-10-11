@@ -1,8 +1,7 @@
 import uuid
 import numpy as np
-import pandas as pd
 import knime.extension as knext
-from typing import Optional
+from typing import Any, Optional
 
 from knime.extension import ExecutionContext
 from models.base import (
@@ -19,9 +18,6 @@ from .base import (
     FilestoreVectorstorePortObject,
     store_category,
 )
-
-from langchain.vectorstores import Chroma
-from langchain.docstore.document import Document
 
 
 chroma_icon = "icons/chroma.png"
@@ -91,11 +87,14 @@ class LocalChromaVectorstorePortObject(
         spec: ChromaVectorstorePortObjectSpec,
         embeddings_port_object: EmbeddingsPortObject,
         folder_path: Optional[str] = None,
-        vectorstore: Optional[Chroma] = None,
+        vectorstore: Optional[Any] = None,
     ) -> None:
         super().__init__(spec, embeddings_port_object, folder_path, vectorstore)
 
-    def save_vectorstore(self, vectorstore_folder: str, vectorstore: Chroma):
+    def save_vectorstore(self, vectorstore_folder: str, vectorstore):
+        from langchain.vectorstores import Chroma
+
+        vectorstore: Chroma = vectorstore
         if (
             vectorstore._persist_directory is None
             or not vectorstore._persist_directory == vectorstore_folder
@@ -138,16 +137,19 @@ class LocalChromaVectorstorePortObject(
             )
         vectorstore.persist()
 
-    def load_vectorstore(self, embeddings, vectorstore_path) -> Chroma:
+    def load_vectorstore(self, embeddings, vectorstore_path):
+        from langchain.vectorstores import Chroma
+
         return Chroma(
             collection_name=self.spec.collection_name,
             embedding_function=embeddings,
             persist_directory=vectorstore_path,
         )
 
-    def get_documents(
-        self, ctx: knext.ExecutionContext
-    ) -> tuple[list[Document], np.ndarray]:
+    def get_documents(self, ctx: knext.ExecutionContext) -> tuple[list, np.ndarray]:
+        from langchain.docstore.document import Document
+        from langchain.vectorstores import Chroma
+
         store: Chroma = self.load_store(ctx)
         content = store.get(include=["embeddings", "metadatas", "documents"])
         documents = [
@@ -232,10 +234,12 @@ class ChromaVectorStoreCreator(BaseVectorStoreCreator):
         self,
         ctx: ExecutionContext,
         embeddings_obj: EmbeddingsPortObject,
-        documents: list[Document],
+        documents: list,
         metadata_column_names: list[str],
-        embeddings: pd.Series | None,
+        embeddings,
     ) -> LocalChromaVectorstorePortObject:
+        from langchain.vectorstores import Chroma
+
         embeddings_model = embeddings_obj.create_model(ctx)
         if embeddings is None:
             db = Chroma.from_documents(
@@ -337,6 +341,8 @@ class ChromaVectorStoreReader:
         ctx: knext.ExecutionContext,
         embeddings_port_object: EmbeddingsPortObject,
     ) -> ChromaVectorstorePortObject:
+        from langchain.vectorstores import Chroma
+
         chroma = Chroma(
             self.collection_name,
             embeddings_port_object.create_model(ctx),

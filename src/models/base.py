@@ -2,27 +2,10 @@
 import knime.extension as knext
 import pyarrow as pa
 import util
-import pandas as pd
 import asyncio
 from base import AIPortObjectSpec
-from typing import Any, List, Optional, Sequence, Callable
+from typing import List, Callable
 from functools import partial
-
-# Langchain imports
-from langchain_core.embeddings import Embeddings
-from langchain_core.language_models import BaseLanguageModel, BaseLLM, BaseChatModel
-from langchain_core.messages import (
-    BaseMessage,
-    HumanMessage,
-    SystemMessage,
-    ChatMessage,
-    AIMessage,
-)
-from langchain_core.callbacks.manager import (
-    CallbackManagerForLLMRun,
-    AsyncCallbackManagerForLLMRun,
-)
-from langchain_core.outputs import ChatGeneration, ChatResult
 
 
 model_category = knext.category(
@@ -140,14 +123,20 @@ class ChatConversationSettings:
                 "The role and content column can not be the same."
             )
 
-    _role_to_message_type = {
-        "ai": AIMessage,
-        "assistant": AIMessage,
-        "user": HumanMessage,
-        "human": HumanMessage,
-    }
+    @property
+    def _role_to_message_type(self):
+        import langchain_core.messages as lcm
+
+        return {
+            "ai": lcm.AIMessage,
+            "assistant": lcm.AIMessage,
+            "user": lcm.HumanMessage,
+            "human": lcm.HumanMessage,
+        }
 
     def _create_message(self, role: str, content: str):
+        import langchain_core.messages as lcm
+
         if not role:
             raise ValueError("No role provided.")
         message_type = self._role_to_message_type.get(role.lower(), None)
@@ -156,9 +145,9 @@ class ChatConversationSettings:
         else:
             # fallback to be used if the user provides other roles
             # which may or may not work in subsequent calls
-            return ChatMessage(content=content, role=role)
+            return lcm.ChatMessage(content=content, role=role)
 
-    def create_messages(self, data_frame: pd.DataFrame):
+    def create_messages(self, data_frame):
         role_column = data_frame[self.role_column]
         content_column = data_frame[self.content_column]
         return [
@@ -210,7 +199,7 @@ class LLMPortObject(knext.PortObject):
     def deserialize(cls, spec: LLMPortObjectSpec, storage: bytes):
         return cls(spec)
 
-    def create_model(self, ctx: knext.ExecutionContext) -> BaseLanguageModel:
+    def create_model(self, ctx: knext.ExecutionContext):
         raise NotImplementedError()
 
 
@@ -232,7 +221,7 @@ class ChatModelPortObject(LLMPortObject):
     def deserialize(cls, spec, data: dict):
         return cls(spec)
 
-    def create_model(self, ctx: knext.ExecutionContext) -> BaseChatModel:
+    def create_model(self, ctx: knext.ExecutionContext):
         raise NotImplementedError()
 
 
@@ -256,7 +245,7 @@ class EmbeddingsPortObject(knext.PortObject):
     def deserialize(cls, spec, data: dict):
         return cls(spec)
 
-    def create_model(self, ctx: knext.ExecutionContext) -> Embeddings:
+    def create_model(self, ctx: knext.ExecutionContext):
         raise NotImplementedError()
 
 
@@ -307,10 +296,13 @@ class LLMPrompter:
 
     async def aprocess_batch(
         self,
-        llm: BaseLanguageModel,
+        llm,
         sub_batch: List[str],
         progress_tracker: Callable[[int], None],
     ):
+        from langchain_core.language_models import BaseChatModel, BaseLanguageModel
+
+        llm: BaseLanguageModel = llm
         responses = await llm.abatch(sub_batch)
         if isinstance(llm, BaseChatModel):
             # chat models return AIMessage, therefore content field of the response has to be extracted
@@ -322,7 +314,7 @@ class LLMPrompter:
     async def aprocess_batches_concurrently(
         self,
         prompts: List[str],
-        llm: BaseLanguageModel,
+        llm,
         n_requests: int,
         progress_tracker: Callable[[int], None],
     ):
@@ -366,6 +358,8 @@ class LLMPrompter:
         llm_port: LLMPortObject,
         input_table: knext.Table,
     ):
+        from langchain_core.language_models import BaseChatModel
+
         llm = llm_port.create_model(ctx)
         num_rows = input_table.num_rows
 
@@ -472,6 +466,8 @@ class ChatModelPrompter:
         chat_model: ChatModelPortObject,
         input_table: knext.Table,
     ):
+        import langchain_core.messages as lcm
+
         data_frame = input_table[
             [
                 self.conversation_settings.role_column,
@@ -481,10 +477,10 @@ class ChatModelPrompter:
 
         conversation_messages = []
         if self.system_message:
-            conversation_messages.append(SystemMessage(content=self.system_message))
+            conversation_messages.append(lcm.SystemMessage(content=self.system_message))
         conversation_messages += self.conversation_settings.create_messages(data_frame)
         if self.chat_message:
-            human_message = HumanMessage(content=self.chat_message)
+            human_message = lcm.HumanMessage(content=self.chat_message)
             conversation_messages.append(human_message)
             data_frame.loc[f"Row{len(data_frame)}"] = [
                 human_message.type,
@@ -652,128 +648,3 @@ class TextEmbedder:
             ctx.set_warning("All rows contain missing or empty values.")
 
         return output_table
-
-
-class LLMChatModelAdapter(BaseChatModel):
-    """
-    This class adapts LLMs as chat models, allowing LLMs that have been fined tuned for
-    chat applications to be used as chat models with the Chat Model Prompter.
-    """
-
-    llm: BaseLLM
-    system_prompt_template: str
-    prompt_template: str
-
-    def _generate(
-        self,
-        messages: List[BaseMessage],
-        stop: Optional[List[str]] = None,
-        run_manager: Optional[CallbackManagerForLLMRun] = None,
-        **kwargs: Any,
-    ) -> ChatResult:
-        prediction = self._predict_messages(
-            messages=messages,
-            system_prompt_template=self.system_prompt_template,
-            prompt_template=self.prompt_template,
-            stop=stop,
-            **kwargs,
-        )
-        return ChatResult(generations=[ChatGeneration(message=prediction)])
-
-    async def _agenerate(
-        self,
-        messages: List[BaseMessage],
-        stop: Optional[List[str]] = None,
-        run_manager: Optional[AsyncCallbackManagerForLLMRun] = None,
-        **kwargs: Any,
-    ) -> ChatResult:
-        prediction = await self._apredict_messages(
-            messages=messages,
-            system_prompt_template=self.system_prompt_template,
-            prompt_template=self.prompt_template,
-            stop=stop,
-            **kwargs,
-        )
-        return ChatResult(generations=[ChatGeneration(message=prediction)])
-
-    def _apply_prompt_templates(
-        self,
-        messages: Sequence[BaseMessage],
-        system_prompt_template: Optional[str] = None,
-        prompt_template: Optional[str] = None,
-    ) -> str:
-        string_messages = []
-
-        message_templates = {
-            HumanMessage: prompt_template,
-            AIMessage: "%1",
-            SystemMessage: system_prompt_template,
-        }
-
-        for m in messages:
-            if type(m) not in message_templates:
-                raise ValueError(f"Got unsupported message type: {m}")
-
-            template = message_templates[type(m)]
-
-            # if the template doesn't include the predefined pattern "%1",
-            # the template input will be ignored and only the entered message will be passed
-            if "%1" in template:
-                message = template.replace(
-                    "%1",
-                    (
-                        m.content
-                        if isinstance(m, (HumanMessage, SystemMessage))
-                        else m.content
-                    ),
-                )
-            else:
-                message = m.content
-
-            string_messages.append(message)
-
-        return "\n".join(string_messages)
-
-    def _predict_messages(
-        self,
-        messages: List[BaseMessage],
-        stop: Optional[Sequence[str]] = None,
-        system_prompt_template: Optional[str] = None,
-        prompt_template: Optional[str] = None,
-        **kwargs: Any,
-    ) -> BaseMessage:
-        text = self._apply_prompt_templates(
-            messages=messages,
-            system_prompt_template=system_prompt_template,
-            prompt_template=prompt_template,
-        )
-        if stop is None:
-            _stop = None
-        else:
-            _stop = list(stop)
-        content = self.llm(text, stop=_stop, **kwargs)
-        return AIMessage(content=content)
-
-    async def _apredict_messages(
-        self,
-        messages: List[BaseMessage],
-        stop: Optional[Sequence[str]] = None,
-        system_prompt_template: Optional[str] = None,
-        prompt_template: Optional[str] = None,
-        **kwargs: Any,
-    ) -> BaseMessage:
-        text = self._apply_prompt_templates(
-            messages=messages,
-            system_prompt_template=system_prompt_template,
-            prompt_template=prompt_template,
-        )
-        if stop is None:
-            _stop = None
-        else:
-            _stop = list(stop)
-        content = await self.llm._call_async(text, stop=_stop, **kwargs)
-        return AIMessage(content=content)
-
-    def _llm_type(self) -> str:
-        """Return type of llm."""
-        return "LLMChatModelAdapter"

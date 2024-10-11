@@ -15,12 +15,7 @@ from models.openai import (
     OpenAIEmbeddingsPortObject,
 )
 
-# Langchain imports
-from langchain_openai import AzureOpenAI, AzureChatOpenAI, AzureOpenAIEmbeddings
-
-
 # Other imports
-import openai
 from socket import gaierror
 
 azure_icon = "icons/azure_logo.png"
@@ -155,7 +150,9 @@ class AzureOpenAILLMPortObject(OpenAILLMPortObject):
     def spec(self) -> AzureOpenAILLMPortObjectSpec:
         return super().spec
 
-    def create_model(self, ctx: knext.ExecutionContext) -> AzureOpenAI:
+    def create_model(self, ctx: knext.ExecutionContext):
+        from langchain_openai import AzureOpenAI
+
         return AzureOpenAI(
             openai_api_key=ctx.get_credentials(self.spec.credentials).password,
             api_version=self.spec.api_version,
@@ -186,7 +183,9 @@ class AzureOpenAIChatModelPortObject(OpenAIChatModelPortObject):
     def spec(self) -> AzureOpenAIChatModelPortObjectSpec:
         return super().spec
 
-    def create_model(self, ctx: knext.ExecutionContext) -> AzureChatOpenAI:
+    def create_model(self, ctx: knext.ExecutionContext):
+        from langchain_openai import AzureChatOpenAI
+
         model_kwargs = {"top_p": self.spec.top_p}
 
         return AzureChatOpenAI(
@@ -243,7 +242,9 @@ class AzureOpenAIEmbeddingsPortObject(OpenAIEmbeddingsPortObject):
     def spec(self) -> AzureOpenAIEmbeddingsPortObjectSpec:
         return super().spec
 
-    def create_model(self, ctx: knext.ExecutionContext) -> AzureOpenAIEmbeddings:
+    def create_model(self, ctx: knext.ExecutionContext):
+        from langchain_openai import AzureOpenAIEmbeddings
+
         return AzureOpenAIEmbeddings(
             openai_api_key=ctx.get_credentials(self.spec.credentials).password,
             azure_endpoint=self.spec.base_url,
@@ -363,6 +364,8 @@ class AzureOpenAIAuthenticator:
         return AzureOpenAIAuthenticationPortObject(self.create_spec())
 
     def _verify_settings(self, ctx):
+        import openai
+
         try:
             openai.AzureOpenAI(
                 api_key=ctx.get_credentials(

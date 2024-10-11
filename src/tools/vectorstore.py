@@ -1,6 +1,5 @@
-from typing import List, Optional
+from typing import Optional
 
-from langchain.callbacks.manager import CallbackManagerForRetrieverRun
 import knime.extension as knext
 from knime.extension.nodes import (
     get_port_type_for_id,
@@ -20,9 +19,6 @@ from indexes.base import (
     vector_store_port_type,
 )
 from .base import ToolListPortObject, ToolListPortObjectSpec, tool_list_port_type
-from langchain.chains import RetrievalQA, RetrievalQAWithSourcesChain
-from langchain.tools import StructuredTool
-from langchain.schema import Document, BaseRetriever
 import os
 from pydantic import BaseModel, Field
 
@@ -59,28 +55,6 @@ class VectorToolPortObjectSpec(ToolPortObjectSpec):
         )
 
 
-class _AdapterRetriever(BaseRetriever):
-    """Langchain expects the sources of documents to always be stored in the source metadata field
-    but we would like to give the users the choice of which metadata contains the sources.
-    This class ensures that what the user chooses is put into the source metadata for LangChain.
-    """
-
-    retriever: BaseRetriever
-    source_metadata: str
-
-    def _get_relevant_documents(
-        self, query: str, *, run_manager: CallbackManagerForRetrieverRun
-    ) -> List[Document]:
-        docs = self.retriever.get_relevant_documents(query)
-        return [self._adapt_document(doc) for doc in docs]
-
-    def _adapt_document(self, doc: Document) -> Document:
-        return Document(
-            page_content=doc.page_content,
-            metadata={"source": doc.metadata[self.source_metadata]},
-        )
-
-
 class VectorToolPortObject(ToolPortObject):
     def __init__(
         self,
@@ -113,6 +87,9 @@ class VectorToolPortObject(ToolPortObject):
         Therefore, RetrievalQA's input key is set to "question" to ensure uniformity in function calls within the create method.
         """
 
+        from langchain.chains import RetrievalQA, RetrievalQAWithSourcesChain
+        from ._retriever import AdapterRetriever
+
         llm = self._llm.create_model(ctx)
         vectorstore = self._vectorstore.load_store(ctx)
         retriever = vectorstore.as_retriever(search_kwargs={"k": self.spec.top_k})
@@ -120,7 +97,7 @@ class VectorToolPortObject(ToolPortObject):
         if source_metadata:
             return RetrievalQAWithSourcesChain.from_chain_type(
                 llm=llm,
-                retriever=_AdapterRetriever(
+                retriever=AdapterRetriever(
                     retriever=retriever, source_metadata=source_metadata
                 ),
                 verbose=True,
@@ -134,11 +111,13 @@ class VectorToolPortObject(ToolPortObject):
             input_key="question",
         )
 
-    def create(self, ctx) -> StructuredTool:
+    def create(self, ctx):
         """
         RetrievalQAWithSourcesChain and RetrievalQA are called via their __call__ method
         instead of run() to enable returning multiple outputs (answer, source, and source_documents).
         """
+        from langchain.tools import StructuredTool
+
         retrieval_chain = self._create_function(ctx, self.spec.source_metadata)
 
         return StructuredTool(

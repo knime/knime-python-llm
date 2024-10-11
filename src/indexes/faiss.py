@@ -1,6 +1,5 @@
-import pandas as pd
 import knime.extension as knext
-from typing import Optional
+from typing import Any, Optional
 
 from models.base import (
     EmbeddingsPortObjectSpec,
@@ -15,8 +14,6 @@ from .base import (
     store_category,
 )
 
-from langchain.vectorstores.faiss import FAISS
-from langchain.docstore.document import Document
 from numpy import ndarray
 
 faiss_icon = "icons/ml.png"
@@ -40,25 +37,27 @@ class FAISSVectorstorePortObject(FilestoreVectorstorePortObject):
         spec: FAISSVectorstorePortObjectSpec,
         embeddings_port_object: EmbeddingsPortObject,
         folder_path: Optional[str] = None,
-        vectorstore: Optional[FAISS] = None,
+        vectorstore: Optional[Any] = None,
     ) -> None:
         super().__init__(
             spec, embeddings_port_object, folder_path, vectorstore=vectorstore
         )
 
-    def load_vectorstore(self, embeddings, vectorstore_path) -> FAISS:
+    def load_vectorstore(self, embeddings, vectorstore_path):
+        from langchain.vectorstores.faiss import FAISS
+
         return FAISS.load_local(
             embeddings=embeddings,
             folder_path=vectorstore_path,
             allow_dangerous_deserialization=True,
         )
 
-    def save_vectorstore(self, vectorstore_folder, vectorstore: FAISS):
+    def save_vectorstore(self, vectorstore_folder, vectorstore):
         vectorstore.save_local(vectorstore_folder)
 
-    def get_documents(
-        self, ctx: knext.ExecutionContext
-    ) -> tuple[list[Document], ndarray]:
+    def get_documents(self, ctx: knext.ExecutionContext) -> tuple[list, ndarray]:
+        from langchain.vectorstores.faiss import FAISS
+
         store: FAISS = self.load_store(ctx)
         docs = [store.docstore.search(id) for id in store.index_to_docstore_id.values()]
         embeddings = [
@@ -125,10 +124,12 @@ class FAISSVectorStoreCreator(BaseVectorStoreCreator):
         self,
         ctx: knext.ExecutionContext,
         embeddings_obj: EmbeddingsPortObject,
-        documents: list[Document],
+        documents: list,
         metadata_column_names: list[str],
-        embeddings: pd.Series | None,
+        embeddings,
     ) -> FAISSVectorstorePortObject:
+        from langchain.vectorstores.faiss import FAISS
+
         embeddings_model = embeddings_obj.create_model(ctx)
         if embeddings is None:
             db = FAISS.from_documents(
@@ -207,6 +208,8 @@ class FAISSVectorStoreReader:
         ctx: knext.ExecutionContext,
         embeddings_port_object: EmbeddingsPortObject,
     ) -> FAISSVectorstorePortObject:
+        from langchain.vectorstores.faiss import FAISS
+
         # TODO: Add check if .fiass and .pkl files are in the directory instead of instatiating as check
         db = FAISS.load_local(
             self.persist_directory,

@@ -14,9 +14,6 @@ from .base import (
     CredentialsSettings,
 )
 
-# Langchain imports
-from langchain_openai import OpenAI, ChatOpenAI, OpenAIEmbeddings
-
 
 # Other imports
 import io
@@ -24,21 +21,9 @@ import util
 import time
 import json
 import base64
-import requests
 import tempfile
-import pandas as pd
 from typing import Callable, List
 
-from openai import Client as OpenAIClient
-from openai.types import FileObject
-from openai._legacy_response import HttpxBinaryResponseContent
-from openai.types.fine_tuning.fine_tuning_job import Hyperparameters, FineTuningJob
-from openai import (
-    NotFoundError,
-    AuthenticationError,
-    APIConnectionError,
-    BadRequestError,
-)
 
 # This logger is necessary
 import logging
@@ -608,6 +593,8 @@ class OpenAIAuthenticationPortObjectSpec(AIPortObjectSpec):
             raise knext.InvalidParametersError("Please provide a base URL.")
 
     def get_model_list(self, ctx: knext.ConfigurationContext) -> list[str]:
+        from openai import Client as OpenAIClient
+
         key = ctx.get_credentials(self.credentials).password
         base_url = self.base_url
 
@@ -764,7 +751,9 @@ class OpenAILLMPortObject(LLMPortObject):
     def spec(self) -> OpenAILLMPortObjectSpec:
         return super().spec
 
-    def create_model(self, ctx) -> OpenAI:
+    def create_model(self, ctx):
+        from langchain_openai import OpenAI
+
         return OpenAI(
             openai_api_key=ctx.get_credentials(self.spec.credentials).password,
             base_url=self.spec.base_url,
@@ -791,7 +780,9 @@ class OpenAIChatModelPortObject(ChatModelPortObject):
     def spec(self) -> OpenAIChatModelPortObjectSpec:
         return super().spec
 
-    def create_model(self, ctx: knext.ExecutionContext) -> ChatOpenAI:
+    def create_model(self, ctx: knext.ExecutionContext):
+        from langchain_openai import ChatOpenAI
+
         return ChatOpenAI(
             openai_api_key=ctx.get_credentials(self.spec.credentials).password,
             base_url=self.spec.base_url,
@@ -853,7 +844,9 @@ class OpenAIEmbeddingsPortObject(EmbeddingsPortObject):
     def spec(self) -> OpenAIEmbeddingsPortObjectSpec:
         return super().spec
 
-    def create_model(self, ctx) -> OpenAIEmbeddings:
+    def create_model(self, ctx):
+        from langchain_openai import OpenAIEmbeddings
+
         return OpenAIEmbeddings(
             openai_api_key=ctx.get_credentials(self.spec.credentials).password,
             base_url=self.spec.base_url,
@@ -943,6 +936,14 @@ class OpenAIAuthenticator:
         return OpenAIAuthenticationPortObject(self.create_spec())
 
     def _verify_settings(self, ctx):
+        from openai import (
+            NotFoundError,
+            AuthenticationError,
+            APIConnectionError,
+        )
+
+        from openai import Client as OpenAIClient
+
         try:
             OpenAIClient(
                 api_key=ctx.get_credentials(
@@ -1271,6 +1272,9 @@ class OpenAIDALLEView:
         ctx: knext.ExecutionContext,
         authentication: OpenAIAuthenticationPortObject,
     ):
+        from openai import Client as OpenAIClient
+        import requests
+
         client = OpenAIClient(
             api_key=ctx.get_credentials(authentication.spec.credentials).password,
             base_url=authentication.spec.base_url,
@@ -1317,6 +1321,8 @@ class OpenAIFineTuneDeleter:
     """
 
     def configure(self, ctx: knext.ConfigurationContext, llm_spec: LLMPortObjectSpec):
+        from openai import Client as OpenAIClient
+
         client = OpenAIClient(
             api_key=ctx.get_credentials(llm_spec.credentials).password,
             base_url=llm_spec.base_url,
@@ -1332,6 +1338,9 @@ class OpenAIFineTuneDeleter:
             )
 
     def execute(self, ctx: knext.ExecutionContext, model: LLMPortObject):
+        from openai import Client as OpenAIClient
+        from openai import NotFoundError
+
         client = OpenAIClient(
             api_key=ctx.get_credentials(model.spec.credentials).password,
             base_url=model.spec.base_url,
@@ -1441,6 +1450,11 @@ class OpenAIFineTuner:
         model: OpenAIChatModelPortObject,
         table: knext.Table,
     ):
+        from openai import Client as OpenAIClient
+        from openai.types import FileObject
+        from openai.types.fine_tuning.fine_tuning_job import FineTuningJob
+        from openai import BadRequestError
+
         client = OpenAIClient(
             api_key=ctx.get_credentials(model.spec.credentials).password,
             base_url=model.spec.base_url,
@@ -1509,7 +1523,9 @@ class OpenAIFineTuner:
 
         return len(selected_columns) == 3
 
-    def _build_hyper_params(self) -> Hyperparameters:
+    def _build_hyper_params(self):
+        from openai.types.fine_tuning.fine_tuning_job import Hyperparameters
+
         batch_size: int = (
             self.ft_settings.batch_size
             if self.ft_settings.automate_batch_size == AutomationOptions.MANUAL.name
@@ -1535,7 +1551,7 @@ class OpenAIFineTuner:
             n_epochs=n_epochs,
         )
 
-    def _prepare_training_file(self, client, conversation_list: List) -> FileObject:
+    def _prepare_training_file(self, client, conversation_list: List):
         with tempfile.NamedTemporaryFile(
             delete=False, suffix=".jsonl"
         ) as temp_jsonl_file:
@@ -1594,10 +1610,10 @@ class OpenAIFineTuner:
         self,
         client,
         model_name: str,
-        training_file: FileObject,
-        hyper_params: Hyperparameters,
+        training_file,
+        hyper_params,
         ctx: knext.ExecutionContext,
-    ) -> FineTuningJob:
+    ):
         job = client.fine_tuning.jobs.create(
             model=model_name,
             training_file=training_file.id,
@@ -1607,9 +1623,7 @@ class OpenAIFineTuner:
 
         return self._await_fine_tuning_response(client, job, ctx)
 
-    def _await_fine_tuning_response(
-        self, client, job: FineTuningJob, ctx: knext.ExecutionContext
-    ) -> FineTuningJob:
+    def _await_fine_tuning_response(self, client, job, ctx: knext.ExecutionContext):
         while True:
             if ctx.is_canceled():
                 client.fine_tuning.jobs.cancel(job.id)
@@ -1630,7 +1644,10 @@ class OpenAIFineTuner:
 
             time.sleep(self.ft_result_settings.progress_interval)
 
-    def _response_to_df(self, client, response: FineTuningJob) -> pd.DataFrame:
+    def _response_to_df(self, client, response):
+        import pandas as pd
+        from openai._legacy_response import HttpxBinaryResponseContent
+
         response_list: List[HttpxBinaryResponseContent] = [
             client.files.content(file_id) for file_id in response.result_files
         ]

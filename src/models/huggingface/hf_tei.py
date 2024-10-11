@@ -7,13 +7,10 @@ from .hf_hub import (
     HFAuthenticationPortObject,
     HFAuthenticationPortObjectSpec,
 )
-import util
 
-# Langchain imports
-from langchain_community.embeddings import HuggingFaceHubEmbeddings
 
 # Other imports
-from typing import List, Optional
+from typing import Optional
 
 hf_tei_category = knext.category(
     path=hf_category,
@@ -22,18 +19,6 @@ hf_tei_category = knext.category(
     description="Contains nodes that connect to Hugging Face's text embeddings inference server.",
     icon=hf_icon,
 )
-
-
-class _HuggingFaceEmbeddings(HuggingFaceHubEmbeddings):
-    batch_size: int = 32
-
-    def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        # Overrides HuggingFaceHubEmbeddings 'embed_documents' to allow batches
-        return util.batched_apply(super().embed_documents, texts, self.batch_size)
-
-    async def aembed_documents(self, texts: List[str]) -> List[List[float]]:
-        # Overrides HuggingFaceHubEmbeddings 'aembed_documents' to allow batches
-        return util.abatched_apply(super().aembed_documents, texts, self.batch_size)
 
 
 class HFTEIEmbeddingsPortObjectSpec(EmbeddingsPortObjectSpec):
@@ -89,9 +74,11 @@ class HFTEIEmbeddingsPortObject(EmbeddingsPortObject):
     def spec(self) -> HFTEIEmbeddingsPortObjectSpec:
         return super().spec
 
-    def create_model(self, ctx: knext.ExecutionContext) -> HuggingFaceHubEmbeddings:
+    def create_model(self, ctx: knext.ExecutionContext):
+        from ._hf_llm import HuggingFaceEmbeddings
+
         hub_auth = self.spec.hf_hub_auth
-        return _HuggingFaceEmbeddings(
+        return HuggingFaceEmbeddings(
             model=self.spec.inference_server_url,
             batch_size=self.spec.batch_size,
             huggingfacehub_api_token=hub_auth.get_token(ctx) if hub_auth else None,

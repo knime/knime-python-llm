@@ -10,7 +10,6 @@ from base import AIPortObjectSpec
 from typing import List
 import os
 from indexes.base import store_category  # TODO add separate tool category?
-from langchain.tools import Tool
 
 
 class ToolPortObjectSpec(AIPortObjectSpec):
@@ -88,7 +87,7 @@ class ToolListPortObject(FilestorePortObject):
     def tools(self) -> List[ToolPortObject]:
         return self._tool_list
 
-    def create_tools(self, ctx) -> List[Tool]:
+    def create_tools(self, ctx):
         return [tool.create(ctx) for tool in self.tools]
 
     def write_to(self, file_path):

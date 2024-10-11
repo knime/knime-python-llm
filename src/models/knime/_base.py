@@ -2,7 +2,6 @@ import knime.extension as knext
 from ..base import model_category
 import knime.api.schema as ks
 from urllib.parse import urlparse, urlunparse
-import requests
 from typing import Callable
 
 hub_connector_icon = "icons/Hub_AI_connector.png"
@@ -68,6 +67,8 @@ def list_models(auth_spec, mode: str) -> list[str]:
 
 
 def _get_model_data(auth_spec, mode: str):
+    import requests
+
     api_base = extract_api_base(auth_spec)
     model_info = api_base + "/management/models?mode=" + mode
     response = requests.get(

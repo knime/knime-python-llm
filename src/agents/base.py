@@ -20,13 +20,6 @@ from base import AIPortObjectSpec
 
 import os
 
-import langchain
-
-
-import langchain.agents
-
-from langchain.memory import ConversationBufferMemory
-
 
 agent_icon = "icons/agent.png"
 agent_category = knext.category(
@@ -353,6 +346,10 @@ class AgentPrompter:
 
         # TODO more memory variants
         # TODO return messages might depend on the type of model (i.e. chat needs it llm doesn't)?
+
+        import langchain
+        import langchain.agents
+        from langchain.memory import ConversationBufferMemory
 
         langchain.debug = self.enable_debug_output
         memory = ConversationBufferMemory(

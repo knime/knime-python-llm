@@ -7,7 +7,6 @@ from ._base import (
     list_models_with_descriptions,
     validate_auth_spec,
 )
-import pandas as pd
 import pyarrow as pa
 
 
@@ -76,6 +75,8 @@ class KnimeHubAIModelLister:
     def execute(
         self, ctx: knext.ExecutionContext, authentication: knext.PortObject
     ) -> knext.Table:
+        import pandas as pd
+
         available_models = []
 
         if self.model_types.chat_models:

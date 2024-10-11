@@ -1,5 +1,3 @@
-from langchain.embeddings.base import Embeddings
-from openai import OpenAI
 import knime.extension as knext
 import knime.api.schema as ks
 from knime.extension import ConfigurationContext, ExecutionContext
@@ -12,40 +10,12 @@ from ._base import (
     list_models,
     validate_auth_spec,
 )
-from typing import List, Optional
 
 
 from ..base import (
     EmbeddingsPortObjectSpec,
     EmbeddingsPortObject,
 )
-
-
-class _OpenAIEmbeddings(Embeddings):
-    def __init__(
-        self,
-        model: str,
-        base_url: str,
-        api_key: str,
-        extra_headers: Optional[dict[str, str]] = None,
-    ) -> None:
-        self._model = model
-        self._client = OpenAI(
-            base_url=base_url, api_key=api_key, default_headers=extra_headers
-        )
-
-    def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        return [embedding.embedding for embedding in self._embed(texts)]
-
-    def embed_query(self, text: str) -> ks.List[float]:
-        return self._embed(text)[0].embedding
-
-    def _embed(self, input: str | List[str]) -> List:
-        return self._client.embeddings.create(
-            model=self._model,
-            input=input,
-            encoding_format="float",
-        ).data
 
 
 class KnimeHubEmbeddingsPortObjectSpec(EmbeddingsPortObjectSpec):
@@ -88,9 +58,11 @@ class KnimeHubEmbeddingsPortObject(EmbeddingsPortObject):
     def spec(self) -> KnimeHubEmbeddingsPortObjectSpec:
         return super().spec
 
-    def create_model(self, ctx: ExecutionContext) -> _OpenAIEmbeddings:
+    def create_model(self, ctx: ExecutionContext):
+        from ._embeddings_model import OpenAIEmbeddings
+
         auth_spec = self.spec.auth_spec
-        return _OpenAIEmbeddings(
+        return OpenAIEmbeddings(
             model=self.spec.model_name,
             base_url=extract_api_base(auth_spec),
             api_key="placeholder",

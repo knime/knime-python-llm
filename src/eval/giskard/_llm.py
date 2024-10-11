@@ -6,14 +6,9 @@ from models.base import (
     llm_port_type,
 )
 
-import pandas as pd
 import numpy as np
 from typing import Optional
 from json.decoder import JSONDecodeError
-
-import giskard as gk
-from giskard.llm.client import set_default_client
-from giskard.llm.errors import LLMGenerationError
 
 from ._base import (
     tortoise_icon,
@@ -21,7 +16,6 @@ from ._base import (
     _get_workflow_schema,
     _get_schema_from_workflow_spec,
     ScannerColumn,
-    KnimeLLMClient,
     _validate_prediction_workflow_spec,
     _pick_default_workflow_column,
 )
@@ -137,14 +131,19 @@ class GiskardLLMScanner:
         is_advanced=True,
     )
 
-    output_columns = [
-        ScannerColumn("domain", knext.string(), pd.StringDtype()),
-        ScannerColumn("slicing_fn", knext.string(), pd.StringDtype()),
-        ScannerColumn("transformation_fn", knext.string(), pd.StringDtype()),
-        ScannerColumn("metric", knext.string(), pd.StringDtype()),
-        ScannerColumn("deviation", knext.string(), pd.StringDtype()),
-        ScannerColumn("description", knext.string(), pd.StringDtype()),
-    ]
+    @property
+    def output_columns(self):
+        """Not a top-level constant to avoid importing pandas when importing the module."""
+        import pandas as pd
+
+        return [
+            ScannerColumn("domain", knext.string(), pd.StringDtype()),
+            ScannerColumn("slicing_fn", knext.string(), pd.StringDtype()),
+            ScannerColumn("transformation_fn", knext.string(), pd.StringDtype()),
+            ScannerColumn("metric", knext.string(), pd.StringDtype()),
+            ScannerColumn("deviation", knext.string(), pd.StringDtype()),
+            ScannerColumn("description", knext.string(), pd.StringDtype()),
+        ]
 
     def configure(
         self,
@@ -180,6 +179,12 @@ class GiskardLLMScanner:
         workflow,
         dataset: Optional[knext.Table],
     ):
+        import giskard as gk
+        from giskard.llm.errors import LLMGenerationError
+        from giskard.llm.client import set_default_client
+        from ._llm_client import KnimeLLMClient
+        import pandas as pd
+
         set_default_client(KnimeLLMClient(llm_port, ctx))
 
         workflow_table_spec = _get_schema_from_workflow_spec(workflow.spec, True)
@@ -303,6 +308,8 @@ class GiskardLLMScanner:
                 if col.ktype == knext.string():
                     dataset_df[col.name] = dataset_df[col.name].astype("object")
         else:
+            import pandas as pd
+
             dataset_df = pd.DataFrame(
                 {
                     col: pd.Series(dtype="object")
@@ -361,13 +368,15 @@ class GiskardLLMScanner:
             "workflow input table",
         )
 
-    def _enforce_string_data_types(self, df: pd.DataFrame) -> pd.DataFrame:
+    def _enforce_string_data_types(self, df):
         for column in df.columns:
             df[column] = df[column].astype(str)
 
         return df
 
-    def _catch_empty_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
+    def _catch_empty_dataframe(self, df):
+        import pandas as pd
+
         if len(df.columns) == 0:
             df = pd.DataFrame(
                 {col.name: pd.Series(dtype=col.pd_type) for col in self.output_columns}

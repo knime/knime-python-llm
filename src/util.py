@@ -2,7 +2,6 @@ import knime.extension as knext
 from typing import Callable, List
 from abc import ABC, abstractmethod
 import re
-import pandas as pd
 import pyarrow as pa
 import pyarrow.compute as pc
 from dataclasses import dataclass
@@ -135,7 +134,10 @@ class MissingValueOutputOptions(knext.EnumParameterOptions):
     )
 
 
-def skip_missing_values(df: pd.DataFrame, col_name: str, ctx: knext.ExecutionContext):
+def skip_missing_values(df, col_name: str, ctx: knext.ExecutionContext):
+    import pandas as pd
+
+    df: pd.DataFrame = df
     # Drops rows with missing values
     df_cleaned = df.dropna(subset=[col_name], how="any")
     n_skipped_rows = len(df) - len(df_cleaned)
@@ -147,12 +149,15 @@ def skip_missing_values(df: pd.DataFrame, col_name: str, ctx: knext.ExecutionCon
 
 
 def handle_missing_and_empty_values(
-    df: pd.DataFrame,
+    df,
     input_column: str,
     missing_value_handling_setting: MissingValueHandlingOptions,
     ctx: knext.ExecutionContext,
     check_empty_values: bool = True,
 ):
+    import pandas as pd
+
+    df: pd.DataFrame = df
     # Drops rows if SkipRow option is selected, otherwise fails
     # if there are any missing values in the input column (=Fail option is selected)
     has_missing_values = df[input_column].isna().any()

@@ -7,14 +7,12 @@ from ..base import (
     LLMPortObject,
     ChatModelPortObject,
     ChatModelPortObjectSpec,
-    LLMChatModelAdapter,
 )
 from .hf_base import (
     hf_category,
     hf_icon,
     HFPromptTemplateSettings,
     HFModelSettings,
-    HFLLM,
 )
 from .hf_hub import (
     HFAuthenticationPortObject,
@@ -168,7 +166,9 @@ class HFTGILLMPortObject(LLMPortObject):
     def spec(self) -> HFTGILLMPortObjectSpec:
         return super().spec
 
-    def create_model(self, ctx: knext.ExecutionContext) -> HFLLM:
+    def create_model(self, ctx: knext.ExecutionContext):
+        from ._hf_llm import HFLLM
+
         hub_auth = self.spec.hf_hub_auth
         return HFLLM(
             model=self.spec.inference_server_url,
@@ -245,7 +245,9 @@ class HFTGIChatModelPortObject(HFTGILLMPortObject, ChatModelPortObject):
     def spec(self) -> HFTGIChatModelPortObjectSpec:
         return super().spec
 
-    def create_model(self, ctx) -> LLMChatModelAdapter:
+    def create_model(self, ctx):
+        from .._adapter import LLMChatModelAdapter
+
         llm = super().create_model(ctx)
         return LLMChatModelAdapter(
             llm=llm,

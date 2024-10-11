@@ -17,13 +17,11 @@ from models.base import (
 )
 from base import AIPortObjectSpec
 
-import pandas as pd
 import pyarrow as pa
 from typing import Optional, Any
 import os
 import shutil
 import logging
-from langchain.docstore.document import Document
 import numpy as np
 
 LOGGER = logging.getLogger(__name__)
@@ -39,7 +37,7 @@ store_category = knext.category(
 
 
 def handle_missing_metadata_values(
-    df: pd.DataFrame,
+    df,
     metadatas: Optional[list[str]] = None,
 ):
     # Fills missing metadata values with empty string
@@ -90,9 +88,7 @@ class VectorstorePortObject(knext.PortObject):
         raise NotImplementedError()
 
     @abstractmethod
-    def get_documents(
-        self, ctx: knext.ExecutionContext
-    ) -> tuple[list[Document], np.ndarray]:
+    def get_documents(self, ctx: knext.ExecutionContext) -> tuple[list, np.ndarray]:
         """Retrieves the documents and embeddings"""
 
 
@@ -349,7 +345,9 @@ class BaseVectorStoreCreator(ABC):
             )
             embeddings_series = df[self.embeddings_column]
 
-        def to_document(row) -> Document:
+        def to_document(row):
+            from langchain.docstore.document import Document
+
             metadata = {name: row[name] for name in metadata_columns}
             return Document(page_content=row[self.document_column], metadata=metadata)
 
@@ -379,9 +377,9 @@ class BaseVectorStoreCreator(ABC):
         self,
         ctx: knext.ExecutionContext,
         embeddings_obj: EmbeddingsPortObject,
-        documents: list[Document],
+        documents: list,
         metadata_column_names: list[str],
-        embeddings: Optional[pd.Series],
+        embeddings,
     ) -> VectorstorePortObject:
         """Creates the vectorstore port object"""
 
@@ -717,6 +715,8 @@ class VectorStoreDataExtractor:
     def execute(
         self, ctx: knext.ExecutionContext, vector_store: VectorstorePortObject
     ) -> knext.Table:
+        import pandas as pd
+
         documents, embeddings = vector_store.get_documents(ctx)
         df = pd.DataFrame()
         df[self.document_column_name] = pd.Series(

@@ -19,54 +19,10 @@ from ._base import (
     _get_workflow_schema,
     _get_schema_from_workflow_spec,
     ScannerColumn,
-    KnimeLLMClient,
     _validate_prediction_workflow_spec,
     _pick_default_workflow_column,
 )
 from ._tqdm import override_tqdm_with_ctx
-
-import pandas as pd
-import numpy as np
-
-from giskard.llm.client import set_default_client
-from giskard.rag.testset_generation import generate_testset, KnowledgeBase
-from giskard.rag import evaluate
-from giskard.rag.testset import QATestset
-from giskard.rag.report import RAGReport
-from giskard.rag.question_generators import (
-    simple_questions,
-    complex_questions,
-    distracting_questions,
-    situational_questions,
-    double_questions,
-)
-
-from bs4 import BeautifulSoup
-
-
-class _KnowledgeBase(KnowledgeBase):
-    """
-    A custom subclass of KnowledgeBase from giskard.rag that overrides the _embeddings property.
-
-    Instead of computing embeddings, this class utilizes precomputed embeddings
-    provided by the vector store.
-    """
-
-    def __init__(
-        self,
-        data: pd.DataFrame,
-        documents_col: str,
-        embeddings_col: str,
-        embeddings_model,
-    ):
-        super().__init__(
-            data=data, columns=[documents_col], embedding_model=embeddings_model
-        )
-        # initialize embeddings so they don't get recalculated in the _embeddings property
-        vectors = data[embeddings_col]
-        self._embeddings_inst = np.array([np.array(vec) for vec in vectors])
-        for doc, emb in zip(self._documents, self._embeddings_inst):
-            doc.embeddings = emb
 
 
 @knext.parameter_group("Data")
@@ -205,9 +161,23 @@ class TestSetGenerator:
         embed_model_port_object: EmbeddingsPortObject,
         input_table: knext.Table,
     ) -> knext.Table:
+        from ._llm_client import KnimeLLMClient
+        from giskard.llm.client import set_default_client
+
         set_default_client(KnimeLLMClient(chat_model_port_object, ctx))
 
         df = input_table.to_pandas()
+
+        # expensive imports are done here to avoid unnecessary imports in the configure method
+        from ._knowledge_base import _KnowledgeBase
+        from giskard.rag.testset_generation import generate_testset
+        from giskard.rag.question_generators import (
+            simple_questions,
+            complex_questions,
+            distracting_questions,
+            situational_questions,
+            double_questions,
+        )
 
         kb = _KnowledgeBase(
             data=df,
@@ -334,19 +304,23 @@ class GiskardRAGETEvaluator:
         "correctness_reason": "Correctness Reason",
     }
 
-    output_columns = [
-        ScannerColumn("Question", knext.string(), pd.StringDtype()),
-        ScannerColumn("Reference Answer", knext.string(), pd.StringDtype()),
-        ScannerColumn("Reference Context", knext.string(), pd.StringDtype()),
-        ScannerColumn(
-            "Metadata",
-            knext.logical(dict),
-            ks.logical(dict).to_pandas(),
-        ),
-        ScannerColumn("Agent Answer", knext.string(), pd.StringDtype()),
-        ScannerColumn("Correctness", knext.bool_(), pd.BooleanDtype()),
-        ScannerColumn("Correctness Reason", knext.string(), pd.StringDtype()),
-    ]
+    @property
+    def output_columns(self):
+        import pandas as pd
+
+        return [
+            ScannerColumn("Question", knext.string(), pd.StringDtype()),
+            ScannerColumn("Reference Answer", knext.string(), pd.StringDtype()),
+            ScannerColumn("Reference Context", knext.string(), pd.StringDtype()),
+            ScannerColumn(
+                "Metadata",
+                knext.logical(dict),
+                ks.logical(dict).to_pandas(),
+            ),
+            ScannerColumn("Agent Answer", knext.string(), pd.StringDtype()),
+            ScannerColumn("Correctness", knext.bool_(), pd.BooleanDtype()),
+            ScannerColumn("Correctness Reason", knext.string(), pd.StringDtype()),
+        ]
 
     def configure(
         self,
@@ -385,6 +359,10 @@ class GiskardRAGETEvaluator:
         rag_workflow,
         test_set: knext.Table,
     ):
+        from ._llm_client import KnimeLLMClient
+        from giskard.llm.client import set_default_client
+        import pandas as pd
+
         input_key = next(iter(rag_workflow.spec.inputs))
 
         set_default_client(KnimeLLMClient(llm, ctx))
@@ -423,6 +401,8 @@ class GiskardRAGETEvaluator:
             return answer
 
         testset = self._dataframe_to_testset(testset_df)
+
+        from giskard.rag import evaluate
 
         report = evaluate(
             get_answer_llm,
@@ -485,6 +465,8 @@ class GiskardRAGETEvaluator:
         """If the evaluation is done with no knowledge base or metrics specified, the corresponding section in
         the HTML report is shown but shows None or is empty. This function removes both sections from the report.
         """
+        from bs4 import BeautifulSoup
+
         soup = BeautifulSoup(html_report, "html.parser")
 
         for section in soup.find_all("div", class_="section-container"):
@@ -497,7 +479,7 @@ class GiskardRAGETEvaluator:
 
         return soup.decode()
 
-    def _dataframe_to_testset(self, df: pd.DataFrame) -> QATestset:
+    def _dataframe_to_testset(self, df):
         """Transforms the DataFrame obtained from the input table into a QATestset."""
         # Rename columns
         df = df.rename(columns={v: k for k, v in self.name_mapping.items()})
@@ -509,9 +491,11 @@ class GiskardRAGETEvaluator:
         df = df.reset_index()
         df = df.rename(columns={"<RowID>": "id"})
 
+        from giskard.rag.testset import QATestset
+
         return QATestset.from_pandas(df)
 
-    def _report_to_knime_table(self, report: RAGReport) -> knext.Table:
+    def _report_to_knime_table(self, report) -> knext.Table:
         """Creates a KNIME Table from the report DataFrame."""
         df = report.to_pandas()
 

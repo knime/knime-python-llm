@@ -1,4 +1,3 @@
-from langchain_openai import ChatOpenAI
 import knime.extension as knext
 import knime.api.schema as ks
 from knime.extension import ConfigurationContext, ExecutionContext
@@ -92,7 +91,9 @@ class KnimeHubChatModelPortObject(ChatModelPortObject):
     def spec(self) -> KnimeHubChatModelPortObjectSpec:
         return super().spec
 
-    def create_model(self, ctx: ExecutionContext) -> ChatOpenAI:
+    def create_model(self, ctx: ExecutionContext):
+        from langchain_openai import ChatOpenAI
+
         auth_spec = self.spec.auth_spec
         return ChatOpenAI(
             model=self.spec.model_name,

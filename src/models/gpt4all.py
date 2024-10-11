@@ -10,19 +10,13 @@ from .base import (
     EmbeddingsPortObjectSpec,
     EmbeddingsPortObject,
     GeneralSettings,
-    LLMChatModelAdapter,
 )
 
-from pydantic import ValidationError, root_validator
-from typing import Optional, Dict
+from pydantic import ValidationError
+from typing import Optional
 import shutil
 import os
-from gpt4all import Embed4All
 
-# Langchain imports
-from langchain_community.llms.gpt4all import GPT4All
-from langchain_community.embeddings import GPT4AllEmbeddings
-from langchain_core.embeddings import Embeddings
 
 gpt4all_icon = "icons/gpt4all.png"
 gpt4all_category = knext.category(
@@ -237,7 +231,9 @@ class GPT4AllLLMPortObject(LLMPortObject):
     def spec(self) -> GPT4AllLLMPortObjectSpec:
         return super().spec
 
-    def create_model(self, ctx) -> GPT4All:
+    def create_model(self, ctx):
+        from langchain_community.llms.gpt4all import GPT4All
+
         try:
             return GPT4All(
                 model=self.spec.local_path,
@@ -306,7 +302,9 @@ class GPT4AllChatModelPortObject(GPT4AllLLMPortObject, ChatModelPortObject):
     def spec(self) -> GPT4AllChatModelPortObjectSpec:
         return super().spec
 
-    def create_model(self, ctx) -> LLMChatModelAdapter:
+    def create_model(self, ctx):
+        from ._adapter import LLMChatModelAdapter
+
         llm = super().create_model(ctx)
         system_prompt_template = self.spec.system_prompt_template
         prompt_template = self.spec.prompt_template
@@ -490,31 +488,6 @@ class GPT4AllChatModelConnector:
 _embeddings4all_model_name = "all-MiniLM-L6-v2.gguf2.f16.gguf"
 
 
-# TODO: Delete the wrapper if Langchain is > 0.2.x and instantiate Embedd4All class
-class _GPT4ALLEmbeddings(GPT4AllEmbeddings):
-    model_name: str
-    model_path: str
-    num_threads: Optional[int] = None
-    allow_download: bool = False
-
-    @root_validator()
-    def validate_environment(cls, values: Dict) -> Dict:
-        """Validate that GPT4All library is installed."""
-
-        try:
-            values["client"] = Embed4All(
-                model_name=values["model_name"],
-                model_path=values["model_path"],
-                n_threads=values.get("num_threads"),
-                allow_download=values["allow_download"],
-            )
-            return values
-        except ConnectionError:
-            raise knext.InvalidParametersError(
-                "Connection error. Please ensure that your internet connection is enabled to download the model."
-            )
-
-
 class Embeddings4AllPortObjectSpec(EmbeddingsPortObjectSpec):
     """The Embeddings4All port object spec."""
 
@@ -558,7 +531,9 @@ class Embeddings4AllPortObject(EmbeddingsPortObject, FilestorePortObject):
     def spec(self) -> Embeddings4AllPortObjectSpec:
         return super().spec
 
-    def create_model(self, ctx) -> Embeddings:
+    def create_model(self, ctx):
+        from ._gpt4all_embeddings import _GPT4ALLEmbeddings
+
         try:
             return _GPT4ALLEmbeddings(
                 model_name=self._model_name,
@@ -581,6 +556,8 @@ class Embeddings4AllPortObject(EmbeddingsPortObject, FilestorePortObject):
             raise ValueError(f"The model at path {self.model_path} is not valid.")
 
     def write_to(self, file_path: str) -> None:
+        from ._gpt4all_embeddings import _GPT4ALLEmbeddings
+
         os.makedirs(file_path)
         if self._model_path:
             # should be verified in the connector
@@ -680,6 +657,8 @@ class Embeddings4AllConnector:
         return Embeddings4AllPortObjectSpec(n_threads)
 
     def execute(self, ctx) -> Embeddings4AllPortObject:
+        from ._gpt4all_embeddings import _GPT4ALLEmbeddings
+
         if self.model_retrieval == ModelRetrievalOptions.DOWNLOAD.name:
             model_path = None
             model_name = _embeddings4all_model_name

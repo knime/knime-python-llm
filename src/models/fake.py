@@ -11,19 +11,7 @@ from .base import (
     util,
 )
 
-# Langchain imports
-from langchain.llms.base import LLM
-from langchain.chat_models.base import SimpleChatModel
-from langchain.embeddings.base import Embeddings
-from langchain.callbacks.manager import (
-    AsyncCallbackManagerForLLMRun,
-    CallbackManagerForLLMRun,
-)
-from langchain.schema import BaseMessage
-
 # Other imports
-from typing import Any, List, Optional, Mapping, Dict
-from pydantic import BaseModel
 import pickle
 
 fake_icon = "icons/fake.png"
@@ -109,7 +97,7 @@ class TestEmbeddingsSettings:
     fail_on_mismatch = knext.BoolParameter(
         "Fail on retrieval mismatch",
         "Whether the Test Embeddings Model should fail downstream on document mismatch.",
-        default_value=False
+        default_value=False,
     )
 
 
@@ -119,129 +107,6 @@ class TestEmbeddingsSettings:
 def _warn_if_same_columns(ctx, f_prompt_col: str, response_col: str) -> None:
     if f_prompt_col == response_col:
         ctx.set_warning("Query and response column are set to be the same column.")
-
-
-def generate_response(
-    response_dict: dict[str, str],
-    default_response: str,
-    prompt: str,
-    missing_value_strategy: str,
-    node: str,
-):
-    response = response_dict.get(prompt)
-
-    if not response:
-        if missing_value_strategy == MissingValueHandlingOptions.Fail.name:
-            raise knext.InvalidParametersError(
-                f"""Could not find matching response for prompt: '{prompt}'. Please ensure that the prompt 
-                exactly matches one specified in the prompt column of the {node} upstream."""
-            )
-        else:
-            return default_response
-
-    return response
-
-
-class TestDictLLM(LLM):
-    """Self implemented Test LLM wrapper for testing purposes."""
-
-    response_dict: dict[str, str]
-    default_response: str
-    missing_value_strategy: str
-
-    @property
-    def _llm_type(self) -> str:
-        return "test-dict"
-
-    def _call(
-        self,
-        prompt: str,
-        stop: List[str] | None = None,
-        run_manager: CallbackManagerForLLMRun | None = None,
-        **kwargs: Any,
-    ) -> str:
-        return generate_response(
-            self.response_dict,
-            self.default_response,
-            prompt,
-            self.missing_value_strategy,
-            "Test LLM Connector",
-        )
-
-    async def _acall(
-        self,
-        prompt: str,
-        stop: Optional[List[str]] = None,
-        run_manager: Optional[AsyncCallbackManagerForLLMRun] = None,
-        **kwargs: Any,
-    ) -> str:
-        """Return next response"""
-        return generate_response(
-            self.response_dict,
-            self.default_response,
-            prompt,
-            self.missing_value_strategy,
-            "Test LLM Connector",
-        )
-
-    @property
-    def _identifying_params(self) -> Mapping[str, Any]:
-        return {}
-
-
-class TestChatModel(SimpleChatModel):
-    """Test ChatModel for testing purposes."""
-
-    response_dict: Dict[str, str]
-    default_response: str
-    missing_value_strategy: str
-
-    @property
-    def _llm_type(self) -> str:
-        return "test-chat-model"
-
-    def _call(
-        self,
-        messages: List[BaseMessage],
-        stop: Optional[List[str]] = None,
-        run_manager: Optional[CallbackManagerForLLMRun] = None,
-        **kwargs: Any,
-    ) -> str:
-        prompt = messages[len(messages) - 1].content
-        return generate_response(
-            self.response_dict,
-            self.default_response,
-            prompt,
-            self.missing_value_strategy,
-            "Test Chat Model Connector",
-        )
-
-    @property
-    def _identifying_params(self) -> Mapping[str, Any]:
-        return {}
-
-
-class TestEmbeddings(Embeddings, BaseModel):
-    embeddings_dict: dict[str, list[float]]
-    fail_on_mismatch: bool
-
-    def embed_documents(self, documents: List[str]) -> List[float]:
-        return [self.embed_query(document) for document in documents]
-
-    def embed_query(self, text: str) -> List[float]:
-        try:
-            return self.embeddings_dict[text]
-        except KeyError:
-            if self.fail_on_mismatch:
-                raise knext.InvalidParametersError(
-                    f"""Could not find document '{text}' in the Test Embeddings Model. Please ensure that 
-                    the query exactly matches one of the embedded documents."""
-                )
-            else:
-                embeddings_dimension = len(next(iter(self.embeddings_dict.values())))
-                zero_vector = [0.0 for _ in range(embeddings_dimension)]
-
-                return zero_vector
 
 
 # == Port Objects ==
@@ -297,7 +162,9 @@ class TestLLMPortObject(LLMPortObject):
         (responses, default_response) = pickle.loads(data)
         return cls(spec, responses, default_response)
 
-    def create_model(self, ctx) -> TestDictLLM:
+    def create_model(self, ctx):
+        from ._fake_models import TestDictLLM
+
         return TestDictLLM(
             response_dict=self.responses,
             default_response=self.default_response,
@@ -360,7 +227,9 @@ class TestChatModelPortObject(ChatModelPortObject):
         (responses, default_response) = pickle.loads(data)
         return cls(spec, responses, default_response)
 
-    def create_model(self, ctx: knext.ExecutionContext) -> TestChatModel:
+    def create_model(self, ctx: knext.ExecutionContext):
+        from ._fake_models import TestChatModel
+
         return TestChatModel(
             response_dict=self.responses,
             default_response=self.default_response,
@@ -412,9 +281,11 @@ class TestEmbeddingsPortObject(EmbeddingsPortObject):
         return TestEmbeddingsPortObject(spec, embeddings_dict)
 
     def create_model(self, ctx):
+        from ._fake_models import TestEmbeddings
+
         return TestEmbeddings(
-            embeddings_dict=self.embeddings_dict, 
-            fail_on_mismatch=self.spec.fail_on_mismatch
+            embeddings_dict=self.embeddings_dict,
+            fail_on_mismatch=self.spec.fail_on_mismatch,
         )
 
 
@@ -497,7 +368,7 @@ def to_dictionary(table, columns: list[str]):
     knext.NodeType.SOURCE,
     fake_icon,
     category=test_category,
-    is_hidden=True
+    is_hidden=True,
 )
 @knext.input_table(
     "Prompt and response table",
@@ -567,7 +438,7 @@ class TestLLMConnector:
     knext.NodeType.SOURCE,
     fake_icon,
     category=test_category,
-    is_hidden=True
+    is_hidden=True,
 )
 @knext.input_table(
     "Prompt and response table",
@@ -634,16 +505,15 @@ class TestChatModelConnector:
         )
 
     def create_spec(self) -> TestChatModelPortObjectSpec:
-        return TestChatModelPortObjectSpec(
-            self.mismatch.prompt_mismatch
-        )
+        return TestChatModelPortObjectSpec(self.mismatch.prompt_mismatch)
+
 
 @knext.node(
     "Test Embeddings Connector",
     knext.NodeType.SOURCE,
     fake_icon,
     category=test_category,
-    is_hidden=True
+    is_hidden=True,
 )
 @knext.input_table(
     "Document and vector table",
@@ -707,10 +577,7 @@ class TestEmbeddingsConnector:
             )
         )
 
-        return TestEmbeddingsPortObject(
-            self.create_spec(),
-            embeddings_dict
-        )
+        return TestEmbeddingsPortObject(self.create_spec(), embeddings_dict)
 
     def create_spec(self) -> TestEmbeddingsPortObjectSpec:
         return TestEmbeddingsPortObjectSpec(self.settings.fail_on_mismatch)

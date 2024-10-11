@@ -706,6 +706,8 @@ class VectorStoreDataExtractor:
         ctx: knext.ConfigurationContext,
         vector_store_spec: VectorstorePortObjectSpec,
     ) -> knext.Schema:
+        vector_store_spec.validate_context(ctx)
+
         if self.document_column_name == self.embedding_column_name:
             raise knext.InvalidParametersError(
                 f"Same name ({self.document_column_name}) used for the document and embedding column. Select unique names."

@@ -567,12 +567,14 @@ class OpenAIAuthenticationPortObjectSpec(AIPortObjectSpec):
     def validate_context(self, ctx: knext.ConfigurationContext):
         if self.credentials not in ctx.get_credential_names():
             raise knext.InvalidParametersError(
-                f"The selected credentials '{self.credentials}' holding the OpenAI API token are not present."
+                f"""The selected credentials '{self.credentials}' holding the OpenAI API key do not exist. 
+                Make sure that you have selected the correct credentials and that they are still available."""
             )
         api_token = ctx.get_credentials(self.credentials)
         if not api_token.password:
             raise knext.InvalidParametersError(
-                f"The OpenAI API token in the credentials '{self.credentials}' is not present."
+                f"""The OpenAI API key '{self.credentials}' does not exist. Make sure that the node you are using to pass the credentials 
+                (e.g. the Credentials Configuration node) is still passing the valid API key as a flow variable to the downstream nodes."""
             )
 
         if not self.base_url:

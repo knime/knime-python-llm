@@ -60,12 +60,14 @@ class HFAuthenticationPortObjectSpec(AIPortObjectSpec):
     def validate_context(self, ctx: knext.ConfigurationContext):
         if self.credentials not in ctx.get_credential_names():
             raise knext.InvalidParametersError(
-                f"The selected credentials '{self.credentials}' holding the Hugging Face Hub API token are not present."
+                f"""The selected credentials '{self.credentials}' holding the Hugging Face Hub API key do not exist. 
+                Make sure that you have selected the correct credentials and that they are still available."""
             )
         hub_token = ctx.get_credentials(self.credentials)
         if not hub_token.password:
             raise knext.InvalidParametersError(
-                f"The Hugging Face Hub token in the credentials '{self.credentials}' is not present."
+                f"""The Hugging Face Hub API key '{self.credentials}' does not exist. Make sure that the node you are using to pass the credentials 
+                (e.g. the Credentials Configuration node) is still passing the valid API key as a flow variable to the downstream nodes."""
             )
 
     def serialize(self) -> dict:

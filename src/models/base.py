@@ -67,12 +67,17 @@ class GeneralRemoteSettings(GeneralSettings):
     )
 
 
-def _is_valid_model_type(ctx: knext.DialogCreationContext) -> bool:
-    from .openai import (
-        OpenAIChatModelPortObjectSpec,
-    )
+def _is_valid_model_type(
+    ctx: knext.DialogCreationContext,
+) -> bool:
+    input_spec = ctx.get_input_specs()[0]
 
-    return isinstance(ctx.get_input_specs()[0], OpenAIChatModelPortObjectSpec)
+    # this check is necessary to be able to open the configuration dialog
+    # of the nodes when they are not connected to any other node
+    if input_spec is None:
+        return False
+    else:
+        return input_spec.json_mode
 
 
 class OutputModeOptions(knext.EnumParameterOptions):
@@ -214,13 +219,19 @@ class LLMPortObjectSpec(AIPortObjectSpec):
     def __init__(
         self,
         n_requests: int = 1,
+        json_mode: bool = False,
     ) -> None:
         super().__init__()
         self._n_requests = n_requests
+        self._json_mode = json_mode
 
     @property
     def n_requests(self) -> int:
         return self._n_requests
+
+    @property
+    def json_mode(self) -> bool:
+        return self._json_mode
 
 
 class LLMPortObject(knext.PortObject):

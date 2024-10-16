@@ -12,9 +12,7 @@ from .base import (
     model_category,
     GeneralRemoteSettings,
     CredentialsSettings,
-    OutputModeOptions,
 )
-
 
 # Other imports
 import io
@@ -23,7 +21,7 @@ import time
 import json
 import base64
 import tempfile
-from typing import Callable, List
+from typing import Callable, List, Optional
 
 
 # This logger is necessary
@@ -669,6 +667,7 @@ class OpenAILLMPortObjectSpec(OpenAIModelPortObjectSpec, LLMPortObjectSpec):
         max_tokens: int,
         seed: int,
         n_requests: int,
+        json_mode: bool = True,
     ) -> None:
         super().__init__(credentials)
         self._model = model_name
@@ -677,6 +676,7 @@ class OpenAILLMPortObjectSpec(OpenAIModelPortObjectSpec, LLMPortObjectSpec):
         self._max_tokens = max_tokens
         self._seed = seed
         self._n_requests = n_requests
+        self._json_mode = json_mode
 
     @property
     def model(self) -> str:
@@ -702,6 +702,10 @@ class OpenAILLMPortObjectSpec(OpenAIModelPortObjectSpec, LLMPortObjectSpec):
     def n_requests(self) -> int:
         return self._n_requests
 
+    @property
+    def json_mode(self) -> bool:
+        return self._json_mode
+
     def serialize(self) -> dict:
         return {
             **super().serialize(),
@@ -711,6 +715,7 @@ class OpenAILLMPortObjectSpec(OpenAIModelPortObjectSpec, LLMPortObjectSpec):
             "max_tokens": self._max_tokens,
             "seed": self._seed,
             "n_requests": self._n_requests,
+            "json_mode": self._json_mode,
         }
 
     @classmethod
@@ -723,6 +728,7 @@ class OpenAILLMPortObjectSpec(OpenAIModelPortObjectSpec, LLMPortObjectSpec):
             data["max_tokens"],
             seed=data.get("seed", 0),
             n_requests=data.get("n_requests", 1),
+            json_mode=data.get("json_mode", True),
         )
 
 
@@ -750,59 +756,6 @@ openai_llm_port_type = knext.port_type(
 )
 
 
-class _ChatOpenAI(BaseChatModel):
-    client: ChatOpenAI
-    response_format: str = None
-
-    def _prepare_kwargs(self, kwargs: Dict[str, Any]) -> Dict[str, Any]:
-        if self.response_format == OutputModeOptions.JsonMode.name:
-            kwargs["response_format"] = {"type": "json_object"}
-        return kwargs
-
-    async def _agenerate(
-        self,
-        messages: List[BaseMessage],
-        stop: Optional[List[str]] = None,
-        run_manager: Optional[Any] = None,
-        **kwargs: Any,
-    ) -> ChatResult:
-        kwargs = self._prepare_kwargs(kwargs)
-        return await self.client._agenerate(
-            messages, stop=stop, run_manager=run_manager, **kwargs
-        )
-
-    def _generate(
-        self,
-        messages: List[BaseMessage],
-        stop: Optional[List[str]] = None,
-        run_manager: Optional[Any] = None,
-        **kwargs: Any,
-    ) -> ChatResult:
-        kwargs = self._prepare_kwargs(kwargs)
-        return self.client._generate(
-            messages, stop=stop, run_manager=run_manager, **kwargs
-        )
-
-    async def abatch(
-        self, sub_batch: List[Any], stop: Optional[List[str]] = None, **kwargs: Any
-    ) -> List[Any]:
-        kwargs = self._prepare_kwargs(kwargs)
-        return await super().abatch(sub_batch, stop=stop, **kwargs)
-
-    def invoke(
-        self,
-        input: LanguageModelInput,
-        config: Optional[Dict[str, Any]] = None,
-        **kwargs: Any,
-    ) -> BaseMessage:
-        kwargs = self._prepare_kwargs(kwargs)
-        return super().invoke(input, config, **kwargs)
-
-    @property
-    def _llm_type(self) -> str:
-        return "wrapper-chat-openai"
-
-
 class OpenAIChatModelPortObjectSpec(OpenAILLMPortObjectSpec, ChatModelPortObjectSpec):
     """Spec of an OpenAI chat model."""
 
@@ -814,7 +767,10 @@ class OpenAIChatModelPortObject(ChatModelPortObject):
 
     def create_model(
         self, ctx: knext.ExecutionContext, response_format: Optional[str] = None
-    ) -> _ChatOpenAI:
+    ):
+        from langchain_openai import ChatOpenAI
+        from ._chat_openai import _ChatOpenAI
+
         openai_chat_client = ChatOpenAI(
             openai_api_key=ctx.get_credentials(self.spec.credentials).password,
             base_url=self.spec.base_url,

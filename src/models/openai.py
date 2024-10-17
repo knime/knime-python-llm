@@ -982,9 +982,9 @@ class OpenAILLMConnector:
     If you are looking for gpt-3.5-turbo or gpt-4, check out the **OpenAI Chat Model Connector** node.
 
     **Note**: If you use the [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
-    and do not select "Save password in configuration (weakly encrypted)" option for passing the API key,
-    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable will not
-    be passed to downstream nodes. In this case, this node will show a warning message.
+    and do not select the "Save password in configuration (weakly encrypted)" option for passing the API key,
+    the Credentials Configuration node will need to be reconfigured upon reopening the workflow, as the credentials
+    flow variable was not saved and will therefore not be available to downstream nodes.
     """
 
     input_settings = LLMLoaderInputSettings()
@@ -1069,9 +1069,9 @@ class OpenAIChatModelConnector:
 
     **Note**: If you use the
     [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
-    and do not select "Save password in configuration (weakly encrypted)" option for passing the API key,
-    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable will not
-    be passed to downstream nodes. In this case, this node will show a warning message.
+    and do not select the "Save password in configuration (weakly encrypted)" option for passing the API key,
+    the Credentials Configuration node will need to be reconfigured upon reopening the workflow, as the credentials
+    flow variable was not saved and will therefore not be available to downstream nodes.
     """
 
     input_settings = ChatModelLoaderInputSettings()
@@ -1161,9 +1161,9 @@ class OpenAIEmbeddingsConnector:
 
     **Note**: If you use the
     [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
-    and do not select "Save password in configuration (weakly encrypted)" option for passing the API key,
-    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable will not
-    be passed to downstream nodes. In this case, this node will show a warning message.
+    and do not select the "Save password in configuration (weakly encrypted)" option for passing the API key,
+    the Credentials Configuration node will need to be reconfigured upon reopening the workflow, as the credentials
+    flow variable was not saved and will therefore not be available to downstream nodes.
     """
 
     input_settings = EmbeddingsLoaderInputSettings()
@@ -1238,9 +1238,9 @@ class OpenAIDALLEView:
 
     **Note**: If you use the
     [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
-    and do not select "Save password in configuration (weakly encrypted)" option for passing the API key,
-    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable will not
-    be passed to downstream nodes. In this case, this node will show a warning message.
+    and do not select the "Save password in configuration (weakly encrypted)" option for passing the API key,
+    the Credentials Configuration node will need to be reconfigured upon reopening the workflow, as the credentials
+    flow variable was not saved and will therefore not be available to downstream nodes.
     """
 
     prompt = knext.MultilineStringParameter(
@@ -1320,9 +1320,9 @@ class OpenAIFineTuneDeleter:
 
     **Note**: If you use the
     [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
-    and do not select "Save password in configuration (weakly encrypted)" option for passing the API key,
-    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable will not
-    be passed to downstream nodes. In this case, this node will show a warning message.
+    and do not select the "Save password in configuration (weakly encrypted)" option for passing the API key,
+    the Credentials Configuration node will need to be reconfigured upon reopening the workflow, as the credentials
+    flow variable was not saved and will therefore not be available to downstream nodes.
     """
 
     def configure(self, ctx: knext.ConfigurationContext, llm_spec: LLMPortObjectSpec):
@@ -1419,9 +1419,9 @@ class OpenAIFineTuner:
 
     **Note**: If you use the
     [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
-    and do not select "Save password in configuration (weakly encrypted)" option for passing the API key,
-    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable will not
-    be passed to downstream nodes. In this case, this node will show a warning message.
+    and do not select the "Save password in configuration (weakly encrypted)" option for passing the API key,
+    the Credentials Configuration node will need to be reconfigured upon reopening the workflow, as the credentials
+    flow variable was not saved and will therefore not be available to downstream nodes.
     """
 
     file_settings = FineTuneFileSettings()

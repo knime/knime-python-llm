@@ -421,9 +421,9 @@ class VectorStoreRetriever:
 
     **Note**: If you use the
     [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
-    and do not select "Save password in configuration (weakly encrypted)" option for passing the API key for the embeddings connector node,
-    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable will not be passed to downstream nodes.
-    In this case, this node will show a warning message.
+    and do not select the "Save password in configuration (weakly encrypted)" option for passing the API key for the embeddings connector node,
+    the Credentials Configuration node will need to be reconfigured upon reopening the workflow, as the credentials flow variable
+    was not saved and will therefore not be available to downstream nodes.
     """
 
     query_column = knext.ColumnParameter(
@@ -667,12 +667,12 @@ class VectorStoreRetriever:
     ],
 )
 @knext.input_port(
-    name="Vector store",
+    name="Vector Store",
     description="The vector store to extract data from.",
     port_type=vector_store_port_type,
 )
 @knext.output_table(
-    name="Extracted data", description="The data stored inside of the vector store."
+    name="Extracted Data", description="The data stored inside of the vector store."
 )
 class VectorStoreDataExtractor:
     """
@@ -684,9 +684,9 @@ class VectorStoreDataExtractor:
 
     **Note**: If you use the
     [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
-    and do not select "Save password in configuration (weakly encrypted)" option for passing the API key for the embeddings connector node,
-    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable will not be passed to downstream nodes.
-    In this case, this node will show a warning message.
+    and do not select the "Save password in configuration (weakly encrypted)" option for passing the API key for the embeddings connector node,
+    the Credentials Configuration node will need to be reconfigured upon reopening the workflow, as the credentials flow variable
+    was not saved and will therefore not be available to downstream nodes.
     """
 
     document_column_name = knext.StringParameter(

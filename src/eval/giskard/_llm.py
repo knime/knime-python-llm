@@ -40,12 +40,12 @@ from ._base import (
     ],
 )
 @knext.input_port(
-    "LLM or chat model",
+    "LLM or Chat Model",
     "The large language model or chat model used to analyze the workflow.",
     llm_port_type,
 )
 @knext.input_port(
-    "Generative workflow",
+    "Generative Workflow",
     "The generative workflow to analyze with Giskard.",
     knext.PortType.WORKFLOW,
 )
@@ -97,9 +97,9 @@ class GiskardLLMScanner:
 
     **Note**: If you use the
     [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
-    and do not select "Save password in configuration (weakly encrypted)" option for passing the API key for the LLM connector node,
-    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable will not be passed to downstream nodes.
-    In this case, this node will show a warning message.
+    and do not select the "Save password in configuration (weakly encrypted)" option for passing the API key for the LLM connector node,
+    the Credentials Configuration node will need to be reconfigured upon reopening the workflow, as the credentials flow variable
+    was not saved and will therefore not be available to downstream nodes.
     """
 
     model_name = knext.StringParameter(

@@ -206,9 +206,9 @@ class ChromaVectorStoreCreator(BaseVectorStoreCreator):
 
     **Note**: If you use the
     [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
-    and do not select "Save password in configuration (weakly encrypted)" option for passing the API key for the embeddings connector node,
-    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable will not be passed to downstream nodes.
-    In this case, this node will show a warning message.
+    and do not select the "Save password in configuration (weakly encrypted)" option for passing the API key for the embeddings connector node,
+    the Credentials Configuration node will need to be reconfigured upon reopening the workflow, as the credentials flow variable
+    was not saved and will therefore not be available to downstream nodes.
     """
 
     # redefined here to enforce the parameter order in the dialog
@@ -315,9 +315,9 @@ class ChromaVectorStoreReader:
 
     **Note**: If you use the
     [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
-    and do not select "Save password in configuration (weakly encrypted)" option for passing the API key for the embeddings connector node,
-    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable will not be passed to downstream nodes.
-    In this case, this node will show a warning message.
+    and do not select the "Save password in configuration (weakly encrypted)" option for passing the API key for the embeddings connector node,
+    the Credentials Configuration node will need to be reconfigured upon reopening the workflow, as the credentials flow variable
+    was not saved and will therefore not be available to downstream nodes.
     """
 
     persist_directory = knext.StringParameter(

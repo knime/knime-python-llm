@@ -285,7 +285,7 @@ def _isinstance_of_port_object(
     ],
 )
 @knext.input_port(
-    "LLM or chat model", "A large language model or chat model.", llm_port_type
+    "LLM or Chat Model", "A large language model or chat model.", llm_port_type
 )
 @knext.input_table("Prompt Table", "A table containing a string column with prompts.")
 @knext.output_table(
@@ -300,9 +300,9 @@ class LLMPrompter:
 
     **Note**: If you use the
     [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
-    and do not select "Save password in configuration (weakly encrypted)" option for passing the API key for the LLM connector node,
-    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable will not be passed to downstream nodes.
-    In this case, this node will show a warning message.
+    and do not select the "Save password in configuration (weakly encrypted)" option for passing the API key for the LLM connector node,
+    the Credentials Configuration node will need to be reconfigured upon reopening the workflow, as the credentials flow variable
+    was not saved and will therefore not be available to downstream nodes.
     """
 
     system_message_handling = knext.EnumParameter(
@@ -565,11 +565,11 @@ class LLMPrompter:
 )
 @knext.input_port("Chat Model", "A chat model.", chat_model_port_type)
 @knext.input_table(
-    "Existing conversation",
+    "Existing Conversation",
     "A table containing the conversation history, or an empty table.",
 )
 @knext.output_table(
-    "Extended conversation", "A table containing the updated conversation history."
+    "Extended Conversation", "A table containing the updated conversation history."
 )
 class ChatModelPrompter:
     """
@@ -583,9 +583,9 @@ class ChatModelPrompter:
 
     **Note**: If you use the
     [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
-    and do not select "Save password in configuration (weakly encrypted)" option for passing the API key for the chat model connector node,
-    the Credentials Configuration node will need to be reconfigured, as the credentials flow variable will not be passed to downstream nodes.
-    In this case, this node will show a warning message.
+    and do not select the "Save password in configuration (weakly encrypted)" option for passing the API key for the chat model connector node,
+    the Credentials Configuration node will need to be reconfigured upon reopening the workflow, as the credentials flow variable
+    was not saved and will therefore not be available to downstream nodes.
     """
 
     system_message = knext.MultilineStringParameter(

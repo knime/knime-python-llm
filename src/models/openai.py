@@ -702,10 +702,6 @@ class OpenAILLMPortObjectSpec(OpenAIModelPortObjectSpec, LLMPortObjectSpec):
     def n_requests(self) -> int:
         return self._n_requests
 
-    @property
-    def json_mode(self) -> bool:
-        return self._json_mode
-
     def serialize(self) -> dict:
         return {
             **super().serialize(),
@@ -715,7 +711,6 @@ class OpenAILLMPortObjectSpec(OpenAIModelPortObjectSpec, LLMPortObjectSpec):
             "max_tokens": self._max_tokens,
             "seed": self._seed,
             "n_requests": self._n_requests,
-            "json_mode": self._json_mode,
         }
 
     @classmethod
@@ -728,7 +723,6 @@ class OpenAILLMPortObjectSpec(OpenAIModelPortObjectSpec, LLMPortObjectSpec):
             data["max_tokens"],
             seed=data.get("seed", 0),
             n_requests=data.get("n_requests", 1),
-            json_mode=data.get("json_mode", True),
         )
 
 
@@ -769,18 +763,20 @@ class OpenAIChatModelPortObject(ChatModelPortObject):
         self, ctx: knext.ExecutionContext, response_format: Optional[str] = None
     ):
         from langchain_openai import ChatOpenAI
-        from ._chat_openai import _ChatOpenAI
 
-        openai_chat_client = ChatOpenAI(
+        model_kwargs = {}
+        if response_format:
+            model_kwargs["response_format"] = {"type": "json_object"}
+
+        return ChatOpenAI(
             openai_api_key=ctx.get_credentials(self.spec.credentials).password,
             base_url=self.spec.base_url,
             model=self.spec.model,
             temperature=self.spec.temperature,
             max_tokens=self.spec.max_tokens,
             seed=self.spec.seed,
+            model_kwargs=model_kwargs,
         )
-
-        return _ChatOpenAI(client=openai_chat_client, response_format=response_format)
 
 
 openai_chat_port_type = knext.port_type(

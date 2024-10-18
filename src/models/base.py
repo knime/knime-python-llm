@@ -523,11 +523,7 @@ class LLMPrompter:
         llm_port: LLMPortObject,
         input_table: knext.Table,
     ):
-
-        if self.response_format == OutputModeOptions.Text.name:
-            llm = llm_port.create_model(ctx)
-        else:
-            llm = llm_port.create_model(ctx, self.response_format)
+        llm = self._initialize_model(llm_port, ctx)
 
         num_rows = input_table.num_rows
 
@@ -550,10 +546,8 @@ class LLMPrompter:
 
             prompts = self._include_system_messages(llm, data_frame)
 
-            responses = asyncio.run(
-                self.aprocess_batches_concurrently(
-                    prompts, llm, n_requests, progress_tracker
-                )
+            responses = self._get_responses(
+                prompts, llm, n_requests, progress_tracker, llm_port, ctx
             )
 
             data_frame[output_column_name] = responses
@@ -564,6 +558,33 @@ class LLMPrompter:
             output_table.append(data_frame)
 
         return output_table
+
+    def _initialize_model(self, llm_port, ctx):
+        if self.response_format == OutputModeOptions.Text.name:
+            return llm_port.create_model(ctx)
+        return llm_port.create_model(ctx, self.response_format)
+
+    def _get_responses(self, prompts, llm, n_requests, progress_tracker, llm_port, ctx):
+        import openai
+
+        try:
+            return asyncio.run(
+                self.aprocess_batches_concurrently(
+                    prompts, llm, n_requests, progress_tracker
+                )
+            )
+        except openai.BadRequestError as e:
+            if "Invalid parameter: 'response_format'" in str(e):
+                ctx.set_warning(
+                    f"Model does not support the response format '{self.response_format}', 'Text' mode is used as an output mode instead."
+                )
+                llm = llm_port.create_model(ctx)
+                return asyncio.run(
+                    self.aprocess_batches_concurrently(
+                        prompts, llm, n_requests, progress_tracker
+                    )
+                )
+            raise e
 
     def _include_system_messages(self, llm, data_frame) -> List[str] | List[List]:
         import langchain_core.messages as lcm
@@ -709,16 +730,32 @@ class ChatModelPrompter:
                 human_message.content,
             ]
 
-        if self.response_format == OutputModeOptions.Text.name:
-            chat = chat_model.create_model(ctx)
-        else:
-            chat = chat_model.create_model(ctx, self.response_format)
-
-        answer = chat.invoke(conversation_messages)
+        chat = self._initialize_model(chat_model, ctx)
+        answer = self._get_responses(chat, chat_model, conversation_messages, ctx)
 
         data_frame.loc[f"Row{len(data_frame)}"] = [answer.type, answer.content]
 
         return knext.Table.from_pandas(data_frame)
+
+    def _initialize_model(self, chat_model_port, ctx):
+        if self.response_format == OutputModeOptions.Text.name:
+            return chat_model_port.create_model(ctx)
+        return chat_model_port.create_model(ctx, self.response_format)
+
+    def _get_responses(self, chat_model, chat_model_port, conversation_messages, ctx):
+        import openai
+
+        try:
+            return chat_model.invoke(conversation_messages)
+
+        except openai.BadRequestError as e:
+            if "Invalid parameter: 'response_format'" in str(e):
+                ctx.set_warning(
+                    f"Model does not support the response format '{self.response_format}', 'Text' mode is used as an output mode instead."
+                )
+                chat_model = chat_model_port.create_model(ctx)
+                return chat_model.invoke(conversation_messages)
+            raise e
 
 
 def _string_col_filter(column: knext.Column):

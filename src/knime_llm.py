@@ -7,6 +7,7 @@ import models.huggingface
 import models.fake
 import models.openai
 import models.knime
+import models.databricks
 
 try:
     import models.gpt4all

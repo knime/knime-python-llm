@@ -14,7 +14,7 @@ class _ChatOpenAI(BaseChatModel):
     response_format: Optional[str] = None
 
     def _prepare_kwargs(self, kwargs: Dict[str, Any]) -> Dict[str, Any]:
-        if self.response_format == OutputModeOptions.JsonMode.name:
+        if self.response_format == OutputModeOptions.JSON.name:
             kwargs["response_format"] = {"type": "json_object"}
         return kwargs
 

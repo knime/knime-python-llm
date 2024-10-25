@@ -76,8 +76,8 @@ def _supports_json_mode(
     # of the nodes when they are not connected to any other node
     if input_spec is None:
         return False
-    else:
-        return input_spec.json_mode
+
+    return OutputFormatOptions.JSON in input_spec.supported_output_formats
 
 
 class OutputFormatOptions(knext.EnumParameterOptions):
@@ -222,19 +222,21 @@ class LLMPortObjectSpec(AIPortObjectSpec):
     def __init__(
         self,
         n_requests: int = 1,
-        json_mode: bool = False,
+        supported_output_formats: list[OutputFormatOptions] = [
+            OutputFormatOptions.Text
+        ],
     ) -> None:
         super().__init__()
         self._n_requests = n_requests
-        self._json_mode = json_mode
+        self._supported_output_formats = supported_output_formats
 
     @property
     def n_requests(self) -> int:
         return self._n_requests
 
     @property
-    def json_mode(self) -> bool:
-        return self._json_mode
+    def supported_output_formats(self) -> list[OutputFormatOptions]:
+        return self._supported_output_formats
 
 
 class LLMPortObject(knext.PortObject):

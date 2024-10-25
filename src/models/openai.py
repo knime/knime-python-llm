@@ -12,6 +12,7 @@ from .base import (
     model_category,
     GeneralRemoteSettings,
     CredentialsSettings,
+    OutputFormatOptions,
 )
 
 # Other imports
@@ -21,7 +22,7 @@ import time
 import json
 import base64
 import tempfile
-from typing import Callable, List, Optional
+from typing import Callable, List
 
 
 # This logger is necessary
@@ -760,12 +761,14 @@ class OpenAIChatModelPortObject(ChatModelPortObject):
         return super().spec
 
     def create_model(
-        self, ctx: knext.ExecutionContext, response_format: Optional[str] = None
+        self,
+        ctx: knext.ExecutionContext,
+        output_format: str = OutputFormatOptions.Text.name,
     ):
         from langchain_openai import ChatOpenAI
 
         model_kwargs = {}
-        if response_format:
+        if output_format == OutputFormatOptions.JSON.name:
             model_kwargs["response_format"] = {"type": "json_object"}
 
         return ChatOpenAI(

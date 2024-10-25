@@ -527,7 +527,7 @@ class LLMPrompter:
         llm_port: LLMPortObject,
         input_table: knext.Table,
     ):
-        llm = self._initialize_model(llm_port, ctx)
+        llm = _initialize_model(llm_port, ctx, self.output_format)
 
         num_rows = input_table.num_rows
 
@@ -550,8 +550,28 @@ class LLMPrompter:
 
             prompts = self._include_system_messages(llm, data_frame)
 
-            responses = self._get_responses(
-                prompts, llm, n_requests, progress_tracker, llm_port, ctx
+            _validate_json_output_format(self.output_format, prompts)
+
+            def get_responses(prompts=prompts):
+                return asyncio.run(
+                    self.aprocess_batches_concurrently(
+                        prompts, llm, n_requests, progress_tracker
+                    )
+                )
+
+            def fallback_responses(prompts=prompts):
+                fallback_llm = llm_port.create_model(ctx)
+                return asyncio.run(
+                    self.aprocess_batches_concurrently(
+                        prompts, fallback_llm, n_requests, progress_tracker
+                    )
+                )
+
+            responses = _output_format_fallback(
+                ctx,
+                get_responses,
+                fallback_responses,
+                self.output_format,
             )
 
             data_frame[output_column_name] = responses
@@ -562,33 +582,6 @@ class LLMPrompter:
             output_table.append(data_frame)
 
         return output_table
-
-    def _initialize_model(self, llm_port, ctx):
-        if self.response_format == OutputModeOptions.Text.name:
-            return llm_port.create_model(ctx)
-        return llm_port.create_model(ctx, self.response_format)
-
-    def _get_responses(self, prompts, llm, n_requests, progress_tracker, llm_port, ctx):
-        import openai
-
-        try:
-            return asyncio.run(
-                self.aprocess_batches_concurrently(
-                    prompts, llm, n_requests, progress_tracker
-                )
-            )
-        except openai.BadRequestError as e:
-            if "Invalid parameter: 'response_format'" in str(e):
-                ctx.set_warning(
-                    f"Model does not support the response format '{self.response_format}', 'Text' mode is used as an output mode instead."
-                )
-                llm = llm_port.create_model(ctx)
-                return asyncio.run(
-                    self.aprocess_batches_concurrently(
-                        prompts, llm, n_requests, progress_tracker
-                    )
-                )
-            raise e
 
     def _include_system_messages(self, llm, data_frame) -> List[str] | List[List]:
         import langchain_core.messages as lcm
@@ -699,6 +692,10 @@ class ChatModelPrompter:
     ):
         self.conversation_settings.configure(input_table_spec)
 
+        _validate_json_output_format(
+            self.output_format, [self.system_message + self.chat_message]
+        )
+
         chat_model_spec.validate_context(ctx)
         return knext.Schema.from_columns(
             [
@@ -734,36 +731,95 @@ class ChatModelPrompter:
                 human_message.content,
             ]
 
-        chat = self._initialize_model(chat_model, ctx)
-        answer = self._get_responses(chat, chat_model, conversation_messages, ctx)
+        chat = _initialize_model(chat_model, ctx, self.output_format)
+
+        def get_response():
+            return chat.invoke(conversation_messages)
+
+        def fallback():
+            fallback_chat = chat_model.create_model(ctx)
+            return fallback_chat.invoke(conversation_messages)
+
+        answer = _output_format_fallback(
+            ctx,
+            get_response,
+            fallback,
+            self.output_format,
+        )
 
         data_frame.loc[f"Row{len(data_frame)}"] = [answer.type, answer.content]
 
         return knext.Table.from_pandas(data_frame)
 
-    def _initialize_model(self, chat_model_port, ctx):
-        if self.response_format == OutputFormatOptions.Text.name:
-            return chat_model_port.create_model(ctx)
-        return chat_model_port.create_model(ctx, self.response_format)
 
-    def _get_responses(self, chat_model, chat_model_port, conversation_messages, ctx):
-        import openai
+def _output_format_fallback(
+    ctx,
+    response_func,
+    fallback_func,
+    output_format,
+):
+    import openai
 
-        try:
-            return chat_model.invoke(conversation_messages)
+    try:
+        return response_func()
+    except openai.BadRequestError as e:
+        if "Invalid parameter: 'response_format'" in str(e):
+            ctx.set_warning(
+                f"""The selected model does not support the output format '{output_format}', 
+                'Text' mode is used as an output format instead."""
+            )
+            return fallback_func()
+        raise e
 
-        except openai.BadRequestError as e:
-            if "Invalid parameter: 'response_format'" in str(e):
-                ctx.set_warning(
-                    f"Model does not support the response format '{self.response_format}', 'Text' mode is used as an output mode instead."
-                )
-                chat_model = chat_model_port.create_model(ctx)
-                return chat_model.invoke(conversation_messages)
-            raise e
+
+def _initialize_model(llm_port, ctx, output_format):
+    if output_format == OutputFormatOptions.Text.name or (
+        OutputFormatOptions.JSON not in llm_port.spec.supported_output_formats
+    ):
+        return llm_port.create_model(ctx)
+    return llm_port.create_model(ctx, output_format)
 
 
 def _string_col_filter(column: knext.Column):
     return column.ktype == knext.string()
+
+
+def _contains_json_keyword(messages: list) -> bool:
+    """
+    Checks if 'json' keyword appears in messages.
+
+    Messages can be one of:
+
+        For LLM Prompter (checked in execute):
+            - prompts ([list of strings])
+            - system_message + prompt ([SystemMessage, HumanMessage])
+
+        For Chat Model Prompter (checked in configure):
+            - system_message and/or chat_message (str)
+
+    """
+    for message in messages:
+        if isinstance(message, str):
+            if "json" in message.lower():
+                return True
+        elif isinstance(message, list):
+            for message_part in message:
+                if "json" in message_part.content.lower():
+                    return True
+    return False
+
+
+def _validate_json_output_format(output_format: str, messages) -> None:
+    """
+    Validates that messages contain the word 'JSON' when JSON output format is selected.
+    """
+    if output_format != OutputFormatOptions.JSON.name:
+        return
+
+    if not _contains_json_keyword(messages):
+        raise ValueError(
+            """When requesting JSON output, the word 'JSON' must appear in either the system message, chat message, or prompt."""
+        )
 
 
 @knext.node(

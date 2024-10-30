@@ -794,13 +794,13 @@ def _contains_json_keyword(messages: list) -> bool:
     """
     for message in messages:
         if isinstance(message, str):
-            if "json" in message.lower():
-                return True
+            if "json" not in message.lower():
+                return False
         elif isinstance(message, list):
-            for message_part in message:
-                if "json" in message_part.content.lower():
-                    return True
-    return False
+            combined_message = " ".join(part.content for part in message)
+            if "json" not in combined_message.lower():
+                return False
+    return True
 
 
 def _validate_json_output_format(output_format: str, messages) -> None:

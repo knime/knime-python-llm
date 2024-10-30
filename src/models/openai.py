@@ -765,12 +765,12 @@ class OpenAIChatModelPortObject(ChatModelPortObject):
     def create_model(
         self,
         ctx: knext.ExecutionContext,
-        output_format: str = OutputFormatOptions.Text.name,
+        output_format: OutputFormatOptions = OutputFormatOptions.Text,
     ):
         from langchain_openai import ChatOpenAI
 
         model_kwargs = {}
-        if output_format == OutputFormatOptions.JSON.name:
+        if output_format == OutputFormatOptions.JSON:
             model_kwargs["response_format"] = {"type": "json_object"}
 
         return ChatOpenAI(

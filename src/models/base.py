@@ -222,13 +222,9 @@ class LLMPortObjectSpec(AIPortObjectSpec):
     def __init__(
         self,
         n_requests: int = 1,
-        supported_output_formats: list[OutputFormatOptions] = [
-            OutputFormatOptions.Text
-        ],
     ) -> None:
         super().__init__()
         self._n_requests = n_requests
-        self._supported_output_formats = supported_output_formats
 
     @property
     def n_requests(self) -> int:
@@ -236,7 +232,7 @@ class LLMPortObjectSpec(AIPortObjectSpec):
 
     @property
     def supported_output_formats(self) -> list[OutputFormatOptions]:
-        return self._supported_output_formats
+        return [OutputFormatOptions.Text]
 
 
 class LLMPortObject(knext.PortObject):

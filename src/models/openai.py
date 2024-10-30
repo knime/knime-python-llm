@@ -668,10 +668,6 @@ class OpenAILLMPortObjectSpec(OpenAIModelPortObjectSpec, LLMPortObjectSpec):
         max_tokens: int,
         seed: int,
         n_requests: int,
-        supported_output_formats: list[OutputFormatOptions] = [
-            OutputFormatOptions.Text,
-            OutputFormatOptions.JSON,
-        ],
     ) -> None:
         super().__init__(credentials)
         self._model = model_name
@@ -680,7 +676,6 @@ class OpenAILLMPortObjectSpec(OpenAIModelPortObjectSpec, LLMPortObjectSpec):
         self._max_tokens = max_tokens
         self._seed = seed
         self._n_requests = n_requests
-        self._supported_output_formats = supported_output_formats
 
     @property
     def model(self) -> str:
@@ -705,6 +700,10 @@ class OpenAILLMPortObjectSpec(OpenAIModelPortObjectSpec, LLMPortObjectSpec):
     @property
     def n_requests(self) -> int:
         return self._n_requests
+
+    @property
+    def supported_output_formats(self) -> list[OutputFormatOptions]:
+        return [OutputFormatOptions.Text, OutputFormatOptions.JSON]
 
     def serialize(self) -> dict:
         return {

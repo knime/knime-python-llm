@@ -523,8 +523,6 @@ class LLMPrompter:
         llm_port: LLMPortObject,
         input_table: knext.Table,
     ):
-        llm = _initialize_model(llm_port, ctx, self.output_format)
-
         num_rows = input_table.num_rows
 
         output_column_name = util.handle_column_name_collision(
@@ -535,6 +533,8 @@ class LLMPrompter:
 
         n_requests = llm_port.spec.n_requests
 
+        is_chat_model = self._is_chat_model(llm_port, ctx)
+
         progress_tracker = util.ProgressTracker(total_rows=num_rows, ctx=ctx)
         for batch in input_table.batches():
             responses = []
@@ -544,29 +544,21 @@ class LLMPrompter:
             if data_frame[self.prompt_column].isnull().values.any():
                 raise RuntimeError("The prompt column contains a missing value.")
 
-            prompts = self._include_system_messages(llm, data_frame)
+            prompts = self._include_system_messages(is_chat_model, data_frame)
 
             _validate_json_output_format(self.output_format, prompts)
 
-            def get_responses(prompts=prompts):
+            def get_responses(llm, prompts=prompts):
                 return asyncio.run(
                     self.aprocess_batches_concurrently(
                         prompts, llm, n_requests, progress_tracker
                     )
                 )
 
-            def fallback_responses(prompts=prompts):
-                fallback_llm = llm_port.create_model(ctx)
-                return asyncio.run(
-                    self.aprocess_batches_concurrently(
-                        prompts, fallback_llm, n_requests, progress_tracker
-                    )
-                )
-
-            responses = _output_format_fallback(
+            responses = _call_model_with_output_format_fallback(
                 ctx,
+                llm_port,
                 get_responses,
-                fallback_responses,
                 self.output_format,
             )
 
@@ -579,12 +571,19 @@ class LLMPrompter:
 
         return output_table
 
-    def _include_system_messages(self, llm, data_frame) -> List[str] | List[List]:
-        import langchain_core.messages as lcm
+    def _is_chat_model(self, llm_port, ctx) -> bool:
         from langchain_core.language_models import BaseChatModel
 
+        llm = _initialize_model(llm_port, ctx)
+        return isinstance(llm, BaseChatModel)
+
+    def _include_system_messages(
+        self, is_chat_model, data_frame
+    ) -> List[str] | List[List]:
+        import langchain_core.messages as lcm
+
         if (
-            not isinstance(llm, BaseChatModel)
+            not is_chat_model
             or self.system_message_handling == SystemMessageHandling.NONE.name
         ):
             prompts = data_frame[self.prompt_column].tolist()
@@ -727,19 +726,13 @@ class ChatModelPrompter:
                 human_message.content,
             ]
 
-        chat = _initialize_model(chat_model, ctx, self.output_format)
-
-        def get_response():
+        def get_response(chat):
             return chat.invoke(conversation_messages)
 
-        def fallback():
-            fallback_chat = chat_model.create_model(ctx)
-            return fallback_chat.invoke(conversation_messages)
-
-        answer = _output_format_fallback(
+        answer = _call_model_with_output_format_fallback(
             ctx,
+            chat_model,
             get_response,
-            fallback,
             self.output_format,
         )
 
@@ -748,29 +741,34 @@ class ChatModelPrompter:
         return knext.Table.from_pandas(data_frame)
 
 
-def _output_format_fallback(
+def _call_model_with_output_format_fallback(
     ctx,
+    model_port,
     response_func,
-    fallback_func,
     output_format,
 ):
     import openai
 
     try:
-        return response_func()
+        model = _initialize_model(model_port, ctx, output_format)
+        return response_func(model)
     except openai.BadRequestError as e:
         if "Invalid parameter: 'response_format'" in str(e):
             ctx.set_warning(
                 f"""The selected model does not support the output format '{output_format}', 
                 'Text' mode is used as an output format instead."""
             )
-            return fallback_func()
+            model = _initialize_model(model_port, ctx, OutputFormatOptions.Text.name)
+            return response_func(model)
         raise e
 
 
-def _initialize_model(llm_port, ctx, output_format):
-    if output_format == OutputFormatOptions.Text.name or (
-        OutputFormatOptions.JSON not in llm_port.spec.supported_output_formats
+def _initialize_model(llm_port, ctx, output_format=OutputFormatOptions.Text.name):
+    # string to enum object mapping is used here since the value switch selection returns a string
+    output_format = OutputFormatOptions[output_format]
+
+    if output_format == OutputFormatOptions.Text or (
+        output_format not in llm_port.spec.supported_output_formats
     ):
         return llm_port.create_model(ctx)
     return llm_port.create_model(ctx, output_format)

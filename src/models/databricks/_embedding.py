@@ -96,7 +96,9 @@ class DatabricksEmbeddingConnector:
     [Databricks documentation](https://docs.databricks.com/en/machine-learning/model-serving/create-foundation-model-endpoints.html)
     for more information on how to serve a model in a Databricks workspace.
 
-    **Note**: This node is only available if the Databricks extension is installed.
+    **Note**: This node is only available if the
+    [KNIME Databricks Integration](https://hub.knime.com/knime/extensions/org.knime.features.bigdata.databricks/latest)
+    is installed.
     """
 
     endpoint = knext.StringParameter(

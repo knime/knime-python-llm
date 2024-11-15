@@ -157,17 +157,15 @@ class AgentPortObjectSpec(AIPortObjectSpec):
         }
 
     @classmethod
-    def deserialize_llm_spec(cls, data: dict, java_callback):
+    def deserialize_llm_spec(cls, data: dict):
         llm_data = data["llm"]
         spec_type = get_port_type_for_id(llm_data["type"])
-        try:
-            return spec_type.spec_class.deserialize(llm_data["spec"], java_callback)
-        except TypeError:
-            return spec_type.spec_class.deserialize(llm_data["spec"])
+
+        return spec_type.spec_class.deserialize(llm_data["spec"])
 
     @classmethod
-    def deserialize(cls, data: dict, java_callback) -> "AgentPortObjectSpec":
-        return cls(cls.deserialize_llm_spec(data, java_callback))
+    def deserialize(cls, data: dict) -> "AgentPortObjectSpec":
+        return cls(cls.deserialize_llm_spec(data))
 
 
 class AgentPortObject(FilestorePortObject):

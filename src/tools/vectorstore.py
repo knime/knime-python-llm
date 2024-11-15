@@ -46,7 +46,7 @@ class VectorToolPortObjectSpec(ToolPortObjectSpec):
         }
 
     @classmethod
-    def deserialize(cls, data: dict, java_callback):
+    def deserialize(cls, data: dict):
         return cls(
             data["name"],
             data["description"],
@@ -179,23 +179,15 @@ class FilestoreVectorToolPortObjectSpec(VectorToolPortObjectSpec):
         return data
 
     @classmethod
-    def deserialize(cls, data: dict, java_callback) -> FilestoreVectorstorePortObject:
+    def deserialize(cls, data: dict) -> FilestoreVectorstorePortObject:
         llm_type: knext.PortType = get_port_type_for_id(data["llm_type"])
-        try:
-            llm_spec = llm_type.spec_class.deserialize(data["llm_spec"], java_callback)
-        except TypeError:
-            llm_spec = llm_type.spec_class.deserialize(data["llm_spec"])
+        llm_spec = llm_type.spec_class.deserialize(data["llm_spec"])
         vectorstore_type: knext.PortType = get_port_type_for_id(
             data["vectorstore_type"]
         )
-        try:
-            vectorstore_spec = vectorstore_type.spec_class.deserialize(
-                data["vectorstore_spec"], java_callback
-            )
-        except TypeError:
-            vectorstore_spec = vectorstore_type.spec_class.deserialize(
-                data["vectorstore_spec"]
-            )
+        vectorstore_spec = vectorstore_type.spec_class.deserialize(
+            data["vectorstore_spec"]
+        )
         return cls(
             data["name"],
             data["description"],

@@ -61,8 +61,8 @@ class LocalChromaVectorstorePortObjectSpec(
         return data
 
     @classmethod
-    def deserialize(cls, data: dict, java_callback):
-        super_cls = super().deserialize(data=data, java_callback=java_callback)
+    def deserialize(cls, data: dict):
+        super_cls = super().deserialize(data=data)
         return cls(
             super_cls.embeddings_spec,
             super_cls.metadata_column_names,

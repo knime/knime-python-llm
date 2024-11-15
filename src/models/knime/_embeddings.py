@@ -46,9 +46,9 @@ class KnimeHubEmbeddingsPortObjectSpec(EmbeddingsPortObjectSpec):
         }
 
     @classmethod
-    def deserialize(cls, data: dict, java_callback):
+    def deserialize(cls, data: dict):
         return cls(
-            ks.HubAuthenticationPortObjectSpec.deserialize(data["auth"], java_callback),
+            ks.HubAuthenticationPortObjectSpec.deserialize(data["auth"]),
             data["model_name"],
         )
 

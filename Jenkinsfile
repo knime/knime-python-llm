@@ -39,6 +39,7 @@ try {
                     'knime-server-client',
                     'knime-js-base',
                     'knime-cef',
+                    'knime-com-shared',
                     repositoryName
                     ],
             ],

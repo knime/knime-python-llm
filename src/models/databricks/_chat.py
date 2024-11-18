@@ -168,7 +168,7 @@ class DatabricksChatModelConnector:
     # TODO investigate if it's possible to list the available models
     endpoint = knext.StringParameter(
         "Endpoint",
-        "The endpoint of the model in the Databricks workspace.",
+        "The name of the endpoint of the model in the Databricks workspace.",
         default_value="",
     )
 

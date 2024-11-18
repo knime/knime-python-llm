@@ -103,7 +103,7 @@ class DatabricksEmbeddingConnector:
 
     endpoint = knext.StringParameter(
         "Endpoint",
-        "The endpoint of the model in the Databricks workspace.",
+        "The name of the endpoint of the model in the Databricks workspace.",
         default_value="",
     )
 

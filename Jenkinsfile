@@ -14,7 +14,11 @@ properties([
 try {
     knimetools.defaultPythonExtensionBuild()
 
-    withCredentials([string(credentialsId: 'openai-api-key', variable: 'OPENAI_API_KEY'), string(credentialsId: 'huggingface-api-key', variable: 'TEST_API_KEY_HUGGINGFACE')]) {
+    withCredentials([
+        string(credentialsId: 'openai-api-key', variable: 'OPENAI_API_KEY'),
+        string(credentialsId: 'huggingface-api-key', variable: 'TEST_API_KEY_HUGGINGFACE'),
+        usernamePassword(credentialsId: 'ai-connectors-application-password', passwordVariable: 'B_HUBDEV_PWD', usernameVariable: 'B_HUBDEV_USER')
+        ]) {
         workflowTests.runTests(
             dependencies: [
                 repositories: [

@@ -6,6 +6,7 @@ from ._utils import (
     get_api_key,
     get_base_url,
     get_model_choices_provider,
+    get_models,
     get_workspace_port_type,
     databricks_category,
     databricks_icon,
@@ -124,6 +125,10 @@ class DatabricksEmbeddingConnector:
         )
 
     def execute(self, ctx, databricks_workspace) -> DatabricksEmbeddingPortObject:
+        if self.endpoint not in get_models(databricks_workspace.spec, "embeddings"):
+            raise knext.InvalidParametersError(
+                f"The embedding model '{self.endpoint}' is not served by the Databricks workspace."
+            )
         return DatabricksEmbeddingPortObject(
             self._create_spec(databricks_workspace.spec)
         )

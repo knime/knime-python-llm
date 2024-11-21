@@ -11,6 +11,7 @@ from ._utils import (
     check_workspace_available,
     get_api_key,
     get_model_choices_provider,
+    get_models,
     get_workspace_port_type,
     databricks_icon,
     databricks_category,
@@ -197,6 +198,10 @@ class DatabricksChatModelConnector:
         )
 
     def execute(self, ctx, databricks_workspace) -> DatabricksChatModelPortObject:
+        if self.endpoint not in get_models(databricks_workspace.spec, "chat"):
+            raise knext.InvalidParametersError(
+                f"The chat model '{self.endpoint}' is not served by the Databricks workspace."
+            )
         return DatabricksChatModelPortObject(
             self._create_output_spec(databricks_workspace.spec)
         )

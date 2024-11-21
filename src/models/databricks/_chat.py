@@ -181,12 +181,12 @@ class DatabricksChatModelConnector:
     ) -> DatabricksChatModelPortObjectSpec:
         if self.endpoint == "":
             raise knext.InvalidParametersError("Select a chat model endpoint.")
+        check_workspace_available(databricks_workspace_spec)
         return self._create_output_spec(databricks_workspace_spec)
 
     def _create_output_spec(
         self, databricks_workspace_spec
     ) -> DatabricksChatModelPortObjectSpec:
-        check_workspace_available(databricks_workspace_spec)
         return DatabricksChatModelPortObjectSpec(
             databricks_workspace_spec=databricks_workspace_spec,
             endpoint=self.endpoint,

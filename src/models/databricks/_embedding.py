@@ -5,6 +5,7 @@ from ._utils import (
     check_workspace_available,
     get_api_key,
     get_base_url,
+    get_model_choices_provider,
     get_workspace_port_type,
     databricks_category,
     databricks_icon,
@@ -105,6 +106,7 @@ class DatabricksEmbeddingConnector:
         "Endpoint",
         "The name of the endpoint of the model in the Databricks workspace.",
         default_value="",
+        choices=get_model_choices_provider("embeddings"),
     )
 
     def configure(self, ctx, databricks_workspace_spec):

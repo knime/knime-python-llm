@@ -10,6 +10,7 @@ import knime.extension as knext
 from ._utils import (
     check_workspace_available,
     get_api_key,
+    get_model_choices_provider,
     get_workspace_port_type,
     databricks_icon,
     databricks_category,
@@ -170,6 +171,7 @@ class DatabricksChatModelConnector:
         "Endpoint",
         "The name of the endpoint of the model in the Databricks workspace.",
         default_value="",
+        choices=get_model_choices_provider("chat"),
     )
 
     model_settings = DatabricksChatModelSettings()

@@ -110,6 +110,8 @@ class DatabricksEmbeddingConnector:
     )
 
     def configure(self, ctx, databricks_workspace_spec):
+        if self.endpoint == "":
+            raise knext.InvalidParametersError("Select an embedding model endpoint.")
         check_workspace_available(databricks_workspace_spec)
         return self._create_spec(databricks_workspace_spec)
 

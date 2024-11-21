@@ -179,6 +179,8 @@ class DatabricksChatModelConnector:
     def configure(
         self, ctx, databricks_workspace_spec
     ) -> DatabricksChatModelPortObjectSpec:
+        if self.endpoint == "":
+            raise knext.InvalidParametersError("Select a chat model endpoint.")
         return self._create_output_spec(databricks_workspace_spec)
 
     def _create_output_spec(

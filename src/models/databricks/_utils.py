@@ -16,7 +16,9 @@ def get_workspace_port_type():
 
 
 def get_base_url(databricks_workspace_spec):
-    return databricks_workspace_spec.workspace_url + "serving-endpoints"
+    from urllib.parse import urljoin
+
+    return urljoin(databricks_workspace_spec.workspace_url, "serving-endpoints")
 
 
 def get_api_key(databricks_workspace_spec):

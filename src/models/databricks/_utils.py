@@ -64,6 +64,7 @@ def get_model_choices_provider(model_type: Literal["chat", "embeddings"]):
                 return []
 
             return get_models(auth_spec, model_type)
+        return []
 
     return get_model_choices
 

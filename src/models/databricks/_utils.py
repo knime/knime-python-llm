@@ -69,7 +69,8 @@ def get_model_choices_provider(model_type: Literal["chat", "embeddings"]):
     return get_model_choices
 
 
-databricks_icon = "icons/databricks.png"
+# looks nicer
+databricks_icon = "icons/Databricks-embeddings-connector.png"
 
 databricks_category = knext.category(
     path=model_category,

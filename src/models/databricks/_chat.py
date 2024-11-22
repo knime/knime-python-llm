@@ -13,7 +13,6 @@ from ._utils import (
     get_model_choices_provider,
     get_models,
     get_workspace_port_type,
-    databricks_icon,
     databricks_category,
     get_base_url,
 )
@@ -140,7 +139,7 @@ class DatabricksChatModelSettings(GeneralRemoteSettings):
 @knext.node(
     "Databricks Chat Model Connector",
     node_type=knext.NodeType.SOURCE,
-    icon_path=databricks_icon,
+    icon_path="icons/Databricks-chat-model-connector.png",
     category=databricks_category,
     keywords=["Databricks", "GenAI", "Chat model"],
 )

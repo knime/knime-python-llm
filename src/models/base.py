@@ -222,7 +222,7 @@ class ChatModelPortObject(LLMPortObject):
 
 
 chat_model_port_type = knext.port_type(
-    "Chat Model Port", ChatModelPortObject, ChatModelPortObjectSpec
+    "Chat Model", ChatModelPortObject, ChatModelPortObjectSpec
 )
 
 
@@ -246,7 +246,7 @@ class EmbeddingsPortObject(knext.PortObject):
 
 
 embeddings_model_port_type = knext.port_type(
-    "Embeddings Port", EmbeddingsPortObject, EmbeddingsPortObjectSpec
+    "Embedding", EmbeddingsPortObject, EmbeddingsPortObjectSpec
 )
 
 

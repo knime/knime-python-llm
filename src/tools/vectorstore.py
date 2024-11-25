@@ -251,8 +251,8 @@ _filestore_vector_tool_port_type = knext.port_type(
         "Retrieval Augmented Generation",
     ],
 )
-@knext.input_port("LLM Port", "A large language model.", llm_port_type)
-@knext.input_port("Vector Store Port", "A loaded vector store.", vector_store_port_type)
+@knext.input_port("LLM", "A large language model.", llm_port_type)
+@knext.input_port("Vector Store", "A loaded vector store.", vector_store_port_type)
 @knext.output_port("Agent Tool", "A tool for an agent to use.", tool_list_port_type)
 class VectorStoreToTool:
     """

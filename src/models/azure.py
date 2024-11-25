@@ -17,6 +17,8 @@ from models.openai import (
 
 # Other imports
 from socket import gaierror
+import logging
+
 
 azure_icon = "icons/azure_logo.png"
 azure_openai_category = knext.category(
@@ -26,9 +28,6 @@ azure_openai_category = knext.category(
     description="Contains nodes for connecting to Azure OpenAI.",
     icon=azure_icon,
 )
-
-# This logger is necessary
-import logging
 
 LOGGER = logging.getLogger(__name__)
 
@@ -266,17 +265,15 @@ azure_openai_embeddings_port_type = knext.port_type(
 class AzureSettings:
     api_base = knext.StringParameter(
         label="Azure Resource Endpoint",
-        description="""The Azure OpenAI Resource Endpoint e.g. https://<myResource>.openai.azure.com/ which can be
-        found on the [Azure Portal](https://portal.azure.com/).
-        """,
+        description="""The Azure Resource Endpoint address can be found in the 'Keys and Endpoints' 
+        section of the [Azure Portal](https://portal.azure.com/).""",
         default_value="",
     )
 
     api_version = knext.StringParameter(
         label="Azure API Version",
-        description="""The API version you want to use. Note that the latest API versions could support more functionality, such
-        as function calling. Find the available API versions here:
-        [API versions](https://learn.microsoft.com/en-us/azure/ai-services/openai/reference#completions).""",
+        description="""Available API versions can be found at the [Azure OpenAI API preview lifecycle](https://learn.microsoft.com/en-us/azure/ai-services/openai/api-version-deprecation).
+        Note that the latest API versions could support more functionality, such as function calling.""",
         default_value="2023-07-01-preview",
     )
 
@@ -316,10 +313,12 @@ class AzureOpenAIAuthenticator:
     [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
     and fed into this node via a flow variable.
 
-    To find your Azure OpenAI API key, navigate to your Azure OpenAI Resource on the [Azure Portal](https://portal.azure.com/) and copy one of the keys and the endpoint from
+    To find your Azure OpenAI API key, navigate to your Azure OpenAI Resource on the [Azure Portal](https://portal.azure.com/) and copy one of the keys from
     'Resource Management - Keys and Endpoints'.
 
-    [Available API versions](https://learn.microsoft.com/en-us/azure/ai-services/openai/reference#completions).
+    The Azure Resource Endpoint URL can also be found on the [Azure Portal](https://portal.azure.com/) under 'Resource Management - Keys and Endpoints'.
+
+    For the correct API version, refer to the [Azure OpenAI API preview lifecycle](https://learn.microsoft.com/en-us/azure/ai-services/openai/api-version-deprecation).
     """
 
     credentials_settings = CredentialsSettings(
@@ -351,6 +350,9 @@ class AzureOpenAIAuthenticator:
         if not self.azure_connection.api_base:
             raise knext.InvalidParametersError("API endpoint not provided.")
 
+        if not self.azure_connection.api_version:
+            raise knext.InvalidParametersError("API version not provided.")
+
         spec = self.create_spec()
         spec.validate_context(ctx)
         return spec
@@ -375,13 +377,16 @@ class AzureOpenAIAuthenticator:
                 azure_endpoint=self.azure_connection.api_base,
             ).models.list()
 
-        except openai.NotFoundError:
-            raise knext.InvalidParametersError(
-                f"Invalid API version provided: '{self.azure_connection.api_version}'"
-            )
         except openai.APIConnectionError:
             raise knext.InvalidParametersError(
                 f"Invalid Azure endpoint provided: '{self.azure_connection.api_base}'"
+            )
+        except openai.NotFoundError:
+            raise knext.InvalidParametersError(
+                """API resource not found. Please ensure you are using a valid address and API version.
+                The address can be found in the 'Keys and Endpoints' section of the [Azure Portal](https://portal.azure.com/).
+                For the correct API version, refer to the [API Version Deprecation Guide at](https://learn.microsoft.com/en-us/azure/ai-services/openai/api-version-deprecation).
+                """
             )
         except openai.AuthenticationError:
             raise knext.InvalidParametersError("Invalid API key provided.")

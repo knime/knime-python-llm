@@ -158,23 +158,6 @@ class LocalChromaVectorstorePortObject(
         ]
         return documents, np.array(content["embeddings"])
 
-    def get_metadata_filter(self, filter_parameter) -> dict:
-        # Chroma expects a filter dictionary with multiple key-value pairs to be combined with an AND operator
-        # reference: https://docs.trychroma.com/guides#using-logical-operators
-        if not filter_parameter:
-            return {}
-
-        if len(filter_parameter) == 1:
-            return {
-                filter_parameter[0].metadata_column: filter_parameter[0].metadata_value
-            }
-
-        filter_list = [
-            {group.metadata_column: group.metadata_value} for group in filter_parameter
-        ]
-
-        return {"$and": filter_list}
-
 
 local_chroma_vector_store_port_type = knext.port_type(
     "Chroma Vector Store",

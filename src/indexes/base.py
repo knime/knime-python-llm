@@ -198,10 +198,6 @@ class FilestoreVectorstorePortObject(FilestorePortObject, VectorstorePortObject)
         embeddings_obj = cls._read_embeddings(spec, file_path)
         return cls(spec, embeddings_obj, file_path)
 
-    @abstractmethod
-    def get_metadata_filter(self, filter_parameter):
-        raise NotImplementedError()
-
 
 def validate_creator_document_column(input_table: knext.Schema, column: str):
     util.check_column(input_table, column, knext.string(), "document")
@@ -236,29 +232,6 @@ def get_metadata_columns(
     except:
         pass
     return meta_data_columns
-
-
-def get_metadata_column_names(ctx: knext.DialogCreationContext) -> list[str]:
-    vectorstore_object_spec = ctx.get_input_specs()[0]
-    if not vectorstore_object_spec:
-        return []
-    metadata_column_names = vectorstore_object_spec.metadata_column_names
-
-    return metadata_column_names
-
-
-@knext.parameter_group(label="Metadata Filter")
-class Parameters:
-    metadata_column = knext.StringParameter(
-        "Metadata column",
-        "Metadata column to filter by.",
-        choices=get_metadata_column_names,
-    )
-
-    metadata_value = knext.StringParameter(
-        "Metadata value",
-        "Only documents where the specified metadata column matches the given value will be retrieved.",
-    )
 
 
 class BaseVectorStoreCreator(ABC):
@@ -474,15 +447,6 @@ class VectorStoreRetriever:
         since_version="5.2.0",
     )
 
-    metadata_filter = knext.ParameterArray(
-        label="Metadata Filter",
-        description="Select metadata column and value to filter by.",
-        since_version="5.4.0",
-        parameters=Parameters(),
-        button_text="Add filter",
-        array_title="Metadata Filter",
-    ).rule(knext.OneOf(retrieve_metadata, [True]), knext.Effect.SHOW)
-
     retrieve_dissimilarity_scores = knext.BoolParameter(
         "Retrieve dissimilarity scores",
         """Whether or not to retrieve dissimilarity scores for the retrieved documents. 
@@ -528,12 +492,6 @@ class VectorStoreRetriever:
                 table_spec.column_names, vectorstore_spec, output_column_name
             )
         )
-
-        for group in self.metadata_filter:
-            if not group.metadata_column or not group.metadata_value:
-                raise knext.InvalidParametersError(
-                    "Both metadata column and metadata value must be provided for metadata filter."
-                )
         return table_spec
 
     def execute(
@@ -559,11 +517,7 @@ class VectorStoreRetriever:
             for query in df[self.query_column]:
                 util.check_canceled(ctx)
 
-                filter_dict = vectorstore.get_metadata_filter(self.metadata_filter)
-
-                documents = db.similarity_search_with_score(
-                    query, k=self.top_k, filter=filter_dict
-                )
+                documents = db.similarity_search_with_score(query, k=self.top_k)
 
                 doc_collection.append(
                     [document[0].page_content for document in documents]
@@ -606,12 +560,6 @@ class VectorStoreRetriever:
                     list(df.columns), self.dissimilarity_scores_column_name
                 )
                 df[dissimilarity_score_name] = dissimilarity_scores
-
-            # Check if any documents were retrieved by looking at the length of the retrieved documents
-            if df[output_column_name].apply(len).eq(0).all():
-                # If no documents were retrieved, each row of all but the first column should be a list containing an empty string
-                for column in df.columns[1:]:
-                    df[column] = [[""] for _ in range(len(df))]
 
             output_table.append(df)
 

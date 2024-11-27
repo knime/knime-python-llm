@@ -384,8 +384,8 @@ class AzureOpenAIAuthenticator:
         except openai.NotFoundError:
             raise knext.InvalidParametersError(
                 """API resource not found. Please ensure you are using a valid address and API version.
-                The address can be found in the 'Keys and Endpoints' section of the [Azure Portal](https://portal.azure.com/).
-                For the correct API version, refer to the [API Version Deprecation Guide at](https://learn.microsoft.com/en-us/azure/ai-services/openai/api-version-deprecation).
+                The address can be found in the 'Keys and Endpoints' section of the Azure Portal at https://portal.azure.com/.
+                For the correct API version, refer to the API Version Deprecation Guide at https://learn.microsoft.com/en-us/azure/ai-services/openai/api-version-deprecation.
                 """
             )
         except openai.AuthenticationError:

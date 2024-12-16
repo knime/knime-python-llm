@@ -477,7 +477,7 @@ class VectorStoreRetriever:
     metadata_filter = knext.ParameterArray(
         label="Metadata Filter",
         description="Select metadata column and value to filter by.",
-        since_version="5.4.0",
+        since_version="5.4.1",
         parameters=Parameters(),
         button_text="Add filter",
         array_title="Metadata Filter",

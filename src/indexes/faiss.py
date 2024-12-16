@@ -65,6 +65,11 @@ class FAISSVectorstorePortObject(FilestoreVectorstorePortObject):
         ]
         return docs, embeddings
 
+    def get_metadata_filter(self, filter_parameter) -> dict:
+        return {
+            group.metadata_column: group.metadata_value for group in filter_parameter
+        }
+
 
 faiss_vector_store_port_type = knext.port_type(
     "FAISS Vector Store", FAISSVectorstorePortObject, FAISSVectorstorePortObjectSpec

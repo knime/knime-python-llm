@@ -43,7 +43,7 @@ class FAISSVectorstorePortObject(FilestoreVectorstorePortObject):
             spec, embeddings_port_object, folder_path, vectorstore=vectorstore
         )
 
-    def load_vectorstore(self, embeddings, vectorstore_path):
+    def load_vectorstore(self, embeddings, vectorstore_path, ctx):
         from langchain.vectorstores.faiss import FAISS
 
         return FAISS.load_local(

@@ -1,6 +1,6 @@
 from typing import Any, List, Optional
 from langchain_core.language_models import LLM
-from pydantic import root_validator
+from pydantic import model_validator
 from huggingface_hub import InferenceClient
 from .hf_base import raise_for
 from langchain_community.embeddings import HuggingFaceHubEmbeddings
@@ -28,10 +28,13 @@ class HFLLM(LLM):
     def _llm_type(self):
         return "hfllm"
 
-    @root_validator()
+    @model_validator(mode="before")
+    @classmethod
     def validate_values(cls, values: dict) -> dict:
         values["client"] = InferenceClient(
-            model=values["model"], timeout=120, token=values.get("hf_api_token")
+            model=values["model"],
+            timeout=120,
+            token=values.get("hf_api_token"),
         )
         return values
 

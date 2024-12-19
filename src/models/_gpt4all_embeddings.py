@@ -1,6 +1,6 @@
 from typing import Dict, Optional
 from langchain_community.embeddings import GPT4AllEmbeddings
-from pydantic import root_validator
+from pydantic import model_validator
 import knime.extension as knext
 from gpt4all import Embed4All
 
@@ -12,7 +12,8 @@ class _GPT4ALLEmbeddings(GPT4AllEmbeddings):
     num_threads: Optional[int] = None
     allow_download: bool = False
 
-    @root_validator()
+    @model_validator(mode="before")
+    @classmethod
     def validate_environment(cls, values: Dict) -> Dict:
         """Validate that GPT4All library is installed."""
 

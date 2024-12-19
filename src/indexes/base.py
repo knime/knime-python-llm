@@ -152,11 +152,11 @@ class FilestoreVectorstorePortObject(FilestorePortObject, VectorstorePortObject)
         if self._vectorstore is None:
             embeddings = self.embeddings_model.create_model(ctx)
             self._vectorstore = self.load_vectorstore(
-                embeddings, self._vectorstore_path
+                embeddings, self._vectorstore_path, ctx
             )
         return self._vectorstore
 
-    def load_vectorstore(self, embeddings, vectorstore_path):
+    def load_vectorstore(self, embeddings, vectorstore_path, ctx):
         raise NotImplementedError()
 
     @classmethod
@@ -560,10 +560,12 @@ class VectorStoreRetriever:
                 util.check_canceled(ctx)
 
                 filter_dict = vectorstore.get_metadata_filter(self.metadata_filter)
-
-                documents = db.similarity_search_with_score(
-                    query, k=self.top_k, filter=filter_dict
-                )
+                if filter_dict:
+                    documents = db.similarity_search_with_score(
+                        query, k=self.top_k, filter=filter_dict
+                    )
+                else:  # Chroma does not support filtering with empty dicts
+                    documents = db.similarity_search_with_score(query, k=self.top_k)
 
                 doc_collection.append(
                     [document[0].page_content for document in documents]

@@ -532,14 +532,16 @@ class Embeddings4AllPortObject(EmbeddingsPortObject, FilestorePortObject):
         return super().spec
 
     def create_model(self, ctx):
-        from ._gpt4all_embeddings import _GPT4ALLEmbeddings
+        from langchain_community.embeddings import GPT4AllEmbeddings
 
         try:
-            return _GPT4ALLEmbeddings(
+            return GPT4AllEmbeddings(
                 model_name=self._model_name,
-                model_path=self._model_path,
-                num_threads=self.spec.num_threads,
-                allow_download=False,
+                n_threads=self.spec.num_threads,
+                gpt4all_kwargs={
+                    "allow_download": False,
+                    "model_path": self._model_path,
+                },
             )
         except Exception as e:
             unsupported_model_exception = (
@@ -556,7 +558,8 @@ class Embeddings4AllPortObject(EmbeddingsPortObject, FilestorePortObject):
             raise ValueError(f"The model at path {self.model_path} is not valid.")
 
     def write_to(self, file_path: str) -> None:
-        from ._gpt4all_embeddings import _GPT4ALLEmbeddings
+        from langchain_community.embeddings import GPT4AllEmbeddings
+        from requests.exceptions import ConnectionError
 
         os.makedirs(file_path)
         if self._model_path:
@@ -566,12 +569,19 @@ class Embeddings4AllPortObject(EmbeddingsPortObject, FilestorePortObject):
                 os.path.join(file_path, self._model_name),
             )
         else:
-            _GPT4ALLEmbeddings(
-                model_path=file_path,
-                model_name=_embeddings4all_model_name,
-                num_threads=1,
-                allow_download=True,
-            )
+            try:
+                GPT4AllEmbeddings(
+                    model_name=_embeddings4all_model_name,
+                    n_threads=1,
+                    gpt4all_kwargs={
+                        "allow_download": True,
+                        "model_path": file_path,
+                    },
+                )
+            except ConnectionError:
+                raise knext.InvalidParametersError(
+                    "Connection error. Please ensure that your internet connection is enabled to download the model."
+                )
 
     @classmethod
     def read_from(
@@ -657,7 +667,7 @@ class Embeddings4AllConnector:
         return Embeddings4AllPortObjectSpec(n_threads)
 
     def execute(self, ctx) -> Embeddings4AllPortObject:
-        from ._gpt4all_embeddings import _GPT4ALLEmbeddings
+        from langchain_community.embeddings import GPT4AllEmbeddings
 
         if self.model_retrieval == ModelRetrievalOptions.DOWNLOAD.name:
             model_path = None
@@ -669,11 +679,13 @@ class Embeddings4AllConnector:
                 )
             model_path, model_name = os.path.split(self.model_path)
             try:
-                _GPT4ALLEmbeddings(
+                GPT4AllEmbeddings(
                     model_name=model_name,
-                    model_path=model_path,
                     n_threads=self.num_threads,
-                    allow_download=False,
+                    gpt4all_kwargs={
+                        "allow_download": False,
+                        "model_path": model_path,
+                    },
                 )
             except Exception as e:
                 unsupported_model_exception = (

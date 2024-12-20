@@ -107,7 +107,7 @@ def _get_output_format_value_switch() -> knext.EnumParameter:
         OutputFormatOptions.Text.name,
         OutputFormatOptions,
         style=knext.EnumParameter.Style.VALUE_SWITCH,
-        since_version="5.4.0",
+        since_version="5.4.1",
     ).rule(
         knext.DialogContextCondition(_supports_json_mode),
         knext.Effect.SHOW,

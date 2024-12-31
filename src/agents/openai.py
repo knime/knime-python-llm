@@ -57,8 +57,8 @@ class OpenAiFunctionsAgentPortObject(AgentPortObject):
 
     def create_agent(self, ctx, tools):
         from langchain.agents import OpenAIFunctionsAgent
-        from langchain.prompts import MessagesPlaceholder
-        from langchain.schema import SystemMessage
+        from langchain_core.prompts import MessagesPlaceholder
+        from langchain_core.messages import SystemMessage
 
         llm = self.llm.create_model(ctx)
         tools = self.validate_tools(tools)

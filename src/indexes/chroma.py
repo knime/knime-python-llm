@@ -166,7 +166,7 @@ class LocalChromaVectorstorePortObject(
         )
 
     def get_documents(self, ctx: knext.ExecutionContext) -> tuple[list, np.ndarray]:
-        from langchain.docstore.document import Document
+        from langchain_core.documents import Document
         from langchain_chroma import Chroma
 
         store: Chroma = self.load_store(ctx)
@@ -199,7 +199,7 @@ class LocalChromaVectorstorePortObject(
         return os.path.isfile(path)
 
     def _extract_data_manually(self):
-        from langchain.docstore.document import Document
+        from langchain_core.documents import Document
         import json
 
         # the vectorstore is outdated, so we extract the data manually

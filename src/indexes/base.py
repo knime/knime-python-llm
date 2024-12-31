@@ -368,7 +368,7 @@ class BaseVectorStoreCreator(ABC):
             embeddings_series = df[self.embeddings_column]
 
         def to_document(row):
-            from langchain.docstore.document import Document
+            from langchain_core.documents import Document
 
             metadata = {name: row[name] for name in metadata_columns}
             return Document(page_content=row[self.document_column], metadata=metadata)

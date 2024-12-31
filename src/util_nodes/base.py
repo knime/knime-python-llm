@@ -32,7 +32,7 @@ class SpecifyLanguageSetting(knext.EnumParameterOptions):
 
 
 class SplitterLanguage(knext.EnumParameterOptions):
-    """Mirrors the languages provided by langchain.text_splitter.Language. Only implements languages handled
+    """Mirrors the languages provided by langchain_text_splitters.Language. Only implements languages handled
     by RecursiveTextSplitter.from_language()."""
 
     CSHARP = ("C#", "C#&#8203; syntax will be used to split the texts.")
@@ -281,7 +281,7 @@ class TextChunker:
                 yield knext.Table.from_pyarrow(output_table, row_ids="keep")
 
     def _create_splitter(self):
-        from langchain.text_splitter import RecursiveCharacterTextSplitter
+        from langchain_text_splitters import RecursiveCharacterTextSplitter
 
         if self.language_mode == SpecifyLanguageSetting.CODE.name:
             return RecursiveCharacterTextSplitter.from_language(
@@ -296,7 +296,7 @@ class TextChunker:
             )
 
     def _get_language(self):
-        from langchain.text_splitter import Language
+        from langchain_text_splitters import Language
 
         try:
             return Language[self.selected_language]

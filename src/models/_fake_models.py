@@ -1,11 +1,10 @@
-from langchain.llms.base import LLM
-from langchain.chat_models.base import SimpleChatModel
-from langchain.embeddings.base import Embeddings
-from langchain.callbacks.manager import (
+from langchain_core.language_models import LLM, SimpleChatModel
+from langchain_core.embeddings import Embeddings
+from langchain_core.callbacks import (
     AsyncCallbackManagerForLLMRun,
     CallbackManagerForLLMRun,
 )
-from langchain.schema import BaseMessage
+from langchain_core.messages import BaseMessage
 from typing import Any, List, Optional, Mapping, Dict
 from pydantic import BaseModel
 import knime.extension as knext

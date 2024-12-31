@@ -256,7 +256,7 @@ class HFHubEmbeddingsPortObject(EmbeddingsPortObject):
         return super().spec
 
     def create_model(self, ctx):
-        from langchain.embeddings.huggingface_hub import HuggingFaceHubEmbeddings
+        from langchain_community.embeddings import HuggingFaceHubEmbeddings
 
         hub_api_token = ctx.get_credentials(self.spec.hub_credentials_name).password
         return HuggingFaceHubEmbeddings(

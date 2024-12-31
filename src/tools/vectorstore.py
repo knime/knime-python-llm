@@ -116,7 +116,7 @@ class VectorToolPortObject(ToolPortObject):
         RetrievalQAWithSourcesChain and RetrievalQA are called via their __call__ method
         instead of run() to enable returning multiple outputs (answer, source, and source_documents).
         """
-        from langchain.tools import StructuredTool
+        from langchain_core.tools import StructuredTool
 
         retrieval_chain = self._create_function(ctx, self.spec.source_metadata)
 

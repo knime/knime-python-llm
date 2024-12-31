@@ -1,5 +1,5 @@
 from typing import List, Optional
-from langchain.embeddings.base import Embeddings
+from langchain_core.embeddings import Embeddings
 from openai import OpenAI
 import knime.api.schema as ks
 

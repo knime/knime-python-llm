@@ -44,7 +44,7 @@ class FAISSVectorstorePortObject(FilestoreVectorstorePortObject):
         )
 
     def load_vectorstore(self, embeddings, vectorstore_path, ctx):
-        from langchain.vectorstores.faiss import FAISS
+        from langchain_community.vectorstores import FAISS
 
         return FAISS.load_local(
             embeddings=embeddings,
@@ -56,7 +56,7 @@ class FAISSVectorstorePortObject(FilestoreVectorstorePortObject):
         vectorstore.save_local(vectorstore_folder)
 
     def get_documents(self, ctx: knext.ExecutionContext) -> tuple[list, ndarray]:
-        from langchain.vectorstores.faiss import FAISS
+        from langchain_community.vectorstores import FAISS
 
         store: FAISS = self.load_store(ctx)
         docs = [store.docstore.search(id) for id in store.index_to_docstore_id.values()]
@@ -139,7 +139,7 @@ class FAISSVectorStoreCreator(BaseVectorStoreCreator):
         metadata_column_names: list[str],
         embeddings,
     ) -> FAISSVectorstorePortObject:
-        from langchain.vectorstores.faiss import FAISS
+        from langchain_community.vectorstores import FAISS
 
         embeddings_model = embeddings_obj.create_model(ctx)
         if embeddings is None:
@@ -225,7 +225,7 @@ class FAISSVectorStoreReader:
         ctx: knext.ExecutionContext,
         embeddings_port_object: EmbeddingsPortObject,
     ) -> FAISSVectorstorePortObject:
-        from langchain.vectorstores.faiss import FAISS
+        from langchain_community.vectorstores import FAISS
 
         # TODO: Add check if .fiass and .pkl files are in the directory instead of instatiating as check
         db = FAISS.load_local(

@@ -347,34 +347,32 @@ class AgentPrompter:
         #         return_messages=True,
         #     )
 
-        # TODO more memory variants
         # TODO return messages might depend on the type of model (i.e. chat needs it llm doesn't)?
 
         import langchain
         import langchain.agents
-        from langchain.memory import ConversationBufferMemory
 
         langchain.debug = self.enable_debug_output
-        memory = ConversationBufferMemory(
-            memory_key="chat_history", return_messages=True
-        )
 
         messages = self.conversation_settings.create_messages(chat_history_df)
-
-        for message in messages:
-            memory.chat_memory.add_message(message)
 
         tools = tools_obj.create_tools(ctx)
         agent = agent_obj.create_agent(ctx, tools)
 
         agent_exec = langchain.agents.AgentExecutor(
-            memory=memory, agent=agent, tools=tools
+            agent=agent,
+            tools=tools,
         )
 
-        response = agent_exec.run(input=self.message_settings.message)
+        response = agent_exec.invoke(
+            {
+                "input": self.message_settings.message,
+                "chat_history": messages,
+            }
+        )
 
         user_input_row = ["Human", self.message_settings.message]
-        agent_output_row = ["AI", response]
+        agent_output_row = ["AI", response["output"]]
 
         chat_history_df.loc[f"Row{len(chat_history_df)}"] = user_input_row
         chat_history_df.loc[f"Row{len(chat_history_df)}"] = agent_output_row

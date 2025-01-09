@@ -384,14 +384,24 @@ class VectorStoreToTool:
             raise knext.InvalidParametersError(
                 "Select the metadata that holds the sources."
             )
-        return FilestoreVectorToolPortObjectSpec(
-            self.tool_name,
-            self.tool_description,
-            self.top_k,
-            self.source_metadata,
-            llm_spec,
-            vectorstore_spec,
-        )
+        if self.retrieve_sources:
+            return FilestoreVectorToolPortObjectSpec(
+                self.tool_name,
+                self.tool_description,
+                self.top_k,
+                self.source_metadata,
+                llm_spec,
+                vectorstore_spec,
+            )
+        else:
+            return FilestoreVectorToolPortObjectSpec(
+                self.tool_name,
+                self.tool_description,
+                self.top_k,
+                None,
+                llm_spec,
+                vectorstore_spec,
+            )
 
     def execute(
         self,

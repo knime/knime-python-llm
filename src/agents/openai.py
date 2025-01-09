@@ -56,17 +56,25 @@ class OpenAiFunctionsAgentPortObject(AgentPortObject):
         return tools
 
     def create_agent(self, ctx, tools):
-        from langchain.agents import OpenAIFunctionsAgent
         from langchain_core.prompts import MessagesPlaceholder
-        from langchain_core.messages import SystemMessage
+        from langchain_core.prompts import ChatPromptTemplate
+        from langchain.agents import create_openai_functions_agent
 
         llm = self.llm.create_model(ctx)
         tools = self.validate_tools(tools)
-        return OpenAIFunctionsAgent.from_llm_and_tools(
+        prompt = ChatPromptTemplate(
+            [
+                ("system", self.spec.system_message),
+                MessagesPlaceholder("chat_history", optional=True),
+                ("human", "{input}"),
+                MessagesPlaceholder("agent_scratchpad"),
+            ]
+        )
+
+        return create_openai_functions_agent(
             llm=llm,
             tools=tools,
-            extra_prompt_messages=[MessagesPlaceholder(variable_name="chat_history")],
-            system_message=SystemMessage(content=self.spec.system_message),
+            prompt=prompt,
         )
 
 

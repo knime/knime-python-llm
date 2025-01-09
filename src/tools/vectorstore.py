@@ -81,55 +81,105 @@ class VectorToolPortObject(ToolPortObject):
     def _create_function(self, ctx, source_metadata: Optional[str] = None):
         """
         This method creates a function based on the given context and retrieval sources flag.
-
-        For RetrievalQA and RetrievalQAWithSourcesChain, the default input keys are "query" and "question" respectively.
-        The input key for RetrievalQA can be modified, but not for RetrievalQAWithSourcesChain.
-        Therefore, RetrievalQA's input key is set to "question" to ensure uniformity in function calls within the create method.
         """
-
-        from langchain.chains import RetrievalQA, RetrievalQAWithSourcesChain
-        from ._retriever import AdapterRetriever
+        from langchain.chains.retrieval import create_retrieval_chain
+        from langchain.chains.combine_documents import create_stuff_documents_chain
+        from langchain_core.prompts import ChatPromptTemplate
 
         llm = self._llm.create_model(ctx)
         vectorstore = self._vectorstore.load_store(ctx)
         retriever = vectorstore.as_retriever(search_kwargs={"k": self.spec.top_k})
 
         if source_metadata:
-            return RetrievalQAWithSourcesChain.from_chain_type(
-                llm=llm,
-                retriever=AdapterRetriever(
-                    retriever=retriever, source_metadata=source_metadata
-                ),
-                verbose=True,
-                return_source_documents=True,
+            from langgraph.graph import START, StateGraph
+            from typing_extensions import List, TypedDict, Annotated
+            from langchain_core.documents import Document
+
+            prompt_message = (
+                "You are an AI assistant for answering questions. You will be provided with the necessary "
+                "context to answer the question. Specify the sources of the pieces of retrieved context used "
+                "to answer the question. If the context does not contain the answer, just say that you "
+                "don't know. Use three sentences maximum and keep the answer concise.\n"
+                "Question: {input}\n\nContext: {context}\n\nAnswer:"
+            )
+            prompt = ChatPromptTemplate(
+                [
+                    ("human", prompt_message),
+                ]
             )
 
-        return RetrievalQA.from_chain_type(
-            llm=llm,
-            chain_type="stuff",
-            retriever=retriever,
-            input_key="question",
+            class AnswerWithSources(TypedDict):
+                answer: str
+                sources: Annotated[
+                    List[str],
+                    ...,
+                    "List of sources used to answer the question",
+                ]
+
+            class State(TypedDict):
+                input: str
+                context: List[Document]
+                answer: str
+                sources: Annotated[
+                    List[str],
+                    ...,
+                    "List of sources used to answer the question",
+                ]
+
+            def retrieve(state: State):
+                retrieved_docs = retriever.invoke(state["input"])
+                return {"context": retrieved_docs}
+
+            def generate(state: State):
+                docs_content = "\n\n".join(
+                    "Content: "
+                    + doc.page_content
+                    + "\n"
+                    + "Source: "
+                    + doc.metadata[source_metadata]
+                    for doc in state["context"]
+                )
+                messages = prompt.invoke(
+                    {"input": state["input"], "context": docs_content}
+                )
+                structured_llm = llm.with_structured_output(AnswerWithSources)
+                response = structured_llm.invoke(messages)
+                return response
+
+            graph_builder = StateGraph(State).add_sequence([retrieve, generate])
+            graph_builder.add_edge(START, "retrieve")
+            graph = graph_builder.compile()
+            return graph
+
+        prompt_message = (
+            "You are an AI assistant for answering questions. You will be provided with the necessary "
+            "context to answer the question. If the context does not contain the answer, just say that you "
+            "don't know. Use three sentences maximum and keep the answer concise.\n"
+            "Question: {input}\n\nContext: {context}\n\nAnswer:"
         )
+        prompt = ChatPromptTemplate(
+            [
+                ("human", prompt_message),
+            ]
+        )
+        combine_docs_chain = create_stuff_documents_chain(llm, prompt)
+        rag_chain = create_retrieval_chain(retriever, combine_docs_chain)
+        return rag_chain
 
     def create(self, ctx):
-        """
-        RetrievalQAWithSourcesChain and RetrievalQA are called via their __call__ method
-        instead of run() to enable returning multiple outputs (answer, source, and source_documents).
-        """
         from langchain_core.tools import StructuredTool
 
         retrieval_chain = self._create_function(ctx, self.spec.source_metadata)
-
-        return StructuredTool(
+        return StructuredTool.from_function(
             name=self.spec.serialize()["name"],
             args_schema=RetrievalQAToolSchema,
-            func=lambda query: retrieval_chain({"question": query}),
+            func=lambda input: retrieval_chain.invoke({"input": input}),
             description=self.spec.serialize()["description"],
         )
 
 
 class RetrievalQAToolSchema(BaseModel):
-    query: str = Field(
+    input: str = Field(
         description="Should be a detailed search query in natural language to be answered by a retriever."
     )
 

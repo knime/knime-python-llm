@@ -874,7 +874,7 @@ class TextEmbedder:
     )
 
     missing_value_handling = knext.EnumParameter(
-        "Handle missing values in the text column",
+        "If there are missing values in the text column",
         """Define whether missing or empty values in the text column should 
         result in missing values in the output table or whether the 
         node execution should fail on such values.""",

@@ -280,7 +280,7 @@ class BaseVectorStoreCreator(ABC):
     )
 
     missing_value_handling = knext.EnumParameter(
-        "Handle missing values in the document column",
+        "If there are missing values in the document column",
         """Define whether missing values in the document column should be skipped or whether the 
         node execution should fail on missing values.""",
         default_value=lambda v: (

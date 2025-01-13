@@ -125,7 +125,7 @@ class MissingValueOutputOptions(knext.EnumParameterOptions):
     """
 
     OutputMissingValues = (
-        "Output Missing Values",
+        "Output missing values",
         "Rows with missing values will not be processed but are included in the output.",
     )
     Fail = (

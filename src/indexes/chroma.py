@@ -33,6 +33,68 @@ chroma_category = knext.category(
 default_collection_name = "langchain"
 
 
+def _extract_data_from_chroma_03(persist_directory: str, collection_name: str):
+    """Extracts data from vector stores created with Chroma 0.3."""
+    from langchain_core.documents import Document
+    import json
+    import pandas as pd
+    import os
+
+    collections_df = pd.read_parquet(
+        persist_directory + os.sep + "chroma-collections.parquet",
+        engine="pyarrow",
+    )
+    embeddings_df = pd.read_parquet(
+        persist_directory + os.sep + "chroma-embeddings.parquet",
+        engine="pyarrow",
+    )
+    if collection_name not in collections_df["name"].values:
+        raise knext.InvalidParametersError(
+            f"No Chroma collection named '{collection_name}' was found in the specified directory."
+        )
+    collection_id = collections_df.loc[collections_df["name"] == collection_name][
+        "uuid"
+    ].values[0]
+    relevant_data = embeddings_df.loc[embeddings_df["collection_uuid"] == collection_id]
+    documents = [
+        Document(page_content=doc, metadata=metadata)
+        for doc, metadata in zip(
+            relevant_data["document"],
+            [json.loads(d) for d in relevant_data["metadata"]],
+        )
+    ]
+    return documents, np.array(relevant_data["embedding"])
+
+
+def create_chroma_from_documents(
+    collection_name: str,
+    embedding_function,
+    documents,
+    embeddings,
+):
+    """Creates a langchain_chroma.Chroma instance and populates it with extracted data."""
+    from langchain_chroma import Chroma
+
+    db = Chroma(
+        collection_name=collection_name,
+        embedding_function=embedding_function,
+    )
+    if documents[0].metadata:
+        db._collection.add(
+            documents=[doc.page_content for doc in documents],
+            embeddings=[arr.tolist() for arr in embeddings],
+            ids=[str(uuid.uuid4()) for _ in range(len(documents))],
+            metadatas=[doc.metadata for doc in documents],
+        )
+    else:
+        db._collection.add(
+            documents=[doc.page_content for doc in documents],
+            embeddings=[arr.tolist() for arr in embeddings],
+            ids=[str(uuid.uuid4()) for _ in range(len(documents))],
+        )
+    return db
+
+
 class ChromaVectorstorePortObjectSpec(VectorstorePortObjectSpec):
     """Super type of the spec of local and remote Chroma vector stores."""
 
@@ -138,16 +200,14 @@ class LocalChromaVectorstorePortObject(
 
         # if the vectorstore is outdated, we create a new temporary chroma vectorstore in memory
         if self._vectorstore_is_outdated(vectorstore_path):
-            extracted_documents, extracted_embeddings = self._extract_data_manually()
-            db = Chroma(
-                collection_name=self.spec.collection_name,
-                embedding_function=embeddings,
+            extracted_documents, extracted_embeddings = _extract_data_from_chroma_03(
+                self._vectorstore_path, self.spec.collection_name
             )
-            db._collection.add(
-                documents=[doc.page_content for doc in extracted_documents],
-                embeddings=[arr.tolist() for arr in extracted_embeddings],
-                ids=[str(uuid.uuid4()) for _ in range(len(extracted_documents))],
-                metadatas=[doc.metadata for doc in extracted_documents],
+            db = create_chroma_from_documents(
+                self.spec.collection_name,
+                embeddings,
+                extracted_documents,
+                extracted_embeddings,
             )
             ctx.set_warning(
                 "The vectorstore is outdated. Consider migrating the vectorstore to avoid creating temporary "
@@ -167,10 +227,13 @@ class LocalChromaVectorstorePortObject(
 
         store: Chroma = self.load_store(ctx)
         content = store.get(include=["embeddings", "metadatas", "documents"])
-        documents = [
-            Document(page_content=doc, metadata=metadata)
-            for doc, metadata in zip(content["documents"], content["metadatas"])
-        ]
+        if content["metadatas"][0] is None:
+            documents = [Document(page_content=doc) for doc in content["documents"]]
+        else:
+            documents = [
+                Document(page_content=doc, metadata=metadata)
+                for doc, metadata in zip(content["documents"], content["metadatas"])
+            ]
         return documents, np.array(content["embeddings"])
 
     def get_metadata_filter(self, filter_parameter) -> dict:
@@ -195,36 +258,6 @@ class LocalChromaVectorstorePortObject(
 
         path = path + os.sep + "chroma-collections.parquet"
         return os.path.isfile(path)
-
-    def _extract_data_manually(self):
-        from langchain_core.documents import Document
-        import json
-        import pandas as pd
-        import os
-
-        # the vectorstore is outdated, so we extract the data manually
-        collections_df = pd.read_parquet(
-            self._vectorstore_path + os.sep + "chroma-collections.parquet",
-            engine="pyarrow",
-        )
-        embeddings_df = pd.read_parquet(
-            self._vectorstore_path + os.sep + "chroma-embeddings.parquet",
-            engine="pyarrow",
-        )
-        collection_id = collections_df.loc[
-            collections_df["name"] == self.spec.collection_name
-        ]["uuid"]
-        relevant_data = embeddings_df.loc[
-            embeddings_df["collection_uuid"] == collection_id
-        ]
-        documents = [
-            Document(page_content=doc, metadata=metadata)
-            for doc, metadata in zip(
-                relevant_data["document"],
-                [json.loads(d) for d in relevant_data["metadata"]],
-            )
-        ]
-        return documents, np.array(relevant_data["embedding"])
 
 
 local_chroma_vector_store_port_type = knext.port_type(
@@ -278,9 +311,9 @@ class ChromaVectorStoreCreator(BaseVectorStoreCreator):
     the Credentials Configuration node will need to be reconfigured upon reopening the workflow, as the credentials flow variable
     was not saved and will therefore not be available to downstream nodes.
 
-    **Note**: Chroma changed their data layout and made outdated vector stores unreadable in downstream nodes.
-    To migrate an outdated vector store, the **Vector Store Data Extractor** can be used to extract its data,
-    which can then be used to create a new vectorstore.
+    **Note**: Chroma changed their data layout which requires downstream nodes to create temporary copies when
+    reading an outdated vector store. To migrate an outdated vector store, the **Vector Store Data Extractor**
+    can be used to extract its data, which can then be used to create a new vectorstore.
     """
 
     # redefined here to enforce the parameter order in the dialog
@@ -326,16 +359,8 @@ class ChromaVectorStoreCreator(BaseVectorStoreCreator):
                 collection_name=self.collection_name,
             )
         else:
-            db = Chroma(
-                collection_name=self.collection_name,
-                embedding_function=embeddings_model,
-            )
-
-            db._collection.add(
-                documents=[doc.page_content for doc in documents],
-                embeddings=[arr.tolist() for arr in embeddings],
-                ids=[str(uuid.uuid4()) for _ in range(len(documents))],
-                metadatas=[doc.metadata for doc in documents],
+            db = create_chroma_from_documents(
+                self.collection_name, embeddings_model, documents, embeddings
             )
 
         return LocalChromaVectorstorePortObject(
@@ -390,8 +415,6 @@ class ChromaVectorStoreReader:
     and do not select the "Save password in configuration (weakly encrypted)" option for passing the API key for the embeddings connector node,
     the Credentials Configuration node will need to be reconfigured upon reopening the workflow, as the credentials flow variable
     was not saved and will therefore not be available to downstream nodes.
-
-    **Note**: Chroma changed their data layout and made outdated vector stores unreadable.
     """
 
     persist_directory = knext.StringParameter(
@@ -427,16 +450,8 @@ class ChromaVectorStoreReader:
         ctx: knext.ExecutionContext,
         embeddings_port_object: EmbeddingsPortObject,
     ) -> ChromaVectorstorePortObject:
-        from langchain_chroma import Chroma
-
-        # Raise error if chromadb would do auto-migration
-        self._check_database_version(self.persist_directory)
-
-        chroma = Chroma(
-            self.collection_name,
-            embeddings_port_object.create_model(ctx),
-            self.persist_directory,
-        )
+        version = self._get_database_version(self.persist_directory)
+        chroma = self._create_chroma_with_version(version, embeddings_port_object, ctx)
 
         document_list = chroma.similarity_search("a", k=1)
         metadata_keys = (
@@ -451,9 +466,9 @@ class ChromaVectorStoreReader:
             vectorstore=chroma,
         )
 
-    def _check_database_version(self, persist_directory: str) -> None:
-        """Since chromadb auto-migrates databases from version 0.4 when reading
-        with version 0.5, we raise an error if the database is from an affected version."""
+    def _get_database_version(self, persist_directory: str) -> str:
+        """Returns the Chroma version used to create the vector store.
+        Raises an error if the specified directory or collection name is wrong."""
         import os
 
         # check if sqlite3 file (new data layout) exists
@@ -462,7 +477,7 @@ class ChromaVectorStoreReader:
             if os.path.isfile(
                 persist_directory + os.sep + "chroma-collections.parquet"
             ):
-                raise RuntimeError("The vectorstore is outdated.")
+                return "0.3"
             else:
                 raise knext.InvalidParametersError(
                     "The specified directory does not contain a Chroma vector store."
@@ -486,10 +501,9 @@ class ChromaVectorStoreReader:
 
             # check if topic column exists, as it indicates the store was created with Chroma 0.4
             if "topic" in column_names:
-                raise RuntimeError(
-                    "The vector store was created with Chroma version 0.4. Since Chroma would irreversibly "
-                    "migrate the vector store to a later version, we do not allow reading it."
-                )
+                return "0.4"
+            else:
+                return "0.5"
         except sqlite3.Error:
             raise RuntimeError(
                 "Failed to connect to the vector store. This may be because the vector store has "
@@ -498,3 +512,74 @@ class ChromaVectorStoreReader:
         finally:
             if sqliteConnection:
                 sqliteConnection.close()
+
+    def _create_chroma_with_version(
+        self, version: str, embeddings_port_object: EmbeddingsPortObject, ctx
+    ):
+        """Returns a langchain_chroma.Chroma instance populated with the data of the specified vectorstore.
+        For outdated vectorstores, the data is manually extracted."""
+        from langchain_chroma import Chroma
+
+        if version == "0.5":
+            return Chroma(
+                self.collection_name,
+                embeddings_port_object.create_model(ctx),
+                self.persist_directory,
+            )
+        elif version == "0.3":
+            extracted_documents, extracted_embeddings = _extract_data_from_chroma_03(
+                self.persist_directory, self.collection_name
+            )
+        elif version == "0.4":
+            extracted_documents, extracted_embeddings = (
+                self._extract_data_from_chroma_04(embeddings_port_object, ctx)
+            )
+        else:
+            raise NotImplementedError("Encountered invalid Chroma version.")
+        db = create_chroma_from_documents(
+            self.collection_name,
+            embeddings_port_object.create_model(ctx),
+            extracted_documents,
+            extracted_embeddings,
+        )
+        return db
+
+    def _extract_data_from_chroma_04(
+        self, embeddings_port_object: EmbeddingsPortObject, ctx
+    ):
+        """Chroma auto-migrates databases from version 0.4 when reading with version 0.5, so we copy the
+        directory to a temporary directory and extract the data from there."""
+        from tempfile import TemporaryDirectory
+        import shutil
+        import os
+        from langchain_chroma import Chroma
+        from langchain_core.documents import Document
+
+        with TemporaryDirectory() as temp_dir:
+            try:
+                shutil.copytree(
+                    self.persist_directory, os.path.join(temp_dir, "vectorstore")
+                )
+                temp_dir_path = os.path.join(temp_dir, "vectorstore")
+                chroma = Chroma(
+                    self.collection_name,
+                    embeddings_port_object.create_model(ctx),
+                    temp_dir_path,
+                )
+                content = chroma.get(include=["embeddings", "metadatas", "documents"])
+                if content["metadatas"][0] is None:
+                    documents = [
+                        Document(page_content=doc) for doc in content["documents"]
+                    ]
+                else:
+                    documents = [
+                        Document(page_content=doc, metadata=metadata)
+                        for doc, metadata in zip(
+                            content["documents"], content["metadatas"]
+                        )
+                    ]
+            finally:
+                # HACK because Chroma does not close its connection to the vector store, so the temp dir can't be removed on Windows
+                chroma._client._system.stop()
+                del chroma
+        return documents, np.array(content["embeddings"])

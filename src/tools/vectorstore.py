@@ -21,6 +21,7 @@ from indexes.base import (
 from .base import ToolListPortObject, ToolListPortObjectSpec, tool_list_port_type
 import os
 from pydantic import BaseModel, Field
+from typing import Annotated
 
 
 class VectorToolPortObjectSpec(ToolPortObjectSpec):
@@ -91,9 +92,8 @@ class VectorToolPortObject(ToolPortObject):
         retriever = vectorstore.as_retriever(search_kwargs={"k": self.spec.top_k})
 
         if source_metadata:
-            from langgraph.graph import START, StateGraph
             from typing_extensions import List, TypedDict, Annotated
-            from langchain_core.documents import Document
+            from langchain_core.runnables import RunnableLambda
 
             prompt_message = (
                 "You are an AI assistant for answering questions. You will be provided with the necessary "
@@ -116,21 +116,11 @@ class VectorToolPortObject(ToolPortObject):
                     "List of sources used to answer the question",
                 ]
 
-            class State(TypedDict):
-                input: str
-                context: List[Document]
-                answer: str
-                sources: Annotated[
-                    List[str],
-                    ...,
-                    "List of sources used to answer the question",
-                ]
-
-            def retrieve(state: State):
+            def retrieve(state: dict):
                 retrieved_docs = retriever.invoke(state["input"])
-                return {"context": retrieved_docs}
+                return {"input": state["input"], "context": retrieved_docs}
 
-            def generate(state: State):
+            def generate(state: dict):
                 docs_content = "\n\n".join(
                     "Content: "
                     + doc.page_content
@@ -142,14 +132,14 @@ class VectorToolPortObject(ToolPortObject):
                 messages = prompt.invoke(
                     {"input": state["input"], "context": docs_content}
                 )
-                structured_llm = llm.with_structured_output(AnswerWithSources)
+                structured_llm = llm.with_structured_output(
+                    AnswerWithSources, method="function_calling"
+                )
                 response = structured_llm.invoke(messages)
                 return response
 
-            graph_builder = StateGraph(State).add_sequence([retrieve, generate])
-            graph_builder.add_edge(START, "retrieve")
-            graph = graph_builder.compile()
-            return graph
+            retrieval_chain = RunnableLambda(retrieve) | RunnableLambda(generate)
+            return retrieval_chain
 
         prompt_message = (
             "You are an AI assistant for answering questions. You will be provided with the necessary "
@@ -179,9 +169,12 @@ class VectorToolPortObject(ToolPortObject):
 
 
 class RetrievalQAToolSchema(BaseModel):
-    input: str = Field(
-        description="Should be a detailed search query in natural language to be answered by a retriever."
-    )
+    input: Annotated[
+        str,
+        Field(
+            description="Should be a detailed search query in natural language to be answered by a retriever."
+        ),
+    ]
 
 
 class FilestoreVectorToolPortObjectSpec(VectorToolPortObjectSpec):

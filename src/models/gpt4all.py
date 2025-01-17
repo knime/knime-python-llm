@@ -559,7 +559,9 @@ class Embeddings4AllPortObject(EmbeddingsPortObject, FilestorePortObject):
 
     def write_to(self, file_path: str) -> None:
         from langchain_community.embeddings import GPT4AllEmbeddings
-        from requests.exceptions import ConnectionError
+        from requests.exceptions import (
+            ConnectionError,
+        )  # The ConnectionError inherits from IOError, so we need the import
 
         os.makedirs(file_path)
         if self._model_path:

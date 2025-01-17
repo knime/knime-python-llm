@@ -1,9 +1,7 @@
 import uuid
 import numpy as np
-import pandas as pd
 import knime.extension as knext
 from typing import Any, Optional
-import os
 
 from knime.extension import ExecutionContext
 from models.base import (
@@ -125,10 +123,8 @@ class LocalChromaVectorstorePortObject(
 
             try:
                 new_collection.add(**existing_entries)
-            except ValueError:
-                raise knext.InvalidParametersError(
-                    f"No Chroma collection named '{existing_collection.name}' was found in the specified directory."
-                )
+            except ValueError:  # Collection.add raises an Error for empty lists
+                raise knext.InvalidParametersError("The vector store is empty.")
             vectorstore = Chroma(
                 embedding_function=vectorstore._embedding_function,
                 persist_directory=vectorstore_folder,
@@ -195,12 +191,16 @@ class LocalChromaVectorstorePortObject(
         return {"$and": filter_list}
 
     def _vectorstore_is_outdated(self, path: str):
+        import os
+
         path = path + os.sep + "chroma-collections.parquet"
         return os.path.isfile(path)
 
     def _extract_data_manually(self):
         from langchain_core.documents import Document
         import json
+        import pandas as pd
+        import os
 
         # the vectorstore is outdated, so we extract the data manually
         collections_df = pd.read_parquet(
@@ -454,6 +454,8 @@ class ChromaVectorStoreReader:
     def _check_database_version(self, persist_directory: str) -> None:
         """Since chromadb auto-migrates databases from version 0.4 when reading
         with version 0.5, we raise an error if the database is from an affected version."""
+        import os
+
         # check if sqlite3 file (new data layout) exists
         path = persist_directory + os.sep + "chroma.sqlite3"
         if not os.path.isfile(path):
@@ -472,7 +474,17 @@ class ChromaVectorStoreReader:
             sql_query = """SELECT * FROM collections;"""
             cursor = sqliteConnection.cursor()
             cursor.execute(sql_query)
+
+            # check if collection name exists
             column_names = [description[0] for description in cursor.description]
+            rows = cursor.fetchall()
+            column_idx = column_names.index("name")
+            if self.collection_name not in [row[column_idx] for row in rows]:
+                raise knext.InvalidParametersError(
+                    f"No Chroma collection named '{self.collection_name}' was found in the specified directory."
+                )
+
+            # check if topic column exists, as it indicates the store was created with Chroma 0.4
             if "topic" in column_names:
                 raise RuntimeError(
                     "The vector store was created with Chroma version 0.4. Since Chroma would irreversibly "

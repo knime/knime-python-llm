@@ -773,6 +773,17 @@ class OpenAIChatModelPortObject(ChatModelPortObject):
         if output_format == OutputFormatOptions.JSON:
             model_kwargs["response_format"] = {"type": "json_object"}
 
+        if "o1" in self.spec.model:
+            return ChatOpenAI(
+                openai_api_key=ctx.get_credentials(self.spec.credentials).password,
+                base_url=self.spec.base_url,
+                model=self.spec.model,
+                temperature=1,
+                max_completion_tokens=self.spec.max_tokens,
+                seed=self.spec.seed,
+                model_kwargs=model_kwargs,
+            )
+
         return ChatOpenAI(
             openai_api_key=ctx.get_credentials(self.spec.credentials).password,
             base_url=self.spec.base_url,

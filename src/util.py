@@ -1,5 +1,5 @@
 import knime.extension as knext
-from typing import Callable, List
+from typing import Callable, List, Union
 from abc import ABC, abstractmethod
 import re
 import pyarrow as pa
@@ -187,11 +187,14 @@ def handle_missing_and_empty_values(
 
 
 class BaseMapper(ABC):
-    def __init__(self, column: str, fn: Callable, output_type) -> None:
+    def __init__(
+        self,
+        columns: Union[str, List[str]],
+        fn: Callable[[pa.Table], pa.Table],
+    ) -> None:
         super().__init__()
-        self._column = column
+        self._columns = [columns] if isinstance(columns, str) else columns
         self._fn = fn
-        self._output_type = output_type
 
     def _is_valid(self, text_array):
         text_array = pc.utf8_trim_whitespace(text_array)
@@ -209,18 +212,18 @@ class BaseMapper(ABC):
 
 class FailOnMissingMapper(BaseMapper):
     def map(self, table: pa.Table):
-        array = table.column(self._column)
-        is_valid = self._is_valid(array)
-        all_valid = pc.all(is_valid)
-        if not all_valid.as_py():
-            raise ValueError(
-                f"There are missing or empty values in column {self._column}. "
-                f"See row ID <{self._get_row_id_of_first_null(table, is_valid)}> "
-                "for the first row that contains such a value."
-            )
+        for column in self._columns:
+            text_array = table.column(column)
+            is_valid = self._is_valid(text_array)
+            all_valid = pc.all(is_valid)
+            if not all_valid.as_py():
+                raise ValueError(
+                    f"There are missing or empty values in column {column}. "
+                    f"See row ID <{self._get_row_id_of_first_null(table, is_valid)}> "
+                    "for the first row that contains such a value."
+                )
 
-        results = self._fn(array.to_pylist())
-        return pa.array(results, type=self._output_type)
+        return self._fn(table)
 
     def _get_row_id_of_first_null(self, table, is_valid):
         empties = pc.filter(table, pc.invert(is_valid))
@@ -234,11 +237,12 @@ class FailOnMissingMapper(BaseMapper):
 class OutputMissingMapper(BaseMapper):
     def __init__(
         self,
-        column: str,
+        columns: Union[str, List[str]],
         fn: Callable,
-        output_type,
+        output_type: pa.DataType,
     ) -> None:
-        super().__init__(column, fn, output_type)
+        super().__init__(columns, fn)
+        self._output_type = output_type
         self._all_missing = True
 
     @property
@@ -246,29 +250,98 @@ class OutputMissingMapper(BaseMapper):
         return self._all_missing
 
     def map(self, table: pa.Table):
-        text_array = table.column(self._column)
-        is_valid = self._is_valid(text_array)
+
+        is_valid = self._compute_validity(table)
         if pc.any(is_valid).as_py():
             self._all_missing = False
 
         all_valid = pc.all(is_valid).as_py()
-        non_empty = text_array if all_valid else text_array.filter(is_valid)
+        non_empty = table if all_valid else table.filter(is_valid)
 
-        processed_values = self._fn(non_empty.to_pylist())
-        processed_array = pa.array(processed_values, type=self._output_type)
+        result_table: pa.Table = self._fn(non_empty)
+
         if all_valid:
-            return processed_array
+            return result_table
 
-        # pc.replace_with_mask does not support list types for some reason
-        # so we do that part ourselves here
-        j = 0
-        results = [None] * len(text_array)
-        for k in range(len(text_array)):
-            if is_valid[k].as_py():
-                results[k] = processed_array[j]
-                j += 1
+        return self._reconstruct_result_table(result_table, is_valid)
 
-        return pa.array(results, type=self._output_type)
+    def _compute_validity(self, table: pa.Table) -> pa.Array:
+        """
+        Computes the validity of the specified columns (self._columns) in the table.
+
+        The result is a boolean array where each element is True if all specified column values
+        in that row are not missing values, and False if any of the specified columns in that row
+        are missing.
+        """
+
+        validity_arrays = [
+            self._is_valid(table.column(column)) for column in self._columns
+        ]
+
+        is_valid = validity_arrays[0]
+        for arr in validity_arrays[1:]:
+            is_valid = pc.and_(is_valid, arr)
+        is_valid = is_valid.combine_chunks()
+
+        return is_valid
+
+    def _reconstruct_result_table(
+        self, result_table: pa.Table, column_validity: pa.Array
+    ) -> pa.Table:
+        """
+        Reconstructs the result table while maintaining the original row structure.
+
+        This method ensures that the output table has the same number of rows as the input table,
+        filling in missing values  where necessary based on the column validity mask.
+
+        `replace_with_mask` currently does not support nested lists (ListArrays), making it unsuitable for our use case
+        where embeddings column contain lists of floats. As an alternative, we use `take` to select valid values.
+        """
+
+        valid_indices = self._compute_valid_indices(column_validity)
+
+        expanded_arrays = []
+        for array in result_table:
+            valid_values = pc.take(array, valid_indices)
+            expanded_arrays.append(valid_values)
+
+        # Recreate the table with the original column names and desired output type.
+        column_names = result_table.schema.names
+        schema = pa.schema([(name, self._output_type) for name in column_names])
+        return pa.table(expanded_arrays, schema=schema)
+
+    def _compute_valid_indices(self, column_validity: pa.Array) -> pa.Array:
+        # Convert boolean validity mask to integers (1 for valid rows, 0 for invalid).
+        validity_int = pc.cast(column_validity, pa.int64())
+
+        # Compute cumulative sum to determine valid row positions.
+        cumulative_indices = pc.cumulative_sum(validity_int)
+
+        # Adjust indices by subtracting 1 to get the correct row positions.
+        valid_indices = pc.subtract(cumulative_indices, 1)
+
+        return pc.if_else(column_validity, valid_indices, None)
+
+
+def table_column_adapter(
+    table: pa.Table,
+    fn: Callable[[List[str]], List[List[float]]],
+    input_column: str,
+    output_column: str,
+) -> pa.Table:
+    """
+    Adapter function that takes a pyarrow table and returns a pyarrow table
+    containing only the processed output column.
+    """
+    if input_column not in table.schema.names:
+        raise ValueError(f"Column '{input_column}' not found in the input table.")
+
+    input_values = table.column(input_column).to_pylist()
+    processed_values = fn(input_values)
+
+    output_array = pa.array(processed_values)
+
+    return pa.table({output_column: output_array})
 
 
 async def abatched_apply(afn, inputs: list, batch_size: int) -> list:

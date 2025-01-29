@@ -544,7 +544,7 @@ class LLMPrompter:
         ),
         enum=util.MissingValueOutputOptions,
         style=knext.EnumParameter.Style.VALUE_SWITCH,
-        since_version="5.4.1",
+        since_version="5.5.0",
     )
 
     output_format = _get_output_format_value_switch()

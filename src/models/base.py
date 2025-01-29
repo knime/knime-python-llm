@@ -359,7 +359,7 @@ class LLMPrompter:
     system_message_handling = knext.EnumParameter(
         "Add system message",
         "Specify whether a customizable system message is included in each prompt. This option is only "
-        "available for chat models.",
+        "available for chat models. Note that some chat models (e.g. OpenAI's o1-mini) do not support system messages.",
         default_value=SystemMessageHandling.NONE.name,
         enum=SystemMessageHandling,
         style=knext.EnumParameter.Style.VALUE_SWITCH,
@@ -666,6 +666,9 @@ class ChatModelPrompter:
 
         Example: You are a helpful assistant that has to answer questions truthfully, and
         if you do not know an answer to a question, you should state that.
+
+        This message is optional and an empty message will not be provided to the model.
+        This is useful for models that don't support system messages (e.g. OpenAI's o1-mini).
         """,
         default_value="",
     )

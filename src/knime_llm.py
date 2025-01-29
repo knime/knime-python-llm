@@ -8,6 +8,7 @@ import models.fake
 import models.openai
 import models.knime
 import models.databricks
+import models.deepseek
 
 try:
     import models.gpt4all

@@ -57,6 +57,8 @@ chat_models = [
     "gpt-4o",
     "gpt-4o-mini",
     "gpt-4-turbo",
+    "o1",
+    "o1-mini",
 ]
 chat_default = "gpt-4o-mini"
 embeddings_models = [
@@ -318,7 +320,16 @@ class ChatModelLoaderInputSettings:
         )
         TURBO_4 = (
             "gpt-4-turbo",
-            """Faster and more cost-effective while maintaining comparable performance to GPT-4.""",
+            """Faster and more cost-effective while maintaining comparable performance to GPT-4.
+            It is recommended to use gpt-4o instead of this model.""",
+        )
+        O1 = (
+            "o1",
+            "Reasoning model designed to solve hard problems across a wide range of domains. Note that the temperature parameter is ignored for this model.",
+        )
+        O1_MINI = (
+            "o1-mini",
+            "Fast and affordable reasoning model for specialized tasks such as programming. Note that this model does not support system messages. Similar to the o1 model, the temperature is also ignored for this model.",
         )
 
     selection = _get_model_selection_value_switch()

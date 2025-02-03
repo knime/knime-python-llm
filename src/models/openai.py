@@ -17,6 +17,7 @@ from .base import (
 
 # Other imports
 import io
+import re
 import util
 import time
 import json
@@ -59,6 +60,7 @@ chat_models = [
     "gpt-4-turbo",
     "o1",
     "o1-mini",
+    "o3-mini"
 ]
 chat_default = "gpt-4o-mini"
 embeddings_models = [
@@ -330,6 +332,10 @@ class ChatModelLoaderInputSettings:
         O1_MINI = (
             "o1-mini",
             "Fast and affordable reasoning model for specialized tasks such as programming. Note that this model does not support system messages. Similar to the o1 model, the temperature is also ignored for this model.",
+        )
+        O3_MINI = (
+            "o3-mini",
+            "Fast and affordable reasoning model designed to excel at science, math, and coding tasks. Note that this model does not support system messages. Similar to the o1 models, the temperature is also ignored for this model.",
         )
 
     selection = _get_model_selection_value_switch()
@@ -784,7 +790,8 @@ class OpenAIChatModelPortObject(ChatModelPortObject):
         if output_format == OutputFormatOptions.JSON:
             model_kwargs["response_format"] = {"type": "json_object"}
 
-        if "o1" in self.spec.model:
+        # reasoning models, e.g. o1, o3-mini, accept max_completion_tokens instead of max_tokens
+        if re.match(r"^o\d", self.spec.model):
             return ChatOpenAI(
                 openai_api_key=ctx.get_credentials(self.spec.credentials).password,
                 base_url=self.spec.base_url,

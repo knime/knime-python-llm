@@ -24,5 +24,6 @@ import tools.base
 import tools.vectorstore
 
 import util_nodes.base
+import util_nodes.wfservice_tool
 
 import eval.giskard

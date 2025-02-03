@@ -3,6 +3,9 @@ from ..base import model_category
 import knime.api.schema as ks
 from urllib.parse import urlparse, urlunparse
 from typing import Callable
+import logging
+
+LOGGER = logging.getLogger(__name__)
 
 hub_connector_icon = "icons/Hub_AI_connector.png"
 

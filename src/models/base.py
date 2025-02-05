@@ -137,47 +137,8 @@ class ChatConversationSettings:
             column_filter=util.create_type_filer(knext.string()),
         )
 
-        self.tool_name_column = knext.ColumnParameter(
-            "Tool name column",
-            "Select the column containing the tool names.",
-            port_index=port_index,
-            column_filter=util.create_type_filer(knext.string()),
-            include_none_column=True,
-            default_value=knext.ColumnParameter.NONE,
-            since_version="5.5.0",
-        ).rule(
-            knext.DialogContextCondition(_tool_definition_table_present),
-            knext.Effect.ENABLE,
-        )
-
-        self.tool_call_id_column = knext.ColumnParameter(
-            "Tool call ID column",
-            "Select the column containing the tool call IDs.",
-            port_index=port_index,
-            column_filter=util.create_type_filer(knext.string()),
-            include_none_column=True,
-            default_value=knext.ColumnParameter.NONE,
-            since_version="5.5.0",
-        ).rule(
-            knext.DialogContextCondition(_tool_definition_table_present),
-            knext.Effect.ENABLE,
-        )
-
-        self.tool_call_arguments_column = knext.ColumnParameter(
-            "Tool call arguments column",
-            "Select the column containing the tool call arguments.",
-            port_index=port_index,
-            column_filter=util.create_type_filer(knext.logical(dict)),
-            include_none_column=True,
-            default_value=knext.ColumnParameter.NONE,
-            since_version="5.5.0",
-        ).rule(
-            knext.DialogContextCondition(_tool_definition_table_present),
-            knext.Effect.ENABLE,
-        )
-
     def configure(
-        self, input_table_spec: knext.Schema, has_tools: Optional[knext.Schema]
+        self, input_table_spec: knext.Schema, has_tools: Optional[bool] = False
     ):
         # TODO autoconfigure when tool columns are present
         if self.content_column:
@@ -218,6 +179,82 @@ class ChatConversationSettings:
                 "The role and content column cannot be the same."
             )
 
+    def create_messages(self, data_frame):  # -> list[ToolMessage | Any | ChatMessage]:
+        return data_frame.apply(self._create_message, axis=1).tolist()
+
+    def _create_message(self, row: dict):
+        import langchain_core.messages as lcm
+
+        role = row.get(self.role_column)
+        if role is None:
+            raise ValueError("No role provided.")
+        message_type = self._role_to_message_type.get(role.lower(), None)
+        content = row.get(self.content_column)
+        if message_type == lcm.AIMessage:
+            return lcm.AIMessage(content=content)
+        if message_type:
+            return message_type(content=content)
+        else:
+            # fallback to be used if the user provides other roles
+            # which may or may not work in subsequent calls
+            return lcm.ChatMessage(content=content, role=role)
+
+    @property
+    def _role_to_message_type(self):
+        import langchain_core.messages as lcm
+
+        return {
+            "ai": lcm.AIMessage,
+            "assistant": lcm.AIMessage,
+            "user": lcm.HumanMessage,
+            "human": lcm.HumanMessage,
+            "tool": lcm.ToolMessage,
+        }
+
+
+class ToolChatConversationSettings(ChatConversationSettings):
+    def __init__(self, port_index=1):
+        super().__init__(port_index=1)
+        self.tool_name_column = knext.ColumnParameter(
+            "Tool name column",
+            "Select the column containing the tool names.",
+            port_index=port_index,
+            column_filter=util.create_type_filer(knext.string()),
+            include_none_column=True,
+            default_value=knext.ColumnParameter.NONE,
+            since_version="5.5.0",
+        ).rule(
+            knext.DialogContextCondition(_tool_definition_table_present),
+            knext.Effect.ENABLE,
+        )
+
+        self.tool_call_id_column = knext.ColumnParameter(
+            "Tool call ID column",
+            "Select the column containing the tool call IDs.",
+            port_index=port_index,
+            column_filter=util.create_type_filer(knext.string()),
+            include_none_column=True,
+            default_value=knext.ColumnParameter.NONE,
+            since_version="5.5.0",
+        ).rule(
+            knext.DialogContextCondition(_tool_definition_table_present),
+            knext.Effect.ENABLE,
+        )
+
+        self.tool_call_arguments_column = knext.ColumnParameter(
+            "Tool call arguments column",
+            "Select the column containing the tool call arguments.",
+            port_index=port_index,
+            column_filter=util.create_type_filer(knext.logical(dict)),
+            include_none_column=True,
+            default_value=knext.ColumnParameter.NONE,
+            since_version="5.5.0",
+        ).rule(
+            knext.DialogContextCondition(_tool_definition_table_present),
+            knext.Effect.ENABLE,
+        )
+
+    def configure(self, input_table_spec: knext.Schema, has_tools: bool):
         if has_tools:
             # TODO autoconfigure
             self._check_tool_column(
@@ -247,17 +284,28 @@ class ChatConversationSettings:
             conversation_table_spec, column, ctype, column_purpose, "tool definitions"
         )
 
-    @property
-    def _role_to_message_type(self):
+    def _create_message(self, row: dict):
         import langchain_core.messages as lcm
 
-        return {
-            "ai": lcm.AIMessage,
-            "assistant": lcm.AIMessage,
-            "user": lcm.HumanMessage,
-            "human": lcm.HumanMessage,
-            "tool": lcm.ToolMessage,
-        }
+        role = row.get(self.role_column).lower()
+        content = row.get(self.content_column)
+        if role == "tool":
+            return lcm.ToolMessage(
+                content=content,
+                tool_call_id=row.get(self.tool_call_id_column),
+            )
+        if role == "ai":
+            tool_calls = []
+            if self.tool_call_arguments_column in row:
+                tool_calls.append(
+                    lcm.ToolCall(
+                        name=row[self.tool_name_column],
+                        id=row[self.tool_call_id_column],
+                        args=row[self.tool_call_arguments_column],
+                    )
+                )
+            return lcm.AIMessage(content=content, tool_calls=tool_calls)
+        return super()._create_message(row)
 
 
 @knext.parameter_group(label="Credentials")
@@ -775,7 +823,7 @@ class ChatModelPrompter:
         default_value="",
     )
 
-    conversation_settings = ChatConversationSettings()
+    conversation_settings = ToolChatConversationSettings()
 
     tool_settings = ToolSettings().rule(
         knext.DialogContextCondition(_tool_definition_table_present),
@@ -878,7 +926,9 @@ class ChatModelPrompter:
         # TODO make ignoring the user message for tools optional
         last_message_is_tool = False
         if len(data_frame) > 0:
-            conversation_messages += self.create_messages(data_frame)
+            conversation_messages += self.conversation_settings.create_messages(
+                data_frame
+            )
 
             last_message_is_tool = (
                 data_frame[self.conversation_settings.role_column].iloc[-1] == "tool"
@@ -977,55 +1027,6 @@ class ChatModelPrompter:
             else:
                 collapsed_messages.append(message)
         return collapsed_messages
-
-    def create_messages(self, data_frame):  # -> list[ToolMessage | Any | ChatMessage]:
-        import pandas as pd
-
-        data_frame: pd.DataFrame = data_frame
-        if self._tool_call_id_column not in data_frame.columns:
-            data_frame[self._tool_call_id_column] = None
-        if self._tool_call_arguments_column not in data_frame.columns:
-            data_frame[self._tool_call_arguments_column] = None
-        return data_frame.apply(self._create_message, axis=1).tolist()
-
-    def _create_message(self, row: dict):
-        import langchain_core.messages as lcm
-
-        role_to_message_type = {
-            "ai": lcm.AIMessage,
-            "assistant": lcm.AIMessage,
-            "user": lcm.HumanMessage,
-            "human": lcm.HumanMessage,
-            "tool": lcm.ToolMessage,
-        }
-
-        role = row.get(self.conversation_settings.role_column)
-        if role is None:
-            raise ValueError("No role provided.")
-        message_type = role_to_message_type.get(role.lower(), None)
-        content = row.get(self.conversation_settings.content_column)
-        if message_type == lcm.ToolMessage:
-            return lcm.ToolMessage(
-                content=content,
-                tool_call_id=row.get(self._tool_call_id_column),
-            )
-        if message_type == lcm.AIMessage:
-            tool_calls = []
-            if self._tool_call_arguments_column in row:
-                tool_calls.append(
-                    lcm.ToolCall(
-                        name=row[self._tool_name_column],
-                        id=row[self._tool_call_id_column],
-                        args=row[self._tool_call_arguments_column],
-                    )
-                )
-            return lcm.AIMessage(content=content, tool_calls=tool_calls)
-        if message_type:
-            return message_type(content=content)
-        else:
-            # fallback to be used if the user provides other roles
-            # which may or may not work in subsequent calls
-            return lcm.ChatMessage(content=content, role=role)
 
 
 def _call_model_with_output_format_fallback(

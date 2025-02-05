@@ -965,7 +965,7 @@ class ChatModelPrompter:
         chat: BaseChatModel = _initialize_model(chat_model, ctx, self.output_format)
         if tool_table is not None:
             tool_data_frame: pd.DataFrame = tool_table.to_pandas()
-            tools = tool_data_frame["tools"].tolist()
+            tools = tool_data_frame[self.tool_settings.tool_definition_column].tolist()
             chat = chat.bind_tools(tools)
         return chat
 

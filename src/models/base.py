@@ -286,6 +286,7 @@ class ToolChatConversationSettings(ChatConversationSettings):
 
     def _create_message(self, row: dict):
         import langchain_core.messages as lcm
+        import pandas as pd
 
         role = row.get(self.role_column).lower()
         content = row.get(self.content_column)
@@ -296,7 +297,9 @@ class ToolChatConversationSettings(ChatConversationSettings):
             )
         if role == "ai":
             tool_calls = []
-            if self.tool_call_arguments_column in row:
+            if self.tool_call_arguments_column in row and pd.notna(
+                row[self.tool_call_id_column]
+            ):
                 tool_calls.append(
                     lcm.ToolCall(
                         name=row[self.tool_name_column],

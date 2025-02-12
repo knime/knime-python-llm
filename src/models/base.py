@@ -180,6 +180,10 @@ class ChatConversationSettings:
             )
 
     def create_messages(self, data_frame):  # -> list[ToolMessage | Any | ChatMessage]:
+
+        if data_frame.empty:
+            return []
+
         return data_frame.apply(self._create_message, axis=1).tolist()
 
     def _create_message(self, row: dict):

@@ -331,6 +331,10 @@ class ChatModelLoaderInputSettings:
             "o1-mini",
             "Fast and affordable reasoning model for specialized tasks such as programming. Note that this model does not support system messages. Similar to the o1 model, the temperature is also ignored for this model.",
         )
+        O3_MINI = (
+            "o3-mini",
+            "Fast and affordable reasoning model designed to excel at science, math, and coding tasks. Note that this model does not support system messages. Similar to the o1 models, the temperature is also ignored for this model.",
+        )
 
     selection = _get_model_selection_value_switch()
 

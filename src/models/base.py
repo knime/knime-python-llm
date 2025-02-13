@@ -180,7 +180,6 @@ class ChatConversationSettings:
             )
 
     def create_messages(self, data_frame):  # -> list[ToolMessage | Any | ChatMessage]:
-
         if data_frame.empty:
             return []
 
@@ -826,8 +825,18 @@ class ChatModelPrompter:
 
     chat_message = knext.MultilineStringParameter(
         "New message",
-        "The new message to be added to the conversation.",
+        "The new message to be added to the conversation. "
+        "This message is optional and an empty message will not be provided to the model.",
         default_value="",
+    )
+
+    ignore_chat_message_if_last_message_is_tool = knext.BoolParameter(
+        "Ignore after tool message",
+        "If enabled, the new message is not added to the conversation if the last message in the conversation table is a tool message.",
+        default_value=lambda v: v
+        < knext.Version(
+            5, 5, 0
+        ),  # False for versions < 5.5.0 for backwards compatibility
     )
 
     conversation_settings = ToolChatConversationSettings()
@@ -938,7 +947,11 @@ class ChatModelPrompter:
             )
 
             last_message_is_tool = (
-                data_frame[self.conversation_settings.role_column].iloc[-1] == "tool"
+                self.ignore_chat_message_if_last_message_is_tool
+                and (
+                    data_frame[self.conversation_settings.role_column].iloc[-1]
+                    == "tool"
+                )
             )
         human_message = None
         if (

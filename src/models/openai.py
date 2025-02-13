@@ -60,6 +60,7 @@ chat_models = [
     "gpt-4-turbo",
     "o1",
     "o1-mini",
+    "o3-mini",
 ]
 chat_default = "gpt-4o-mini"
 embeddings_models = [

@@ -17,6 +17,7 @@ from .base import (
 
 # Other imports
 import io
+import re
 import util
 import time
 import json
@@ -139,6 +140,8 @@ class OpenAIGeneralSettings(GeneralRemoteSettings):
 
         Try 0.9 for more creative applications, and 0 for ones with a well-defined answer.
         It is generally recommended altering this, or Top-p, but not both.
+
+        **Note**: this setting is ignored for o-series models.
         """,
         default_value=0.2,
         min_value=0.0,
@@ -329,11 +332,11 @@ class ChatModelLoaderInputSettings:
         )
         O1_MINI = (
             "o1-mini",
-            "Fast and affordable reasoning model for specialized tasks such as programming. Note that this model does not support system messages. Similar to the o1 model, the temperature is also ignored for this model.",
+            "Fast and affordable reasoning model for specialized tasks such as programming. Note that this model does not support system messages, and the temperature parameter is ignored.",
         )
         O3_MINI = (
             "o3-mini",
-            "Fast and affordable reasoning model designed to excel at science, math, and coding tasks. Note that this model does not support system messages. Similar to the o1 models, the temperature is also ignored for this model.",
+            "Fast and affordable reasoning model designed to excel at science, math, and coding tasks. Note that the temperature parameter is ignored for this model.",
         )
 
     selection = _get_model_selection_value_switch()
@@ -788,11 +791,13 @@ class OpenAIChatModelPortObject(ChatModelPortObject):
         if output_format == OutputFormatOptions.JSON:
             model_kwargs["response_format"] = {"type": "json_object"}
 
+        is_o_series = bool(re.match(r"^o\d", self.spec.model))
+
         return ChatOpenAI(
             openai_api_key=ctx.get_credentials(self.spec.credentials).password,
             base_url=self.spec.base_url,
             model=self.spec.model,
-            temperature=self.spec.temperature,
+            temperature=1.0 if is_o_series else self.spec.temperature,
             max_tokens=self.spec.max_tokens,
             seed=self.spec.seed,
             model_kwargs=model_kwargs,

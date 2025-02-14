@@ -953,7 +953,7 @@ class ChatModelPrompter:
 
         chat = self.initialize_chat_model(ctx, chat_model, tool_table)
 
-        answer: lcm.AIMessage = chat.invoke(conversation_messages)
+        answer: lcm.AIMessage = self._invoke_chat_model(chat, conversation_messages)
 
         response_df = self.create_response_dataframe(
             has_tool_input, human_message, answer
@@ -964,6 +964,18 @@ class ChatModelPrompter:
         data_frame = pd.concat([data_frame, response_df], ignore_index=True)
 
         return knext.Table.from_pandas(data_frame)
+
+    def _invoke_chat_model(self, chat, conversation_messages):
+        try:
+            return chat.invoke(conversation_messages)
+        except Exception as e:
+            if getattr(e, "param", None) == "messages[0].role" and "system" in str(e):
+                raise ValueError(
+                    """The selected model does not support system messages. 
+                    Please ensure that the model you are using supports system messages 
+                    or remove the system message from the configuration."""
+                )
+            raise e
 
     def initialize_chat_model(self, ctx, chat_model, tool_table):
         from langchain_core.language_models import BaseChatModel

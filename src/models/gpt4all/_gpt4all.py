@@ -105,4 +105,12 @@ class GPT4All(LLM):
             text += token
         if stop is not None:
             text = enforce_stop_tokens(text, stop)
+
+        if (
+            text
+            == "ERROR: The prompt size exceeds the context window size and cannot be processed."
+        ):
+            raise ValueError(
+                "The prompt size exceeds the context window size and cannot be processed."
+            )
         return text

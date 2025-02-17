@@ -73,7 +73,10 @@ class Embeddings4AllPortObject(EmbeddingsPortObject, FilestorePortObject):
     def create_model(self, ctx):
         try:
             return _create_embedding_model(
-                self._model_name, self.spec.num_threads, self._model_path, False
+                model_name=self._model_name,
+                n_threads=self.spec.num_threads,
+                model_path=self._model_path,
+                allow_download=False,
             )
         except Exception as e:
             unsupported_model_exception = (
@@ -103,7 +106,12 @@ class Embeddings4AllPortObject(EmbeddingsPortObject, FilestorePortObject):
             )
         else:
             try:
-                _create_embedding_model(_embeddings4all_model_name, file_path, 1, True)
+                _create_embedding_model(
+                    model_name=_embeddings4all_model_name,
+                    model_path=file_path,
+                    n_threads=1,
+                    allow_download=True,
+                )
             except ConnectionError:
                 raise knext.InvalidParametersError(
                     "Connection error. Please ensure that your internet connection is enabled to download the model."
@@ -206,7 +214,12 @@ class Embeddings4AllConnector:
                 )
             model_path, model_name = os.path.split(self.model_path)
             try:
-                _create_embedding_model(model_name, model_path, self.num_threads, False)
+                _create_embedding_model(
+                    model_name=model_name,
+                    model_path=model_path,
+                    n_threads=self.num_threads,
+                    allow_download=False,
+                )
             except Exception as e:
                 unsupported_model_exception = (
                     "Unable to instantiate model: Unsupported model architecture: bert"

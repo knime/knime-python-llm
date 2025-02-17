@@ -45,7 +45,7 @@ class GPT4AllModelParameterSettings(GeneralSettings):
         default_value=2048,
         min_value=1,
         is_advanced=True,
-        since_version="5.5.0",
+        since_version="5.4.3",
     )
 
     temperature = knext.DoubleParameter(

@@ -3,7 +3,6 @@ import knime.extension as knext
 import pyarrow as pa
 from knime.extension import Schema
 import util
-import asyncio
 from base import AIPortObjectSpec
 from typing import List, Callable, Optional, Type
 from functools import partial
@@ -645,6 +644,8 @@ class LLMPrompter:
         llm_port: LLMPortObject,
         input_table: knext.Table,
     ):
+        import asyncio
+
         num_rows = input_table.num_rows
 
         output_column_name = util.handle_column_name_collision(

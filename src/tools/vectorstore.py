@@ -20,8 +20,6 @@ from indexes.base import (
 )
 from .base import ToolListPortObject, ToolListPortObjectSpec, tool_list_port_type
 import os
-from pydantic import BaseModel, Field
-from typing import Annotated
 
 
 class VectorToolPortObjectSpec(ToolPortObjectSpec):
@@ -158,6 +156,7 @@ class VectorToolPortObject(ToolPortObject):
 
     def create(self, ctx):
         from langchain_core.tools import StructuredTool
+        from ._schema import RetrievalQAToolSchema
 
         retrieval_chain = self._create_function(ctx, self.spec.source_metadata)
         return StructuredTool.from_function(
@@ -166,15 +165,6 @@ class VectorToolPortObject(ToolPortObject):
             func=lambda input: retrieval_chain.invoke({"input": input}),
             description=self.spec.serialize()["description"],
         )
-
-
-class RetrievalQAToolSchema(BaseModel):
-    input: Annotated[
-        str,
-        Field(
-            description="Should be a detailed search query in natural language to be answered by a retriever."
-        ),
-    ]
 
 
 class FilestoreVectorToolPortObjectSpec(VectorToolPortObjectSpec):

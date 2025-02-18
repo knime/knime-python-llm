@@ -11,7 +11,6 @@ from ._base import (
 
 from ._utils import gpt4all_icon, gpt4all_category, is_valid_model
 
-from pydantic import ValidationError
 import logging
 
 LOGGER = logging.getLogger(__name__)
@@ -112,6 +111,7 @@ class GPT4AllLLMPortObject(LLMPortObject):
 
     def create_model(self, ctx):
         from ._gpt4all import GPT4All
+        from pydantic import ValidationError
 
         try:
             return GPT4All(

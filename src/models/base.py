@@ -140,19 +140,8 @@ class ChatConversationSettings:
     def configure(
         self, input_table_spec: knext.Schema, has_tools: Optional[bool] = False
     ):
-        # TODO autoconfigure when tool columns are present
-        if self.content_column:
-            util.check_column(
-                input_table_spec,
-                self.content_column,
-                knext.string(),
-                "content",
-            )
-        else:
-            self.content_column = util.pick_default_column(
-                input_table_spec, knext.string()
-            )
-
+        available_columns = [c for c in input_table_spec]
+        available_columns.reverse()
         if self.role_column:
             util.check_column(
                 input_table_spec,
@@ -161,14 +150,23 @@ class ChatConversationSettings:
                 "role",
             )
         else:
-            spec_without_content = knext.Schema.from_columns(
-                [c for c in input_table_spec if c.name != self.content_column]
+            self.role_column = util.pick_default_column(
+                available_columns, knext.string()
             )
+        available_columns = [c for c in available_columns if c.name != self.role_column]
+        if self.content_column:
+            util.check_column(
+                input_table_spec,
+                self.content_column,
+                knext.string(),
+                "content",
+            )
+        else:
             try:
-                self.role_column = util.pick_default_column(
-                    spec_without_content, knext.string()
+                self.content_column = util.pick_default_column(
+                    available_columns, knext.string()
                 )
-            except:
+            except knext.InvalidParametersError:
                 raise knext.InvalidParametersError(
                     "The conversation table must contain at least two string columns. "
                     "One for the message roles and one for the message contents."
@@ -258,8 +256,14 @@ class ToolChatConversationSettings(ChatConversationSettings):
         )
 
     def configure(self, input_table_spec: knext.Schema, has_tools: bool):
+        super().configure(input_table_spec, has_tools)
+
         if has_tools:
-            # TODO autoconfigure
+            # auto configure is not implemented because there is a bug
+            # on the java side that results in dialogs not showing changes made
+            # by configure calls after the dialog was opened the first time
+            # since the input here is optional, it's very likely that the user
+            # will have opened the dialog before connecting the tool table
             self._check_tool_column(
                 input_table_spec, self.tool_name_column, knext.string(), "tool name"
             )
@@ -742,19 +746,21 @@ class ToolSettings:
         column_filter=util.create_type_filer(knext.logical(dict)),
     )
 
-    def configure(self, tool_table_spec):
-        if self.tool_definition_column:
-            util.check_column(
-                tool_table_spec,
-                self.tool_definition_column,
-                knext.logical(dict),
-                "tool definition",
-                "tool definition",
-            )
-        else:
-            raise knext.InvalidParametersError(
-                "Select a tool definition column from the tool definition table."
-            )
+    def configure(self, tool_table_spec: Optional[knext.Schema]):
+        if tool_table_spec is None:
+            return
+        # auto configure is not implemented because there is a bug
+        # on the java side that results in dialogs not showing changes made
+        # by configure calls after the dialog was opened the first time
+        # since the input here is optional, it's very likely that the user
+        # will have opened the dialog before connecting the tool table
+        util.check_column(
+            tool_table_spec,
+            self.tool_definition_column,
+            knext.logical(dict),
+            "tool definition",
+            "tool definition",
+        )
 
 
 @knext.parameter_group(label="Output Settings", since_version="5.5.0")

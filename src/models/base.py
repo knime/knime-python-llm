@@ -928,18 +928,29 @@ class ChatModelPrompter:
         input_table: knext.Table,
         tool_table: Optional[knext.Table],
     ):
-        import langchain_core.messages as lcm
         import pandas as pd
 
         has_tool_input = tool_table is not None
         data_frame: pd.DataFrame = input_table[
             self._needed_columns(has_tool_input)
         ].to_pandas()
+        conversation_messages, human_message = self._construct_conversation(data_frame)
+        chat = self.initialize_chat_model(ctx, chat_model, tool_table)
+        answer = self._invoke_chat_model(chat, conversation_messages)
+        response_df = self.create_response_dataframe(
+            has_tool_input, human_message, answer
+        )
+        if self.output_settings.output_only_new_messages:
+            return knext.Table.from_pandas(response_df)
+        data_frame = pd.concat([data_frame, response_df], ignore_index=True)
+        return knext.Table.from_pandas(data_frame)
+
+    def _construct_conversation(self, data_frame):
+        import langchain_core.messages as lcm
 
         conversation_messages = []
         if self.system_message:
             conversation_messages.append(lcm.SystemMessage(content=self.system_message))
-        # TODO make ignoring the user message for tools optional
         last_message_is_tool = False
         if len(data_frame) > 0:
             conversation_messages += self.conversation_settings.create_messages(
@@ -964,19 +975,7 @@ class ChatModelPrompter:
             conversation_messages
         )
 
-        chat = self.initialize_chat_model(ctx, chat_model, tool_table)
-
-        answer: lcm.AIMessage = self._invoke_chat_model(chat, conversation_messages)
-
-        response_df = self.create_response_dataframe(
-            has_tool_input, human_message, answer
-        )
-        if self.output_settings.output_only_new_messages:
-            return knext.Table.from_pandas(response_df)
-
-        data_frame = pd.concat([data_frame, response_df], ignore_index=True)
-
-        return knext.Table.from_pandas(data_frame)
+        return conversation_messages, human_message
 
     def _invoke_chat_model(self, chat, conversation_messages):
         try:

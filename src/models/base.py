@@ -296,8 +296,15 @@ class ToolChatConversationSettings(ChatConversationSettings):
         import pandas as pd
 
         role = row.get(self.role_column).lower()
+        if pd.isna(role):
+            raise ValueError("No role provided.")
         content = row.get(self.content_column)
+        if pd.isna(content):
+            raise ValueError("No content provided.")
         if role == "tool":
+            tool_call_id = row.get(self.tool_call_id_column)
+            if pd.isna(tool_call_id):
+                raise ValueError("No tool call ID provided.")
             return lcm.ToolMessage(
                 content=content,
                 tool_call_id=row.get(self.tool_call_id_column),
@@ -1003,6 +1010,8 @@ class ChatModelPrompter:
         if tool_table is not None:
             tool_data_frame: pd.DataFrame = tool_table.to_pandas()
             tools = tool_data_frame[self.tool_settings.tool_definition_column].tolist()
+            if any(tool is None for tool in tools):
+                raise ValueError("There is a missing value in the tool table.")
             chat = chat.bind_tools(tools)
         return chat
 

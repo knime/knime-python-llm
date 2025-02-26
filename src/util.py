@@ -1,5 +1,5 @@
 import knime.extension as knext
-from typing import Callable, List, Union
+from typing import Callable, List, Union, Any
 from abc import ABC, abstractmethod
 import re
 import pyarrow as pa
@@ -239,10 +239,10 @@ class OutputMissingMapper(BaseMapper):
         self,
         columns: Union[str, List[str]],
         fn: Callable,
-        output_type: pa.DataType,
+        output_schema: pa.Schema,
     ) -> None:
         super().__init__(columns, fn)
-        self._output_type = output_type
+        self._output_schema = output_schema
         self._all_missing = True
 
     @property
@@ -256,9 +256,9 @@ class OutputMissingMapper(BaseMapper):
             self._all_missing = False
 
         all_valid = pc.all(is_valid).as_py()
-        non_empty = table if all_valid else table.filter(is_valid)
+        valid_table = table if all_valid else table.filter(is_valid)
 
-        result_table: pa.Table = self._fn(non_empty)
+        result_table: pa.Table = self._fn(valid_table)
 
         if all_valid:
             return result_table
@@ -292,7 +292,7 @@ class OutputMissingMapper(BaseMapper):
         Reconstructs the result table while maintaining the original row structure.
 
         This method ensures that the output table has the same number of rows as the input table,
-        filling in missing values  where necessary based on the column validity mask.
+        filling in missing values where necessary based on the column validity mask.
 
         `replace_with_mask` currently does not support nested lists (ListArrays), making it unsuitable for our use case
         where embeddings column contain lists of floats. As an alternative, we use `take` to select valid values.
@@ -305,10 +305,7 @@ class OutputMissingMapper(BaseMapper):
             valid_values = pc.take(array, valid_indices)
             expanded_arrays.append(valid_values)
 
-        # Recreate the table with the original column names and desired output type.
-        column_names = result_table.schema.names
-        schema = pa.schema([(name, self._output_type) for name in column_names])
-        return pa.table(expanded_arrays, schema=schema)
+        return pa.table(expanded_arrays, schema=self._output_schema)
 
     def _compute_valid_indices(self, column_validity: pa.Array) -> pa.Array:
         # Convert boolean validity mask to integers (1 for valid rows, 0 for invalid).
@@ -325,7 +322,7 @@ class OutputMissingMapper(BaseMapper):
 
 def table_column_adapter(
     table: pa.Table,
-    fn: Callable[[List[str]], List[List[float]]],
+    fn: Callable[[Any], Any],
     input_column: str,
     output_column: str,
 ) -> pa.Table:

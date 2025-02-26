@@ -615,7 +615,7 @@ class LLMPrompter:
         node execution should fail on such values.""",
         default_value=lambda v: (
             util.MissingValueOutputOptions.Fail.name
-            if v < knext.Version(5, 4, 1)
+            if v < knext.Version(5, 5, 0)
             else util.MissingValueOutputOptions.OutputMissingValues.name
         ),
         enum=util.MissingValueOutputOptions,
@@ -642,13 +642,15 @@ class LLMPrompter:
             progress_tracker.update_progress(len(sub_batch))
         return responses
 
-    def aprocess_batches_concurrently(
+    def process_batches_concurrently(
         self,
         prompts: List[str] | List[List],
         llm,
         n_requests: int,
         progress_tracker: Callable[[int], None],
     ):
+        import asyncio
+
         func = partial(self.aprocess_batch, llm, progress_tracker=progress_tracker)
         return asyncio.run(util.abatched_apply(func, prompts, n_requests))
 
@@ -750,10 +752,21 @@ class LLMPrompter:
             prompts = self._include_system_messages(
                 is_chat_model, prompt_table.to_pandas()
             )
+
+            output_schema = pa.schema([(self.response_column_name, pa.string())])
+
+            # Check if all prompts are empty/missing
+            if not prompts:
+                missing_values_table = pa.table(
+                    {self.response_column_name: [None] * len(prompts)},
+                    schema=output_schema,
+                )
+                return missing_values_table
+
             _validate_json_output_format(self.output_format, prompts)
 
             def get_responses(model):
-                return self.aprocess_batches_concurrently(
+                return self.process_batches_concurrently(
                     prompts,
                     model,
                     n_requests,
@@ -773,7 +786,6 @@ class LLMPrompter:
             pa_table = batch.to_pyarrow()
             table_from_batch = pa.Table.from_batches([pa_table])
             response_table = mapper.map(table_from_batch)
-
             table_from_batch = pa.Table.from_arrays(
                 table_from_batch.columns + response_table.columns,
                 table_from_batch.column_names + response_table.column_names,
@@ -789,22 +801,19 @@ class LLMPrompter:
         """
         Returns the appropriate mapper based on the selected missing value handling option.
         """
-        import pyarrow as pa
 
-        columns = [self.prompt_column]
+        input_columns = [self.prompt_column]
         if self.system_message_column:
-            columns = [self.prompt_column, self.system_message_column]
+            input_columns.append(self.system_message_column)
 
-        output_type = pa.string()
         if missing_value_handling == util.MissingValueOutputOptions.Fail:
-            return util.FailOnMissingMapper(columns=columns, fn=apply_model)
+            return util.FailOnMissingMapper(columns=input_columns, fn=apply_model)
         elif (
             missing_value_handling == util.MissingValueOutputOptions.OutputMissingValues
         ):
             return util.OutputMissingMapper(
-                columns=columns,
+                columns=input_columns,
                 fn=apply_model,
-                output_type=output_type,
             )
 
     def _is_chat_model(self, llm_port, ctx) -> bool:
@@ -822,10 +831,10 @@ class LLMPrompter:
             not is_chat_model
             or self.system_message_handling == SystemMessageHandling.NONE.name
         ):
-            prompts = data_frame[self.prompt_column].values.tolist()
+            prompts = data_frame[self.prompt_column].tolist()
         else:
             if self.system_message_handling == SystemMessageHandling.SINGLE.name:
-                prompts = data_frame[self.prompt_column].values.tolist()
+                prompts = data_frame[self.prompt_column].tolist()
                 prompts = self._add_global_system_message(prompts)
             elif self.system_message_handling == SystemMessageHandling.COLUMN.name:
                 prompts = data_frame.apply(
@@ -834,7 +843,7 @@ class LLMPrompter:
                         lcm.HumanMessage(row[self.prompt_column]),
                     ],
                     axis=1,
-                ).values.tolist()
+                ).tolist()
             else:
                 raise NotImplementedError(
                     f"System messages handled via '{SystemMessageHandling[self.system_message_handling].label}' are not implemented yet."
@@ -1411,21 +1420,21 @@ class TextEmbedder:
             table.schema.column_names, self.embeddings_column_name
         )
 
+        output_column_field = pa.field(output_column_name, pa.list_(pa.float64()))
+
         adapter_fn = partial(
             util.table_column_adapter,
             fn=embeddings_model.embed_documents,
             input_column=self.text_column,
-            output_column=output_column_name,
+            output_column=output_column_field,
         )
 
-        output_type = pa.list_(pa.float64())
         if missing_value_handling_setting == util.MissingValueOutputOptions.Fail:
             mapper = util.FailOnMissingMapper(self.text_column, adapter_fn)
         else:
             mapper = util.OutputMissingMapper(
-                self.text_column,
-                adapter_fn,
-                output_type,
+                columns=self.text_column,
+                fn=adapter_fn,
             )
 
         for batch in table.batches():

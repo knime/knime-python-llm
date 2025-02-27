@@ -119,26 +119,28 @@ def _tool_definition_table_present(ctx: knext.DialogCreationContext) -> bool:
     return len(specs) > 2 and specs[2] is not None
 
 
-@knext.parameter_group(label="Conversation Settings")
+@knext.parameter_group(label="Conversation")
 class ChatConversationSettings:
     def __init__(self, port_index=1) -> None:
         self.role_column = knext.ColumnParameter(
-            "Message roles column",
-            "Select the column that specifies the alternating sender roles assigned to each message. Example values are 'Human' and 'AI'.",
+            "Role column",
+            """Select the column of the conversation table that specifies the role assigned to each message.
+            The column can be empty if starting the conversation from scratch.
+            
+            **Example roles**: 'human', 'ai'.""",
             port_index=port_index,
             column_filter=util.create_type_filer(knext.string()),
         )
 
         self.content_column = knext.ColumnParameter(
-            "Messages column",
-            "Select the column containing the messages composing the conversation history.",
+            "Message column",
+            """Select the column of the conversation table that specifies the messages.
+            The column can be empty if starting the conversation from scratch.""",
             port_index=port_index,
             column_filter=util.create_type_filer(knext.string()),
         )
 
-    def configure(
-        self, input_table_spec: knext.Schema, has_tools: Optional[bool] = False
-    ):
+    def configure(self, input_table_spec: knext.Schema):
         available_columns = [c for c in input_table_spec]
         available_columns.reverse()
         if self.role_column:
@@ -212,51 +214,81 @@ class ChatConversationSettings:
         }
 
 
-class ToolChatConversationSettings(ChatConversationSettings):
-    def __init__(self, port_index=1):
-        super().__init__(port_index=1)
+@knext.parameter_group(label="Tool Calling", since_version="5.5.0")
+class ToolCallingSettings:
+    def __init__(self):
+        conversation_table_port_index = 1
+        tool_definitions_table_port_index = 2
+
+        self.ignore_chat_message_if_last_message_is_tool = knext.BoolParameter(
+            "Ignore new message during tool calling",
+            """If enabled, the 'New message' specified in the configuration dialog will not be appended
+             to the conversation table while the last row is a tool call message.
+             
+             In most cases, the new message would be what caused the model to invoke tool calling in the first place,
+             and will have already been appended to the conversation table.""",
+            default_value=lambda v: v
+            < knext.Version(
+                5, 5, 0
+            ),  # False for versions < 5.5.0 for backwards compatibility
+        )
+
+        self.tool_definition_column = knext.ColumnParameter(
+            "Tool definition column",
+            """Select the column of the tool definitions table containing definitions of the tools that should be available to the chat model.
+            
+            Tool definitions usually take the form of JSON Schema-based objects, specifying the tool's name, description, parameters, and required fields.""",
+            port_index=tool_definitions_table_port_index,
+            column_filter=util.create_type_filer(knext.logical(dict)),
+        )
+
         self.tool_name_column = knext.ColumnParameter(
             "Tool name column",
-            "Select the column containing the tool names.",
-            port_index=port_index,
+            """Select the column of the conversation table specifying tool names as **strings**.
+            
+            This column gets populated with the name of tool the model decides to call.""",
+            port_index=conversation_table_port_index,
             column_filter=util.create_type_filer(knext.string()),
             include_none_column=True,
             default_value=knext.ColumnParameter.NONE,
-            since_version="5.5.0",
-        ).rule(
-            knext.DialogContextCondition(_tool_definition_table_present),
-            knext.Effect.ENABLE,
         )
 
         self.tool_call_id_column = knext.ColumnParameter(
             "Tool call ID column",
-            "Select the column containing the tool call IDs.",
-            port_index=port_index,
+            """Select the column of the conversation table specifying tool call IDs as **strings**.
+            
+            This column gets populated with IDs of tool calls, so that they can be referenced by the model.""",
+            port_index=conversation_table_port_index,
             column_filter=util.create_type_filer(knext.string()),
             include_none_column=True,
             default_value=knext.ColumnParameter.NONE,
-            since_version="5.5.0",
-        ).rule(
-            knext.DialogContextCondition(_tool_definition_table_present),
-            knext.Effect.ENABLE,
         )
 
         self.tool_call_arguments_column = knext.ColumnParameter(
             "Tool call arguments column",
-            "Select the column containing the tool call arguments.",
-            port_index=port_index,
+            """Select the column of the conversation table specifying tool call arguments as **JSON objects**.
+            
+            This column gets populated with the expected input arguments for the tool the model decides to call.""",
+            port_index=conversation_table_port_index,
             column_filter=util.create_type_filer(knext.logical(dict)),
             include_none_column=True,
             default_value=knext.ColumnParameter.NONE,
-            since_version="5.5.0",
-        ).rule(
-            knext.DialogContextCondition(_tool_definition_table_present),
-            knext.Effect.ENABLE,
         )
 
-    def configure(self, input_table_spec: knext.Schema, has_tools: bool):
-        super().configure(input_table_spec, has_tools)
 
+class ToolChatConversationSettings(ChatConversationSettings):
+    def __init__(self, port_index=1):
+        super().__init__(port_index)
+
+        self.tool_calling_settings = ToolCallingSettings().rule(
+            knext.DialogContextCondition(_tool_definition_table_present),
+            knext.Effect.SHOW,
+        )
+
+    def configure(self, input_table_spec: knext.Schema, tool_table_spec: knext.Schema):
+        super().configure(input_table_spec)
+
+        has_tools = tool_table_spec is not None
         if has_tools:
             # auto configure is not implemented because there is a bug
             # on the java side that results in dialogs not showing changes made
@@ -264,19 +296,29 @@ class ToolChatConversationSettings(ChatConversationSettings):
             # since the input here is optional, it's very likely that the user
             # will have opened the dialog before connecting the tool table
             self._check_tool_column(
-                input_table_spec, self.tool_name_column, knext.string(), "tool name"
+                input_table_spec,
+                self.tool_calling_settings.tool_name_column,
+                knext.string(),
+                "tool name",
             )
             self._check_tool_column(
                 input_table_spec,
-                self.tool_call_id_column,
+                self.tool_calling_settings.tool_call_id_column,
                 knext.string(),
                 "tool call ID",
             )
             self._check_tool_column(
                 input_table_spec,
-                self.tool_call_arguments_column,
+                self.tool_calling_settings.tool_call_arguments_column,
                 knext.logical(dict),
                 "tool call arguments",
+            )
+            util.check_column(
+                tool_table_spec,
+                self.tool_calling_settings.tool_definition_column,
+                knext.logical(dict),
+                "tool definition",
+                "tool definition",
             )
 
     def _check_tool_column(
@@ -301,23 +343,24 @@ class ToolChatConversationSettings(ChatConversationSettings):
         if pd.isna(content):
             raise ValueError("No content provided.")
         if role == "tool":
-            tool_call_id = row.get(self.tool_call_id_column)
+            tool_call_id = row.get(self.tool_calling_settings.tool_call_id_column)
             if pd.isna(tool_call_id):
                 raise ValueError("No tool call ID provided.")
             return lcm.ToolMessage(
                 content=content,
-                tool_call_id=row.get(self.tool_call_id_column),
+                tool_call_id=row.get(self.tool_calling_settings.tool_call_id_column),
             )
         if role == "ai":
             tool_calls = []
-            if self.tool_call_arguments_column in row and pd.notna(
-                row[self.tool_call_id_column]
+            if (
+                self.tool_calling_settings.tool_call_arguments_column in row
+                and pd.notna(row[self.tool_calling_settings.tool_call_id_column])
             ):
                 tool_calls.append(
                     lcm.ToolCall(
-                        name=row[self.tool_name_column],
-                        id=row[self.tool_call_id_column],
-                        args=row[self.tool_call_arguments_column],
+                        name=row[self.tool_calling_settings.tool_name_column],
+                        id=row[self.tool_calling_settings.tool_call_id_column],
+                        args=row[self.tool_calling_settings.tool_call_arguments_column],
                     )
                 )
             return lcm.AIMessage(content=content, tool_calls=tool_calls)
@@ -745,41 +788,6 @@ class LLMPrompter:
         ]
 
 
-@knext.parameter_group(label="Tool Settings", since_version="5.5.0")
-class ToolSettings:
-    tool_definition_column = knext.ColumnParameter(
-        "Tool Definition Column",
-        "The column containing the tool definitions.",
-        port_index=2,
-        column_filter=util.create_type_filer(knext.logical(dict)),
-    )
-
-    def configure(self, tool_table_spec: Optional[knext.Schema]):
-        if tool_table_spec is None:
-            return
-        # auto configure is not implemented because there is a bug
-        # on the java side that results in dialogs not showing changes made
-        # by configure calls after the dialog was opened the first time
-        # since the input here is optional, it's very likely that the user
-        # will have opened the dialog before connecting the tool table
-        util.check_column(
-            tool_table_spec,
-            self.tool_definition_column,
-            knext.logical(dict),
-            "tool definition",
-            "tool definition",
-        )
-
-
-@knext.parameter_group(label="Output Settings", since_version="5.5.0")
-class ChatModelPrompterOutputSettings:
-    output_only_new_messages = knext.BoolParameter(
-        "Only output new messages",
-        "If enabled, only the messages that were created by this node are output.",
-        default_value=False,
-    )
-
-
 @knext.node(
     "Chat Model Prompter",
     knext.NodeType.PREDICTOR,
@@ -824,45 +832,40 @@ class ChatModelPrompter:
     """
 
     system_message = knext.MultilineStringParameter(
-        "System Message",
+        "System message",
         """
-        The first message given to the model describing how it should behave.
+        Optional instructional message provided to the model at the start of the conversation,
+        usually used to define various guidelines and rules for the model to adhere to.
 
-        Example: You are a helpful assistant that has to answer questions truthfully, and
-        if you do not know an answer to a question, you should state that.
+        **Note**: Certain models don't support system messages (e.g. OpenAI's o1-mini).
+        For such models, the system message should be left empty.
 
-        This message is optional and an empty message will not be provided to the model.
-        This is useful for models that don't support system messages (e.g. OpenAI's o1-mini).
+        **Example**: You are an expert in geospacial analytics, and you only reply using JSON.
         """,
         default_value="",
     )
 
     chat_message = knext.MultilineStringParameter(
         "New message",
-        "The new message to be added to the conversation. "
-        "This message is optional and an empty message will not be provided to the model.",
+        "Optional next message to prompt the chat model with. If provided, a corresponding row will be appended to the conversation table.",
         default_value="",
     )
 
-    ignore_chat_message_if_last_message_is_tool = knext.BoolParameter(
-        "Ignore after tool message",
-        "If enabled, the new message is not added to the conversation if the last message in the conversation table is a tool message.",
-        default_value=lambda v: v
-        < knext.Version(
-            5, 5, 0
-        ),  # False for versions < 5.5.0 for backwards compatibility
-    )
+    output_format = _get_output_format_value_switch()
 
     conversation_settings = ToolChatConversationSettings()
 
-    tool_settings = ToolSettings().rule(
-        knext.DialogContextCondition(_tool_definition_table_present),
-        knext.Effect.ENABLE,
+    extend_existing_conversation = knext.BoolParameter(
+        "Extend existing conversation",
+        """If enabled, messages produced by this node will be appended to the provided conversation table.
+
+         Otherwise, the output table will only contain the new message and the model's reply.
+         
+         **Note**: If an existing conversation is provided, it will still be used as context if this setting is disabled.""",
+        default_value=True,
+        since_version="5.5.0",
+        is_advanced=True,
     )
-
-    output_settings = ChatModelPrompterOutputSettings()
-
-    output_format = _get_output_format_value_switch()
 
     def configure(
         self,
@@ -871,17 +874,14 @@ class ChatModelPrompter:
         input_table_spec: knext.Schema,
         tool_table_spec: Optional[knext.Schema],
     ) -> Schema:
-        has_tools = tool_table_spec is not None
-        self.conversation_settings.configure(input_table_spec, has_tools)
-
-        if has_tools:
-            self.tool_settings.configure(tool_table_spec)
+        self.conversation_settings.configure(input_table_spec, tool_table_spec)
 
         _validate_json_output_format(
             self.output_format, [self.system_message + self.chat_message]
         )
 
         chat_model_spec.validate_context(ctx)
+        has_tools = tool_table_spec is not None
         return self._create_output_schema(has_tools)
 
     def _create_output_schema(self, has_tool_input: bool) -> Schema:
@@ -904,19 +904,22 @@ class ChatModelPrompter:
     @property
     def _tool_name_column(self):
         return self._replace_none_column(
-            self.conversation_settings.tool_name_column, "tool_name"
+            self.conversation_settings.tool_calling_settings.tool_name_column,
+            "tool_name",
         )
 
     @property
     def _tool_call_id_column(self):
         return self._replace_none_column(
-            self.conversation_settings.tool_call_id_column, "tool_call_id"
+            self.conversation_settings.tool_calling_settings.tool_call_id_column,
+            "tool_call_id",
         )
 
     @property
     def _tool_call_arguments_column(self):
         return self._replace_none_column(
-            self.conversation_settings.tool_call_arguments_column, "tool_call_arguments"
+            self.conversation_settings.tool_calling_settings.tool_call_arguments_column,
+            "tool_call_arguments",
         )
 
     def _replace_none_column(self, column, default_name):
@@ -954,8 +957,14 @@ class ChatModelPrompter:
         response_df = self.create_response_dataframe(
             has_tool_input, human_message, answer
         )
-        if self.output_settings.output_only_new_messages:
+
+        # conversation history empty
+        if data_frame.empty:
             return knext.Table.from_pandas(response_df)
+
+        if not self.extend_existing_conversation:
+            return knext.Table.from_pandas(response_df)
+
         data_frame = pd.concat([data_frame, response_df], ignore_index=True)
         return knext.Table.from_pandas(data_frame)
 
@@ -972,7 +981,7 @@ class ChatModelPrompter:
             )
 
             last_message_is_tool = (
-                self.ignore_chat_message_if_last_message_is_tool
+                self.conversation_settings.tool_calling_settings.ignore_chat_message_if_last_message_is_tool
                 and (
                     data_frame[self.conversation_settings.role_column].iloc[-1]
                     == "tool"
@@ -1010,7 +1019,9 @@ class ChatModelPrompter:
         chat: BaseChatModel = _initialize_model(chat_model, ctx, self.output_format)
         if tool_table is not None:
             tool_data_frame: pd.DataFrame = tool_table.to_pandas()
-            tools = tool_data_frame[self.tool_settings.tool_definition_column].tolist()
+            tools = tool_data_frame[
+                self.conversation_settings.tool_calling_settings.tool_definition_column
+            ].tolist()
             if any(tool is None for tool in tools):
                 raise ValueError("There is a missing value in the tool table.")
             chat = chat.bind_tools(tools)

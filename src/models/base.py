@@ -802,7 +802,7 @@ class LLMPrompter:
 )
 @knext.input_port("Chat Model", "A chat model.", chat_model_port_type)
 @knext.input_table(
-    "Existing Conversation",
+    "Conversation History",
     "A table containing the conversation history, or an empty table.",
 )
 @knext.input_table(
@@ -811,18 +811,68 @@ class LLMPrompter:
     optional=True,
 )
 @knext.output_table(
-    "Messages",
-    "A table containing the updated conversation history or only the new messages depending on the configuration.",
+    "Updated Conversation",
+    "A table containing either the extended conversation history, or only the new messages, depending on the configuration.",
 )
 class ChatModelPrompter:
     """
     Prompts a Chat Model.
 
-    This node prompts a chat model using the provided user message, with an existing conversation history as context.
+    This node prompts a chat model using the provided user message, using an existing conversation history as context.
+    An optional table containing tool definitions can be provided to enable tool calling.
 
-    If you want to reduce the amount of consumed tokens, consider reducing
-    the conversation table length to a reasonable (e.g. 5 conversation steps) length
-    before feeding it into the node.
+    **Conversation history** is a table containing two columns:
+
+    - **Role column**: Indicates the sender of the message (e.g., 'human', 'ai', or 'tool').
+    - **Message column**: Contains the content of the message.
+
+    If the conversation history table is non-empty, it will be used as context when sending the new message to the chat model.
+    To use only the conversation history table for prompting (without a new message), leave the new message setting empty and
+    ensure that the last entry in the table has the 'human' role.
+
+    In order to enable **tool calling**, a table containing tool definitions must be connected to the dynamic
+    input port of the node. If tool definitions are provided, the conversation history table must include the
+    following columns to support tool calling (*these columns will be populated by the chat model*):
+
+    - **Tool name column**
+    - **Tool call ID column**
+    - **Tool call arguments column**
+
+    If the chat model decides to call a tool, the node appends a new 'ai' message with the above columns populated based on the selected tool.
+    This information can then be used to route the downstream portion of the workflow appropriately.
+    The output of the tool can then be fed back into the node by appending a new 'tool' message to the
+    conversation history table, with the tool's output being the message content.
+
+    A common way to ensure that the tool call output is presented back to the Chat Model Prompter is
+    to embed the node together with its tools in a [Recursive Loop](https://hub.knime.com/knime/extensions/org.knime.features.base/latest/org.knime.base.node.meta.looper.recursive.RecursiveLoopStartDynamicNodeFactory).
+
+    A **tool definition** is a JSON object describing the corresponding tool and its parameters. The more
+    descriptive the definition, the more likely the LLM will call it appropriately.
+
+    Example:
+
+    ```
+    {
+        "title": "Adder",
+        "type": "object",
+        "description": "Adds two numbers.",
+        "properties": {
+            "a": {
+                "title": "A",
+                "type": "integer",
+                "description": "First value to add"
+            },
+            "b": {
+                "title": "B",
+                "type": "integer",
+                "description": "Second value to add"
+            }
+        },
+        "required": ["a", "b"]
+    }
+    ```
+
+    ---
 
     **Note**: If you use the
     [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)

@@ -1,11 +1,13 @@
 # KNIME / own imports
 import knime.extension as knext
+import pyarrow as pa
 from knime.extension import Schema
 import util
 import asyncio
 from base import AIPortObjectSpec
 from typing import List, Callable, Optional, Type
 from functools import partial
+
 
 model_category = knext.category(
     path=util.main_category,
@@ -531,22 +533,6 @@ class LLMPrompter:
         default_value="Response",
     )
 
-    missing_value_handling = knext.EnumParameter(
-        "If there are missing values",
-        """Define whether missing or empty values in the prompt column and system message
-        column (only applicable if the system message is provided via a column) should 
-        result in missing values in the output table or whether the 
-        node execution should fail on such values.""",
-        default_value=lambda v: (
-            util.MissingValueOutputOptions.Fail.name
-            if v < knext.Version(5, 4, 1)
-            else util.MissingValueOutputOptions.OutputMissingValues.name
-        ),
-        enum=util.MissingValueOutputOptions,
-        style=knext.EnumParameter.Style.VALUE_SWITCH,
-        since_version="5.4.1",
-    )
-
     output_format = _get_output_format_value_switch()
 
     async def aprocess_batch(
@@ -566,7 +552,7 @@ class LLMPrompter:
             progress_tracker.update_progress(len(sub_batch))
         return responses
 
-    def aprocess_batches_concurrently(
+    async def aprocess_batches_concurrently(
         self,
         prompts: List[str] | List[List],
         llm,
@@ -574,7 +560,8 @@ class LLMPrompter:
         progress_tracker: Callable[[int], None],
     ):
         func = partial(self.aprocess_batch, llm, progress_tracker=progress_tracker)
-        return asyncio.run(util.abatched_apply(func, prompts, n_requests))
+
+        return await util.abatched_apply(func, prompts, n_requests)
 
     def configure(
         self,
@@ -648,13 +635,6 @@ class LLMPrompter:
         llm_port: LLMPortObject,
         input_table: knext.Table,
     ):
-        import pyarrow as pa
-
-        # Output rows with missing values if "Output Missing Values" option is selected
-        # or fail execution if "Fail" is selected and there are missing values
-        missing_value_handling_setting = util.MissingValueOutputOptions[
-            self.missing_value_handling
-        ]
         num_rows = input_table.num_rows
 
         output_column_name = util.handle_column_name_collision(
@@ -664,72 +644,44 @@ class LLMPrompter:
         output_table: knext.BatchOutputTable = knext.BatchOutputTable.create()
 
         n_requests = llm_port.spec.n_requests
+
         is_chat_model = self._is_chat_model(llm_port, ctx)
+
         progress_tracker = util.ProgressTracker(total_rows=num_rows, ctx=ctx)
-        llm = _initialize_model(llm_port, ctx, self.output_format)
+        for batch in input_table.batches():
+            responses = []
+            util.check_canceled(ctx)
+            data_frame = batch.to_pandas()
 
-        def apply_model(prompt_table: pa.Table):
-            """Applies the model to the given prompt table."""
+            if data_frame[self.prompt_column].isnull().values.any():
+                raise RuntimeError("The prompt column contains a missing value.")
 
-            prompts = self._include_system_messages(
-                is_chat_model, prompt_table.to_pandas()
-            )
+            prompts = self._include_system_messages(is_chat_model, data_frame)
+
             _validate_json_output_format(self.output_format, prompts)
 
-            def get_responses(model):
-                return self.aprocess_batches_concurrently(
-                    prompts,
-                    model,
-                    n_requests,
-                    progress_tracker,
+            def get_responses(llm, prompts=prompts):
+                return asyncio.run(
+                    self.aprocess_batches_concurrently(
+                        prompts, llm, n_requests, progress_tracker
+                    )
                 )
 
             responses = _call_model_with_output_format_fallback(
-                ctx, llm_port, get_responses, self.output_format, llm
+                ctx,
+                llm_port,
+                get_responses,
+                self.output_format,
             )
-            response_table = pa.table({output_column_name: responses})
-            return response_table
 
-        mapper = self._get_mapper(missing_value_handling_setting, apply_model)
-
-        for batch in input_table.batches():
-            util.check_canceled(ctx)
-            pa_table = batch.to_pyarrow()
-            table_from_batch = pa.Table.from_batches([pa_table])
-            response_table = mapper.map(table_from_batch)
-
-            table_from_batch = pa.Table.from_arrays(
-                table_from_batch.columns + response_table.columns,
-                table_from_batch.column_names + response_table.column_names,
-            )
-            output_table.append(knext.Table.from_pyarrow(table_from_batch))
-
-        if mapper.all_missing:
-            ctx.set_warning("All rows contain missing or empty values.")
+            data_frame[output_column_name] = responses
+            if len(data_frame) == 0:
+                data_frame[output_column_name] = data_frame[output_column_name].astype(
+                    "string"
+                )
+            output_table.append(data_frame)
 
         return output_table
-
-    def _get_mapper(self, missing_value_handling, apply_model):
-        """
-        Returns the appropriate mapper based on the selected missing value handling option.
-        """
-        import pyarrow as pa
-
-        columns = [self.prompt_column]
-        if self.system_message_column:
-            columns = [self.prompt_column, self.system_message_column]
-
-        output_type = pa.string()
-        if missing_value_handling == util.MissingValueOutputOptions.Fail:
-            return util.FailOnMissingMapper(columns=columns, fn=apply_model)
-        elif (
-            missing_value_handling == util.MissingValueOutputOptions.OutputMissingValues
-        ):
-            return util.OutputMissingMapper(
-                columns=columns,
-                fn=apply_model,
-                output_type=output_type,
-            )
 
     def _is_chat_model(self, llm_port, ctx) -> bool:
         from langchain_core.language_models import BaseChatModel
@@ -746,19 +698,23 @@ class LLMPrompter:
             not is_chat_model
             or self.system_message_handling == SystemMessageHandling.NONE.name
         ):
-            prompts = data_frame[self.prompt_column].values.tolist()
+            prompts = data_frame[self.prompt_column].tolist()
         else:
             if self.system_message_handling == SystemMessageHandling.SINGLE.name:
-                prompts = data_frame[self.prompt_column].values.tolist()
+                prompts = data_frame[self.prompt_column].tolist()
                 prompts = self._add_global_system_message(prompts)
             elif self.system_message_handling == SystemMessageHandling.COLUMN.name:
+                if data_frame[self.system_message_column].isnull().values.any():
+                    raise RuntimeError(
+                        "The system message column contains a missing value."
+                    )
                 prompts = data_frame.apply(
                     lambda row: [
                         lcm.SystemMessage(row[self.system_message_column]),
                         lcm.HumanMessage(row[self.prompt_column]),
                     ],
                     axis=1,
-                ).values.tolist()
+                ).tolist()
             else:
                 raise NotImplementedError(
                     f"System messages handled via '{SystemMessageHandling[self.system_message_handling].label}' are not implemented yet."
@@ -1093,13 +1049,15 @@ class ChatModelPrompter:
 
 
 def _call_model_with_output_format_fallback(
-    ctx, model_port, response_func, output_format, model=None
+    ctx,
+    model_port,
+    response_func,
+    output_format,
 ):
     import openai
 
     try:
-        if model is None:
-            model = _initialize_model(model_port, ctx, output_format)
+        model = _initialize_model(model_port, ctx, output_format)
         return response_func(model)
     except openai.BadRequestError as e:
         if "Invalid parameter: 'response_format'" in str(e):
@@ -1265,8 +1223,6 @@ class TextEmbedder:
         embeddings_obj: EmbeddingsPortObject,
         table: knext.Table,
     ) -> knext.Table:
-        import pyarrow as pa
-
         # Output rows with missing values if "Output Missing Values" option is selected
         # or fail execution if "Fail" is selected and there are missing values
         missing_value_handling_setting = util.MissingValueOutputOptions[
@@ -1294,34 +1250,25 @@ class TextEmbedder:
         output_column_name = util.handle_column_name_collision(
             table.schema.column_names, self.embeddings_column_name
         )
-
-        adapter_fn = partial(
-            util.table_column_adapter,
-            fn=embeddings_model.embed_documents,
-            input_column=self.text_column,
-            output_column=output_column_name,
-        )
-
         output_type = pa.list_(pa.float64())
         if missing_value_handling_setting == util.MissingValueOutputOptions.Fail:
-            mapper = util.FailOnMissingMapper(self.text_column, adapter_fn)
+            mapper = util.FailOnMissingMapper(
+                self.text_column, embeddings_model.embed_documents, output_type
+            )
         else:
             mapper = util.OutputMissingMapper(
                 self.text_column,
-                adapter_fn,
+                embeddings_model.embed_documents,
                 output_type,
             )
-
         for batch in table.batches():
             util.check_canceled(ctx)
             pa_table = batch.to_pyarrow()
             table_from_batch = pa.Table.from_batches([pa_table])
             embeddings_array = mapper.map(table_from_batch)
-            table_from_batch = pa.Table.from_arrays(
-                table_from_batch.columns + embeddings_array.columns,
-                table_from_batch.column_names + embeddings_array.column_names,
+            table_from_batch = table_from_batch.append_column(
+                output_column_name, embeddings_array
             )
-
             output_table.append(knext.Table.from_pyarrow(table_from_batch))
 
             i += batch.num_rows

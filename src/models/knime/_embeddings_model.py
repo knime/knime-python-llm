@@ -18,7 +18,11 @@ class OpenAIEmbeddings(Embeddings):
         )
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        return [embedding.embedding for embedding in self._embed(texts)]
+        embeddings = []
+        for i in range(0, len(texts), 1000):
+            chunk = texts[i : i + 1000]
+            embeddings.extend([embedding.embedding for embedding in self._embed(chunk)])
+        return embeddings
 
     def embed_query(self, text: str) -> ks.List[float]:
         return self._embed(text)[0].embedding

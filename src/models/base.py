@@ -119,6 +119,30 @@ def _tool_definition_table_present(ctx: knext.DialogCreationContext) -> bool:
     return len(specs) > 2 and specs[2] is not None
 
 
+def _assert_tool_title_openai_compatibility(tool_dict: dict) -> None:
+    """
+    Ensure the tool title is OpenAI-compatible, meaning it follows the required format:
+
+    - Only letters (a-z, A-Z), numbers (0-9), underscores (_), and hyphens (-) are allowed.
+    - No spaces or special characters.
+    """
+    import re
+
+    openai_tool_name_pattern = re.compile(r"^[a-zA-Z0-9_-]+$")
+
+    if "title" not in tool_dict:
+        raise ValueError("Tool definitions must have a 'title' property.")
+
+    title = tool_dict["title"]
+    if not openai_tool_name_pattern.match(title):
+        raise ValueError(
+            f"""Invalid tool title: '{title}'.
+            
+            Tool titles can only contain letters (a-z, A-Z), numbers (0-9), underscores (_), and hyphens (-).
+            No spaces or special characters are allowed. Examples of allowed formats: 'get_weather', 'fetchData', 'convert-temperature', 'calculate_area_2'."""
+        )
+
+
 @knext.parameter_group(label="Conversation")
 class ChatConversationSettings:
     def __init__(self, port_index=1) -> None:
@@ -853,7 +877,7 @@ class ChatModelPrompter:
 
     ```
     {
-        "title": "Adder",
+        "title": "number_adder",
         "type": "object",
         "description": "Adds two numbers.",
         "properties": {
@@ -1072,8 +1096,13 @@ class ChatModelPrompter:
             tools = tool_data_frame[
                 self.conversation_settings.tool_calling_settings.tool_definition_column
             ].tolist()
+
             if any(tool is None for tool in tools):
                 raise ValueError("There is a missing value in the tool table.")
+
+            for tool_str in tools:
+                _assert_tool_title_openai_compatibility(tool_str)
+
             chat = chat.bind_tools(tools)
         return chat
 

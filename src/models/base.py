@@ -238,7 +238,7 @@ class ChatConversationSettings:
         }
 
 
-@knext.parameter_group(label="Tool Calling", since_version="5.5.0")
+@knext.parameter_group(label="Tool Calling", since_version="5.4.3")
 class ToolCallingSettings:
     def __init__(self):
         conversation_table_port_index = 1
@@ -937,7 +937,7 @@ class ChatModelPrompter:
          
          **Note**: If an existing conversation is provided, it will still be used as context if this setting is disabled.""",
         default_value=True,
-        since_version="5.5.0",
+        since_version="5.4.3",
         is_advanced=True,
     )
 

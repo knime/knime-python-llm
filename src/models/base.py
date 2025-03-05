@@ -238,7 +238,7 @@ class ChatConversationSettings:
         }
 
 
-@knext.parameter_group(label="Tool Calling", since_version="5.5.0")
+@knext.parameter_group(label="Tool Calling", since_version="5.4.3")
 class ToolCallingSettings:
     def __init__(self):
         conversation_table_port_index = 1
@@ -253,21 +253,12 @@ class ToolCallingSettings:
              and will have already been appended to the conversation table.""",
             default_value=lambda v: v
             < knext.Version(
-                5, 5, 0
-            ),  # False for versions < 5.5.0 for backwards compatibility
-        )
-
-        self.tool_definition_column = knext.ColumnParameter(
-            "Tool definition column",
-            """Select the column of the tool definitions table containing definitions of the tools that should be available to the chat model.
-            
-            Tool definitions usually take the form of JSON Schema-based objects, specifying the tool's name, description, parameters, and required fields.""",
-            port_index=tool_definitions_table_port_index,
-            column_filter=util.create_type_filer(knext.logical(dict)),
+                5, 4, 3
+            ),  # False for versions < 5.4.3 for backwards compatibility
         )
 
         self.tool_name_column = knext.ColumnParameter(
-            "Tool name column",
+            "Tool name column (‘Conversation History’ table)",
             """Select the column of the conversation table specifying tool names as **strings**.
             
             This column gets populated with the name of tool the model decides to call.""",
@@ -278,7 +269,7 @@ class ToolCallingSettings:
         )
 
         self.tool_call_id_column = knext.ColumnParameter(
-            "Tool call ID column",
+            "Tool call ID column (‘Conversation History’ table)",
             """Select the column of the conversation table specifying tool call IDs as **strings**.
             
             This column gets populated with IDs of tool calls, so that they can be referenced by the model.""",
@@ -289,7 +280,7 @@ class ToolCallingSettings:
         )
 
         self.tool_call_arguments_column = knext.ColumnParameter(
-            "Tool call arguments column",
+            "Tool call arguments column (‘Conversation History’ table)",
             """Select the column of the conversation table specifying tool call arguments as **JSON objects**.
             
             This column gets populated with the expected input arguments for the tool the model decides to call.""",
@@ -297,6 +288,15 @@ class ToolCallingSettings:
             column_filter=util.create_type_filer(knext.logical(dict)),
             include_none_column=True,
             default_value=knext.ColumnParameter.NONE,
+        )
+
+        self.tool_definition_column = knext.ColumnParameter(
+            "Tool definition column (‘Table Definitions’ table)",
+            """Select the column of the tool definitions table containing definitions of the tools that should be available to the chat model.
+            
+            Tool definitions take the form of JSON Schema-based objects, specifying the tool's name, description, parameters, and required fields.""",
+            port_index=tool_definitions_table_port_index,
+            column_filter=util.create_type_filer(knext.logical(dict)),
         )
 
 
@@ -937,7 +937,7 @@ class ChatModelPrompter:
          
          **Note**: If an existing conversation is provided, it will still be used as context if this setting is disabled.""",
         default_value=True,
-        since_version="5.5.0",
+        since_version="5.4.3",
         is_advanced=True,
     )
 

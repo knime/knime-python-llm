@@ -42,14 +42,14 @@ class TestNodesGeneralSettings:
         "Prompt column",
         "Column containing the test prompts.",
         port_index=0,
-        column_filter=util.create_type_filer(knext.string()),
+        column_filter=util.create_type_filter(knext.string()),
     )
 
     test_response_col = knext.ColumnParameter(
         "Response column",
         "Column containing the test responses for each prompt.",
         port_index=0,
-        column_filter=util.create_type_filer(knext.string()),
+        column_filter=util.create_type_filter(knext.string()),
     )
 
 
@@ -80,7 +80,7 @@ class TestEmbeddingsSettings:
         "Document column",
         "Column containing the test documents as strings.",
         port_index=0,
-        column_filter=util.create_type_filer(knext.string()),
+        column_filter=util.create_type_filter(knext.string()),
     )
 
     test_vector_col = knext.ColumnParameter(
@@ -91,7 +91,7 @@ class TestEmbeddingsSettings:
         the [Create Collection Column](https://hub.knime.com/knime/extensions/org.knime.features.base/latest/org.knime.base.collection.list.create2.CollectionCreate2NodeFactoryhttps://hub.knime.com/knime/extensions/org.knime.features.base/latest/org.knime.base.collection.list.create2.CollectionCreate2NodeFactory) 
         nodes.""",
         port_index=0,
-        column_filter=util.create_type_filer(knext.ListType(knext.double())),
+        column_filter=util.create_type_filter(knext.ListType(knext.double())),
     )
 
     fail_on_mismatch = knext.BoolParameter(

@@ -12,7 +12,7 @@ def is_nominal(column: knext.Column) -> bool:
     return column.ktype == knext.string() or column.ktype == knext.bool_()
 
 
-def create_type_filer(ktype: knext.KnimeType) -> Callable[[knext.Column], bool]:
+def create_type_filter(ktype: knext.KnimeType) -> Callable[[knext.Column], bool]:
     return lambda c: c.ktype == ktype
 
 

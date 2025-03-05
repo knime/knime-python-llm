@@ -151,7 +151,7 @@ class ChatConversationSettings:
             
             **Example roles**: 'human', 'ai'.""",
             port_index=port_index,
-            column_filter=util.create_type_filer(knext.string()),
+            column_filter=util.create_type_filter(knext.string()),
         )
 
         self.content_column = knext.ColumnParameter(
@@ -159,7 +159,7 @@ class ChatConversationSettings:
             """Select the column of the conversation table that specifies the messages.
             The column can be empty if starting the conversation from scratch.""",
             port_index=port_index,
-            column_filter=util.create_type_filer(knext.string()),
+            column_filter=util.create_type_filter(knext.string()),
         )
 
     def configure(self, input_table_spec: knext.Schema):
@@ -261,7 +261,7 @@ class ToolCallingSettings:
             
             This column gets populated with the name of tool the model decides to call.""",
             port_index=conversation_table_port_index,
-            column_filter=util.create_type_filer(knext.string()),
+            column_filter=util.create_type_filter(knext.string()),
             include_none_column=True,
             default_value=knext.ColumnParameter.NONE,
         )
@@ -272,7 +272,7 @@ class ToolCallingSettings:
             
             This column gets populated with IDs of tool calls, so that they can be referenced by the model.""",
             port_index=conversation_table_port_index,
-            column_filter=util.create_type_filer(knext.string()),
+            column_filter=util.create_type_filter(knext.string()),
             include_none_column=True,
             default_value=knext.ColumnParameter.NONE,
         )
@@ -283,7 +283,7 @@ class ToolCallingSettings:
             
             This column gets populated with the expected input arguments for the tool the model decides to call.""",
             port_index=conversation_table_port_index,
-            column_filter=util.create_type_filer(knext.logical(dict)),
+            column_filter=util.create_type_filter(knext.logical(dict)),
             include_none_column=True,
             default_value=knext.ColumnParameter.NONE,
         )
@@ -294,7 +294,7 @@ class ToolCallingSettings:
             
             Tool definitions take the form of JSON Schema-based objects, specifying the tool's name, description, parameters, and required fields.""",
             port_index=tool_definitions_table_port_index,
-            column_filter=util.create_type_filer(knext.logical(dict)),
+            column_filter=util.create_type_filter(knext.logical(dict)),
         )
 
 
@@ -598,7 +598,7 @@ class LLMPrompter:
         "Prompt column",
         "Column containing prompts for the LLM.",
         port_index=1,
-        column_filter=util.create_type_filer(knext.string()),
+        column_filter=util.create_type_filter(knext.string()),
     )
 
     response_column_name = knext.StringParameter(

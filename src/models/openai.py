@@ -465,21 +465,21 @@ class FineTuneFileSettings:
         "Conversation ID column",
         "Column containing references to group rows into conversations.",
         port_index=1,
-        column_filter=util.create_type_filer(knext.string()),
+        column_filter=util.create_type_filter(knext.string()),
     )
 
     role_column = knext.ColumnParameter(
         "Role column",
         "Column containing the message role. Can be either 'system', 'assistant' or 'user'.",
         port_index=1,
-        column_filter=util.create_type_filer(knext.string()),
+        column_filter=util.create_type_filter(knext.string()),
     )
 
     content_column = knext.ColumnParameter(
         "Content column",
         "Column containing the message contents.",
         port_index=1,
-        column_filter=util.create_type_filer(knext.string()),
+        column_filter=util.create_type_filter(knext.string()),
     )
 
 

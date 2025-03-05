@@ -213,7 +213,7 @@ class MetadataSettings:
         "Metadata columns",
         """Selection of columns used as metadata for each document. The documents column will be ignored.""",
         port_index=1,
-        column_filter=util.create_type_filer(knext.string()),  # TODO fix typo
+        column_filter=util.create_type_filter(knext.string()),
         default_value=lambda v: (
             knext.ColumnFilterConfig(
                 manual_filter=ManualFilterConfig(include_unknown_columns=False)
@@ -266,14 +266,14 @@ class BaseVectorStoreCreator(ABC):
         "Document column",
         """Select the column containing the documents to be embedded.""",
         port_index=1,
-        column_filter=util.create_type_filer(knext.string()),
+        column_filter=util.create_type_filter(knext.string()),
     )
 
     embeddings_column = knext.ColumnParameter(
         "Embeddings column",
         "Select the column containing existing embeddings if available.",
         port_index=1,
-        column_filter=util.create_type_filer(knext.list_(knext.double())),
+        column_filter=util.create_type_filter(knext.list_(knext.double())),
         include_none_column=True,
         since_version="5.3.2",
         default_value=knext.ColumnParameter.NONE,
@@ -452,7 +452,7 @@ class VectorStoreRetriever:
         "Queries column",
         "Column containing the queries.",
         port_index=1,
-        column_filter=util.create_type_filer(knext.string()),
+        column_filter=util.create_type_filter(knext.string()),
     )
 
     top_k = knext.IntParameter(

@@ -289,7 +289,7 @@ class ToolCallingSettings:
         )
 
         self.tool_definition_column = knext.ColumnParameter(
-            "Tool definition column (‘Table Definitions’ table)",
+            "Tool definition column (‘Tool Definitions’ table)",
             """Select the column of the tool definitions table containing definitions of the tools that should be available to the chat model.
             
             Tool definitions take the form of JSON Schema-based objects, specifying the tool's name, description, parameters, and required fields.""",

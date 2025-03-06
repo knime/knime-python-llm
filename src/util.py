@@ -12,8 +12,8 @@ def is_nominal(column: knext.Column) -> bool:
     return column.ktype == knext.string() or column.ktype == knext.bool_()
 
 
-def create_type_filter(ktype: knext.KnimeType) -> Callable[[knext.Column], bool]:
-    return lambda c: c.ktype == ktype
+def create_type_filter(*ktypes: knext.KnimeType) -> Callable[[knext.Column], bool]:
+    return lambda c: c.ktype in ktypes
 
 
 ai_icon = "icons/ml.png"
@@ -53,7 +53,7 @@ def pick_default_columns(
 def check_column(
     input_table: knext.Schema,
     column_name: str,
-    expected_type: knext.KnimeType,
+    expected_types: Union[knext.KnimeType, List[knext.KnimeType]],
     column_purpose: str,
     table_name: str = "input table",
 ) -> None:
@@ -65,9 +65,13 @@ def check_column(
             f"The {column_purpose} column '{column_name}' is missing in the {table_name}."
         )
     ktype = input_table[column_name].ktype
-    if ktype != expected_type:
+
+    if not isinstance(expected_types, list):
+        expected_types = [expected_types]
+
+    if ktype not in expected_types:
         raise knext.InvalidParametersError(
-            f"The {column_purpose} column '{column_name}' is of type {str(ktype)} but should be of type {str(expected_type)}."
+            f"The {column_purpose} column '{column_name}' is of type {str(ktype)} but should be one of the types {str(expected_types)}."
         )
 
 

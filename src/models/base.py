@@ -598,7 +598,7 @@ class LLMPrompter:
         "Prompt column",
         "Column containing prompts for the LLM.",
         port_index=1,
-        column_filter=util.create_type_filter(knext.string()),
+        column_filter=util.create_type_filter(knext.string(), knext.logical(dict)),
     )
 
     response_column_name = knext.StringParameter(
@@ -662,7 +662,10 @@ class LLMPrompter:
     ):
         if self.prompt_column:
             util.check_column(
-                input_table_spec, self.prompt_column, knext.string(), "prompt"
+                input_table_spec,
+                self.prompt_column,
+                [knext.string(), knext.logical(dict)],
+                "prompt",
             )
         else:
             self.prompt_column = util.pick_default_column(
@@ -784,11 +787,20 @@ class LLMPrompter:
         for batch in input_table.batches():
             util.check_canceled(ctx)
             pa_table = batch.to_pyarrow()
-            table_from_batch = pa.Table.from_batches([pa_table])
+
+            # Create a separate table for transformations (e.g. JSON conversion and mapping)
+            # since PyArrow tables are immutable.
+            prompt_table = pa_table
+
+            if self._prompt_column_is_json(pa_table):
+                prompt_table = self._convert_dict_column_to_json(pa_table)
+
+            table_from_batch = pa.Table.from_batches([prompt_table])
             response_table = mapper.map(table_from_batch)
+
             table_from_batch = pa.Table.from_arrays(
-                table_from_batch.columns + response_table.columns,
-                table_from_batch.column_names + response_table.column_names,
+                pa_table.columns + response_table.columns,
+                pa_table.column_names + response_table.column_names,
             )
             output_table.append(knext.Table.from_pyarrow(table_from_batch))
 
@@ -837,6 +849,7 @@ class LLMPrompter:
                 prompts = data_frame[self.prompt_column].tolist()
                 prompts = self._add_global_system_message(prompts)
             elif self.system_message_handling == SystemMessageHandling.COLUMN.name:
+
                 prompts = data_frame.apply(
                     lambda row: [
                         lcm.SystemMessage(row[self.system_message_column]),
@@ -861,6 +874,34 @@ class LLMPrompter:
             ]
             for x in prompts
         ]
+
+    def _convert_dict_column_to_json(self, pa_table):
+        import pyarrow as pa
+        import json
+
+        # Convert the dictionary column to a JSON formatted string column
+        # by checking if the dictionary is empty or None. If so, keep the value as None.
+        json_strings = pa.array(
+            [
+                json.dumps(val_py) if val_py != {} else None
+                for val in pa_table[self.prompt_column]
+                if (val_py := val.as_py()) is not None
+            ],
+            type=pa.string(),
+        )
+
+        # Replace the column with the converted string values
+        pa_table = pa_table.set_column(
+            pa_table.schema.get_field_index(self.prompt_column),
+            self.prompt_column,
+            json_strings,
+        )
+        return pa_table
+
+    def _prompt_column_is_json(self, pa_table) -> bool:
+        return (
+            pa_table.column(self.prompt_column).type == knext.logical(dict).to_pyarrow()
+        )
 
 
 @knext.node(

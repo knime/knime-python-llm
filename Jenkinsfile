@@ -57,6 +57,7 @@ try {
                     'knime-js-base',
                     'knime-cef',
                     'knime-com-shared',
+                    'knime-hubclient-sdk',
                     repositoryName
                     ],
             ],

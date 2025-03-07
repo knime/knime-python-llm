@@ -193,6 +193,8 @@ class KnimeHubChatModelConnector:
     ) -> KnimeHubChatModelPortObjectSpec:
         # raises exception if the hub authenticator has not been executed
         validate_auth_spec(authentication)
+        if self.model_name == "":
+            raise knext.InvalidParametersError("No chat model selected.")
         return self._create_spec(authentication)
 
     def execute(

@@ -883,9 +883,8 @@ class LLMPrompter:
         # by checking if the dictionary is empty or None. If so, keep the value as None.
         json_strings = pa.array(
             [
-                json.dumps(val_py) if val_py != {} else None
+                (json.dumps(val_py) if (val_py := val.as_py()) is not None else None)
                 for val in pa_table[self.prompt_column]
-                if (val_py := val.as_py()) is not None
             ],
             type=pa.string(),
         )

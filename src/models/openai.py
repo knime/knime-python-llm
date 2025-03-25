@@ -751,7 +751,7 @@ class OpenAILLMPortObject(LLMPortObject):
     def spec(self) -> OpenAILLMPortObjectSpec:
         return super().spec
 
-    def create_model(self, ctx):
+    def create_model(self, ctx, output_format):
         from langchain_openai import OpenAI
 
         return OpenAI(

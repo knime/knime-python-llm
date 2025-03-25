@@ -434,7 +434,9 @@ class LLMPortObject(knext.PortObject):
     def deserialize(cls, spec: LLMPortObjectSpec, storage: bytes):
         return cls(spec)
 
-    def create_model(self, ctx: knext.ExecutionContext):
+    def create_model(
+        self, ctx: knext.ExecutionContext, output_format: OutputFormatOptions
+    ):
         raise NotImplementedError()
 
 
@@ -456,7 +458,9 @@ class ChatModelPortObject(LLMPortObject):
     def deserialize(cls, spec, data: dict):
         return cls(spec)
 
-    def create_model(self, ctx: knext.ExecutionContext):
+    def create_model(
+        self, ctx: knext.ExecutionContext, output_format: OutputFormatOptions
+    ):
         raise NotImplementedError()
 
 
@@ -1192,10 +1196,8 @@ def _initialize_model(llm_port, ctx, output_format=OutputFormatOptions.Text.name
     # string to enum object mapping is used here since the value switch selection returns a string
     output_format = OutputFormatOptions[output_format]
 
-    if output_format == OutputFormatOptions.Text or (
-        output_format not in llm_port.spec.supported_output_formats
-    ):
-        return llm_port.create_model(ctx)
+    if output_format not in llm_port.spec.supported_output_formats:
+        output_format = OutputFormatOptions.Text
     return llm_port.create_model(ctx, output_format)
 
 

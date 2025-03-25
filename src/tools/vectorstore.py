@@ -9,7 +9,12 @@ from knime.extension.nodes import (
     FilestorePortObject,
 )
 from .base import ToolPortObjectSpec, ToolPortObject
-from models.base import LLMPortObject, LLMPortObjectSpec, llm_port_type
+from models.base import (
+    LLMPortObject,
+    LLMPortObjectSpec,
+    llm_port_type,
+    OutputFormatOptions,
+)
 from indexes.base import (
     VectorstorePortObject,
     VectorstorePortObjectSpec,
@@ -85,7 +90,7 @@ class VectorToolPortObject(ToolPortObject):
         from langchain.chains.combine_documents import create_stuff_documents_chain
         from langchain_core.prompts import ChatPromptTemplate
 
-        llm = self._llm.create_model(ctx)
+        llm = self._llm.create_model(ctx, OutputFormatOptions.Text)
         vectorstore = self._vectorstore.load_store(ctx)
         retriever = vectorstore.as_retriever(search_kwargs={"k": self.spec.top_k})
 

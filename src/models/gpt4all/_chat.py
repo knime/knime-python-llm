@@ -63,10 +63,10 @@ class GPT4AllChatModelPortObject(GPT4AllLLMPortObject, ChatModelPortObject):
     def spec(self) -> GPT4AllChatModelPortObjectSpec:
         return super().spec
 
-    def create_model(self, ctx):
+    def create_model(self, ctx, output_format):
         from .._adapter import LLMChatModelAdapter
 
-        llm = super().create_model(ctx)
+        llm = super().create_model(ctx, output_format)
         system_prompt_template = self.spec.system_prompt_template
         prompt_template = self.spec.prompt_template
 

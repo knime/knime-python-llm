@@ -1,6 +1,6 @@
 # KNIME / own imports
 import knime.extension as knext
-from .base import model_category, CredentialsSettings
+from .base import model_category, CredentialsSettings, OutputFormatOptions
 
 from models.openai import (
     OpenAIGeneralSettings,
@@ -16,7 +16,6 @@ from models.openai import (
 )
 
 # Other imports
-from socket import gaierror
 import logging
 
 
@@ -146,7 +145,7 @@ class AzureOpenAILLMPortObject(OpenAILLMPortObject):
     def spec(self) -> AzureOpenAILLMPortObjectSpec:
         return super().spec
 
-    def create_model(self, ctx: knext.ExecutionContext):
+    def create_model(self, ctx: knext.ExecutionContext, output_format):
         from langchain_openai import AzureOpenAI
 
         return AzureOpenAI(
@@ -178,10 +177,17 @@ class AzureOpenAIChatModelPortObject(OpenAIChatModelPortObject):
     def spec(self) -> AzureOpenAIChatModelPortObjectSpec:
         return super().spec
 
-    def create_model(self, ctx: knext.ExecutionContext):
+    def create_model(
+        self,
+        ctx: knext.ExecutionContext,
+        output_format: OutputFormatOptions = OutputFormatOptions.Text,
+    ):
         from langchain_openai import AzureChatOpenAI
 
         model_kwargs = {"top_p": self.spec.top_p}
+
+        if output_format == OutputFormatOptions.JSON:
+            model_kwargs["response_format"] = {"type": "json_object"}
 
         return AzureChatOpenAI(
             openai_api_key=ctx.get_credentials(self.spec.credentials).password,

@@ -1,5 +1,5 @@
 import knime.extension as knext
-from models.base import LLMPortObject
+from models.base import LLMPortObject, OutputFormatOptions
 
 from typing import Sequence, Optional
 from langchain_core.language_models import BaseChatModel
@@ -52,7 +52,9 @@ class KnimeLLMClient(LLMClient):
                 setattr(self._model.spec, attr, value)
 
         # Create model
-        model = self._model.create_model(self._ctx)
+        model = self._model.create_model(
+            self._ctx, output_format=OutputFormatOptions.Text
+        )
 
         converted_messages = self._convert_messages(messages)
         answer = model.invoke(converted_messages)

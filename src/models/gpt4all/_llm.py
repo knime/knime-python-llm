@@ -109,7 +109,7 @@ class GPT4AllLLMPortObject(LLMPortObject):
     def spec(self) -> GPT4AllLLMPortObjectSpec:
         return super().spec
 
-    def create_model(self, ctx):
+    def create_model(self, ctx, output_format):
         from ._gpt4all import GPT4All
         from pydantic import ValidationError
 

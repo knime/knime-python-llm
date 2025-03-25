@@ -1,3 +1,4 @@
+from models.base import OutputFormatOptions
 from models.openai import (
     OpenAIChatModelPortObject,
     OpenAIChatModelPortObjectSpec,
@@ -60,7 +61,7 @@ class OpenAiFunctionsAgentPortObject(AgentPortObject):
         from langchain_core.prompts import ChatPromptTemplate
         from langchain.agents import create_openai_functions_agent
 
-        llm = self.llm.create_model(ctx)
+        llm = self.llm.create_model(ctx, OutputFormatOptions.Text)
         tools = self.validate_tools(tools)
         prompt = ChatPromptTemplate(
             [

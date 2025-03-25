@@ -99,7 +99,7 @@ class DatabricksChatModelPortObject(ChatModelPortObject):
     def spec(self) -> DatabricksChatModelPortObjectSpec:
         return self._spec
 
-    def create_model(self, ctx):
+    def create_model(self, ctx, output_format):
         from ._custom_chat import DatabricksChatOpenAI
         from ._utils import get_user_agent_header
 

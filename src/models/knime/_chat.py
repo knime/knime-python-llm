@@ -91,7 +91,7 @@ class KnimeHubChatModelPortObject(ChatModelPortObject):
     def spec(self) -> KnimeHubChatModelPortObjectSpec:
         return super().spec
 
-    def create_model(self, ctx: ExecutionContext):
+    def create_model(self, ctx: ExecutionContext, output_format):
         from langchain_openai import ChatOpenAI
 
         auth_spec = self.spec.auth_spec

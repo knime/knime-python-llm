@@ -467,7 +467,7 @@ class GeminiChatModelPortObject(ChatModelPortObject):
     def spec(self) -> GeminiChatModelPortObjectSpec:
         return self._spec
 
-    def create_model(self, ctx):
+    def create_model(self, ctx, output_format):
         auth_spec = self.spec.auth_spec
 
         if isinstance(auth_spec, VertexAiConnectionPortObjectSpec):

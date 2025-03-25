@@ -97,10 +97,7 @@ class IBMwatsonxChatModelPortObject(ChatModelPortObject):
     def spec(self) -> IBMwatsonxChatModelPortObjectSpec:
         return super().spec
 
-    def create_model(
-        self,
-        ctx: knext.ExecutionContext,
-    ):
+    def create_model(self, ctx: knext.ExecutionContext, output_format):
         from langchain_ibm import ChatWatsonx
 
         # Retrieve the name-id map for projects or spaces

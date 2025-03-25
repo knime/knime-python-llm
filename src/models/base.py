@@ -432,7 +432,9 @@ class LLMPortObject(knext.PortObject):
     def deserialize(cls, spec: LLMPortObjectSpec, storage: bytes):
         return cls(spec)
 
-    def create_model(self, ctx: knext.ExecutionContext):
+    def create_model(
+        self, ctx: knext.ExecutionContext, output_format: OutputFormatOptions
+    ):
         raise NotImplementedError()
 
 
@@ -458,7 +460,9 @@ class ChatModelPortObject(LLMPortObject):
     def deserialize(cls, spec, data: dict):
         return cls(spec)
 
-    def create_model(self, ctx: knext.ExecutionContext):
+    def create_model(
+        self, ctx: knext.ExecutionContext, output_format: OutputFormatOptions
+    ):
         raise NotImplementedError()
 
 
@@ -853,7 +857,6 @@ class LLMPrompter:
                 prompts = data_frame[self.prompt_column].tolist()
                 prompts = self._add_global_system_message(prompts)
             elif self.system_message_handling == SystemMessageHandling.COLUMN.name:
-
                 prompts = data_frame.apply(
                     lambda row: [
                         lcm.SystemMessage(row[self.system_message_column]),
@@ -1290,10 +1293,8 @@ def _initialize_model(llm_port, ctx, output_format=OutputFormatOptions.Text.name
     # string to enum object mapping is used here since the value switch selection returns a string
     output_format = OutputFormatOptions[output_format]
 
-    if output_format == OutputFormatOptions.Text or (
-        output_format not in llm_port.spec.supported_output_formats
-    ):
-        return llm_port.create_model(ctx)
+    if output_format not in llm_port.spec.supported_output_formats:
+        output_format = OutputFormatOptions.Text
     return llm_port.create_model(ctx, output_format)
 
 

@@ -10,6 +10,7 @@ import models.knime
 import models.databricks
 import models.deepseek
 import models.ibm
+import models.google
 
 try:
     import models.gpt4all

@@ -1,1 +1,1 @@
-from ._connectivity import VertexAiConnector
+from ._connectivity import VertexAiConnector, GoogleAiStudioAuthenticator

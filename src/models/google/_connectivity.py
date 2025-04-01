@@ -1,11 +1,15 @@
 # Nodes:
 # - Vertex AI Connector
+# - Google Ai Studio Authenticator
 
 import knime.extension as knext
+
+from models.base import CredentialsSettings
 
 from ._utils import (
     google_category,
     vertex_ai_icon,
+    google_ai_studio_icon,
     DEFAULT_VERTEX_AI_LOCATION,
     _vertex_ai_location_choices_provider,
 )
@@ -13,6 +17,9 @@ from ._port_types import (
     vertex_ai_connection_port_type,
     VertexAiConnectionPortObjectSpec,
     VertexAiConnectionPortObject,
+    google_ai_studio_authentication_port_type,
+    GoogleAiStudioAuthenticationPortObjectSpec,
+    GoogleAiStudioAuthenticationPortObject,
 )
 
 
@@ -122,4 +129,69 @@ class VertexAiConnector:
             project_id=self.project_id,
             location=self.location,
             custom_base_api_url=self.custom_base_api_url,
+        )
+
+
+@knext.node(
+    name="Google AI Studio Authenticator",
+    node_type=knext.NodeType.SOURCE,
+    icon_path=google_ai_studio_icon,
+    category=google_category,
+    keywords=["Google", "AI Studio", "Gemini", "GenAI", "Chat model"],
+)
+@knext.output_port(
+    "Google AI Studio Authentication",
+    "Authentication for the Google AI Studio",
+    google_ai_studio_authentication_port_type,
+)
+class GoogleAiStudioAuthenticator:
+    """Authenticates with Google AI Studio via API key.
+
+    This node authenticates with Google AI Studio via the provided API key. The Google AI Studio
+    authentication produced by this node can then be used to select chat and embedding models
+    from the Gemini family using the **Gemini Chat Model Connector** and **Gemini Embedding Model Connector**
+    nodes.
+
+    Please refer to the Google AI Studio documentation for details on how to [create an API key](https://ai.google.dev/gemini-api/docs).
+    """
+
+    credentials_settings = CredentialsSettings(
+        label="Google AI Studio API key",
+        description="The credentials containing the Google AI Studio API key in its *password* field (the *username* is ignored).",
+    )
+
+    should_validate_api_key = knext.BoolParameter(
+        "Validate API key",
+        "Whether to validate the provided API key by making a request to list the available models.",
+        True,
+        is_advanced=True,
+    )
+
+    def configure(
+        self, ctx: knext.ConfigurationContext
+    ) -> GoogleAiStudioAuthenticationPortObjectSpec:
+        if not ctx.get_credential_names():
+            raise knext.InvalidParametersError("Credentials not provided.")
+
+        if not self.credentials_settings.credentials_param:
+            raise knext.InvalidParametersError("Credentials not selected.")
+
+        spec = self.create_spec()
+        spec.validate_context(ctx)
+
+        return spec
+
+    def execute(
+        self, ctx: knext.ExecutionContext
+    ) -> GoogleAiStudioAuthenticationPortObject:
+        spec = self.create_spec()
+
+        if self.should_validate_api_key:
+            spec.validate_api_key(ctx)
+
+        return GoogleAiStudioAuthenticationPortObject(spec)
+
+    def create_spec(self) -> GoogleAiStudioAuthenticationPortObjectSpec:
+        return GoogleAiStudioAuthenticationPortObjectSpec(
+            self.credentials_settings.credentials_param
         )

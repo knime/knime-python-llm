@@ -6,7 +6,16 @@ from typing import List
 
 DEFAULT_VERTEX_AI_LOCATION = "europe-west1"
 
+# Taken from https://ai.google.dev/gemini-api/docs/models
+GEMINI_CHAT_MODELS_FALLBACK = [
+    "models/gemini-2.0-flash-lite",
+    "models/gemini-2.0-flash",
+    "gemini-2.5-pro-exp-03-25",
+]
+GEMINI_EMBEDDING_MODELS_FALLBACK = ["gemini-embedding-exp", "models/text-embedding-004"]
+
 vertex_ai_icon = "icons/vertex_ai.png"
+google_ai_studio_icon = "icons/google_ai_studio.png"
 google_icon = "icons/google_super_g.png"
 
 google_category = knext.category(

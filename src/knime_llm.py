@@ -11,6 +11,7 @@ import models.databricks
 import models.deepseek
 import models.ibm
 import models.google
+import models.anthropic_api
 
 try:
     import models.gpt4all

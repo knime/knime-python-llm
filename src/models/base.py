@@ -442,6 +442,10 @@ llm_port_type = knext.port_type("LLM", LLMPortObject, LLMPortObjectSpec)
 class ChatModelPortObjectSpec(LLMPortObjectSpec):
     """Most generic chat model spec. Used to define the most generic chat model PortType."""
 
+    @property
+    def supports_tools(self) -> bool:
+        return True
+
 
 class ChatModelPortObject(LLMPortObject):
     def __init__(self, spec: ChatModelPortObjectSpec) -> None:
@@ -1047,6 +1051,11 @@ class ChatModelPrompter:
 
         chat_model_spec.validate_context(ctx)
         has_tools = tool_table_spec is not None
+
+        if has_tools and not chat_model_spec.supports_tools:
+            raise knext.InvalidParametersError(
+                "The selected model does not support tool calling."
+            )
         return self._create_output_schema(has_tools)
 
     def _create_output_schema(self, has_tool_input: bool) -> Schema:

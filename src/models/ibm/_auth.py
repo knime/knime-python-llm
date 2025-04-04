@@ -36,14 +36,18 @@ class IBMwatsonxAuthenticationPortObjectSpec(AIPortObjectSpec):
     def base_url(self) -> str:
         return self._base_url
 
+    def get_api_key(self, ctx: knext.ExecutionContext) -> str:
+        api_key = ctx.get_credentials(self.credentials).password
+        return api_key
+
     def validate_context(self, ctx: knext.ConfigurationContext):
         if self.credentials not in ctx.get_credential_names():
             raise knext.InvalidParametersError(
                 f"""The selected credentials '{self.credentials}' holding the IBM watsonx.ai API key do not exist. 
                 Make sure that you have selected the correct credentials and that they are still available."""
             )
-        api_token = ctx.get_credentials(self.credentials)
-        if not api_token.password:
+        api_key = ctx.get_credentials(self.credentials)
+        if not api_key.password:
             raise knext.InvalidParametersError(
                 f"""The IBM watsonx.ai API key '{self.credentials}' does not exist. Make sure that the node you are using to pass the credentials 
                 (e.g. the Credentials Configuration node) is still passing the valid API key as a flow variable to the downstream nodes."""
@@ -65,9 +69,27 @@ class IBMwatsonxAuthenticationPortObjectSpec(AIPortObjectSpec):
                 "Could not authenticate with the IBM watsonx.ai API."
             ) from e
 
-    def _get_models_from_api(
+    def model_supports_tools(
+        self, model: str, ctx: knext.ConfigurationContext | knext.ExecutionContext
+    ) -> bool:
+        """
+        Check if the model supports tools.
+        This is a placeholder implementation and should be overridden by subclasses.
+        """
+
+        api_client = self._get_api_client(ctx)
+
+        chat_models = (
+            api_client.foundation_models.get_chat_function_calling_model_specs()
+        )
+
+        return any(
+            chat_model["model_id"] == model for chat_model in chat_models["resources"]
+        )
+
+    def _get_api_client(
         self, ctx: knext.ConfigurationContext | knext.ExecutionContext
-    ) -> list[str]:
+    ) -> APIClient:
 
         api_key = ctx.get_credentials(self.credentials).password
         base_url = self.base_url
@@ -100,9 +122,7 @@ class IBMwatsonxAuthenticationPortObjectSpec(AIPortObjectSpec):
     def _map_names_to_ids(
         self,
         ctx: knext.ConfigurationContext | knext.ExecutionContext,
-        name,
-        type,
-    ) -> dict[str, str]:
+    ) -> str:
         """
         Get the ID for the given name from the list of available projects or spaces.
         The list of available projects or spaces is retrieved from the IBM watsonx.ai API.
@@ -110,31 +130,41 @@ class IBMwatsonxAuthenticationPortObjectSpec(AIPortObjectSpec):
 
         api_client = self._get_api_client(ctx)
 
+        name = self.project_or_space.name
+        type = self.project_or_space.type
+
         items = (
             api_client.projects.list()
             if type == ProjectOrSpaceSelection.PROJECT.name
             else api_client.spaces.list()
         )
 
-        # build a name-to-ID mapping
-        name_to_id_map = dict(zip(items["NAME"], items["ID"]))
+        for item_name, item_id in zip(items["NAME"], items["ID"]):
+            if item_name == name:
+                # found the name, return the ID
+                return item_id
+        # if the name is not found, raise an error
+        raise knext.InvalidParametersError(
+            f"'{name}' was not found in the list of available projects or spaces. "
+            "Please make sure the name is correct."
+        )
 
-        # validate and retrieve the target ID
-        try:
-            return name_to_id_map[name]
-        except KeyError:
-            raise knext.InvalidParametersError(
-                f"'{name}' was not found in the list of available projects or spaces. "
-                "Please make sure the name is correct."
-            )
+    def get_project_or_space_ids(self, ctx) -> tuple[str | None, str | None]:
+        """
+        Returns a tuple of (project_id, space_id) based on the selected type and name.
+        If the type is PROJECT, project_id is set to id and space_id is None.
+        If the type is SPACE, space_id is set to id and project_id is None.
+        """
 
-    def get_map_names_to_ids(
-        self,
-        ctx: knext.ConfigurationContext | knext.ExecutionContext,
-        name: str,
-        type: str,
-    ) -> dict[str, str]:
-        return self._map_names_to_ids(ctx, name, type)
+        project_or_space = self.project_or_space
+        type = project_or_space.type
+
+        id = self._map_names_to_ids(ctx)
+
+        project_id = id if type == ProjectOrSpaceSelection.PROJECT.name else None
+        space_id = id if type == ProjectOrSpaceSelection.SPACE.name else None
+
+        return project_id, space_id
 
     def serialize(self) -> dict:
         return {
@@ -188,7 +218,7 @@ ibm_watsonx_auth_port_type = knext.port_type(
     ibm_watsonx_auth_port_type,
 )
 class IBMwatsonxAuthenticator:
-    """Authenticates with IBM watsonx via API key.
+    """Authenticates with IBM watsonx.ai via API key.
 
     This nodes authenticates with IBM watsonx.ai via the provided API key. The resulting
     authenticated connection can then be used to select chat and embedding models available

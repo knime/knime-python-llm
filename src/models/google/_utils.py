@@ -3,20 +3,44 @@ import knime.extension as knext
 from ..base import model_category
 
 from typing import List
+from pydantic import BaseModel
 
-DEFAULT_VERTEX_AI_LOCATION = "europe-west1"
+
+class GeminiModelWrapper(BaseModel):
+    name: str
+
+
+DEFAULT_VERTEX_AI_LOCATION = "us-central1"
+DEFAULT_VERTEX_AI_GEMINI_CHAT_MODEL = (
+    "publishers/google/models/gemini-2.0-flash-lite-001"
+)
+VERTEX_AI_GEMINI_CHAT_MODELS_FALLBACK = [
+    GeminiModelWrapper(name="publishers/google/models/gemini-2.0-flash-lite"),
+    GeminiModelWrapper(name="publishers/google/models/gemini-2.0-flash"),
+    GeminiModelWrapper(name="publishers/google/models/gemini-2.5-pro-exp-03-25"),
+]
+VERTEX_AI_GEMINI_EMBEDDING_MODELS_FALLBACK = [
+    GeminiModelWrapper(name="publishers/google/gemini-embedding-exp"),
+    GeminiModelWrapper(name="publishers/google/models/text-embedding-004"),
+]
 
 # Taken from https://ai.google.dev/gemini-api/docs/models
-GEMINI_CHAT_MODELS_FALLBACK = [
-    "models/gemini-2.0-flash-lite",
-    "models/gemini-2.0-flash",
-    "gemini-2.5-pro-exp-03-25",
+DEFAULT_GOOGLE_AI_STUDIO_GEMINI_CHAT_MODEL = "models/gemini-2.0-flash-lite-bababa"
+GOOGLE_AI_STUDIO_GEMINI_CHAT_MODELS_FALLBACK = [
+    GeminiModelWrapper(name="models/gemini-2.0-flash-lite"),
+    GeminiModelWrapper(name="models/gemini-2.0-flash"),
+    GeminiModelWrapper(name="gemini-2.5-pro-exp-03-25"),
 ]
-GEMINI_EMBEDDING_MODELS_FALLBACK = ["gemini-embedding-exp", "models/text-embedding-004"]
+GOOGLE_AI_STUDIO_GEMINI_EMBEDDING_MODELS_FALLBACK = [
+    "gemini-embedding-exp",
+    "models/text-embedding-004",
+]
 
+# icons
 vertex_ai_icon = "icons/vertex_ai.png"
 google_ai_studio_icon = "icons/google_ai_studio.png"
 google_icon = "icons/google_super_g.png"
+gemini_icon = "icons/gemini.png"
 
 google_category = knext.category(
     path=model_category,

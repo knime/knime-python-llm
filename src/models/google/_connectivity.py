@@ -1,6 +1,6 @@
 # Nodes:
 # - Vertex AI Connector
-# - Google Ai Studio Authenticator
+# - Google AI Studio Authenticator
 
 import knime.extension as knext
 
@@ -86,7 +86,7 @@ class VertexAiConnector:
 
     should_validate_connection = knext.BoolParameter(
         "Validate connection",
-        "Whether to validate the connection to Vertex AI by making an API call during execution.",
+        "Whether to validate the connection to Vertex AI by making an API call to list the available models during execution.",
         True,
         is_advanced=True,
     )
@@ -96,24 +96,23 @@ class VertexAiConnector:
         ctx: knext.ConfigurationContext,
         google_cloud_credentials_spec: knext.CredentialPortObjectSpec,
     ) -> VertexAiConnectionPortObjectSpec:
-        return self.create_spec(google_cloud_credentials_spec, ctx)
+        return self._create_output_spec(google_cloud_credentials_spec)
 
     def execute(
         self,
         ctx: knext.ExecutionContext,
         google_cloud_credentials: knext.CredentialPortObjectSpec,
     ) -> VertexAiConnectionPortObject:
-        spec = self.create_spec(google_cloud_credentials.spec, ctx)
+        spec = self._create_output_spec(google_cloud_credentials.spec)
 
         if self.should_validate_connection:
-            spec.validate_connection()
+            spec.validate_connection(ctx)
 
         return VertexAiConnectionPortObject(spec=spec)
 
-    def create_spec(
+    def _create_output_spec(
         self,
         credential_spec: knext.CredentialPortObjectSpec,
-        ctx,
     ) -> VertexAiConnectionPortObjectSpec:
         if not self.project_id:
             raise knext.InvalidParametersError("Project ID cannot be empty.")
@@ -176,7 +175,7 @@ class GoogleAiStudioAuthenticator:
         if not self.credentials_settings.credentials_param:
             raise knext.InvalidParametersError("Credentials not selected.")
 
-        spec = self.create_spec()
+        spec = self._create_output_spec()
         spec.validate_context(ctx)
 
         return spec
@@ -184,14 +183,14 @@ class GoogleAiStudioAuthenticator:
     def execute(
         self, ctx: knext.ExecutionContext
     ) -> GoogleAiStudioAuthenticationPortObject:
-        spec = self.create_spec()
+        spec = self._create_output_spec()
 
         if self.should_validate_api_key:
             spec.validate_api_key(ctx)
 
         return GoogleAiStudioAuthenticationPortObject(spec)
 
-    def create_spec(self) -> GoogleAiStudioAuthenticationPortObjectSpec:
+    def _create_output_spec(self) -> GoogleAiStudioAuthenticationPortObjectSpec:
         return GoogleAiStudioAuthenticationPortObjectSpec(
             self.credentials_settings.credentials_param
         )

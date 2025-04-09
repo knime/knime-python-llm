@@ -100,13 +100,13 @@ class DatabricksChatModelPortObject(ChatModelPortObject):
         return self._spec
 
     def create_model(self, ctx):
-        from langchain_openai import ChatOpenAI
+        from ._custom_chat import DatabricksChatOpenAI
 
         base_url = get_base_url(self.spec.databricks_workspace_spec)
 
         api_key = get_api_key(self.spec.databricks_workspace_spec)
 
-        return ChatOpenAI(
+        return DatabricksChatOpenAI(
             model=self.spec.endpoint,
             base_url=base_url,
             api_key=api_key,

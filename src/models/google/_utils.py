@@ -37,10 +37,10 @@ GOOGLE_AI_STUDIO_GEMINI_EMBEDDING_MODELS_FALLBACK = [
 ]
 
 # icons
-vertex_ai_icon = "icons/vertex_ai.png"
-google_ai_studio_icon = "icons/google_ai_studio.png"
-google_icon = "icons/google_super_g.png"
-gemini_icon = "icons/gemini.png"
+vertex_ai_icon = "icons/google/vertex_ai.png"
+google_ai_studio_icon = "icons/google/google_ai_studio.png"
+google_icon = "icons/google/google_super_g.png"
+gemini_icon = "icons/google/gemini.png"
 
 google_category = knext.category(
     path=model_category,

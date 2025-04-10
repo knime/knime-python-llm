@@ -8,6 +8,18 @@ databricks_workspace_port_type_id = (
 )
 
 
+def get_user_agent() -> str:
+    from knime.extension.parameter import _extension_version
+
+    return f"KNIME/{_extension_version}"
+
+
+def get_user_agent_header() -> dict[str, str]:
+    return {
+        "User-Agent": get_user_agent(),
+    }
+
+
 def workspace_port_type_available() -> bool:
     return kn.has_port_type_for_id(databricks_workspace_port_type_id)
 
@@ -46,6 +58,7 @@ def get_models(
 
     headers = {
         "Authorization": f"Bearer {api_key}",
+        "User-Agent": get_user_agent(),
     }
     serving_endpoints_url = urljoin(base_url, "api/2.0/serving-endpoints")
     res = requests.get(serving_endpoints_url, headers=headers)

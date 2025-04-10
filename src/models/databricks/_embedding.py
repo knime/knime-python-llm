@@ -57,11 +57,13 @@ class DatabricksEmbeddingPortObject(EmbeddingsPortObject):
 
     def create_model(self, ctx):
         from ..knime._embeddings_model import OpenAIEmbeddings
+        from ._utils import get_user_agent_header
 
         return OpenAIEmbeddings(
             api_key=get_api_key(self.spec.databricks_workspace_spec),
             base_url=get_base_url(self.spec.databricks_workspace_spec),
             model=self.spec.endpoint,
+            extra_headers=get_user_agent_header(),
         )
 
 

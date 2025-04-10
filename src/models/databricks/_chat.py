@@ -101,6 +101,7 @@ class DatabricksChatModelPortObject(ChatModelPortObject):
 
     def create_model(self, ctx):
         from ._custom_chat import DatabricksChatOpenAI
+        from ._utils import get_user_agent_header
 
         base_url = get_base_url(self.spec.databricks_workspace_spec)
 
@@ -113,6 +114,7 @@ class DatabricksChatModelPortObject(ChatModelPortObject):
             temperature=self.spec.temperature,
             top_p=self.spec.top_p,
             max_tokens=self.spec.max_tokens,
+            default_headers=get_user_agent_header(),
         )
 
 

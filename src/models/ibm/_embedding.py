@@ -13,7 +13,6 @@ from ._auth import (
 from ._util import (
     list_embedding_models,
     check_model,
-    validate_model_availability,
 )
 from typing import List
 
@@ -151,5 +150,8 @@ class IBMwatsonxEmbeddingModelConnector:
         self, ctx, auth: IBMwatsonxAuthenticationPortObject
     ) -> IBMwatsonxEmbeddingPortObject:
         # Check if the model is still available
-        validate_model_availability(auth, ctx, self.model_id, "embedding")
+        if self.model_id not in auth.spec.get_embedding_model_list(ctx):
+            raise knext.InvalidParametersError(
+                f"The embedding model {self.model_id} is not available."
+            )
         return IBMwatsonxEmbeddingPortObject(self._create_spec(auth.spec))

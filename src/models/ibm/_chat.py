@@ -12,13 +12,11 @@ from ._auth import (
 from ._util import (
     check_model,
     list_chat_models,
-    validate_model_availability,
     IBMwatsonxChatModelSettings,
 )
 
 
 class IBMwatsonxChatModelPortObjectSpec(ChatModelPortObjectSpec):
-
     def __init__(
         self,
         auth: IBMwatsonxAuthenticationPortObjectSpec,
@@ -70,7 +68,6 @@ class IBMwatsonxChatModelPortObjectSpec(ChatModelPortObjectSpec):
         self.auth.validate_context(ctx)
 
     def serialize(self) -> dict:
-
         return {
             "auth": self.auth.serialize(),
             "model_id": self.model_id,
@@ -196,7 +193,6 @@ class IBMwatsonxChatModelConnector:
     def create_spec(
         self, auth: IBMwatsonxAuthenticationPortObjectSpec, model_supports_tools: bool
     ) -> IBMwatsonxChatModelPortObjectSpec:
-
         return IBMwatsonxChatModelPortObjectSpec(
             auth,
             self.model_id,
@@ -210,10 +206,12 @@ class IBMwatsonxChatModelConnector:
     def execute(
         self, ctx: knext.ExecutionContext, auth: IBMwatsonxAuthenticationPortObject
     ) -> IBMwatsonxChatModelPortObject:
-        model_supports_tools = auth.spec.model_supports_tools(self.model_id, ctx)
-
         # Check if the model is still available
-        validate_model_availability(auth, ctx, self.model_id, "chat")
+        if self.model_id not in auth.spec.get_chat_model_list(ctx):
+            raise knext.InvalidParametersError(
+                f"The chat model {self.model_id} is not available."
+            )
+        model_supports_tools = auth.spec.model_supports_tools(self.model_id, ctx)
         return IBMwatsonxChatModelPortObject(
             self.create_spec(auth.spec, model_supports_tools)
         )

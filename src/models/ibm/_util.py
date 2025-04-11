@@ -41,7 +41,6 @@ class ProjectOrSpaceSelection(knext.EnumParameterOptions):
 
 @knext.parameter_group(label="Connection configuration")
 class IBMwatsonxConnectionSettings:
-
     project_or_space = knext.EnumParameter(
         "Project or space",
         """
@@ -146,26 +145,6 @@ def list_embedding_models(ctx: knext.ConfigurationContext):
 def check_model(model_id: str) -> None:
     if not model_id:
         raise knext.InvalidParametersError("Select a model.")
-
-
-def validate_model_availability(
-    auth,
-    ctx,
-    model_id: str,
-    model_type: str,
-) -> None:
-    """
-    Check if the model is available in the list of available models.
-    """
-    if model_type == "embedding":
-        available_models = auth.spec.get_embedding_model_list(ctx)
-    else:
-        available_models = auth.spec.get_chat_model_list(ctx)
-
-    if model_id not in available_models:
-        raise knext.InvalidParametersError(
-            f"'{model_id}' was not found in the list of available models. "
-        )
 
 
 def get_project_or_space(

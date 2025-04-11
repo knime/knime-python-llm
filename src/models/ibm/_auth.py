@@ -63,7 +63,7 @@ class IBMwatsonxAuthenticationPortObjectSpec(AIPortObjectSpec):
 
     def validate_api_key(self, ctx: knext.ExecutionContext):
         try:
-            self._get_models_from_api(ctx)
+            self.get_chat_model_list(ctx)
         except Exception as e:
             raise RuntimeError(
                 "Could not authenticate with the IBM watsonx.ai API."
@@ -102,7 +102,7 @@ class IBMwatsonxAuthenticationPortObjectSpec(AIPortObjectSpec):
         api_client = APIClient(credentials)
         return api_client
 
-    def _get_models_from_api(
+    def get_chat_model_list(
         self,
         ctx: knext.ConfigurationContext | knext.ExecutionContext,
     ) -> list[str]:
@@ -116,8 +116,19 @@ class IBMwatsonxAuthenticationPortObjectSpec(AIPortObjectSpec):
 
         return [model["model_id"] for model in chat_models["resources"]]
 
-    def get_model_list(self, ctx: knext.ConfigurationContext) -> list[str]:
-        return self._get_models_from_api(ctx)
+    def get_embedding_model_list(
+        self,
+        ctx: knext.ConfigurationContext | knext.ExecutionContext,
+    ) -> list[str]:
+        """
+        Get the list of available embedding models from the IBM watsonx.ai API.
+        """
+
+        api_client = self._get_api_client(ctx)
+
+        embedding_models = api_client.foundation_models.get_embeddings_model_specs()
+
+        return [model["model_id"] for model in embedding_models["resources"]]
 
     def _map_names_to_ids(
         self,

@@ -11,7 +11,8 @@ from ._auth import (
 )
 from ._util import (
     check_model,
-    list_models,
+    list_chat_models,
+    validate_model_availability,
     IBMwatsonxChatModelSettings,
 )
 
@@ -174,7 +175,7 @@ class IBMwatsonxChatModelConnector:
         "Model",
         description="The model to use for the chat completion.",
         default_value="",
-        choices=list_models,
+        choices=list_chat_models,
     )
 
     model_settings = IBMwatsonxChatModelSettings()
@@ -210,6 +211,9 @@ class IBMwatsonxChatModelConnector:
         self, ctx: knext.ExecutionContext, auth: IBMwatsonxAuthenticationPortObject
     ) -> IBMwatsonxChatModelPortObject:
         model_supports_tools = auth.spec.model_supports_tools(self.model_id, ctx)
+
+        # Check if the model is still available
+        validate_model_availability(auth, ctx, self.model_id, "chat")
         return IBMwatsonxChatModelPortObject(
             self.create_spec(auth.spec, model_supports_tools)
         )

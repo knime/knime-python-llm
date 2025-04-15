@@ -105,7 +105,7 @@ deepseek_auth_port_type = knext.port_type(
     keywords=["DeepSeek", "GenAI"],
 )
 @knext.output_port(
-    "DeepSeek API Authentication",
+    "DeepSeek Authentication",
     "Authentication for the DeepSeek API",
     deepseek_auth_port_type,
 )

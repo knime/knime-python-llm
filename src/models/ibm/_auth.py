@@ -222,7 +222,7 @@ ibm_watsonx_auth_port_type = knext.port_type(
     keywords=["IBM", "watsonx", "GenAI"],
 )
 @knext.output_port(
-    "IBM watsonx.ai API Authentication",
+    "IBM watsonx.ai Authentication",
     "Authentication for the IBM watsonx.ai API.",
     ibm_watsonx_auth_port_type,
 )

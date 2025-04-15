@@ -73,7 +73,6 @@ class GeminiChatModelConnector:
         """,
         min_value=0,
         default_value=4096,
-        is_advanced=True,
     )
 
     temperature = knext.DoubleParameter(
@@ -88,7 +87,6 @@ class GeminiChatModelConnector:
         min_value=0.0,
         max_value=1.0,
         default_value=0.7,
-        is_advanced=True,
     )
 
     def configure(

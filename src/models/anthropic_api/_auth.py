@@ -1,6 +1,7 @@
 import knime.extension as knext
 from ._base import anthropic_icon, anthropic_category
 from ..base import CredentialsSettings, AIPortObjectSpec
+from ._util import latest_models
 
 _default_anthropic_api_base = "https://api.anthropic.com"
 
@@ -56,9 +57,9 @@ class AnthropicAuthenticationPortObjectSpec(AIPortObjectSpec):
 
     def get_model_list(self, ctx: knext.ConfigurationContext) -> list[str]:
         try:
-            return self._get_models_from_api(ctx)
+            return self._get_models_from_api(ctx) + latest_models
         except Exception:
-            return ["claude-3-7-sonnet-20250219", "claude-3-5-haiku-20241022"]
+            return latest_models
 
     def serialize(self) -> dict:
         return {
@@ -117,7 +118,8 @@ class AnthropicAuthenticator:
     You can generate an API key at [Anthropic](https://console.anthropic.com/settings/keys).
 
     **Note**: Data sent to the Anthropic API is not used for the training of models by default,
-    but can be if the prompts are flagged for Trust & Safety violations.
+    but can be if the prompts are flagged for Trust & Safety violations. For more information, check the
+    [Anthropic documentation](https://privacy.anthropic.com/en/articles/10023580-is-my-data-used-for-model-training).
     """
 
     credentials_settings = CredentialsSettings(

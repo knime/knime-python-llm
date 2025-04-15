@@ -6,6 +6,7 @@ from ._auth import (
     AnthropicAuthenticationPortObject,
     anthropic_auth_port_type,
 )
+from ._util import latest_models
 
 
 class AnthropicChatModelPortObjectSpec(ChatModelPortObjectSpec):
@@ -96,7 +97,7 @@ anthropic_chat_model_port_type = knext.port_type(
 def _list_models(ctx: knext.ConfigurationContext):
     if (specs := ctx.get_input_specs()) and (auth_spec := specs[0]):
         return auth_spec.get_model_list(ctx)
-    return ["claude-3-7-sonnet-20250219", "claude-3-5-haiku-20241022"]
+    return latest_models
 
 
 @knext.node(
@@ -104,7 +105,7 @@ def _list_models(ctx: knext.ConfigurationContext):
     node_type=knext.NodeType.SOURCE,
     icon_path=anthropic_icon,
     category=anthropic_category,
-    keywords=["Anthropic", "GenAI"],
+    keywords=["Anthropic", "GenAI", "Claude", "Sonnet", "Opus", "Haiku"],
 )
 @knext.input_port(
     "Anthropic Authentication",
@@ -123,13 +124,18 @@ class AnthropicChatModelConnector:
     using the **Anthropic Authenticator** node, you can select a chat model from a predefined list.
 
     **Note**: Data sent to the Anthropic API is not used for the training of models by default,
-    but can be if the prompts are flagged for Trust & Safety violations.
+    but can be if the prompts are flagged for Trust & Safety violations. For more information, check the
+    [Anthropic documentation](https://privacy.anthropic.com/en/articles/10023580-is-my-data-used-for-model-training).
     """
 
     model = knext.StringParameter(
         "Model",
-        description="The model to use. The available models are fetched from the Anthropic API if possible.",
-        default_value="claude-3-7-sonnet-20250219",
+        description="""The model to use. The available models are fetched from the Anthropic API if possible.
+
+        Models with the suffix -latest are the latest snapshots of the respective models. For more consistent
+        behavior, specific snapshots should be used (e.g. claude-3-7-sonnet-20250219).
+        """,
+        default_value="claude-3-7-sonnet-latest",
         choices=_list_models,
     )
 

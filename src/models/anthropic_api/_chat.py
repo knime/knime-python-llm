@@ -76,9 +76,9 @@ class AnthropicChatModelPortObject(ChatModelPortObject):
         ctx: knext.ExecutionContext,
         output_format: OutputFormatOptions = OutputFormatOptions.Text,
     ):
-        from langchain_anthropic import ChatAnthropic
+        from ._custom_chat import _ChatAnthropic
 
-        return ChatAnthropic(
+        return _ChatAnthropic(
             api_key=ctx.get_credentials(self.spec.auth.credentials).password,
             base_url=self.spec.auth.base_url,
             model=self.spec.model,

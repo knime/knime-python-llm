@@ -8,8 +8,6 @@ from ._util import (
     get_project_or_space,
     ProjectOrSpace,
 )
-from ibm_watsonx_ai import APIClient
-from ibm_watsonx_ai import Credentials
 
 
 class IBMwatsonxAuthenticationPortObjectSpec(AIPortObjectSpec):
@@ -87,9 +85,9 @@ class IBMwatsonxAuthenticationPortObjectSpec(AIPortObjectSpec):
             chat_model["model_id"] == model for chat_model in chat_models["resources"]
         )
 
-    def _get_api_client(
-        self, ctx: knext.ConfigurationContext | knext.ExecutionContext
-    ) -> APIClient:
+    def _get_api_client(self, ctx: knext.ConfigurationContext | knext.ExecutionContext):
+        from ibm_watsonx_ai import APIClient
+        from ibm_watsonx_ai import Credentials
 
         api_key = ctx.get_credentials(self.credentials).password
         base_url = self.base_url
@@ -255,7 +253,6 @@ class IBMwatsonxAuthenticator:
     def configure(
         self, ctx: knext.ConfigurationContext
     ) -> IBMwatsonxAuthenticationPortObjectSpec:
-
         if not self.credentials_settings.credentials_param:
             raise knext.InvalidParametersError("Credentials not selected.")
 

@@ -67,6 +67,7 @@ try {
                     'knime-pmml',
                     'knime-ensembles',
                     'knime-distance',
+                    'knime-base-expressions',
                     repositoryName
                     ],
             ],

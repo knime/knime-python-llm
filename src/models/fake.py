@@ -7,6 +7,7 @@ from .base import (
     ChatModelPortObject,
     EmbeddingsPortObjectSpec,
     EmbeddingsPortObject,
+    OutputFormatOptions,
     model_category,
     util,
 )
@@ -162,7 +163,9 @@ class TestLLMPortObject(LLMPortObject):
         (responses, default_response) = pickle.loads(data)
         return cls(spec, responses, default_response)
 
-    def create_model(self, ctx, output_format):
+    def create_model(
+        self, ctx: knext.ExecutionContext, output_format: OutputFormatOptions
+    ):
         from ._fake_models import TestDictLLM
 
         return TestDictLLM(
@@ -227,7 +230,9 @@ class TestChatModelPortObject(ChatModelPortObject):
         (responses, default_response) = pickle.loads(data)
         return cls(spec, responses, default_response)
 
-    def create_model(self, ctx: knext.ExecutionContext, output_format):
+    def create_model(
+        self, ctx: knext.ExecutionContext, output_format: OutputFormatOptions
+    ):
         from ._fake_models import TestChatModel
 
         return TestChatModel(

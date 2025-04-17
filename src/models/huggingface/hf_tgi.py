@@ -7,6 +7,7 @@ from ..base import (
     LLMPortObject,
     ChatModelPortObject,
     ChatModelPortObjectSpec,
+    OutputFormatOptions,
 )
 from .hf_base import (
     hf_category,
@@ -166,7 +167,9 @@ class HFTGILLMPortObject(LLMPortObject):
     def spec(self) -> HFTGILLMPortObjectSpec:
         return super().spec
 
-    def create_model(self, ctx: knext.ExecutionContext, output_format):
+    def create_model(
+        self, ctx: knext.ExecutionContext, output_format: OutputFormatOptions
+    ):
         from ._hf_llm import HFLLM
 
         hub_auth = self.spec.hf_hub_auth
@@ -245,7 +248,9 @@ class HFTGIChatModelPortObject(HFTGILLMPortObject, ChatModelPortObject):
     def spec(self) -> HFTGIChatModelPortObjectSpec:
         return super().spec
 
-    def create_model(self, ctx, output_format):
+    def create_model(
+        self, ctx: knext.ExecutionContext, output_format: OutputFormatOptions
+    ):
         from .._adapter import LLMChatModelAdapter
 
         llm = super().create_model(ctx, output_format)

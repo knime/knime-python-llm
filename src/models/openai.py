@@ -751,7 +751,9 @@ class OpenAILLMPortObject(LLMPortObject):
     def spec(self) -> OpenAILLMPortObjectSpec:
         return super().spec
 
-    def create_model(self, ctx, output_format):
+    def create_model(
+        self, ctx: knext.ExecutionContext, output_format: OutputFormatOptions
+    ):
         from langchain_openai import OpenAI
 
         return OpenAI(

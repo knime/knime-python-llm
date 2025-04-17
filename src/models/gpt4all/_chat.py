@@ -2,6 +2,7 @@ import knime.extension as knext
 from ..base import (
     ChatModelPortObject,
     ChatModelPortObjectSpec,
+    OutputFormatOptions,
 )
 
 from ._llm import GPT4AllLLMPortObject, GPT4AllLLMPortObjectSpec
@@ -63,7 +64,9 @@ class GPT4AllChatModelPortObject(GPT4AllLLMPortObject, ChatModelPortObject):
     def spec(self) -> GPT4AllChatModelPortObjectSpec:
         return super().spec
 
-    def create_model(self, ctx, output_format):
+    def create_model(
+        self, ctx: knext.ExecutionContext, output_format: OutputFormatOptions
+    ):
         from .._adapter import LLMChatModelAdapter
 
         llm = super().create_model(ctx, output_format)

@@ -145,7 +145,9 @@ class AzureOpenAILLMPortObject(OpenAILLMPortObject):
     def spec(self) -> AzureOpenAILLMPortObjectSpec:
         return super().spec
 
-    def create_model(self, ctx: knext.ExecutionContext, output_format):
+    def create_model(
+        self, ctx: knext.ExecutionContext, output_format: OutputFormatOptions
+    ):
         from langchain_openai import AzureOpenAI
 
         return AzureOpenAI(

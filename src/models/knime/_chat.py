@@ -1,7 +1,7 @@
 import knime.extension as knext
 import knime.api.schema as ks
-from knime.extension import ConfigurationContext, ExecutionContext
-from ..base import GeneralSettings
+from knime.extension import ConfigurationContext
+from ..base import GeneralSettings, OutputFormatOptions
 from ._base import (
     hub_connector_icon,
     knime_category,
@@ -91,7 +91,9 @@ class KnimeHubChatModelPortObject(ChatModelPortObject):
     def spec(self) -> KnimeHubChatModelPortObjectSpec:
         return super().spec
 
-    def create_model(self, ctx: ExecutionContext, output_format):
+    def create_model(
+        self, ctx: knext.ExecutionContext, output_format: OutputFormatOptions
+    ):
         from langchain_openai import ChatOpenAI
 
         auth_spec = self.spec.auth_spec

@@ -1,5 +1,5 @@
 import knime.extension as knext
-from ..base import ChatModelPortObject, ChatModelPortObjectSpec
+from ..base import ChatModelPortObject, ChatModelPortObjectSpec, OutputFormatOptions
 from ._base import (
     ibm_watsonx_icon,
     ibm_watsonx_category,
@@ -97,7 +97,9 @@ class IBMwatsonxChatModelPortObject(ChatModelPortObject):
     def spec(self) -> IBMwatsonxChatModelPortObjectSpec:
         return super().spec
 
-    def create_model(self, ctx: knext.ExecutionContext, output_format):
+    def create_model(
+        self, ctx: knext.ExecutionContext, output_format: OutputFormatOptions
+    ):
         from langchain_ibm import ChatWatsonx
 
         # Retrieve the name-id map for projects or spaces

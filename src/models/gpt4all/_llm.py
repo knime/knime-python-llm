@@ -2,6 +2,7 @@ import knime.extension as knext
 from ..base import (
     LLMPortObjectSpec,
     LLMPortObject,
+    OutputFormatOptions,
 )
 
 from ._base import (
@@ -109,7 +110,9 @@ class GPT4AllLLMPortObject(LLMPortObject):
     def spec(self) -> GPT4AllLLMPortObjectSpec:
         return super().spec
 
-    def create_model(self, ctx, output_format):
+    def create_model(
+        self, ctx: knext.ExecutionContext, output_format: OutputFormatOptions
+    ):
         from ._gpt4all import GPT4All
         from pydantic import ValidationError
 

@@ -9,7 +9,11 @@ from typing import Dict, List, Literal
 import logging
 
 from base import AIPortObjectSpec
-from models.base import ChatModelPortObject, ChatModelPortObjectSpec
+from models.base import (
+    ChatModelPortObject,
+    ChatModelPortObjectSpec,
+    OutputFormatOptions,
+)
 from ._utils import (
     VERTEX_AI_GEMINI_CHAT_MODELS_FALLBACK,
     VERTEX_AI_GEMINI_EMBEDDING_MODELS_FALLBACK,
@@ -467,7 +471,9 @@ class GeminiChatModelPortObject(ChatModelPortObject):
     def spec(self) -> GeminiChatModelPortObjectSpec:
         return self._spec
 
-    def create_model(self, ctx, output_format):
+    def create_model(
+        self, ctx: knext.ExecutionContext, output_format: OutputFormatOptions
+    ):
         auth_spec = self.spec.auth_spec
 
         if isinstance(auth_spec, VertexAiConnectionPortObjectSpec):

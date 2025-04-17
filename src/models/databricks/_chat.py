@@ -5,6 +5,7 @@ from ..base import (
     ChatModelPortObject,
     ChatModelPortObjectSpec,
     GeneralRemoteSettings,
+    OutputFormatOptions,
 )
 import knime.extension as knext
 from ._utils import (
@@ -99,7 +100,9 @@ class DatabricksChatModelPortObject(ChatModelPortObject):
     def spec(self) -> DatabricksChatModelPortObjectSpec:
         return self._spec
 
-    def create_model(self, ctx, output_format):
+    def create_model(
+        self, ctx: knext.ExecutionContext, output_format: OutputFormatOptions
+    ):
         from ._custom_chat import DatabricksChatOpenAI
         from ._utils import get_user_agent_header
 

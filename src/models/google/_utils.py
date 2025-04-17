@@ -2,11 +2,11 @@ import knime.extension as knext
 
 from ..base import model_category
 
-from typing import List
-from pydantic import BaseModel
+from typing import List, NamedTuple
 
 
-class GeminiModelWrapper(BaseModel):
+# objects representing models returned from Google's endpoints have a `name` field that we mimic here
+class GeminiModelWrapper(NamedTuple):
     name: str
 
 
@@ -15,25 +15,25 @@ DEFAULT_VERTEX_AI_GEMINI_CHAT_MODEL = (
     "publishers/google/models/gemini-2.0-flash-lite-001"
 )
 VERTEX_AI_GEMINI_CHAT_MODELS_FALLBACK = [
-    GeminiModelWrapper(name="publishers/google/models/gemini-2.0-flash-lite"),
-    GeminiModelWrapper(name="publishers/google/models/gemini-2.0-flash"),
-    GeminiModelWrapper(name="publishers/google/models/gemini-2.5-pro-exp-03-25"),
+    GeminiModelWrapper("publishers/google/models/gemini-2.0-flash-lite"),
+    GeminiModelWrapper("publishers/google/models/gemini-2.0-flash"),
+    GeminiModelWrapper("publishers/google/models/gemini-2.5-pro-exp-03-25"),
 ]
 VERTEX_AI_GEMINI_EMBEDDING_MODELS_FALLBACK = [
-    GeminiModelWrapper(name="publishers/google/gemini-embedding-exp"),
-    GeminiModelWrapper(name="publishers/google/models/text-embedding-004"),
+    GeminiModelWrapper("publishers/google/gemini-embedding-exp"),
+    GeminiModelWrapper("publishers/google/models/text-embedding-004"),
 ]
 
 # Taken from https://ai.google.dev/gemini-api/docs/models
 DEFAULT_GOOGLE_AI_STUDIO_GEMINI_CHAT_MODEL = "models/gemini-2.0-flash-lite-bababa"
 GOOGLE_AI_STUDIO_GEMINI_CHAT_MODELS_FALLBACK = [
-    GeminiModelWrapper(name="models/gemini-2.0-flash-lite"),
-    GeminiModelWrapper(name="models/gemini-2.0-flash"),
-    GeminiModelWrapper(name="gemini-2.5-pro-exp-03-25"),
+    GeminiModelWrapper("models/gemini-2.0-flash-lite"),
+    GeminiModelWrapper("models/gemini-2.0-flash"),
+    GeminiModelWrapper("gemini-2.5-pro-exp-03-25"),
 ]
 GOOGLE_AI_STUDIO_GEMINI_EMBEDDING_MODELS_FALLBACK = [
-    "gemini-embedding-exp",
-    "models/text-embedding-004",
+    GeminiModelWrapper("models/gemini-embedding-exp"),
+    GeminiModelWrapper("models/text-embedding-004"),
 ]
 
 # icons

@@ -15,6 +15,7 @@ from models.base import (
     OutputFormatOptions,
 )
 from ._utils import (
+    KNOWN_DEPRECATED_MODELS,
     VERTEX_AI_GEMINI_CHAT_MODELS_FALLBACK,
     VERTEX_AI_GEMINI_EMBEDDING_MODELS_FALLBACK,
     GOOGLE_AI_STUDIO_GEMINI_CHAT_MODELS_FALLBACK,
@@ -31,16 +32,14 @@ class GenericGeminiConnectionPortObjectSpec(AIPortObjectSpec):
     def __init__(self, connection_type: Literal["vertex_ai", "google_ai_studio"]):
         self._connection_type = connection_type
 
-    def get_chat_model_list(
-        self, dialog_creation_context: knext.DialogCreationContext
-    ) -> List[str]:
+    def get_chat_model_list(self, dialog_creation_context: knext.DialogCreationContext):
         raise NotImplementedError(
             "Subclasses of the generic Gemini connection must implement this method."
         )
 
     def get_embedding_model_list(
         self, dialog_creation_context: knext.DialogCreationContext
-    ) -> List[str]:
+    ):
         raise NotImplementedError(
             "Subclasses of the generic Gemini connection must implement this method."
         )
@@ -158,9 +157,7 @@ class VertexAiConnectionPortObjectSpec(GenericGeminiConnectionPortObjectSpec):
                 f" Ensure the project ID exists and the authenticated account has appropriate permissions. Error: {e}"
             )
 
-    def get_chat_model_list(
-        self, dialog_creation_context: knext.DialogCreationContext
-    ) -> List[str]:
+    def get_chat_model_list(self, dialog_creation_context: knext.DialogCreationContext):
         models = self._fetch_models_from_api("chat")
         if not models:
             LOGGER.info(
@@ -172,7 +169,7 @@ class VertexAiConnectionPortObjectSpec(GenericGeminiConnectionPortObjectSpec):
 
     def get_embedding_model_list(
         self, dialog_creation_context: knext.DialogCreationContext
-    ) -> List[str]:
+    ):
         models = self._fetch_models_from_api("embedding")
         if not models:
             LOGGER.info(
@@ -185,7 +182,7 @@ class VertexAiConnectionPortObjectSpec(GenericGeminiConnectionPortObjectSpec):
     def _fetch_models_from_api(
         self,
         model_type: Literal["chat", "embedding"],
-    ) -> List[str]:
+    ):
         """
         Always returns either:
         - a list of matched models from the API endpoint
@@ -314,7 +311,7 @@ class GoogleAiStudioAuthenticationPortObjectSpec(GenericGeminiConnectionPortObje
             )
             return GOOGLE_AI_STUDIO_GEMINI_CHAT_MODELS_FALLBACK
 
-        return models
+        return self._sort_models(models)
 
     def get_embedding_model_list(
         self, dialog_creation_context: knext.DialogCreationContext
@@ -326,13 +323,39 @@ class GoogleAiStudioAuthenticationPortObjectSpec(GenericGeminiConnectionPortObje
             )
             return GOOGLE_AI_STUDIO_GEMINI_EMBEDDING_MODELS_FALLBACK
 
-        return models
+        return self._sort_models(models)
+
+    def _sort_models(self, models):
+        """
+        Given a list of Model objects fetched from the API, we ensure that:
+        - their names don't have the "/models" prefix
+        - gemini- models are listed first
+        - gemma- models are listed second
+        - other models are listed below
+        """
+
+        def get_group(s):
+            if s.startswith("gemini"):
+                return 0
+
+            if s.startswith("gemma"):
+                return 1
+
+            return 2
+
+        unique_model_names = set([m.name.split("/")[-1] for m in models])
+
+        # we want gemini-2.5 to appear before gemini-2.0, thus reverse sorting
+        sorted_names = sorted(unique_model_names, reverse=True)
+        grouped_names = sorted(sorted_names, key=get_group)
+
+        return grouped_names
 
     def _fetch_models_from_api(
         self,
         ctx: knext.ExecutionContext | knext.DialogCreationContext,
         model_type: Literal["chat", "embedding"],
-    ) -> List[str]:
+    ):
         """
         Always returns either:
         - a list of matched models from the API endpoint
@@ -342,11 +365,23 @@ class GoogleAiStudioAuthenticationPortObjectSpec(GenericGeminiConnectionPortObje
         """
 
         def matches_model_type(model):
+            # deprecated models no longer work but still get listed
+            def is_deprecated_model():
+                if model.description is not None:
+                    return "deprecated" in model.description.lower()
+
+                return model.name in KNOWN_DEPRECATED_MODELS
+
+            if is_deprecated_model():
+                return False
+
             if model_type == "chat":
                 return "generateContent" in model.supported_actions
 
             if model_type == "embedding":
                 return "embedContent" in model.supported_actions
+
+            return False
 
         from google.genai import Client
 
@@ -418,7 +453,11 @@ class GeminiChatModelPortObjectSpec(ChatModelPortObjectSpec):
 
     @property
     def model_name(self) -> str:
-        return self._model_name
+        if isinstance(self.auth_spec, VertexAiConnectionPortObjectSpec):
+            return f"publishers/google/models/{self._model_name}"
+
+        if isinstance(self.auth_spec, GoogleAiStudioAuthenticationPortObjectSpec):
+            return f"models/{self._model_name}"
 
     @property
     def max_output_tokens(self) -> int:

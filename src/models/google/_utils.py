@@ -5,35 +5,36 @@ from ..base import model_category
 from typing import List, NamedTuple
 
 
-# objects representing models returned from Google's endpoints have a `name` field that we mimic here
+# objects representing models returned from Google's endpoints have a `name` field, which we mimic here
+# in order to have a single way to handle both models returned from the API and fallback models
 class GeminiModelWrapper(NamedTuple):
     name: str
 
 
+KNOWN_DEPRECATED_MODELS = ["gemini-1.0-pro-vision-latest", "gemini-pro-vision"]
+
 DEFAULT_VERTEX_AI_LOCATION = "us-central1"
-DEFAULT_VERTEX_AI_GEMINI_CHAT_MODEL = (
-    "publishers/google/models/gemini-2.0-flash-lite-001"
-)
+DEFAULT_VERTEX_AI_GEMINI_CHAT_MODEL = GeminiModelWrapper("gemini-2.0-flash-lite")
 VERTEX_AI_GEMINI_CHAT_MODELS_FALLBACK = [
-    GeminiModelWrapper("publishers/google/models/gemini-2.0-flash-lite"),
-    GeminiModelWrapper("publishers/google/models/gemini-2.0-flash"),
-    GeminiModelWrapper("publishers/google/models/gemini-2.5-pro-exp-03-25"),
+    GeminiModelWrapper("gemini-2.0-flash-lite"),
+    GeminiModelWrapper("gemini-2.0-flash"),
+    GeminiModelWrapper("gemini-2.5-pro-preview-03-25"),
 ]
 VERTEX_AI_GEMINI_EMBEDDING_MODELS_FALLBACK = [
-    GeminiModelWrapper("publishers/google/gemini-embedding-exp"),
-    GeminiModelWrapper("publishers/google/models/text-embedding-004"),
+    GeminiModelWrapper("gemini-embedding-exp-03-07"),
+    GeminiModelWrapper("text-embedding-004"),
 ]
 
 # Taken from https://ai.google.dev/gemini-api/docs/models
-DEFAULT_GOOGLE_AI_STUDIO_GEMINI_CHAT_MODEL = "models/gemini-2.0-flash-lite-bababa"
+DEFAULT_GOOGLE_AI_STUDIO_GEMINI_CHAT_MODEL = GeminiModelWrapper("gemini-2.0-flash-lite")
 GOOGLE_AI_STUDIO_GEMINI_CHAT_MODELS_FALLBACK = [
-    GeminiModelWrapper("models/gemini-2.0-flash-lite"),
-    GeminiModelWrapper("models/gemini-2.0-flash"),
-    GeminiModelWrapper("gemini-2.5-pro-exp-03-25"),
+    GeminiModelWrapper("gemini-2.0-flash-lite"),
+    GeminiModelWrapper("gemini-2.0-flash"),
+    GeminiModelWrapper("gemini-2.5-pro-preview-03-25"),
 ]
 GOOGLE_AI_STUDIO_GEMINI_EMBEDDING_MODELS_FALLBACK = [
-    GeminiModelWrapper("models/gemini-embedding-exp"),
-    GeminiModelWrapper("models/text-embedding-004"),
+    GeminiModelWrapper("gemini-embedding-exp-03-07"),
+    GeminiModelWrapper("text-embedding-004"),
 ]
 
 # icons

@@ -27,7 +27,7 @@ def _list_gemini_chat_models(
     if generic_connection_spec is None:
         return [""]
 
-    return [model.name for model in generic_connection_spec.get_chat_model_list(ctx)]
+    return generic_connection_spec.get_chat_model_list(ctx)
 
 
 @knext.node(

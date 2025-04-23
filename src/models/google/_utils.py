@@ -2,15 +2,6 @@ import knime.extension as knext
 
 from ..base import model_category
 
-from typing import List, NamedTuple
-
-
-# objects representing models returned from Google's endpoints have a `name` field, which we mimic here
-# in order to have a single way to handle both models returned from the API and fallback models
-class GeminiModelWrapper(NamedTuple):
-    name: str
-
-
 # Reference: https://cloud.google.com/vertex-ai/generative-ai/docs/learn/model-versions
 KNOWN_DEPRECATED_MODELS = [
     "gemini-ultra",
@@ -32,28 +23,15 @@ KNOWN_DEPRECATED_MODELS = [
     "textembedding-gecko@001",
 ]
 
-DEFAULT_VERTEX_AI_LOCATION = "us-central1"
-DEFAULT_VERTEX_AI_GEMINI_CHAT_MODEL = GeminiModelWrapper("gemini-2.0-flash-lite")
-VERTEX_AI_GEMINI_CHAT_MODELS_FALLBACK = [
-    GeminiModelWrapper("gemini-2.0-flash-lite"),
-    GeminiModelWrapper("gemini-2.0-flash"),
-    GeminiModelWrapper("gemini-2.5-pro-preview-03-25"),
-]
-VERTEX_AI_GEMINI_EMBEDDING_MODELS_FALLBACK = [
-    GeminiModelWrapper("gemini-embedding-exp-03-07"),
-    GeminiModelWrapper("text-embedding-004"),
-]
-
 # Taken from https://ai.google.dev/gemini-api/docs/models
-DEFAULT_GOOGLE_AI_STUDIO_GEMINI_CHAT_MODEL = GeminiModelWrapper("gemini-2.0-flash-lite")
-GOOGLE_AI_STUDIO_GEMINI_CHAT_MODELS_FALLBACK = [
-    GeminiModelWrapper("gemini-2.0-flash-lite"),
-    GeminiModelWrapper("gemini-2.0-flash"),
-    GeminiModelWrapper("gemini-2.5-pro-preview-03-25"),
+GEMINI_CHAT_MODELS_FALLBACK = [
+    "gemini-2.5-pro-preview-03-25",
+    "gemini-2.0-flash-lite",
+    "gemini-2.0-flash",
 ]
-GOOGLE_AI_STUDIO_GEMINI_EMBEDDING_MODELS_FALLBACK = [
-    GeminiModelWrapper("gemini-embedding-exp-03-07"),
-    GeminiModelWrapper("text-embedding-004"),
+GEMINI_EMBEDDING_MODELS_FALLBACK = [
+    "gemini-embedding-exp-03-07",
+    "text-embedding-004",
 ]
 
 # icons
@@ -70,9 +48,11 @@ google_category = knext.category(
     icon=google_icon,
 )
 
+DEFAULT_VERTEX_AI_LOCATION = "us-central1"
+
 
 # Taken from https://cloud.google.com/vertex-ai/generative-ai/docs/learn/locations
-def _vertex_ai_location_choices_provider(ctx) -> List[str]:
+def _vertex_ai_location_choices_provider(ctx):
     return [
         # United States
         "us-central1",

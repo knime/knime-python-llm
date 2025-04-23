@@ -16,10 +16,8 @@ from models.base import (
 )
 from ._utils import (
     KNOWN_DEPRECATED_MODELS,
-    VERTEX_AI_GEMINI_CHAT_MODELS_FALLBACK,
-    VERTEX_AI_GEMINI_EMBEDDING_MODELS_FALLBACK,
-    GOOGLE_AI_STUDIO_GEMINI_CHAT_MODELS_FALLBACK,
-    GOOGLE_AI_STUDIO_GEMINI_EMBEDDING_MODELS_FALLBACK,
+    GEMINI_CHAT_MODELS_FALLBACK,
+    GEMINI_EMBEDDING_MODELS_FALLBACK,
 )
 
 LOGGER = logging.getLogger(__name__)
@@ -188,7 +186,7 @@ class VertexAiConnectionPortObjectSpec(GenericGeminiConnectionPortObjectSpec):
             LOGGER.info(
                 f"No chat models available for specified location '{self.location}'. Using a predefined list of known chat models."
             )
-            return VERTEX_AI_GEMINI_CHAT_MODELS_FALLBACK
+            return GEMINI_CHAT_MODELS_FALLBACK
 
         return self._clean_and_sort_models(models)
 
@@ -200,7 +198,7 @@ class VertexAiConnectionPortObjectSpec(GenericGeminiConnectionPortObjectSpec):
             LOGGER.info(
                 f"No embedding models available for specified location '{self.location}'. Using a predefined list of known embedding models."
             )
-            return VERTEX_AI_GEMINI_EMBEDDING_MODELS_FALLBACK
+            return GEMINI_EMBEDDING_MODELS_FALLBACK
 
         return self._clean_and_sort_models(models)
 
@@ -236,7 +234,15 @@ class VertexAiConnectionPortObjectSpec(GenericGeminiConnectionPortObjectSpec):
             return False
 
         # 1. we use us-central1 to get the list of all available models
-        base_genai_client = self._create_genai_client_for_location("us-central1")
+        try:
+            base_genai_client = self._create_genai_client_for_location("us-central1")
+        except Exception as e:
+            LOGGER.warning(
+                "Could not fetch list of models from Vertex AI."
+                " Ensure you are providing valid authentication."
+                f" Error: {e}"
+            )
+            return []
 
         # 2. filter out deprecated and irrelevant models
         paged_model_list = base_genai_client.models.list(config={"query_base": True})
@@ -372,7 +378,7 @@ class GoogleAiStudioAuthenticationPortObjectSpec(GenericGeminiConnectionPortObje
             LOGGER.info(
                 "No chat models available for the authenticated Google AI Studio user. Using a predefined list of known chat models."
             )
-            return GOOGLE_AI_STUDIO_GEMINI_CHAT_MODELS_FALLBACK
+            return GEMINI_CHAT_MODELS_FALLBACK
 
         return self._clean_and_sort_models(models)
 
@@ -384,7 +390,7 @@ class GoogleAiStudioAuthenticationPortObjectSpec(GenericGeminiConnectionPortObje
             LOGGER.info(
                 "No embedding models available for the authenticated Google AI Studio user. Using a predefined list of known embedding models."
             )
-            return GOOGLE_AI_STUDIO_GEMINI_EMBEDDING_MODELS_FALLBACK
+            return GEMINI_EMBEDDING_MODELS_FALLBACK
 
         return self._clean_and_sort_models(models)
 
@@ -425,8 +431,16 @@ class GoogleAiStudioAuthenticationPortObjectSpec(GenericGeminiConnectionPortObje
         key = ctx.get_credentials(self.credentials).password
         client = Client(api_key=key)
 
-        # this is a paged iterator that automatically fetches the next page
-        paged_model_list = client.models.list()
+        try:
+            # this is a paged iterator that automatically fetches the next page
+            paged_model_list = client.models.list()
+        except Exception as e:
+            LOGGER.warning(
+                "Could not fetch list of models from Google AI Studio."
+                " Ensure you are providing a valid API key for authentication."
+                f" Error: {e}"
+            )
+            return []
 
         return [m for m in paged_model_list if matches_model_type(m)]
 

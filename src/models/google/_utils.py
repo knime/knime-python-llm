@@ -11,7 +11,26 @@ class GeminiModelWrapper(NamedTuple):
     name: str
 
 
-KNOWN_DEPRECATED_MODELS = ["gemini-1.0-pro-vision-latest", "gemini-pro-vision"]
+# Reference: https://cloud.google.com/vertex-ai/generative-ai/docs/learn/model-versions
+KNOWN_DEPRECATED_MODELS = [
+    "gemini-ultra",
+    "gemini-ultra-vision",
+    "gemini-pro",
+    "gemini-pro-vision",
+    "gemini-1.5-flash-001",
+    "gemini-1.5-pro-001",
+    "gemini-1.0-pro-001",
+    "gemini-1.0-pro-002",
+    "gemini-1.0-pro-vision-latest",
+    "gemini-1.0-flash-vision-001",
+    "text-bison",
+    "chat-bison",
+    "code-gecko",
+    "textembedding-gecko-multilingual@001",
+    "textembedding-gecko@003",
+    "textembedding-gecko@002",
+    "textembedding-gecko@001",
+]
 
 DEFAULT_VERTEX_AI_LOCATION = "us-central1"
 DEFAULT_VERTEX_AI_GEMINI_CHAT_MODEL = GeminiModelWrapper("gemini-2.0-flash-lite")

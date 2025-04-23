@@ -5,7 +5,7 @@
 
 import knime.extension as knext
 
-from typing import Dict, List, Literal
+from typing import Dict, List, Literal, Optional
 import logging
 
 from base import AIPortObjectSpec
@@ -27,6 +27,7 @@ LOGGER = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------
 # Generic Gemini Connection Port Type
+# region Generic Authentication
 # ---------------------------------------------------------------------
 class GenericGeminiConnectionPortObjectSpec(AIPortObjectSpec):
     def __init__(self, connection_type: Literal["vertex_ai", "google_ai_studio"]):
@@ -44,6 +45,32 @@ class GenericGeminiConnectionPortObjectSpec(AIPortObjectSpec):
             "Subclasses of the generic Gemini connection must implement this method."
         )
 
+    def _clean_and_sort_models(self, models):
+        """
+        Given a list of Model objects fetched from the API, we ensure that:
+        - their names don't have the "/models" prefix
+        - Gemini models are listed first
+        - Gemma models are listed second
+        - other models are listed third
+        """
+
+        def get_group(s):
+            if s.startswith("gemini"):
+                return 0
+
+            if s.startswith("gemma"):
+                return 1
+
+            return 2
+
+        unique_model_names = set([m.name.split("/")[-1] for m in models])
+
+        # we want e.g. gemini-2.5 to appear before gemini-2.0, thus reverse sorting
+        sorted_names = sorted(unique_model_names, reverse=True)
+        grouped_names = sorted(sorted_names, key=get_group)
+
+        return grouped_names
+
 
 class GenericGeminiConnectionPortObject(knext.PortObject):
     """Base class for the Gemini Connection input port of Gemini connector nodes."""
@@ -58,6 +85,7 @@ generic_gemini_connection_port_type = knext.port_type(
 
 # ---------------------------------------------------------------------
 # Vertex AI Connection Port Type
+# region Vertex Authentication
 # ---------------------------------------------------------------------
 class VertexAiConnectionPortObjectSpec(GenericGeminiConnectionPortObjectSpec):
     def __init__(
@@ -86,10 +114,14 @@ class VertexAiConnectionPortObjectSpec(GenericGeminiConnectionPortObjectSpec):
         return self._location
 
     @property
-    def base_api_url(self) -> str:
+    def custom_base_api_url(self) -> Optional[str]:
         if self._custom_base_api_url:
             return self._custom_base_api_url
 
+        return None
+
+    @property
+    def base_api_url(self) -> str:
         return f"{self.location}-aiplatform.googleapis.com"
 
     def serialize(self):
@@ -139,25 +171,18 @@ class VertexAiConnectionPortObjectSpec(GenericGeminiConnectionPortObjectSpec):
         )
 
     def validate_connection(self, ctx: knext.ExecutionContext):
-        """
-        Called during execution.
-        """
         try:
-            models = self._fetch_models_from_api("chat")
-            if not models:
-                ctx.set_warning(
-                    "Connection with Vertex AI established, but no models are available"
-                    f" for project ID '{self.project_id}' under location '{self.location}'."
-                    " A predefined lit of known chat or embedding models will be used downstream."
-                    " Try selecting a different location, e.g. `us-central1`."
-                )
+            genai_client = self._create_genai_client_for_location(self.location)
+            genai_client.models.list()
         except Exception as e:
             raise RuntimeError(
                 "Could not establish connection with Vertex AI."
                 f" Ensure the project ID exists and the authenticated account has appropriate permissions. Error: {e}"
             )
 
-    def get_chat_model_list(self, dialog_creation_context: knext.DialogCreationContext):
+    def get_chat_model_list(
+        self, dialog_creation_context: knext.DialogCreationContext
+    ) -> List[str]:
         models = self._fetch_models_from_api("chat")
         if not models:
             LOGGER.info(
@@ -165,11 +190,11 @@ class VertexAiConnectionPortObjectSpec(GenericGeminiConnectionPortObjectSpec):
             )
             return VERTEX_AI_GEMINI_CHAT_MODELS_FALLBACK
 
-        return models
+        return self._clean_and_sort_models(models)
 
     def get_embedding_model_list(
         self, dialog_creation_context: knext.DialogCreationContext
-    ):
+    ) -> List[str]:
         models = self._fetch_models_from_api("embedding")
         if not models:
             LOGGER.info(
@@ -177,7 +202,7 @@ class VertexAiConnectionPortObjectSpec(GenericGeminiConnectionPortObjectSpec):
             )
             return VERTEX_AI_GEMINI_EMBEDDING_MODELS_FALLBACK
 
-        return models
+        return self._clean_and_sort_models(models)
 
     def _fetch_models_from_api(
         self,
@@ -192,49 +217,86 @@ class VertexAiConnectionPortObjectSpec(GenericGeminiConnectionPortObjectSpec):
         """
 
         def matches_model_type(model):
-            model_name = model.name.lower()
-
-            def is_chat_model(model_name):
-                return any(s in model_name for s in ["gemini", "gemma"])
-
-            def is_embedding_model(model_name):
-                return any(s in model_name for s in ["text", "embed"])
+            model_name = model.name.split("/")[-1]
 
             # deprecated models no longer work but still get listed
-            def is_deprecated_model(model_name):
-                return any(s in model_name for s in ["vision"])
+            is_deprecated_model = model_name in KNOWN_DEPRECATED_MODELS
+            is_chat_model = any(s in model_name for s in ["gemini", "gemma"])
+            is_embedding_model = any(s in model_name for s in ["text", "embed"])
+
+            if is_deprecated_model:
+                return False
 
             if model_type == "chat":
-                return (
-                    is_chat_model(model_name)
-                    and not is_embedding_model(model_name)
-                    and not is_deprecated_model(model_name)
-                )
+                return is_chat_model and not is_embedding_model
 
             if model_type == "embedding":
-                return is_embedding_model(model_name)
+                return is_embedding_model
 
-        credentials = self._construct_google_credentials_from_auth_spec(
+            return False
+
+        # 1. we use us-central1 to get the list of all available models
+        base_genai_client = self._create_genai_client_for_location("us-central1")
+
+        # 2. filter out deprecated and irrelevant models
+        paged_model_list = base_genai_client.models.list(config={"query_base": True})
+        filtered_models = [m for m in paged_model_list if matches_model_type(m)]
+
+        # 3. filter out models unavailable to the authenticated user at the specified location
+        regional_genai_client = (
+            self._create_genai_client_for_location(self.location)
+            if self.location != "us-central1"
+            else base_genai_client
+        )
+        available_models = self._check_model_availability(
+            regional_genai_client, filtered_models
+        )
+
+        return available_models
+
+    def _check_model_availability(self, genai_client, models):
+        def is_available(model) -> bool:
+            model_name = model.name
+
+            try:
+                # free API call: https://cloud.google.com/vertex-ai/generative-ai/docs/multimodal/get-token-count#pricing_and_quota
+                genai_client.models.count_tokens(model=model_name, contents="check")
+                return True
+            except Exception:
+                return False
+
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        available_models = []
+
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            future_to_model = {pool.submit(is_available, m): m for m in models}
+            for future in as_completed(future_to_model):
+                model = future_to_model[future]
+                if future.result():
+                    available_models.append(model)
+
+        return available_models
+
+    def _create_genai_client_for_location(self, location: str):
+        from google.genai import Client
+
+        creds = self._construct_google_credentials_from_auth_spec(
             self.google_credentials_spec
         )
 
-        # this gets foundation models published by Google.
-        # TODO: add support for custom models deployed in the Model Garden
-        from google.genai import Client
+        base_url = (
+            self.custom_base_api_url or f"https://{location}-aiplatform.googleapis.com"
+        )
+        http_options = {"base_url": base_url}
 
-        http_options = {"base_url": f"https://{self.base_api_url}"}
-        genai_client = Client(
+        return Client(
             vertexai=True,
-            credentials=credentials,
             project=self.project_id,
-            location=self.location,
+            location=location,
+            credentials=creds,
             http_options=http_options,
         )
-
-        # this is a paged iterator that automatically fetches the next page
-        paged_model_list = genai_client.models.list(config={"query_base": True})
-
-        return [m for m in paged_model_list if matches_model_type(m)]
 
 
 class VertexAiConnectionPortObject(GenericGeminiConnectionPortObject):
@@ -262,6 +324,7 @@ vertex_ai_connection_port_type = knext.port_type(
 
 # ---------------------------------------------------------------------
 # Google AI Studio Authentication Port Type
+# region AI Studio Authentication
 # ---------------------------------------------------------------------
 class GoogleAiStudioAuthenticationPortObjectSpec(GenericGeminiConnectionPortObjectSpec):
     def __init__(self, credentials: str) -> None:
@@ -311,7 +374,7 @@ class GoogleAiStudioAuthenticationPortObjectSpec(GenericGeminiConnectionPortObje
             )
             return GOOGLE_AI_STUDIO_GEMINI_CHAT_MODELS_FALLBACK
 
-        return self._sort_models(models)
+        return self._clean_and_sort_models(models)
 
     def get_embedding_model_list(
         self, dialog_creation_context: knext.DialogCreationContext
@@ -323,33 +386,7 @@ class GoogleAiStudioAuthenticationPortObjectSpec(GenericGeminiConnectionPortObje
             )
             return GOOGLE_AI_STUDIO_GEMINI_EMBEDDING_MODELS_FALLBACK
 
-        return self._sort_models(models)
-
-    def _sort_models(self, models):
-        """
-        Given a list of Model objects fetched from the API, we ensure that:
-        - their names don't have the "/models" prefix
-        - gemini- models are listed first
-        - gemma- models are listed second
-        - other models are listed below
-        """
-
-        def get_group(s):
-            if s.startswith("gemini"):
-                return 0
-
-            if s.startswith("gemma"):
-                return 1
-
-            return 2
-
-        unique_model_names = set([m.name.split("/")[-1] for m in models])
-
-        # we want gemini-2.5 to appear before gemini-2.0, thus reverse sorting
-        sorted_names = sorted(unique_model_names, reverse=True)
-        grouped_names = sorted(sorted_names, key=get_group)
-
-        return grouped_names
+        return self._clean_and_sort_models(models)
 
     def _fetch_models_from_api(
         self,
@@ -370,7 +407,7 @@ class GoogleAiStudioAuthenticationPortObjectSpec(GenericGeminiConnectionPortObje
                 if model.description is not None:
                     return "deprecated" in model.description.lower()
 
-                return model.name in KNOWN_DEPRECATED_MODELS
+                return model.name.split("/")[-1] in KNOWN_DEPRECATED_MODELS
 
             if is_deprecated_model():
                 return False
@@ -430,6 +467,7 @@ google_ai_studio_authentication_port_type = knext.port_type(
 
 # ---------------------------------------------------------------------
 # Gemini Chat Model Port Type
+# region Gemini Chat Model
 # ---------------------------------------------------------------------
 class GeminiChatModelPortObjectSpec(ChatModelPortObjectSpec):
     def __init__(
@@ -530,17 +568,13 @@ class GeminiChatModelPortObject(ChatModelPortObject):
                 max_tokens=self.spec.max_output_tokens,
                 temperature=self.spec.temperature,
                 max_retries=2,  # default is 6, instead we just try twice before failing
-                base_url=auth_spec.base_api_url,
+                base_url=auth_spec.custom_base_api_url or auth_spec.base_api_url,
             )
 
         if isinstance(auth_spec, GoogleAiStudioAuthenticationPortObjectSpec):
             from langchain_google_genai import ChatGoogleGenerativeAI
 
             api_key = ctx.get_credentials(auth_spec.credentials).password
-            if not api_key:
-                raise ValueError(
-                    f"API Key not found in credentials '{auth_spec.credentials}'"
-                )
 
             return ChatGoogleGenerativeAI(
                 model=self.spec.model_name,

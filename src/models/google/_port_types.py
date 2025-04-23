@@ -490,14 +490,14 @@ class GeminiChatModelPortObjectSpec(ChatModelPortObjectSpec):
         model_name: str,
         max_output_tokens: int,
         temperature: float,
-        n_requests=1,
+        n_requests: int,
     ):
-        super().__init__(n_requests)
         self._auth_spec = auth_spec
         self._connection_type = auth_spec._connection_type
         self._model_name = model_name
         self._max_output_tokens = max_output_tokens
         self._temperature = temperature
+        self._n_requests = n_requests
 
     @property
     def auth_spec(self) -> GenericGeminiConnectionPortObjectSpec:
@@ -518,6 +518,10 @@ class GeminiChatModelPortObjectSpec(ChatModelPortObjectSpec):
     @property
     def temperature(self) -> int:
         return self._temperature
+
+    @property
+    def n_requests(self) -> int:
+        return self._n_requests
 
     def serialize(self):
         return {
@@ -550,7 +554,7 @@ class GeminiChatModelPortObjectSpec(ChatModelPortObjectSpec):
             model_name=data["model_name"],
             max_output_tokens=data["max_output_tokens"],
             temperature=data["temperature"],
-            n_requests=data.get("n_requests", 1),
+            n_requests=data["n_requests"],
         )
 
 

@@ -89,6 +89,17 @@ class GeminiChatModelConnector:
         default_value=0.7,
     )
 
+    n_requests = knext.IntParameter(
+        "Number of concurrent requests",
+        """Specify the number of maximum requests that can be made concurrently.
+
+        Increasing this number is particularly useful in conjunction with the **LLM Prompter** node,
+        as it operates in a row-based manner (e.g. 10 concurrent requests would result
+        in a batch of 10 rows being processed concurrently).
+        """,
+        10,
+    )
+
     def configure(
         self,
         ctx: knext.ConfigurationContext,
@@ -118,4 +129,5 @@ class GeminiChatModelConnector:
             model_name=self.model_name,
             max_output_tokens=self.max_output_tokens,
             temperature=self.temperature,
+            n_requests=self.n_requests,
         )

@@ -23,15 +23,21 @@ KNOWN_DEPRECATED_MODELS = [
     "textembedding-gecko@001",
 ]
 
-# Taken from https://ai.google.dev/gemini-api/docs/models
+# References:
+# https://ai.google.dev/gemini-api/docs/models
+# https://cloud.google.com/vertex-ai/generative-ai/docs/embeddings/get-text-embeddings#supported-models
 GEMINI_CHAT_MODELS_FALLBACK = [
     "gemini-2.5-pro-preview-03-25",
     "gemini-2.0-flash-lite",
     "gemini-2.0-flash",
 ]
-GEMINI_EMBEDDING_MODELS_FALLBACK = [
+VERTEX_AI_GEMINI_EMBEDDING_MODELS_FALLBACK = [
+    "text-embedding-large-exp-03-07",
+    "text-embedding-005",
+]
+GOOGLE_AI_STUDIO_GEMINI_EMBEDDING_MODELS_FALLBACK = [
     "gemini-embedding-exp-03-07",
-    "text-embedding-004",
+    "text-embedding-005",
 ]
 
 # icons

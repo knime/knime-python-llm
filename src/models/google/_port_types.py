@@ -20,7 +20,8 @@ from models.base import (
 from ._utils import (
     KNOWN_DEPRECATED_MODELS,
     GEMINI_CHAT_MODELS_FALLBACK,
-    GEMINI_EMBEDDING_MODELS_FALLBACK,
+    VERTEX_AI_GEMINI_EMBEDDING_MODELS_FALLBACK,
+    GOOGLE_AI_STUDIO_GEMINI_EMBEDDING_MODELS_FALLBACK,
 )
 
 LOGGER = logging.getLogger(__name__)
@@ -221,7 +222,7 @@ class VertexAiConnectionPortObjectSpec(GenericGeminiConnectionPortObjectSpec):
             LOGGER.info(
                 f"No embedding models available for specified location '{self.location}'. Using a predefined list of known embedding models."
             )
-            return GEMINI_EMBEDDING_MODELS_FALLBACK
+            return VERTEX_AI_GEMINI_EMBEDDING_MODELS_FALLBACK
 
         return self._clean_and_sort_models(models)
 
@@ -281,18 +282,25 @@ class VertexAiConnectionPortObjectSpec(GenericGeminiConnectionPortObjectSpec):
             else base_genai_client
         )
         available_models = self._check_model_availability(
-            regional_genai_client, filtered_models
+            regional_genai_client, filtered_models, model_type
         )
 
         return available_models
 
-    def _check_model_availability(self, genai_client, models):
+    def _check_model_availability(self, genai_client, models, model_type):
         def is_available(model) -> bool:
             model_name = model.name
 
             try:
-                # free API call: https://cloud.google.com/vertex-ai/generative-ai/docs/multimodal/get-token-count#pricing_and_quota
-                genai_client.models.count_tokens(model=model_name, contents="check")
+                # free API calls:
+                # https://cloud.google.com/vertex-ai/generative-ai/docs/multimodal/get-token-count#pricing_and_quota
+                # https://ai.google.dev/api/models#method:-models.get
+                if model_type == "chat":
+                    genai_client.models.count_tokens(model=model_name, contents="check")
+                if model_type == "embedding":
+                    LOGGER.info(f"In here with model {model_name}")
+                    genai_client.models.get(model=model_name)
+
                 return True
             except Exception:
                 return False
@@ -448,7 +456,7 @@ class GoogleAiStudioAuthenticationPortObjectSpec(GenericGeminiConnectionPortObje
             LOGGER.info(
                 "No embedding models available for the authenticated Google AI Studio user. Using a predefined list of known embedding models."
             )
-            return GEMINI_EMBEDDING_MODELS_FALLBACK
+            return GOOGLE_AI_STUDIO_GEMINI_EMBEDDING_MODELS_FALLBACK
 
         return self._clean_and_sort_models(models)
 
@@ -651,6 +659,7 @@ gemini_chat_model_port_type = knext.port_type(
 
 # ---------------------------------------------------------------------
 # Gemini Embedding Model Port Type
+# region Gemini Embeddings
 # ---------------------------------------------------------------------
 class GeminiEmbeddingModelPortObjectSpec(EmbeddingsPortObjectSpec):
     def __init__(
@@ -669,8 +678,11 @@ class GeminiEmbeddingModelPortObjectSpec(EmbeddingsPortObjectSpec):
 
     @property
     def model_name(self) -> str:
-        # only return the model name portion without publishers/google/models
-        return self._model_name.split("/")[-1]
+        if isinstance(self.auth_spec, VertexAiConnectionPortObjectSpec):
+            return self._model_name
+
+        if isinstance(self.auth_spec, GoogleAiStudioAuthenticationPortObjectSpec):
+            return f"models/{self._model_name}"
 
     def serialize(self):
         return {
@@ -719,14 +731,12 @@ class GeminiEmbeddingModelPortObject(EmbeddingsPortObject):
                 auth_spec.google_credentials_spec
             )
 
-            LOGGER.info(f"Embedding model selected: {self.spec.model_name}")
-
             return VertexAIEmbeddings(
                 model_name=self.spec.model_name,
                 project=auth_spec.project_id,
                 location=auth_spec.location,
                 max_retries=2,  # default is 6, instead we just try twice before failing
-                base_url=auth_spec.base_api_url,
+                base_url=auth_spec.custom_base_api_url or auth_spec.base_api_url,
                 credentials=google_credentials,
             )
 
@@ -734,10 +744,6 @@ class GeminiEmbeddingModelPortObject(EmbeddingsPortObject):
             from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
             api_key = ctx.get_credentials(auth_spec.credentials).password
-            if not api_key:
-                raise ValueError(
-                    f"API Key not found in credentials '{auth_spec.credentials}'"
-                )
 
             return GoogleGenerativeAIEmbeddings(
                 model=self.spec.model_name,

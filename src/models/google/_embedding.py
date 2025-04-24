@@ -29,9 +29,7 @@ def _list_gemini_embedding_models(
     if generic_connection_spec is None:
         return [""]
 
-    return [
-        model.name for model in generic_connection_spec.get_embedding_model_list(ctx)
-    ]
+    return generic_connection_spec.get_embedding_model_list(ctx)
 
 
 @knext.node(

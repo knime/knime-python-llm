@@ -14,8 +14,6 @@ from ._util import (
     list_embedding_models,
     check_model,
 )
-from typing import List
-
 
 class IBMwatsonxEmbeddingPortObjectSpec(EmbeddingsPortObjectSpec):
     def __init__(self, auth: IBMwatsonxAuthenticationPortObjectSpec, model_id: str):
@@ -46,47 +44,25 @@ class IBMwatsonxEmbeddingPortObjectSpec(EmbeddingsPortObjectSpec):
         )
 
 
-class WatsonxEmbeddingsWrapper:
-    """
-    Wrapper for WatsonxEmbeddings to handle exceptions that may occur during embedding generation.
-    """
-
-    def __init__(self, model):
-        self.model = model
-
-    def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        try:
-            return self.model.embed_documents(texts)
-        except Exception:
-            raise knext.InvalidParametersError(
-                "Failed to embed texts. If you selected a space to run your model, "
-                "make sure that the space has a valid runtime service instance. "
-                "You can check this at IBM watsonx.ai Studio under Manage tab in your space."
-            )
-
-
 class IBMwatsonxEmbeddingPortObject(EmbeddingsPortObject):
     @property
     def spec(self) -> IBMwatsonxEmbeddingPortObjectSpec:
         return super().spec
 
     def create_model(self, ctx):
-        from langchain_ibm import WatsonxEmbeddings
+        from ._embedding_model import WatsonxEmbeddings
 
         # Retrieve the name-id map for projects or spaces
         project_id, space_id = self.spec.auth.get_project_or_space_ids(ctx)
 
-        embedding_model = WatsonxEmbeddingsWrapper(
-            model=WatsonxEmbeddings(
+        model = WatsonxEmbeddings(
                 apikey=self.spec.auth.get_api_key(ctx),
                 url=self.spec.auth.base_url,
                 model_id=self.spec.model_id,
                 project_id=project_id,
                 space_id=space_id,
             )
-        )
-
-        return embedding_model
+        return model
 
 
 ibm_watsonx_embedding_port_type = knext.port_type(

@@ -608,6 +608,7 @@ class OpenAIAuthenticationPortObjectSpec(AIPortObjectSpec):
                 for model in OpenAIClient(api_key=key, base_url=base_url)
                 .models.list()
                 .data
+                if model.id is not None
             ]
         except Exception:
             model_list = []

@@ -125,7 +125,7 @@ class GeminiChatModelConnector:
             )
 
         return GeminiChatModelPortObjectSpec(
-            auth_spec=connection_spec,
+            connection_spec=connection_spec,
             model_name=self.model_name,
             max_output_tokens=self.max_output_tokens,
             temperature=self.temperature,

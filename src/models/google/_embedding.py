@@ -99,6 +99,6 @@ class GeminiEmbeddingModelConnector:
             )
 
         return GeminiEmbeddingModelPortObjectSpec(
-            auth_spec=connection_spec,
+            connection_spec=connection_spec,
             model_name=self.model_name,
         )

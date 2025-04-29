@@ -49,17 +49,31 @@ class GenericGeminiConnectionPortObjectSpec(AIPortObjectSpec):
             "Subclasses of the generic Gemini connection must implement this method."
         )
 
-    def create_model_name(self, model_name) -> str:
+    def create_chat_model_name(self, model_name) -> str:
         raise NotImplementedError(
             "Subclasses of the generic Gemini connection must implement this method."
         )
 
-    def create_model(
+    def create_embedding_model_name(self, model_name) -> str:
+        raise NotImplementedError(
+            "Subclasses of the generic Gemini connection must implement this method."
+        )
+
+    def create_chat_model(
         self,
         execution_ctx: knext.ExecutionContext,
         model_name: str,
         max_tokens: int,
         temperature: float,
+    ):
+        raise NotImplementedError(
+            "Subclasses of the generic Gemini connection must implement this method."
+        )
+
+    def create_embedding_model(
+        self,
+        execution_ctx: knext.ExecutionContext,
+        model_name: str,
     ):
         raise NotImplementedError(
             "Subclasses of the generic Gemini connection must implement this method."
@@ -164,8 +178,11 @@ class VertexAiConnectionPortObjectSpec(GenericGeminiConnectionPortObjectSpec):
             custom_base_api_url=data["custom_base_api_url"],
         )
 
-    def create_model_name(self, model_name) -> str:
+    def create_chat_model_name(self, model_name) -> str:
         return f"publishers/google/models/{model_name}"
+
+    def create_embedding_model_name(self, model_name) -> str:
+        return model_name
 
     def _construct_google_credentials(
         self,
@@ -298,7 +315,6 @@ class VertexAiConnectionPortObjectSpec(GenericGeminiConnectionPortObjectSpec):
                 if model_type == "chat":
                     genai_client.models.count_tokens(model=model_name, contents="check")
                 if model_type == "embedding":
-                    LOGGER.info(f"In here with model {model_name}")
                     genai_client.models.get(model=model_name)
 
                 return True
@@ -339,7 +355,7 @@ class VertexAiConnectionPortObjectSpec(GenericGeminiConnectionPortObjectSpec):
             http_options=http_options,
         )
 
-    def create_model(
+    def create_chat_model(
         self,
         execution_ctx: knext.ExecutionContext,
         model_name: str,
@@ -359,6 +375,20 @@ class VertexAiConnectionPortObjectSpec(GenericGeminiConnectionPortObjectSpec):
             temperature=temperature,
             max_retries=2,  # default is 6, instead we just try twice before failing
             base_url=self.custom_base_api_url or self.base_api_url,
+        )
+
+    def create_embedding_model(self, execution_ctx, model_name):
+        from langchain_google_vertexai import VertexAIEmbeddings
+
+        google_credentials = self._construct_google_credentials()
+
+        return VertexAIEmbeddings(
+            model_name=model_name,
+            project=self.project_id,
+            location=self.location,
+            max_retries=2,  # default is 6, instead we just try twice before failing
+            base_url=self.custom_base_api_url or self.base_api_url,
+            credentials=google_credentials,
         )
 
 
@@ -433,7 +463,10 @@ class GoogleAiStudioAuthenticationPortObjectSpec(GenericGeminiConnectionPortObje
                 f"Could not authenticate with Google AI Studio. Error: {e}"
             )
 
-    def create_model_name(self, model_name):
+    def create_chat_model_name(self, model_name):
+        return f"models/{model_name}"
+
+    def create_embedding_model_name(self, model_name) -> str:
         return f"models/{model_name}"
 
     def get_chat_model_list(
@@ -510,7 +543,7 @@ class GoogleAiStudioAuthenticationPortObjectSpec(GenericGeminiConnectionPortObje
 
         return [m for m in paged_model_list if matches_model_type(m)]
 
-    def create_model(
+    def create_chat_model(
         self,
         execution_ctx: knext.ExecutionContext,
         model_name: str,
@@ -526,6 +559,16 @@ class GoogleAiStudioAuthenticationPortObjectSpec(GenericGeminiConnectionPortObje
             google_api_key=api_key,
             max_tokens=max_tokens,
             temperature=temperature,
+        )
+
+    def create_embedding_model(self, execution_ctx, model_name):
+        from langchain_google_genai import GoogleGenerativeAIEmbeddings
+
+        api_key = execution_ctx.get_credentials(self.credentials).password
+
+        return GoogleGenerativeAIEmbeddings(
+            model=model_name,
+            google_api_key=api_key,
         )
 
 
@@ -580,7 +623,7 @@ class GeminiChatModelPortObjectSpec(ChatModelPortObjectSpec):
 
     @property
     def model_name(self) -> str:
-        return self.connection_spec.create_model_name(self._model_name)
+        return self.connection_spec.create_chat_model_name(self._model_name)
 
     @property
     def max_output_tokens(self) -> int:
@@ -642,7 +685,7 @@ class GeminiChatModelPortObject(ChatModelPortObject):
     def create_model(
         self, ctx: knext.ExecutionContext, output_format: OutputFormatOptions
     ):
-        return self.spec.connection_spec.create_model(
+        return self.spec.connection_spec.create_chat_model(
             execution_ctx=ctx,
             model_name=self.spec.model_name,
             max_tokens=self.spec.max_output_tokens,
@@ -664,51 +707,49 @@ gemini_chat_model_port_type = knext.port_type(
 class GeminiEmbeddingModelPortObjectSpec(EmbeddingsPortObjectSpec):
     def __init__(
         self,
-        auth_spec: GenericGeminiConnectionPortObjectSpec,
+        connection_spec: GenericGeminiConnectionPortObjectSpec,
         model_name: str,
     ):
         super().__init__()
-        self._auth_spec = auth_spec
-        self._connection_type = auth_spec._connection_type
+        self._connection_spec = connection_spec
+        self._connection_type = connection_spec._connection_type
         self._model_name = model_name
 
     @property
-    def auth_spec(self) -> GenericGeminiConnectionPortObjectSpec:
-        return self._auth_spec
+    def connection_spec(self) -> GenericGeminiConnectionPortObjectSpec:
+        return self._connection_spec
 
     @property
     def model_name(self) -> str:
-        if isinstance(self.auth_spec, VertexAiConnectionPortObjectSpec):
-            return self._model_name
-
-        if isinstance(self.auth_spec, GoogleAiStudioAuthenticationPortObjectSpec):
-            return f"models/{self._model_name}"
+        return self.connection_spec.create_embedding_model_name(self._model_name)
 
     def serialize(self):
         return {
             "connection_type": self._connection_type,
-            "auth_spec_data": self._auth_spec.serialize(),
+            "connection_spec_data": self._connection_spec.serialize(),
             "model_name": self._model_name,
         }
 
     @classmethod
     def deserialize(cls, data: Dict):
         connection_type = data["connection_type"]
-        auth_spec_data = data["auth_spec_data"]
+        connection_spec_data = data["connection_spec_data"]
 
         if connection_type == "vertex_ai":
-            auth_spec = VertexAiConnectionPortObjectSpec.deserialize(auth_spec_data)
+            connection_spec = VertexAiConnectionPortObjectSpec.deserialize(
+                connection_spec_data
+            )
         elif connection_type == "google_ai_studio":
-            auth_spec = GoogleAiStudioAuthenticationPortObjectSpec.deserialize(
-                auth_spec_data
+            connection_spec = GoogleAiStudioAuthenticationPortObjectSpec.deserialize(
+                connection_spec_data
             )
         else:
             raise ValueError(
-                f"Unknown auth spec type during deserialization: {connection_type}"
+                f"Unknown connection spec type during deserialization: {connection_type}"
             )
 
         return cls(
-            auth_spec=auth_spec,  # _connection_type gets inferred from the auth spec object
+            connection_spec=connection_spec,  # _connection_type gets inferred from the connection spec object
             model_name=data["model_name"],
         )
 
@@ -722,33 +763,9 @@ class GeminiEmbeddingModelPortObject(EmbeddingsPortObject):
         return self._spec
 
     def create_model(self, ctx):
-        auth_spec = self.spec.auth_spec
-
-        if isinstance(auth_spec, VertexAiConnectionPortObjectSpec):
-            from langchain_google_vertexai import VertexAIEmbeddings
-
-            google_credentials = auth_spec._construct_google_credentials_from_auth_spec(
-                auth_spec.google_credentials_spec
-            )
-
-            return VertexAIEmbeddings(
-                model_name=self.spec.model_name,
-                project=auth_spec.project_id,
-                location=auth_spec.location,
-                max_retries=2,  # default is 6, instead we just try twice before failing
-                base_url=auth_spec.custom_base_api_url or auth_spec.base_api_url,
-                credentials=google_credentials,
-            )
-
-        if isinstance(auth_spec, GoogleAiStudioAuthenticationPortObjectSpec):
-            from langchain_google_genai import GoogleGenerativeAIEmbeddings
-
-            api_key = ctx.get_credentials(auth_spec.credentials).password
-
-            return GoogleGenerativeAIEmbeddings(
-                model=self.spec.model_name,
-                google_api_key=api_key,
-            )
+        return self.spec.connection_spec.create_embedding_model(
+            execution_ctx=ctx, model_name=self.spec.model_name
+        )
 
 
 gemini_embedding_model_port_type = knext.port_type(

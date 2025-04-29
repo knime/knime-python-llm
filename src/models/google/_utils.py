@@ -24,8 +24,8 @@ KNOWN_DEPRECATED_MODELS = [
 ]
 
 # References:
-# https://ai.google.dev/gemini-api/docs/models
-# https://cloud.google.com/vertex-ai/generative-ai/docs/embeddings/get-text-embeddings#supported-models
+# - https://ai.google.dev/gemini-api/docs/models
+# - https://cloud.google.com/vertex-ai/generative-ai/docs/embeddings/get-text-embeddings#supported-models
 GEMINI_CHAT_MODELS_FALLBACK = [
     "gemini-2.5-pro-preview-03-25",
     "gemini-2.0-flash-lite",

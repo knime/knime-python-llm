@@ -1358,7 +1358,7 @@ class ImageModels(knext.EnumParameterOptions):
 
 
 @knext.node(
-    "OpenAI DALL-E View",
+    "OpenAI Image Generator",
     node_type=knext.NodeType.VISUALIZER,
     icon_path=openai_icon,
     category=openai_category,

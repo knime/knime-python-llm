@@ -428,7 +428,7 @@ class EmbeddingsLoaderInputSettings:
     )
 
 
-@knext.parameter_group(label="Model Settings")
+@knext.parameter_group(label="DALL-E 3 Settings")
 class ImageLoaderInputSettings:
     size = knext.StringParameter(
         "Image size",
@@ -468,7 +468,7 @@ class ImageLoaderInputSettings:
     )
 
 
-@knext.parameter_group(label="Model Settings", since_version="5.4.4")
+@knext.parameter_group(label="GPT Image 1 Settings", since_version="5.4.4")
 class GPTImage1Settings:
     class ImageSizeOptions(knext.EnumParameterOptions):
         Square = ("Square", "1024x1024")

@@ -26,6 +26,9 @@ def _list_gemini_embedding_models(
     generic_connection_spec: GenericGeminiConnectionPortObjectSpec = input_specs[0]
 
     # in case the config dialog is open without any inputs
+    # TODO: we return a list with an empty string, because returning an empty
+    # list causes the UI of the dialogue setting to be stuck in the "Loading" state.
+    # If/when that FE behaviour changes, we should adjust this accordingly.
     if generic_connection_spec is None:
         return [""]
 

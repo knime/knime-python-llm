@@ -144,7 +144,7 @@ class DatabricksChatModelSettings(GeneralRemoteSettings):
 @knext.node(
     "Databricks Chat Model Connector",
     node_type=knext.NodeType.SOURCE,
-    icon_path="icons/Databricks-chat-model-connector.png",
+    icon_path="icons/databricks/Databricks-chat-model-connector.png",
     category=databricks_category,
     keywords=["Databricks", "GenAI", "Chat model"],
 )

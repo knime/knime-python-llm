@@ -20,7 +20,7 @@ from .base import (
 )
 
 
-chroma_icon = "icons/chroma.png"
+chroma_icon = "icons/embeddings/chroma.png"
 chroma_category = knext.category(
     path=store_category,
     level_id="chroma",

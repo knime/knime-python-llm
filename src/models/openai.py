@@ -31,7 +31,7 @@ import logging
 
 LOGGER = logging.getLogger(__name__)
 
-openai_icon = "icons/openai.png"
+openai_icon = "icons/openai/openai.png"
 openai_category = knext.category(
     path=model_category,
     level_id="openai",

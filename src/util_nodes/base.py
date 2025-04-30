@@ -6,7 +6,7 @@ import util
 import pyarrow as pa
 import pyarrow.compute as pc
 
-text_chunker_icon = "icons/text_chunker.png"
+text_chunker_icon = "icons/generic/text_chunker.png"
 
 
 class OutputColumnSetting(knext.EnumParameterOptions):

@@ -4,7 +4,7 @@ import knime.api.schema as ks
 from urllib.parse import urlparse, urlunparse
 from typing import Callable
 
-hub_connector_icon = "icons/Hub_AI_connector.png"
+hub_connector_icon = "icons/knime/Hub_AI_connector.png"
 
 knime_category = knext.category(
     path=model_category,

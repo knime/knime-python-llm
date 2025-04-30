@@ -77,7 +77,7 @@ databricks_embedding_port_type = knext.port_type(
 @knext.node(
     name="Databricks Embedding Connector",
     category=databricks_category,
-    icon_path="icons/Databricks-embeddings-connector.png",
+    icon_path="icons/databricks/Databricks-embeddings-connector.png",
     keywords=["Databricks", "Embedding", "GenAI", "Mosaic"],
     node_type=knext.NodeType.SOURCE,
 )

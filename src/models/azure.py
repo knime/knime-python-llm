@@ -19,7 +19,7 @@ from models.openai import (
 import logging
 
 
-azure_icon = "icons/azure_logo.png"
+azure_icon = "icons/azure/azure_logo.png"
 azure_openai_category = knext.category(
     path=model_category,
     level_id="azure",

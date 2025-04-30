@@ -4,7 +4,7 @@ from ..base import (
     model_category,
 )
 
-gpt4all_icon = "icons/gpt4all.png"
+gpt4all_icon = "icons/gpt4all/gpt4all.png"
 gpt4all_category = knext.category(
     path=model_category,
     level_id="gpt4all",

@@ -21,7 +21,7 @@ from base import AIPortObjectSpec
 import os
 
 
-agent_icon = "icons/agent.png"
+agent_icon = "icons/generic/agent.png"
 agent_category = knext.category(
     path=util.main_category,
     level_id="agents",

@@ -2,7 +2,7 @@ import knime.extension as knext
 import util
 from dataclasses import dataclass
 
-tortoise_icon = "icons/tortoise_icon.png"
+tortoise_icon = "icons/giskard/tortoise_icon.png"
 
 eval_category = knext.category(
     path=util.main_category,

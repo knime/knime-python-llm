@@ -11,7 +11,7 @@ model_category = knext.category(
     level_id="models",
     name="Models",
     description="",
-    icon="icons/ml.png",
+    icon="icons/generic/brain.png",
 )
 
 
@@ -520,7 +520,7 @@ def _isinstance_of_port_object(
 @knext.node(
     "LLM Prompter",
     knext.NodeType.PREDICTOR,
-    "icons/ml.png",
+    "icons/generic/brain.png",
     model_category,
     keywords=[
         "GenAI",
@@ -913,7 +913,7 @@ class LLMPrompter:
 @knext.node(
     "Chat Model Prompter",
     knext.NodeType.PREDICTOR,
-    "icons/ml.png",
+    "icons/generic/brain.png",
     model_category,
     keywords=[
         "GenAI",

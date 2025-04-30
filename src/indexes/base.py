@@ -26,7 +26,7 @@ import numpy as np
 
 LOGGER = logging.getLogger(__name__)
 
-store_icon = "icons/store.png"
+store_icon = "icons/embeddings/store.png"
 store_category = knext.category(
     path=util.main_category,
     level_id="stores",

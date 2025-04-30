@@ -8,7 +8,7 @@ from ..base import (
 )
 
 
-hf_icon = "icons/huggingface.png"
+hf_icon = "icons/huggingface/huggingface.png"
 hf_category = knext.category(
     path=model_category,
     level_id="huggingface",

@@ -277,7 +277,7 @@ _filestore_vector_tool_port_type = knext.port_type(
 @knext.node(
     "Vector Store to Tool",
     knext.NodeType.MANIPULATOR,
-    icon_path="icons/store.png",
+    icon_path="icons/embeddings/store.png",
     category=store_category,
     keywords=[
         "GenAI",

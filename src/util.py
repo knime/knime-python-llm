@@ -16,7 +16,7 @@ def create_type_filter(*ktypes: knext.KnimeType) -> Callable[[knext.Column], boo
     return lambda c: c.ktype in ktypes
 
 
-ai_icon = "icons/ml.png"
+ai_icon = "icons/generic/brain.png"
 
 main_category = knext.category(
     path="/labs",
@@ -252,7 +252,6 @@ class OutputMissingMapper(BaseMapper):
         return self._all_missing
 
     def map(self, table: pa.Table):
-
         is_valid = self._compute_validity(table)
         if pc.any(is_valid).as_py():
             self._all_missing = False

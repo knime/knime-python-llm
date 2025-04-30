@@ -466,7 +466,7 @@ class ImageLoaderInputSettings:
     )
 
 
-@knext.parameter_group(label="Model Settings", since_version="5.5.0")
+@knext.parameter_group(label="Model Settings", since_version="5.4.4")
 class GPTImage1Settings:
     class ImageSizeOptions(knext.EnumParameterOptions):
         Square = ("Square", "1024x1024")
@@ -1402,9 +1402,9 @@ class OpenAIDALLEView:
         label="Model",
         enum=ImageModels,
         default_value=lambda v: ImageModels.GPT_IMAGE_1.name
-        if v >= knext.Version(5, 5, 0)
+        if v >= knext.Version(5, 4, 4)
         else ImageModels.DALL_E_3.name,
-        since_version="5.5.0",
+        since_version="5.4.4",
         description="The model to use for image generation.",
         style=knext.EnumParameter.Style.VALUE_SWITCH,
     )

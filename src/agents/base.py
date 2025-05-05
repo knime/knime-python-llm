@@ -47,7 +47,13 @@ import knime.extension as knext
 import util
 
 
-from models.base import LLMPortObjectSpec, LLMPortObject, ChatConversationSettings
+from models.base import (
+    LLMPortObjectSpec,
+    LLMPortObject,
+    ChatConversationSettings,
+    ChatModelPortObjectSpec,
+    ChatModelPortObject,
+)
 from tools.base import (
     tool_list_port_type,
     ToolListPortObject,
@@ -278,3 +284,39 @@ class AgentPrompter:
         chat_history_df.loc[f"Row{len(chat_history_df)}"] = agent_output_row
 
         return knext.Table.from_pandas(chat_history_df)
+
+
+class AgentPrompter2:
+    # TODO type filter for tool columns. How to declare the type?
+    tool_column = knext.ColumnParameter(
+        "Tool column", "The column holding the tools the agent can use.", port_index=1
+    )
+
+    def configure(
+        self,
+        ctx: knext.ConfigurationContext,
+        chat_model_spec: ChatModelPortObjectSpec,
+        tools_schema: knext.Schema,
+    ) -> knext.Schema:
+        chat_model_spec.validate_context(ctx)
+        self._configure_tool_tables(tools_schema)
+
+        return self._create_conversation_schema()
+
+    def _configure_tool_tables(self, tools_schema):
+        if self.tool_column is None:
+            # TODO instead pick the last tool column from the table. Similar to the type filter, we need the type for this
+            raise knext.InvalidParametersError("Select the column holding the tools.")
+        elif self.tool_column not in tools_schema.column_names:
+            raise knext.InvalidParametersError(
+                f"Column {self.tool_column} not found in the tools table."
+            )
+
+    def _create_conversation_schema(self) -> knext.Schema: ...
+
+    def execute(
+        self,
+        ctx: knext.ExecutionContext,
+        chat_model: ChatModelPortObject,
+        tools_table: knext.Table,
+    ): ...

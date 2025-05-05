@@ -584,6 +584,46 @@ class GPTImage1Settings:
         knext.Effect.SHOW,
     )
 
+    def _list_image_columns(ctx: knext.DialogCreationContext) -> list[str]:
+        # add "None" as the first option in case the user doesn't want to use a mask
+        # because after selecting a column, it's not possible to set it to None
+        cols = ["None"]
+
+        from PIL import Image
+
+        img_type = knext.logical(Image.Image)
+
+        if (specs := ctx.get_input_specs()) and (table_spec := specs[1]):
+            for column in table_spec:
+                if img_type == column.ktype:
+                    cols.append(column.name)
+        return cols
+
+    mask_column = knext.StringParameter(
+        "Mask",
+        """
+        Column containing mask to indicate where the image should be edited.
+
+        Mask requirements:
+
+        - The image to edit and mask must be of the same format and size (less than 25MB in size).
+        - The mask image must also contain an alpha channel.
+        - If you're using an image editing tool to create the mask, make sure to save the mask with an alpha channel.
+        - The mask must be provided in a separate column.
+
+        If you provide multiple input image columns, the mask will be applied to the image in the first row of 
+        the first image column.
+
+        **Note**: OpenAI’s API currently does not perform true inpainting (image editing with a mask) — 
+        unmasked (filled) areas may be altered.
+        """,
+        choices=_list_image_columns,
+        since_version="5.5.0"
+    ).rule(
+        knext.DialogContextCondition(_image_table_present),
+        knext.Effect.SHOW,
+    )
+
 
 @knext.parameter_group(label="Data")
 class FineTuneFileSettings:
@@ -1407,11 +1447,18 @@ class OpenAIDALLEView:
     """
     Generate or edit images with OpenAI's DALL-E 3 or GPT Image 1.
 
-    This node allows you to generate or edit images using OpenAI's DALL-E 3 or GPT Image 1.
-    GPT Image 1 also supports image editing, while DALL-E 3 does not.
+    This node allows you to generate images using OpenAI's DALL-E 3 or GPT Image 1.
+    Additionally, GPT Image 1 supports image editing.
 
     To generate an image, provide a prompt and select the model you want to use.
     To edit images, provide an input table that contains image columns.
+    To edit an image with a mask, provide an input table that contains an image column and the mask column.
+    
+    There are two ways to provide images for editing:
+    
+    - Provide a single image column with images and select it as the image column.
+       The model will use all images in the column to generate a new image based on the prompt.
+    - Provide multiple image columns and select them as the image columns.
 
     You can include multiple image columns in the table and choose which ones to use for editing.
     For example, one column could contain images of objects and another could contain backgrounds.
@@ -1506,27 +1553,14 @@ class OpenAIDALLEView:
         authentication: OpenAIAuthenticationPortObject,
         image_table: Optional[knext.Table],
     ):
-        from openai import Client as OpenAIClient
-
-        has_image_table = image_table is not None
-
-        client = OpenAIClient(
-            api_key=ctx.get_credentials(authentication.spec.credentials).password,
-            base_url=authentication.spec.base_url,
-        )
+        client = self._initialize_client(ctx, authentication)
 
         if self.model == ImageModels.DALL_E_3.name:
             img_bytes = self._create_with_dalle_3(client)
         elif self.model == ImageModels.GPT_IMAGE_1.name:
-            if has_image_table:
-                images = self._prepare_images(
-                    image_table, self.gpt_image_1_settings.image_columns
-                )
-                img_bytes = self._edit_with_gpt_image_1(client, images)
-            else:
-                img_bytes = self._create_with_gpt_image_1(client)
+            img_bytes = self._create_or_edit_with_gpt_image_1(client, image_table)
         else:
-            raise knext.InvalidParametersError(
+            knext.InvalidParametersError(
                 f"Invalid model '{self.model}' selected. Please select a valid model."
             )
 
@@ -1551,6 +1585,33 @@ class OpenAIDALLEView:
         if response.status_code != 200:
             raise RuntimeError("Could not retrieve image from OpenAI.")
         return response.content
+
+    def _create_or_edit_with_gpt_image_1(self, client, image_table: Optional[knext.Table]):
+        if image_table is None:
+            return self._create_with_gpt_image_1(client)
+
+        mask_column = self.gpt_image_1_settings.mask_column
+        image_columns = self.gpt_image_1_settings.image_columns
+
+        image_column_names = self._get_image_column_names(
+            image_columns,
+            image_table.schema,
+            mask_column,
+        )
+
+        images = self._prepare_images(image_table, image_column_names)
+
+        if mask_column and mask_column != "None":
+            mask = self._prepare_mask(image_table, mask_column)
+            if mask is None:
+                raise knext.InvalidParametersError(
+                    "Error while preparing the mask. Please ensure the mask column contains valid images "
+                    "and the images are in PNG format."
+                )
+        else:
+            mask = None
+
+        return self._edit_with_gpt_image_1(client, images, mask)
 
     def _create_with_gpt_image_1(self, client) -> bytes:
         size = GPTImage1Settings.ImageSizeOptions.size_to_dimension(
@@ -1586,22 +1647,35 @@ class OpenAIDALLEView:
 
         return base64.b64decode(b_64)
 
-    def _edit_with_gpt_image_1(self, client, images) -> bytes:
+    def _edit_with_gpt_image_1(self, client, images, mask) -> bytes:
         size = GPTImage1Settings.ImageSizeOptions.size_to_dimension(
             self.gpt_image_1_settings.size
         )
 
+        edit_params = {
+            "prompt": self.prompt,
+            "model": "gpt-image-1",
+            "n": 1,
+            "image": images,
+            "size": size,
+            "quality": self.gpt_image_1_settings.quality.lower(),
+        }
+
+        if mask is not None:
+            edit_params["mask"] = mask
+
         try:
-            response = client.images.edit(
-                prompt=self.prompt,
-                model="gpt-image-1",
-                n=1,
-                image=images,
-                size=size,
-                quality=self.gpt_image_1_settings.quality.lower(),
-            )
+            response = client.images.edit(**edit_params)
         except Exception as e:
             error_message = str(e)
+            if hasattr(e, "response") and hasattr(e.response, "text"):
+                try:
+                    error_json = json.loads(e.response.text)
+                    error_message = error_json.get("error", {}).get(
+                        "message", error_message
+                    )
+                except Exception:
+                    pass
             raise RuntimeError(
                 f"Failed to edit image(s). Error message: {error_message}"
             )
@@ -1609,56 +1683,109 @@ class OpenAIDALLEView:
 
         return base64.b64decode(b_64)
 
+    def _initialize_client(
+        self,
+        ctx: knext.ExecutionContext,
+        authentication: OpenAIAuthenticationPortObject,
+    ):
+        from openai import Client as OpenAIClient
+
+        return OpenAIClient(
+            api_key=ctx.get_credentials(authentication.spec.credentials).password,
+            base_url=authentication.spec.base_url,
+        )
+
+    def _get_image_column_names(
+        self,
+        column_filter_config: knext.ColumnFilterConfig,
+        schema: knext.Schema,
+        mask_column: str,
+    ) -> List[str]:
+        """
+        Get the image column names from the column filter config and schema.
+        """
+
+        image_column_names = []
+        if not column_filter_config:
+            return image_column_names
+        else:
+            image_column_names = [
+                col.name for col in column_filter_config.apply(schema)
+            ]
+
+        # ignore the mask column from the image column names if it's also selected as an image column
+        if mask_column in image_column_names:
+            image_column_names.remove(mask_column)
+
+        if image_column_names == []:
+            raise knext.InvalidParametersError(
+                "No image columns selected. Please select at least one image column for editing."
+            )
+
+        return image_column_names
+
+    def _convert_image_to_tuple(self, pil_img, filename) -> Tuple[str, bytes, str]:
+        """
+        Converts a PIL.Image to a (filename, raw_bytes, mimetype) tuple.
+        """
+        # create an in-memory bytes buffer to hold the PNG data
+        buffer = io.BytesIO()
+
+        # save the image into our buffer in PNG format
+        # this encodes the PIL.Image into valid PNG bytes
+        try:
+            pil_img.save(buffer, format="PNG")
+        except Exception:
+            return None
+        
+        # extract raw PNG bytes from the buffer
+        raw = buffer.getvalue()
+        return (filename, raw, "image/png")
+
     def _prepare_images(
         self,
         image_table: knext.Table,
-        image_columns: knext.ColumnFilterConfig,
-    ) -> List[Tuple[str, io.BytesIO, str]]:
+        image_column_names: List[str],
+    ) -> List[Tuple[str, bytes, str]]:
         """
         Extracts images from table according to selected image columns,
         converts them to PNG in-memory file tuples, and returns a list
         of (filename, raw_png_bytes, mimetype).
         This format is required by the OpenAI Image API for image generation.
         """
-        image_column_names = self._get_image_column_names(
-            image_columns,
-            schema=image_table.schema,
-        )
-
         image_df = image_table[image_column_names].to_pandas()
 
         files = []
         for idx, row in enumerate(image_df.itertuples(index=False), start=1):
-            # for each image column, save the image to a bytes buffer
             for i, col in enumerate(image_column_names):
-                # create an in-memory bytes buffer to hold the PNG data
-                buffer = io.BytesIO()
-
                 # pull out the PIL.Image object from the row
                 pil_img = row[i]
-
-                # save the image into our buffer in PNG format
-                # this encodes the PIL.Image into valid PNG bytes
-                pil_img.save(buffer, format="PNG")
-
-                # extract raw PNG bytes from the buffer
-                raw = buffer.getvalue()
-
                 filename = f"{col}_{idx}.png"
-                files.append((filename, raw, "image/png"))
+                image_tuple = self._convert_image_to_tuple(pil_img, filename)
+                if image_tuple:
+                    files.append(image_tuple)
+
+        if not files:
+            raise knext.InvalidParametersError(
+                "No images found in the selected image columns. "
+                "Please ensure the selected columns contain valid images."
+            )
         return files
 
-    def _get_image_column_names(
+    def _prepare_mask(
         self,
-        column_filter_config,
-        schema: knext.Schema,
-    ) -> List[str]:
-        """
-        Get the image column names from the column filter config and schema.
-        """
-        if not column_filter_config:
-            return []
-        return [col.name for col in column_filter_config.apply(schema)]
+        image_table: knext.Table,
+        mask_column: str,
+    ) -> Tuple[str, bytes, str]:
+        image_df = image_table[[mask_column]].to_pandas()
+        valid_masks = image_df[mask_column].dropna()
+        if valid_masks.empty:
+            raise knext.InvalidParametersError(
+                f"No valid mask found in the column '{mask_column}'. Please provide a valid mask."
+            )
+        pil_img = valid_masks.iloc[0]
+        filename = f"{mask_column}_1.png"
+        return self._convert_image_to_tuple(pil_img, filename)
 
 
 @knext.node(

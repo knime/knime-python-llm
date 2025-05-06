@@ -1,0 +1,302 @@
+NOTICE
+======
+
+This file aggregates NOTICE information from third-party libraries used by the KNIME AI Extension.
+
+--------------------------------------------------------------------------------
+Package: databricks-sdk
+Version: 0.50.0
+
+Notice Text:
+---------------
+  Copyright (2023) Databricks, Inc.
+
+  This Software includes software developed at Databricks (https://www.databricks.com/) and its use is subject to the included LICENSE file.
+
+  This Software contains code from the following open source projects, licensed under the Apache 2.0 license:
+
+  psf/requests - https://github.com/psf/requests
+  Copyright 2019 Kenneth Reitz
+  License - https://github.com/psf/requests/blob/main/LICENSE
+
+  googleapis/google-auth-library-python - https://github.com/googleapis/google-auth-library-python/tree/main
+  Copyright google-auth-library-python authors
+  License - https://github.com/googleapis/google-auth-library-python/blob/main/LICENSE
+
+  openai/openai-python - https://github.com/openai/openai-python
+  Copyright 2024 OpenAI
+  License - https://github.com/openai/openai-python/blob/main/LICENSE
+
+  This software contains code from the following open source projects, licensed under the BSD (3-clause) license.
+
+  x/oauth2 - https://cs.opensource.google/go/x/oauth2/+/master:oauth2.go
+  Copyright 2014 The Go Authors. All rights reserved.
+  License - https://cs.opensource.google/go/x/oauth2/+/master:LICENSE
+
+  encode/httpx - https://github.com/encode/httpx
+  Copyright 2019, Encode OSS Ltd
+  License - https://github.com/encode/httpx/blob/master/LICENSE.md
+
+  This software contains code from the following open source projects, licensed under the MIT license:
+
+  langchain-ai/langchain - https://github.com/langchain-ai/langchain/blob/master/libs/partners/openai
+  Copyright 2023 LangChain, Inc.
+  License - https://github.com/langchain-ai/langchain/blob/master/libs/partners/openai/LICENSE
+
+--------------------------------------------------------------------------------
+Package: ibm-cos-sdk-core
+Version: 2.14.0
+
+Notice Text:
+---------------
+  Botocore includes a vendorized copy of the requests python library to ease installation.
+
+  Requests License
+  ================
+
+  Copyright 2013 Kenneth Reitz
+
+     Licensed under the Apache License, Version 2.0 (the "License");
+     you may not use this file except in compliance with the License.
+     You may obtain a copy of the License at
+
+         http://www.apache.org/licenses/LICENSE-2.0
+
+     Unless required by applicable law or agreed to in writing, software
+     distributed under the License is distributed on an "AS IS" BASIS,
+     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+     See the License for the specific language governing permissions and
+     limitations under the License.
+
+
+  The requests library also includes some vendorized python libraries to ease installation.
+
+  Urllib3 License
+  ===============
+
+  This is the MIT license: http://www.opensource.org/licenses/mit-license.php
+
+  Copyright 2008-2011 Andrey Petrov and contributors (see CONTRIBUTORS.txt),
+  Modifications copyright 2012 Kenneth Reitz.
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy of this
+  software and associated documentation files (the "Software"), to deal in the Software
+  without restriction, including without limitation the rights to use, copy, modify, merge,
+  publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons
+  to whom the Software is furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in all copies or
+  substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+  INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+  PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE
+  FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+  OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+  DEALINGS IN THE SOFTWARE.
+
+  Chardet License
+  ===============
+
+  This library is free software; you can redistribute it and/or
+  modify it under the terms of the GNU Lesser General Public
+  License as published by the Free Software Foundation; either
+  version 2.1 of the License, or (at your option) any later version.
+
+  This library is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+  Lesser General Public License for more details.
+
+  You should have received a copy of the GNU Lesser General Public
+  License along with this library; if not, write to the Free Software
+  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
+  02110-1301  USA
+
+  Bundle of CA Root Certificates
+  ==============================
+
+  This library is free software; you can redistribute it and/or
+  modify it under the terms of the GNU Lesser General Public
+  License as published by the Free Software Foundation; either
+  version 2.1 of the License, or (at your option) any later version.
+
+  This library is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+  Lesser General Public License for more details.
+
+  You should have received a copy of the GNU Lesser General Public
+  License along with this library; if not, write to the Free Software
+  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
+  02110-1301
+
+--------------------------------------------------------------------------------
+Package: ibm-cos-sdk-s3transfer
+Version: 2.14.0
+
+Notice Text:
+---------------
+  s3transfer
+  Copyright 2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+
+--------------------------------------------------------------------------------
+Package: langdetect
+Version: 1.0.9
+
+Notice Text:
+---------------
+  language-detection license
+  ==========================
+
+      Copyright (c) 2010-2014 Cybozu Labs, Inc. All rights reserved.
+
+      Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+      Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
+
+--------------------------------------------------------------------------------
+Package: propcache
+Version: 0.3.1
+
+Notice Text:
+---------------
+  Copyright 2016-2021, Andrew Svetlov and aio-libs team
+
+     Licensed under the Apache License, Version 2.0 (the "License");
+     you may not use this file except in compliance with the License.
+     You may obtain a copy of the License at
+
+         http://www.apache.org/licenses/LICENSE-2.0
+
+     Unless required by applicable law or agreed to in writing, software
+     distributed under the License is distributed on an "AS IS" BASIS,
+     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+     See the License for the specific language governing permissions and
+     limitations under the License.
+
+--------------------------------------------------------------------------------
+Package: pulsar-client
+Version: 3.6.1
+
+Notice Text:
+---------------
+  Apache Pulsar
+  Copyright 2017-2022 The Apache Software Foundation
+
+  This product includes software developed at
+  The Apache Software Foundation (http://www.apache.org/).
+
+--------------------------------------------------------------------------------
+Package: pyarrow
+Version: 19.0.1
+
+Notice Text:
+---------------
+  Apache Arrow
+  Copyright 2016-2024 The Apache Software Foundation
+
+  This product includes software developed at
+  The Apache Software Foundation (http://www.apache.org/).
+
+  This product includes software from the SFrame project (BSD, 3-clause).
+  * Copyright (C) 2015 Dato, Inc.
+  * Copyright (c) 2009 Carnegie Mellon University.
+
+  This product includes software from the Feather project (Apache 2.0)
+  https://github.com/wesm/feather
+
+  This product includes software from the DyND project (BSD 2-clause)
+  https://github.com/libdynd
+
+  This product includes software from the LLVM project
+   * distributed under the University of Illinois Open Source
+
+  This product includes software from the google-lint project
+   * Copyright (c) 2009 Google Inc. All rights reserved.
+
+  This product includes software from the mman-win32 project
+   * Copyright https://code.google.com/p/mman-win32/
+   * Licensed under the MIT License;
+
+  This product includes software from the LevelDB project
+   * Copyright (c) 2011 The LevelDB Authors. All rights reserved.
+   * Use of this source code is governed by a BSD-style license that can be
+   * Moved from Kudu http://github.com/cloudera/kudu
+
+  This product includes software from the CMake project
+   * Copyright 2001-2009 Kitware, Inc.
+   * Copyright 2012-2014 Continuum Analytics, Inc.
+   * All rights reserved.
+
+  This product includes software from https://github.com/matthew-brett/multibuild (BSD 2-clause)
+   * Copyright (c) 2013-2016, Matt Terry and Matthew Brett; all rights reserved.
+
+  This product includes software from the Ibis project (Apache 2.0)
+   * Copyright (c) 2015 Cloudera, Inc.
+   * https://github.com/cloudera/ibis
+
+  This product includes software from Dremio (Apache 2.0)
+    * Copyright (C) 2017-2018 Dremio Corporation
+    * https://github.com/dremio/dremio-oss
+
+  This product includes software from Google Guava (Apache 2.0)
+    * Copyright (C) 2007 The Guava Authors
+    * https://github.com/google/guava
+
+  This product include software from CMake (BSD 3-Clause)
+    * CMake - Cross Platform Makefile Generator
+    * Copyright 2000-2019 Kitware, Inc. and Contributors
+
+  The web site includes files generated by Jekyll.
+
+  --------------------------------------------------------------------------------
+
+  This product includes code from Apache Kudu, which includes the following in
+  its NOTICE file:
+
+    Apache Kudu
+    Copyright 2016 The Apache Software Foundation
+
+    This product includes software developed at
+    The Apache Software Foundation (http://www.apache.org/).
+
+    Portions of this software were developed at
+    Cloudera, Inc (http://www.cloudera.com/).
+
+  --------------------------------------------------------------------------------
+
+  This product includes code from Apache ORC, which includes the following in
+  its NOTICE file:
+
+    Apache ORC
+    Copyright 2013-2019 The Apache Software Foundation
+
+    This product includes software developed by The Apache Software
+    Foundation (http://www.apache.org/).
+
+    This product includes software developed by Hewlett-Packard:
+    (c) Copyright [2014-2015] Hewlett-Packard Development Company, L.P
+
+--------------------------------------------------------------------------------
+Package: yarl
+Version: 1.20.0
+
+Notice Text:
+---------------
+  Copyright 2016-2021, Andrew Svetlov and aio-libs team
+
+     Licensed under the Apache License, Version 2.0 (the "License");
+     you may not use this file except in compliance with the License.
+     You may obtain a copy of the License at
+
+         http://www.apache.org/licenses/LICENSE-2.0
+
+     Unless required by applicable law or agreed to in writing, software
+     distributed under the License is distributed on an "AS IS" BASIS,
+     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+     See the License for the specific language governing permissions and
+     limitations under the License.
+

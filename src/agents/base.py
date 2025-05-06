@@ -43,6 +43,7 @@
 # ------------------------------------------------------------------------
 
 
+from dataclasses import dataclass
 import knime.extension as knext
 import util
 
@@ -53,6 +54,8 @@ from models.base import (
     ChatConversationSettings,
     ChatModelPortObjectSpec,
     ChatModelPortObject,
+    OutputFormatOptions,
+    chat_model_port_type,
 )
 from tools.base import (
     tool_list_port_type,
@@ -286,7 +289,41 @@ class AgentPrompter:
         return knext.Table.from_pandas(chat_history_df)
 
 
+@dataclass
+class WorkflowTool:
+    """Mirrors the tool class defined in knime-python so we can use type hints here."""
+
+    name: str
+    description: str
+    parameter_schema: dict
+    tool_bytes: bytes
+
+
+@knext.node(
+    "Agent Prompter 2.0",
+    node_type=knext.NodeType.PREDICTOR,
+    icon_path=agent_icon,
+    category=agent_category,
+)
+@knext.input_port(
+    "Chat model", "The chat model to use.", port_type=chat_model_port_type
+)
+@knext.input_table("Tools", "The tools the agent can use.")
+@knext.output_table("Result", "The result of the agent execution.")
 class AgentPrompter2:
+    # TODO better name + description
+    developer_message = knext.MultilineStringParameter(
+        "Developer message",
+        "Message provided to the agent that instructs it how to act.",
+    )
+
+    # TODO better name + description
+    # TODO or does it come from the input table?
+    user_message = knext.MultilineStringParameter(
+        "User message",
+        "Message provided to the agent that instructs it how to act.",
+    )
+
     # TODO type filter for tool columns. How to declare the type?
     tool_column = knext.ColumnParameter(
         "Tool column", "The column holding the tools the agent can use.", port_index=1
@@ -319,4 +356,55 @@ class AgentPrompter2:
         ctx: knext.ExecutionContext,
         chat_model: ChatModelPortObject,
         tools_table: knext.Table,
-    ): ...
+    ):
+        from langchain.chat_models.base import BaseChatModel
+        from langgraph.prebuilt import create_react_agent
+        import pandas as pd
+        import base64
+
+        # TODO check if JSON output format is compatible with tool calling
+        chat_model: BaseChatModel = chat_model.create_model(
+            ctx, output_format=OutputFormatOptions.Text
+        )
+
+        tool_cells = self._extract_tools(tools_table)
+
+        tool_cell = tool_cells[0]
+        tool_bytes = tool_cell.tool_bytes
+        tool_bytes_base64 = base64.b64encode(tool_bytes).decode("utf-8")
+        result = ctx.execute_tool(tool_bytes_base64, self.user_message)
+        result_df = pd.DataFrame({"Result": [result]})
+        return knext.Table.from_pandas(result_df)
+
+        tools = [self._to_langchain_tool(ctx, tool) for tool in tool_cells]
+
+        graph = create_react_agent(
+            chat_model, tools=tools, prompt=self.developer_message
+        )
+        inputs = {"messages": [{"role": "user", "content": self.user_message}]}
+        final_state = graph.invoke(inputs)
+        result_df = pd.DataFrame({"Result": [final_state["messages"]]})
+        return result_df
+
+    def _extract_tools(self, tools_table: knext.Table) -> list:
+        tools_df = tools_table[self.tool_column].to_pandas()
+        tool_list = tools_df[self.tool_column].tolist()
+        return tool_list
+
+    def _to_langchain_tool(self, ctx: knext.ExecutionContext, tool: WorkflowTool):
+        import json
+        from langchain.tools import StructuredTool
+        import base64
+
+        tool_bytes_base64 = base64.b64encode(tool.tool_bytes).decode("utf-8")
+
+        def func(**params):
+            params_json = json.dumps(params)
+            return ctx.execute_tool(tool_bytes_base64, params_json)
+
+        return StructuredTool.from_function(
+            func=func,
+            name=tool.name,
+            description=tool.description,
+            args_schema=tool.parameter_schema,
+        )

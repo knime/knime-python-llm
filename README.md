@@ -24,4 +24,5 @@ This repository contains the source code for the KNIME AI Extension. The extensi
 
 ## License
 
-The repository is released under the [GPL v3 License](https://www.gnu.org/licenses/gpl-3.0.html). Please refer to `LICENSE.txt`.
+The repository is released under the [GPL v3 License](https://www.gnu.org/licenses/gpl-3.0.html). Please refer to `LICENSE.txt`. Refer to `THIRD_PARTY_LICENSES.txt` for licenses corresponding to
+third party libraries and frameworks used in this repository.

@@ -360,7 +360,6 @@ class AgentPrompter2:
         from langchain.chat_models.base import BaseChatModel
         from langgraph.prebuilt import create_react_agent
         import pandas as pd
-        import base64
 
         # TODO check if JSON output format is compatible with tool calling
         chat_model: BaseChatModel = chat_model.create_model(
@@ -369,13 +368,6 @@ class AgentPrompter2:
 
         tool_cells = self._extract_tools(tools_table)
 
-        tool_cell = tool_cells[0]
-        tool_bytes = tool_cell.tool_bytes
-        tool_bytes_base64 = base64.b64encode(tool_bytes).decode("utf-8")
-        result = ctx.execute_tool(tool_bytes_base64, self.user_message)
-        result_df = pd.DataFrame({"Result": [result]})
-        return knext.Table.from_pandas(result_df)
-
         tools = [self._to_langchain_tool(ctx, tool) for tool in tool_cells]
 
         graph = create_react_agent(
@@ -383,8 +375,14 @@ class AgentPrompter2:
         )
         inputs = {"messages": [{"role": "user", "content": self.user_message}]}
         final_state = graph.invoke(inputs)
-        result_df = pd.DataFrame({"Result": [final_state["messages"]]})
-        return result_df
+        messages = final_state["messages"]
+        result_df = pd.DataFrame(
+            {
+                "Role": [msg.type for msg in messages],
+                "Content": [msg.content for msg in messages],
+            }
+        )
+        return knext.Table.from_pandas(result_df)
 
     def _extract_tools(self, tools_table: knext.Table) -> list:
         tools_df = tools_table[self.tool_column].to_pandas()
@@ -398,6 +396,12 @@ class AgentPrompter2:
 
         tool_bytes_base64 = base64.b64encode(tool.tool_bytes).decode("utf-8")
 
+        args_schema = {
+            "type": "object",
+            "properties": tool.parameter_schema,
+            "required": list(tool.parameter_schema.keys()),
+        }
+
         def func(**params):
             params_json = json.dumps(params)
             return ctx.execute_tool(tool_bytes_base64, params_json)
@@ -406,5 +410,5 @@ class AgentPrompter2:
             func=func,
             name=tool.name,
             description=tool.description,
-            args_schema=tool.parameter_schema,
+            args_schema=args_schema,
         )

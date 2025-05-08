@@ -44,6 +44,7 @@
 
 
 from dataclasses import dataclass
+from typing import Optional
 import knime.extension as knext
 import util
 
@@ -73,6 +74,9 @@ from knime.extension.nodes import (
 from base import AIPortObjectSpec
 
 import os
+import logging
+
+_logger = logging.getLogger(__name__)
 
 
 agent_icon = "icons/generic/agent.png"
@@ -290,6 +294,59 @@ class AgentPrompter:
 
 
 @dataclass
+class Port:
+    name: str
+    description: str
+    type: str
+    spec: Optional[str]
+
+
+@dataclass
+class DataItem:
+    llm_representation: str
+    data: knext.Table
+
+
+class DataRegistry:
+    def __init__(self):
+        self._data: list[DataItem] = []
+
+    def add_table(self, table: knext.Table):
+        table_representation = self._table_representation(table)
+        self._data.append(DataItem(table_representation, table))
+
+    def get_data(self, index: int) -> knext.Table:
+        if index < 0 or index >= len(self._data):
+            raise IndexError("Index out of range")
+        return self._data[index].data
+
+    def create_port_description(port: Port) -> str:
+        import json
+
+        return json.dumps(
+            {
+                "name": port.name,
+                "description": port.description,
+                "type": port.type,
+                "spec": port.spec,
+            }
+        )
+
+    def llm_representation(self) -> str:
+        import json
+
+        return json.dumps(
+            {id: representation for id, representation in enumerate(self._data)}
+        )
+
+    def _column_representation(self, column: knext.Column) -> str:
+        return f"({column.name}, {str(column.ktype)})"
+
+    def _table_representation(self, table: knext.Table) -> str:
+        return f"[{', '.join(map(self._column_representation, table.schema))}]"
+
+
+@dataclass
 class WorkflowTool:
     """Mirrors the tool class defined in knime-python so we can use type hints here."""
 
@@ -297,6 +354,8 @@ class WorkflowTool:
     description: str
     parameter_schema: dict
     tool_bytes: bytes
+    input_ports: list[Port]
+    output_ports: list[Port]
 
 
 @knext.node(
@@ -310,6 +369,14 @@ class WorkflowTool:
 )
 @knext.input_table("Tools", "The tools the agent can use.")
 @knext.output_table("Result", "The result of the agent execution.")
+@knext.input_table_group(
+    "Data inputs",
+    "The data inputs for the agent.",
+)
+@knext.output_table_group(
+    "Data outputs",
+    "The data outputs of the agent.",
+)
 class AgentPrompter2:
     # TODO better name + description
     developer_message = knext.MultilineStringParameter(
@@ -334,11 +401,12 @@ class AgentPrompter2:
         ctx: knext.ConfigurationContext,
         chat_model_spec: ChatModelPortObjectSpec,
         tools_schema: knext.Schema,
+        data_schemas: list[knext.Schema],
     ) -> knext.Schema:
         chat_model_spec.validate_context(ctx)
         self._configure_tool_tables(tools_schema)
 
-        return self._create_conversation_schema()
+        return self._create_conversation_schema(), []
 
     def _configure_tool_tables(self, tools_schema):
         if self.tool_column is None:
@@ -356,6 +424,7 @@ class AgentPrompter2:
         ctx: knext.ExecutionContext,
         chat_model: ChatModelPortObject,
         tools_table: knext.Table,
+        input_tables: list[knext.Table],
     ):
         from langchain.chat_models.base import BaseChatModel
         from langgraph.prebuilt import create_react_agent
@@ -368,18 +437,33 @@ class AgentPrompter2:
 
         tool_cells = self._extract_tools(tools_table)
 
-        tools = [self._to_langchain_tool(ctx, tool) for tool in tool_cells]
+        data_registry = DataRegistry()
+        for table in input_tables:
+            data_registry.add_table(table)
 
+        tools = [
+            self._to_langchain_tool(ctx, data_registry, tool) for tool in tool_cells
+        ]
         graph = create_react_agent(
             chat_model, tools=tools, prompt=self.developer_message
         )
-        inputs = {"messages": [{"role": "user", "content": self.user_message}]}
+
+        initial_message = f"""# Initial data
+{data_registry.llm_representation()}
+# User message
+{self.user_message}"""
+
+        inputs = {"messages": [{"role": "user", "content": initial_message}]}
         final_state = graph.invoke(inputs)
         messages = final_state["messages"]
         result_df = pd.DataFrame(
             {
                 "Role": [msg.type for msg in messages],
                 "Content": [msg.content for msg in messages],
+                "Tool Calls": [
+                    str(msg.tool_calls) if hasattr(msg, "tool_calls") else None
+                    for msg in messages
+                ],
             }
         )
         return knext.Table.from_pandas(result_df)
@@ -389,7 +473,20 @@ class AgentPrompter2:
         tool_list = tools_df[self.tool_column].tolist()
         return tool_list
 
-    def _to_langchain_tool(self, ctx: knext.ExecutionContext, tool: WorkflowTool):
+    def _to_langchain_tool(
+        self,
+        ctx: knext.ExecutionContext,
+        data_registry: DataRegistry,
+        tool: WorkflowTool,
+    ):
+        if tool.input_ports or tool.output_ports:
+            return self._to_langchain_tool_with_data(ctx, data_registry, tool)
+        else:
+            return self._to_langchain_tool_without_data(ctx, tool)
+
+    def _to_langchain_tool_without_data(
+        self, ctx: knext.ExecutionContext, tool: WorkflowTool
+    ):
         import json
         from langchain.tools import StructuredTool
         import base64
@@ -404,11 +501,82 @@ class AgentPrompter2:
 
         def func(**params):
             params_json = json.dumps(params)
-            return ctx.execute_tool(tool_bytes_base64, params_json)
+            return ctx.execute_tool(tool_bytes_base64, params_json, []).message()
 
         return StructuredTool.from_function(
             func=func,
             name=tool.name,
             description=tool.description,
+            args_schema=args_schema,
+        )
+
+    def _to_langchain_tool_with_data(
+        self,
+        ctx: knext.ExecutionContext,
+        data_registry: DataRegistry,
+        tool: WorkflowTool,
+    ):
+        import json
+        from langchain.tools import StructuredTool
+        import base64
+
+        tool_bytes_base64 = base64.b64encode(tool.tool_bytes).decode("utf-8")
+
+        args_schema = {
+            "type": "object",
+            "properties": {
+                "parameters": {
+                    "type": "object",
+                    "properties": tool.parameter_schema,
+                    "description": "Parameters that control the tool's behavior.",
+                },
+                "data_inputs": {
+                    "type": "array",
+                    "items": {"type": "integer"},
+                    "description": "IDs of the data inputs for the tool.",
+                },
+            },
+            "required": ["parameters", "data_inputs"],
+        }
+
+        input_ports = tool.input_ports if tool.input_ports else []
+        output_ports = tool.output_ports if tool.output_ports else []
+
+        input_descriptions = "\n".join(
+            list(map(data_registry.create_port_description, input_ports))
+        )
+        output_descriptions = "\n".join(
+            list(map(data_registry.create_port_description, output_ports))
+        )
+
+        description_with_data_info = f"""
+# General description
+{tool.description}
+
+# Data inputs
+{input_descriptions}
+
+# Data outputs
+{output_descriptions}
+"""
+        _logger.error(json.dumps(args_schema, indent=2))
+
+        def func(parameters: dict, data_inputs: list[int]):
+            params_json = json.dumps(parameters)
+            inputs = [data_registry.get_data(i) for i in data_inputs]
+            result = ctx.execute_tool(tool_bytes_base64, params_json, inputs)
+            if result.outputs:
+                for output in result.outputs:
+                    data_registry.add_table(output)
+            return f"""# Tool message
+            {result.message}
+            # Updated data
+            {data_registry.llm_representation()}
+            """
+
+        return StructuredTool.from_function(
+            func=func,
+            name=tool.name,
+            description=description_with_data_info,
             args_schema=args_schema,
         )

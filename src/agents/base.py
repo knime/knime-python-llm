@@ -406,7 +406,9 @@ class AgentPrompter2:
         chat_model_spec.validate_context(ctx)
         self._configure_tool_tables(tools_schema)
 
-        return self._create_conversation_schema(), []
+        return self._create_conversation_schema(), [
+            None
+        ] * ctx.get_connected_output_port_numbers()[1]
 
     def _configure_tool_tables(self, tools_schema):
         if self.tool_column is None:
@@ -466,7 +468,16 @@ class AgentPrompter2:
                 ],
             }
         )
-        return knext.Table.from_pandas(result_df)
+        conversation_table = knext.Table.from_pandas(result_df)
+        num_data_outputs = ctx.get_connected_output_port_numbers()[1]
+
+        if num_data_outputs == 0:
+            return conversation_table
+        # TODO allow the model to pick the outputs
+        # return the last n tables from the data registry
+        return conversation_table, [
+            item.data for item in data_registry._data[-num_data_outputs:]
+        ]
 
     def _extract_tools(self, tools_table: knext.Table) -> list:
         tools_df = tools_table[self.tool_column].to_pandas()

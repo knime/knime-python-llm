@@ -541,11 +541,7 @@ class AgentPrompter2:
                     "description": "Parameters that control the tool's behavior.",
                     "required": list(tool.parameter_schema.keys()),
                 },
-                "data_inputs": {
-                    "type": "array",
-                    "items": {"type": "integer"},
-                    "description": "IDs of the data inputs for the tool.",
-                },
+                "data_inputs": self._create_input_data_schema(tool),
             },
             "required": ["parameters", "data_inputs"],
         }
@@ -560,10 +556,10 @@ class AgentPrompter2:
         )
         _logger.error(json.dumps(args_schema, indent=2))
 
-        def func(parameters: dict, data_inputs: list[int]) -> str:
+        def func(parameters: dict, data_inputs: dict) -> str:
             try:
+                inputs = [data_registry.get_data(i) for i in data_inputs.values()]
                 params_json = json.dumps(parameters)
-                inputs = [data_registry.get_data(i) for i in data_inputs]
                 message, outputs = ctx.execute_tool(
                     tool_bytes_base64, params_json, inputs
                 )
@@ -585,3 +581,19 @@ class AgentPrompter2:
             description=description_with_data_info,
             args_schema=args_schema,
         )
+
+    def _create_input_data_schema(self, tool: WorkflowTool) -> knext.Schema:
+        # TODO implement this method to create the data schema for the tool
+        # based on the input and output ports of the tool
+        return {
+            "type": "object",
+            "description": "The input data the tool requires.",
+            "properties": {
+                port.name: {
+                    "type": "integer",
+                    "description": "ID of the data to feed to the port for "
+                    + port.description,
+                }
+                for port in tool.input_ports
+            },
+        }

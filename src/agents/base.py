@@ -311,33 +311,26 @@ class DataRegistry:
     def __init__(self):
         self._data: list[DataItem] = []
 
-    def add_table(self, table: knext.Table):
+    def add_table(self, table: knext.Table) -> dict:
         table_representation = self._table_representation(table)
         self._data.append(DataItem(table_representation, table))
+        return {len(self._data) - 1: table_representation}
 
     def get_data(self, index: int) -> knext.Table:
         if index < 0 or index >= len(self._data):
             raise IndexError("Index out of range")
         return self._data[index].data
 
-    def create_port_description(self, port: Port) -> str:
-        import json
+    def create_port_description(self, port: Port) -> dict:
+        return {
+            "name": port.name,
+            "description": port.description,
+            "type": port.type,
+            "spec": port.spec,
+        }
 
-        return json.dumps(
-            {
-                "name": port.name,
-                "description": port.description,
-                "type": port.type,
-                "spec": port.spec,
-            }
-        )
-
-    def llm_representation(self) -> str:
-        import json
-
-        return json.dumps(
-            {id: data.llm_representation for id, data in enumerate(self._data)}
-        )
+    def llm_representation(self) -> dict:
+        return {id: data.llm_representation for id, data in enumerate(self._data)}
 
     def _column_representation(self, column: knext.Column) -> str:
         return f"({column.name}, {str(column.ktype)})"
@@ -450,10 +443,10 @@ class AgentPrompter2:
             chat_model, tools=tools, prompt=self.developer_message
         )
 
-        initial_message = f"""# Initial data
-{data_registry.llm_representation()}
-# User message
-{self.user_message}"""
+        initial_message = self._render_message(
+            initial_data=data_registry.llm_representation(),
+            user_message=self.user_message,
+        )
 
         inputs = {"messages": [{"role": "user", "content": initial_message}]}
         final_state = graph.invoke(inputs)
@@ -478,6 +471,11 @@ class AgentPrompter2:
         return conversation_table, [
             item.data for item in data_registry._data[-num_data_outputs:]
         ]
+
+    def _render_message(self, **kwargs) -> str:
+        import json
+
+        return json.dumps(kwargs)
 
     def _extract_tools(self, tools_table: knext.Table) -> list:
         tools_df = tools_table[self.tool_column].to_pandas()
@@ -555,26 +553,14 @@ class AgentPrompter2:
         input_ports = tool.input_ports if tool.input_ports else []
         output_ports = tool.output_ports if tool.output_ports else []
 
-        input_descriptions = "\n".join(
-            list(map(data_registry.create_port_description, input_ports))
+        description_with_data_info = self._render_message(
+            description=tool.description,
+            input_ports=list(map(data_registry.create_port_description, input_ports)),
+            output_ports=list(map(data_registry.create_port_description, output_ports)),
         )
-        output_descriptions = "\n".join(
-            list(map(data_registry.create_port_description, output_ports))
-        )
-
-        description_with_data_info = f"""
-# General description
-{tool.description}
-
-# Data inputs
-{input_descriptions}
-
-# Data outputs
-{output_descriptions}
-"""
         _logger.error(json.dumps(args_schema, indent=2))
 
-        def func(parameters: dict, data_inputs: list[int]):
+        def func(parameters: dict, data_inputs: list[int]) -> str:
             try:
                 params_json = json.dumps(parameters)
                 inputs = [data_registry.get_data(i) for i in data_inputs]
@@ -582,13 +568,13 @@ class AgentPrompter2:
                     tool_bytes_base64, params_json, inputs
                 )
                 if outputs:
+                    output_representations = {}
                     for output in outputs:
-                        data_registry.add_table(output)
-                return f"""# Tool message
-                {message}
-                # Updated data
-                {data_registry.llm_representation()}
-                """
+                        output_representations.update(data_registry.add_table(output))
+
+                return self._render_message(
+                    message=message, outputs=output_representations
+                )
             except Exception as e:
                 _logger.exception(e)
                 raise

@@ -320,7 +320,7 @@ class DataRegistry:
             raise IndexError("Index out of range")
         return self._data[index].data
 
-    def create_port_description(port: Port) -> str:
+    def create_port_description(self, port: Port) -> str:
         import json
 
         return json.dumps(
@@ -336,7 +336,7 @@ class DataRegistry:
         import json
 
         return json.dumps(
-            {id: representation for id, representation in enumerate(self._data)}
+            {id: data.llm_representation for id, data in enumerate(self._data)}
         )
 
     def _column_representation(self, column: knext.Column) -> str:
@@ -479,6 +479,7 @@ class AgentPrompter2:
         data_registry: DataRegistry,
         tool: WorkflowTool,
     ):
+        _logger.error(f"Tool: {tool.input_ports}")
         if tool.input_ports or tool.output_ports:
             return self._to_langchain_tool_with_data(ctx, data_registry, tool)
         else:
@@ -501,7 +502,7 @@ class AgentPrompter2:
 
         def func(**params):
             params_json = json.dumps(params)
-            return ctx.execute_tool(tool_bytes_base64, params_json, []).message()
+            return ctx.execute_tool(tool_bytes_base64, params_json, [])[0]
 
         return StructuredTool.from_function(
             func=func,
@@ -529,6 +530,7 @@ class AgentPrompter2:
                     "type": "object",
                     "properties": tool.parameter_schema,
                     "description": "Parameters that control the tool's behavior.",
+                    "required": list(tool.parameter_schema.keys()),
                 },
                 "data_inputs": {
                     "type": "array",
@@ -562,17 +564,23 @@ class AgentPrompter2:
         _logger.error(json.dumps(args_schema, indent=2))
 
         def func(parameters: dict, data_inputs: list[int]):
-            params_json = json.dumps(parameters)
-            inputs = [data_registry.get_data(i) for i in data_inputs]
-            result = ctx.execute_tool(tool_bytes_base64, params_json, inputs)
-            if result.outputs:
-                for output in result.outputs:
-                    data_registry.add_table(output)
-            return f"""# Tool message
-            {result.message}
-            # Updated data
-            {data_registry.llm_representation()}
-            """
+            try:
+                params_json = json.dumps(parameters)
+                inputs = [data_registry.get_data(i) for i in data_inputs]
+                message, outputs = ctx.execute_tool(
+                    tool_bytes_base64, params_json, inputs
+                )
+                if outputs:
+                    for output in outputs:
+                        data_registry.add_table(output)
+                return f"""# Tool message
+                {message}
+                # Updated data
+                {data_registry.llm_representation()}
+                """
+            except Exception as e:
+                _logger.exception(e)
+                raise
 
         return StructuredTool.from_function(
             func=func,

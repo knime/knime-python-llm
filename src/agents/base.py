@@ -535,10 +535,10 @@ class AgentPrompter2:
         args_schema = {
             "type": "object",
             "properties": {
-                "parameters": {
+                "configuration": {
                     "type": "object",
                     "properties": tool.parameter_schema,
-                    "description": "Parameters that control the tool's behavior.",
+                    "description": "Configures the tool to perform the task at hand.",
                     "required": list(tool.parameter_schema.keys()),
                 },
                 "data_inputs": self._create_input_data_schema(tool),
@@ -556,21 +556,23 @@ class AgentPrompter2:
         )
         _logger.error(json.dumps(args_schema, indent=2))
 
-        def func(parameters: dict, data_inputs: dict) -> str:
+        def func(configuration: dict, data_inputs: dict) -> str:
+            _logger.error(f"Data inputs: {data_inputs}")
+            _logger.error(f"Parameters: {configuration}")
             try:
                 inputs = [data_registry.get_data(i) for i in data_inputs.values()]
-                params_json = json.dumps(parameters)
+                params_json = json.dumps(configuration)
                 message, outputs = ctx.execute_tool(
                     tool_bytes_base64, params_json, inputs
                 )
-                if outputs:
-                    output_representations = {}
-                    for output in outputs:
-                        output_representations.update(data_registry.add_table(output))
+                _logger.error(f"Message: {message}")
+                _logger.error(f"Outputs: {outputs}")
+                output_references = {}
+                for output in outputs:
+                    output_reference = data_registry.add_table(output)
+                    output_references.update(output_reference)
 
-                return self._render_message(
-                    message=message, outputs=output_representations
-                )
+                return self._render_message(message=message, outputs=output_references)
             except Exception as e:
                 _logger.exception(e)
                 raise
@@ -583,17 +585,19 @@ class AgentPrompter2:
         )
 
     def _create_input_data_schema(self, tool: WorkflowTool) -> knext.Schema:
-        # TODO implement this method to create the data schema for the tool
-        # based on the input and output ports of the tool
         return {
             "type": "object",
-            "description": "The input data the tool requires.",
-            "properties": {
-                port.name: {
-                    "type": "integer",
-                    "description": "ID of the data to feed to the port for "
-                    + port.description,
-                }
-                for port in tool.input_ports
-            },
+            "description": "The input data the tool requires for the task at hand.",
+            "properties": self._create_input_port_properties(tool.input_ports),
+            "required": [port.name for port in tool.input_ports],
+        }
+
+    def _create_input_port_properties(self, ports: list[Port]):
+        return {
+            port.name: {
+                "type": "integer",
+                "description": "ID of the data to feed to the port for "
+                + port.description,
+            }
+            for port in ports
         }

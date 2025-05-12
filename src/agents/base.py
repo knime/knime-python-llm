@@ -329,6 +329,18 @@ class AgentPrompter2:
         "Tool column", "The column holding the tools the agent can use.", port_index=1
     )
 
+    recursion_limit = knext.IntParameter(
+        "Recursion limit",
+        """
+        The maximum number of times the agent can repeat its steps to
+        avoid getting stuck in an endless loop.
+        If not provided, defaults to 25.""",
+        default_value=25,
+        min_value=1,
+        is_advanced=True,
+        since_version="5.5.0",
+    )
+
     def configure(
         self,
         ctx: knext.ConfigurationContext,
@@ -352,7 +364,14 @@ class AgentPrompter2:
                 f"Column {self.tool_column} not found in the tools table."
             )
 
-    def _create_conversation_schema(self) -> knext.Schema: ...
+    def _create_conversation_schema(self) -> knext.Schema:
+        return knext.Schema.from_columns(
+            [
+                knext.Column(knext.string(), "Role"),
+                knext.Column(knext.string(), "Content"),
+                knext.Column(knext.string(), "Tool Calls"),
+            ]
+        )
 
     def execute(
         self,
@@ -362,12 +381,12 @@ class AgentPrompter2:
         input_tables: list[knext.Table],
     ):
         from langchain.chat_models.base import BaseChatModel
-        from langgraph.prebuilt import create_react_agent
         import pandas as pd
         from ._agent_impl import (
             DataRegistry,
             LangchainToolConverter,
             _render_message_as_json,
+            build_agent_graph,
         )
 
         data_registry = DataRegistry(input_tables)
@@ -383,18 +402,34 @@ class AgentPrompter2:
         tool_cells = _extract_tools_from_table(tools_table, self.tool_column)
 
         tools = [tool_converter.to_langchain_tool(tool) for tool in tool_cells]
-        graph = create_react_agent(
-            chat_model, tools=tools, prompt=self.developer_message
-        )
 
         initial_message = _render_message_as_json(
             initial_data=data_registry.llm_representation(),
             user_message=self.user_message,
         )
+        num_data_outputs = ctx.get_connected_output_port_numbers()[1]
+
+        graph = build_agent_graph(chat_model, tools, num_data_outputs)
 
         inputs = {"messages": [{"role": "user", "content": initial_message}]}
-        final_state = graph.invoke(inputs)
+        config = {"recursion_limit": self.recursion_limit}
+
+        try:
+            final_state = graph.invoke(inputs, config=config)
+        except Exception as e:
+            if "Recursion limit" in str(e):
+                raise knext.InvalidParametersError(
+                    f"""Recursion limit of {self.recursion_limit} reached. 
+                    You can increase the limit by setting the `recursion_limit` parameter."""
+                )
+            else:
+                raise knext.InvalidParametersError(
+                    f"An error occurred while executing the agent: {e}"
+                )
+
         messages = final_state["messages"]
+        output_table_ids = final_state.get("output_table_ids", [])
+
         result_df = pd.DataFrame(
             {
                 "Role": [msg.type for msg in messages],
@@ -405,20 +440,24 @@ class AgentPrompter2:
                 ],
             }
         )
+
         conversation_table = knext.Table.from_pandas(result_df)
-        num_data_outputs = ctx.get_connected_output_port_numbers()[1]
 
         if num_data_outputs == 0:
             return conversation_table
-        # TODO allow the model to pick the outputs
-        # return the last n tables from the data registry
-        return conversation_table, [
-            item.data for item in data_registry._data[-num_data_outputs:]
-        ]
+        else:
+            # allow the model to pick which output tables to return
+            return conversation_table, [
+                data_registry.get_data(int(table_id)) for table_id in output_table_ids
+            ]
 
 
 def _extract_tools_from_table(tools_table: knext.Table, tool_column: str):
-    tools_df = tools_table[tool_column].to_pandas()
+    tools_df = tools_table[tool_column].to_pandas().dropna()
+    if tools_df.empty:
+        raise knext.InvalidParametersError(
+            f"Tool column {tool_column} is empty. Please provide a valid tool column."
+        )
     tool_list = tools_df[tool_column].tolist()
     return tool_list
 

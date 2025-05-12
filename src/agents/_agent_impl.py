@@ -46,6 +46,14 @@ from dataclasses import dataclass
 from typing import Callable, Optional, Sequence
 import knime.extension as knext
 
+from langgraph.graph import StateGraph, END
+from langgraph.graph.message import add_messages
+from langgraph.prebuilt import ToolNode
+from typing import Annotated, TypedDict
+from langchain.chat_models.base import BaseChatModel
+from langchain_core.tools import BaseTool
+
+
 import logging
 
 _logger = logging.getLogger(__name__)
@@ -194,9 +202,29 @@ class LangchainToolConverter:
         )
         _logger.error(json.dumps(args_schema, indent=2))
 
-        def func(configuration: dict, data_inputs: dict) -> str:
-            _logger.error(f"Data inputs: {data_inputs}")
-            _logger.error(f"Parameters: {configuration}")
+        def func(configuration: dict = None, data_inputs: dict = None) -> str:
+            configuration = configuration or {}
+            data_inputs = data_inputs or {}
+
+            # Validate configuration parameters
+            missing_params = [
+                param
+                for param in tool.parameter_schema.keys()
+                if param not in configuration
+            ]
+            if missing_params:
+                raise knext.InvalidParametersError(
+                    f"Missing configuration parameters: {', '.join(missing_params)}"
+                )
+
+            # Validate data inputs
+            missing_data_inputs = [
+                port.name for port in tool.input_ports if port.name not in data_inputs
+            ]
+            if missing_data_inputs:
+                raise knext.InvalidParametersError(
+                    f"Missing data inputs for ports: {', '.join(missing_data_inputs)}"
+                )
             try:
                 inputs = [self._data_registry.get_data(i) for i in data_inputs.values()]
                 params_json = json.dumps(configuration)
@@ -271,3 +299,119 @@ class ChatAgentPrompterDataService:
     def get_final_data(self):
         # Called to get the final data from the view (e.g. tables)
         pass
+
+
+class State(TypedDict):
+    messages: Annotated[list, add_messages]
+    output_table_ids: list[str]
+
+
+def build_agent_graph(
+    self, chat_model: BaseChatModel, tools: list[BaseTool], num_data_outputs: int
+):
+    chat_model = chat_model.bind_tools(tools)
+    output_selection_tool = _output_selection_tool(num_data_outputs)
+    model_with_selection = chat_model.bind_tools([output_selection_tool])
+
+    agent_node = _build_agent_node(chat_model)
+    selection_node = _build_selection_node(model_with_selection, num_data_outputs)
+    graph = _compile_graph(agent_node, selection_node, tools, num_data_outputs)
+    return graph
+
+
+def _output_selection_tool(self, num_data_outputs: int):
+    from langchain.tools import StructuredTool
+
+    def func(output_table_ids: list[str]):
+        return {"selected_output_ids": output_table_ids}
+
+    return StructuredTool.from_function(
+        func=func,
+        name="Output_Table_Selection",
+        description="Use this tool to return the final output table IDs. "
+        "You should select a number of table IDs from the list of output table "
+        "IDs based on their relevance to the user prompt and how many output tables are expected.",
+        args_schema={
+            "type": "object",
+            "properties": {
+                "output_table_ids": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "The IDs of the output tables.",
+                }
+            },
+            "required": ["output_table_ids"],
+        },
+    )
+
+
+def _build_agent_node(chat_model: BaseChatModel):
+    def agent_node(state):
+        messages = state["messages"]
+        response = chat_model.invoke(messages)
+        messages.append(response)
+        return {"messages": messages}
+
+    return agent_node
+
+
+def _build_selection_node(chat_model: BaseChatModel, num_data_outputs: int):
+    def selection_node(state):
+        from langchain_core.messages import AIMessage
+
+        prompt = AIMessage(
+            content=f"""The number of expected output tables: {num_data_outputs}.
+            You must return exactly {num_data_outputs} output table ID(s).
+            Do not return more or fewer than {num_data_outputs} ID(s)."""
+        )
+
+        messages = state["messages"]
+        messages[-1] = prompt
+
+        response = chat_model.invoke(messages)
+        tool_call = response.tool_calls[0]
+        output_table_ids = tool_call["args"]["output_table_ids"]
+
+        final_msg = AIMessage(
+            content=f"""The number of output tables does not match the number of input tables. 
+            Therefore, a special selection tool was used to identify the most relevant output tables. 
+            {len(output_table_ids)} table(s) have been selected as the final output."""
+        )
+        messages[-1] = final_msg
+
+        return {"messages": messages, "output_table_ids": output_table_ids}
+
+    return selection_node
+
+
+def _router(state: State):
+    messages = state["messages"]
+    last_msg = messages[-1]
+
+    if getattr(last_msg, "tool_calls", None):
+        return "tools"
+
+    # no tool calls, route to selection node
+    return "select_output"
+
+
+def _compile_graph(agent_node, selection_node, tools):
+    builder = StateGraph(State)
+
+    builder.add_node("agent", agent_node)
+    builder.add_node("tools", ToolNode(tools))
+    builder.add_node("select_output", selection_node)
+
+    builder.set_entry_point("agent")
+    builder.add_conditional_edges(
+        "agent",
+        _router,
+        {
+            "tools": "tools",
+            "select_output": "select_output",
+        },
+    )
+    builder.add_edge("tools", "agent")
+    builder.add_edge("select_output", END)
+
+    return builder.compile()

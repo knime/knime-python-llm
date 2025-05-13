@@ -60,6 +60,7 @@ class HFLLM(LLM):
 
     model: str
     """Can be a repo id on hugging face hub or the url of a TGI server."""
+    provider: str = None
     hf_api_token: Optional[str] = None
     max_new_tokens: int = 512
     top_k: Optional[int] = None
@@ -78,6 +79,7 @@ class HFLLM(LLM):
     def validate_values(cls, values: dict) -> dict:
         values["client"] = InferenceClient(
             model=values["model"],
+            provider=values.get("provider"),
             timeout=120,
             token=values.get("hf_api_token"),
         )

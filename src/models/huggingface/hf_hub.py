@@ -141,12 +141,14 @@ class HFHubLLMPortObjectSpec(LLMPortObjectSpec):
         self,
         credentials: HFAuthenticationPortObjectSpec,
         repo_id,
+        provider,
         n_requests,
         model_kwargs,
     ) -> None:
         super().__init__()
         self._credentials = credentials
         self._repo_id = repo_id
+        self._provider = provider
         self._n_requests = n_requests
         self._model_kwargs = model_kwargs
 
@@ -162,6 +164,10 @@ class HFHubLLMPortObjectSpec(LLMPortObjectSpec):
         return self._repo_id
 
     @property
+    def provider(self):
+        return self._provider
+
+    @property
     def n_requests(self):
         return self._n_requests
 
@@ -173,6 +179,7 @@ class HFHubLLMPortObjectSpec(LLMPortObjectSpec):
         return {
             **self._credentials.serialize(),
             "repo_id": self._repo_id,
+            "provider": self._provider,
             "n_requests": self._n_requests,
             "model_kwargs": self._model_kwargs,
         }
@@ -182,6 +189,7 @@ class HFHubLLMPortObjectSpec(LLMPortObjectSpec):
         return cls(
             HFAuthenticationPortObjectSpec.deserialize(data),
             data["repo_id"],
+            data["provider"],
             data.get("n_requests", 1),
             data["model_kwargs"],
         )
@@ -202,6 +210,7 @@ class HFHubLLMPortObject(LLMPortObject):
 
         return HFLLM(
             model=self.spec.repo_id,
+            provider=self.spec.provider,
             hf_api_token=self.spec.credentials.get_token(ctx),
             max_new_tokens=self.spec.model_kwargs.get("max_new_tokens"),
             top_k=self.spec.model_kwargs.get("top_k"),
@@ -222,6 +231,7 @@ class HFHubChatModelPortObjectSpec(HFHubLLMPortObjectSpec, ChatModelPortObjectSp
         super().__init__(
             llm_spec._credentials,
             llm_spec.repo_id,
+            llm_spec.provider,
             llm_spec.n_requests,
             llm_spec.model_kwargs,
         )
@@ -439,9 +449,8 @@ class HFHubConnector:
     To use this node, you need to successfully authenticate with the Hugging Face Hub using the **HF Hub Authenticator** node.
 
     Provide the name of the desired LLM repository available on the [Hugging Face Hub](https://huggingface.co/models) as an input.
-
-    For more details and information about integrating LLMs from the Hugging Face Hub, refer to the
-    [LangChain documentation](https://python.langchain.com/docs/modules/model_io/models/llms/integrations/huggingface_hub).
+    The model will be executed with the
+    [Inference Provider](https://huggingface.co/docs/inference-providers/en/index) "HF Inference".
 
     Please ensure that you have the necessary permissions to access the model.
     Failures with gated models may occur due to outdated tokens.
@@ -490,6 +499,7 @@ class HFHubConnector:
         return HFHubLLMPortObjectSpec(
             huggingface_auth_spec,
             self.hub_settings.repo_id,
+            "hf-inference",
             self.model_settings.n_requests,
             model_kwargs,
         )
@@ -539,7 +549,8 @@ class HFHubChatModelConnector:
 
     Provide the name of the desired chat model repository available on the
     [Hugging Face Hub](https://huggingface.co/models)
-    as an input.
+    as an input. The model will be executed with the
+    [Inference Provider](https://huggingface.co/docs/inference-providers/en/index) "HF Inference".
 
     Please ensure that you have the necessary permissions to access the model.
     Failures with gated models may occur due to outdated tokens.
@@ -581,6 +592,7 @@ class HFHubChatModelConnector:
         llm_spec = HFHubLLMPortObjectSpec(
             auth,
             self.hub_settings.repo_id,
+            "hf-inference",
             self.model_settings.n_requests,
             model_kwargs,
         )

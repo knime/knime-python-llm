@@ -601,3 +601,71 @@ class AgentPrompter2:
             }
             for port in ports
         }
+
+
+@knext.node(
+    "Chat Agent Prompter",
+    node_type=knext.NodeType.VISUALIZER,
+    icon_path=agent_icon,
+    category=agent_category,
+)
+@knext.input_port(
+    "Chat model", "The chat model to use.", port_type=chat_model_port_type
+)
+@knext.input_table("Tools", "The tools the agent can use.")
+@knext.input_table_group(
+    "Data inputs",
+    "The data inputs for the agent.",
+)
+@knext.output_view(
+    "KNIME Icon", "Shows the KNIME icon", static_resources="assets"
+)
+class ChatAgentPrompter:
+    # TODO better name + description
+    developer_message = knext.MultilineStringParameter(
+        "Developer message",
+        "Message provided to the agent that instructs it how to act.",
+    )
+
+    # TODO better name + description
+    # TODO or does it come from the input table?
+    user_message = knext.MultilineStringParameter(
+        "User message",
+        "Message provided to the agent that instructs it how to act.",
+    )
+
+    # TODO type filter for tool columns. How to declare the type?
+    tool_column = knext.ColumnParameter(
+        "Tool column", "The column holding the tools the agent can use.", port_index=1
+    )
+
+    def configure(
+        self,
+        ctx: knext.ConfigurationContext,
+        chat_model_spec: ChatModelPortObjectSpec,
+        tools_schema: knext.Schema,
+        data_schemas: list[knext.Schema],
+    ) -> knext.Schema:
+        pass
+
+    def execute(
+        self,
+        ctx: knext.ExecutionContext,
+        chat_model: ChatModelPortObject,
+        tools_table: knext.Table,
+        input_tables: list[knext.Table],
+    ):
+        # Load the index.html file as a string
+        current_dir = os.path.dirname(__file__)
+        html_file_path = os.path.join(current_dir, "chat_app", "dist", "index.html")
+
+        with open(html_file_path, "r", encoding="utf-8") as html_file:
+            html_content = html_file.read()
+        
+        return knext.view_html(html_content)
+
+    def getData(self, param: str) -> str:
+        
+        return "blub " + param
+
+

@@ -9506,7 +9506,7 @@ License Text:
 
 --------------------------------------------------------------------------------
 Package: huggingface_hub
-Version: 0.30.2
+Version: 0.31.4
 Declared License: Apache
 
 License Text:

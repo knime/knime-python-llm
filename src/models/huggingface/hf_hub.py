@@ -73,6 +73,9 @@ hf_hub_category = knext.category(
     icon=hf_icon,
 )
 
+HF_DEFAULT_INFERENCE_PROVIDER = "hf-inference"
+HF_LEGACY_INFERENCE_PROVIDER = "hf-inference"  # for port objects created before 5.5
+
 
 def _create_repo_id_parameter() -> knext.StringParameter:
     return knext.StringParameter(
@@ -189,7 +192,7 @@ class HFHubLLMPortObjectSpec(LLMPortObjectSpec):
         return cls(
             HFAuthenticationPortObjectSpec.deserialize(data),
             data["repo_id"],
-            data["provider"],
+            data.get("provider", HF_LEGACY_INFERENCE_PROVIDER),  # added in 5.5
             data.get("n_requests", 1),
             data["model_kwargs"],
         )
@@ -282,11 +285,15 @@ class HFHubChatModelPortObject(HFHubLLMPortObject, ChatModelPortObject):
 
 class HFHubEmbeddingsPortObjectSpec(EmbeddingsPortObjectSpec):
     def __init__(
-        self, hub_credentials: HFAuthenticationPortObjectSpec, repo_id: str
+        self,
+        hub_credentials: HFAuthenticationPortObjectSpec,
+        repo_id: str,
+        provider: str,
     ) -> None:
         super().__init__()
         self._repo_id = repo_id
         self._hub_credentials = hub_credentials
+        self._provider = provider
 
     @property
     def repo_id(self) -> str:
@@ -296,6 +303,10 @@ class HFHubEmbeddingsPortObjectSpec(EmbeddingsPortObjectSpec):
     def hub_credentials_name(self) -> str:
         return self._hub_credentials.credentials
 
+    @property
+    def provider(self) -> str:
+        return self._provider
+
     def validate_context(self, ctx: knext.ConfigurationContext):
         self._hub_credentials.validate_context(ctx)
 
@@ -303,11 +314,16 @@ class HFHubEmbeddingsPortObjectSpec(EmbeddingsPortObjectSpec):
         return {
             **self._hub_credentials.serialize(),
             "repo_id": self.repo_id,
+            "provider": self.provider,
         }
 
     @classmethod
     def deserialize(cls, data: dict):
-        return cls(HFAuthenticationPortObjectSpec.deserialize(data), data["repo_id"])
+        return cls(
+            HFAuthenticationPortObjectSpec.deserialize(data),
+            data["repo_id"],
+            data.get("provider", HF_LEGACY_INFERENCE_PROVIDER),  # added in 5.5
+        )
 
 
 class HFHubEmbeddingsPortObject(EmbeddingsPortObject):
@@ -316,11 +332,13 @@ class HFHubEmbeddingsPortObject(EmbeddingsPortObject):
         return super().spec
 
     def create_model(self, ctx):
-        from langchain_community.embeddings import HuggingFaceHubEmbeddings
+        from ._hf_llm import HuggingFaceEmbeddings
 
         hub_api_token = ctx.get_credentials(self.spec.hub_credentials_name).password
-        return HuggingFaceHubEmbeddings(
-            repo_id=self.spec.repo_id, huggingfacehub_api_token=hub_api_token
+        return HuggingFaceEmbeddings(
+            model=self.spec.repo_id,
+            hf_api_token=hub_api_token,
+            provider=self.spec.provider,
         )
 
 
@@ -499,7 +517,7 @@ class HFHubConnector:
         return HFHubLLMPortObjectSpec(
             huggingface_auth_spec,
             self.hub_settings.repo_id,
-            "hf-inference",
+            HF_DEFAULT_INFERENCE_PROVIDER,
             self.model_settings.n_requests,
             model_kwargs,
         )
@@ -592,7 +610,7 @@ class HFHubChatModelConnector:
         llm_spec = HFHubLLMPortObjectSpec(
             auth,
             self.hub_settings.repo_id,
-            "hf-inference",
+            HF_DEFAULT_INFERENCE_PROVIDER,
             self.model_settings.n_requests,
             model_kwargs,
         )
@@ -614,7 +632,7 @@ def _validate_repo_id(repo_id: str, token: str):
 
     try:
         huggingface_hub.model_info(repo_id, token=token)
-    except huggingface_hub.utils._errors.GatedRepoError as e:
+    except huggingface_hub.utils.GatedRepoError as e:
         raise knext.InvalidParametersError(
             f"""Access to this repository is restricted: {e}. 
             Please make sure you have the necessary permissions to access the model and an up-to-date token."""
@@ -692,7 +710,9 @@ class HFHubEmbeddingsConnector:
     def create_spec(
         self, authentication_spec: HFAuthenticationPortObjectSpec
     ) -> HFHubEmbeddingsPortObjectSpec:
-        return HFHubEmbeddingsPortObjectSpec(authentication_spec, self.repo_id)
+        return HFHubEmbeddingsPortObjectSpec(
+            authentication_spec, self.repo_id, HF_DEFAULT_INFERENCE_PROVIDER
+        )
 
     def execute(
         self,

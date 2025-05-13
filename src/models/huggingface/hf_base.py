@@ -121,6 +121,7 @@ class HFPromptTemplateSettings:
 
 def raise_for(exception: Exception, default: Optional[Exception] = None):
     import requests
+    from huggingface_hub.errors import HfHubHTTPError
 
     if isinstance(exception, requests.exceptions.ProxyError):
         raise RuntimeError(
@@ -130,6 +131,12 @@ def raise_for(exception: Exception, default: Optional[Exception] = None):
         raise RuntimeError(
             "The connection to Hugging Face Hub timed out."
         ) from exception
+    if isinstance(exception, HfHubHTTPError):
+        if "404 Client Error: Not Found for url" in str(exception):
+            raise RuntimeError(
+                "The model at the URL could not be found. For models deployed via Hugging Face Hub, "
+                "this could be because the model is not supported by provider 'HF Inference'.",
+            ) from exception
     if default:
         raise default from exception
     raise exception

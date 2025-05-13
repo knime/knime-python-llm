@@ -45,10 +45,10 @@
 
 from typing import Any, List, Optional
 from langchain_core.language_models import LLM
-from pydantic import model_validator
-from huggingface_hub import InferenceClient
+from langchain_core.embeddings import Embeddings
+from pydantic import model_validator, BaseModel
+from huggingface_hub import InferenceClient, AsyncInferenceClient
 from .hf_base import raise_for
-from langchain_community.embeddings import HuggingFaceHubEmbeddings
 import util
 
 
@@ -60,7 +60,7 @@ class HFLLM(LLM):
 
     model: str
     """Can be a repo id on hugging face hub or the url of a TGI server."""
-    provider: str = None
+    provider: str = None  # None for TGI
     hf_api_token: Optional[str] = None
     max_new_tokens: int = 512
     top_k: Optional[int] = None
@@ -107,13 +107,70 @@ class HFLLM(LLM):
             raise_for(ex)
 
 
-class HuggingFaceEmbeddings(HuggingFaceHubEmbeddings):
+class HuggingFaceEmbeddings(BaseModel, Embeddings):
+    """Custom implementation backed by huggingface_hub.InferenceClient to avoid the torch dependency of
+    langchain_huggingface."""
+
+    model: str
+    """Can be a model or a repo id on hugging face hub or the url of a TEI server."""
+    provider: str = None  # None for TEI
+    hf_api_token: Optional[str] = None
+    client: Any
+    async_client: Any
+
+    @model_validator(mode="before")
+    @classmethod
+    def validate_values(cls, values: dict) -> dict:
+        values["client"] = InferenceClient(
+            model=values["model"],
+            provider=values.get("provider"),
+            timeout=120,
+            token=values.get("hf_api_token"),
+        )
+        values["async_client"] = AsyncInferenceClient(
+            model=values["model"],
+            provider=values.get("provider"),
+            timeout=120,
+            token=values.get("hf_api_token"),
+        )
+        return values
+
+    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        texts = [
+            text.replace("\n", " ") for text in texts
+        ]  # newlines can negatively affect performance according to langchain_huggingface
+        try:
+            responses = self.client.feature_extraction(text=texts)
+        except Exception as ex:
+            raise_for(ex)
+        return responses.tolist()
+
+    async def aembed_documents(self, texts: List[str]) -> List[List[float]]:
+        texts = [
+            text.replace("\n", " ") for text in texts
+        ]  # newlines can negatively affect performance according to langchain_huggingface
+        try:
+            responses = await self.async_client.feature_extraction(text=texts)
+        except Exception as ex:
+            raise_for(ex)
+        return responses.tolist()
+
+    def embed_query(self, text: str) -> list[float]:
+        response = self.embed_documents([text])[0]
+        return response
+
+    async def aembed_query(self, text: str) -> list[float]:
+        response = (await self.aembed_documents([text]))[0]
+        return response
+
+
+class HuggingFaceTEIEmbeddings(HuggingFaceEmbeddings):
     batch_size: int = 32
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        # Overrides HuggingFaceHubEmbeddings 'embed_documents' to allow batches
+        # Overrides HuggingFaceEmbeddings 'embed_documents' to allow batches
         return util.batched_apply(super().embed_documents, texts, self.batch_size)
 
     async def aembed_documents(self, texts: List[str]) -> List[List[float]]:
-        # Overrides HuggingFaceHubEmbeddings 'aembed_documents' to allow batches
+        # Overrides HuggingFaceEmbeddings 'aembed_documents' to allow batches
         return util.abatched_apply(super().aembed_documents, texts, self.batch_size)

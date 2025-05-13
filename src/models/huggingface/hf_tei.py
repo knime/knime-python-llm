@@ -120,13 +120,13 @@ class HFTEIEmbeddingsPortObject(EmbeddingsPortObject):
         return super().spec
 
     def create_model(self, ctx: knext.ExecutionContext):
-        from ._hf_llm import HuggingFaceEmbeddings
+        from ._hf_llm import HuggingFaceTEIEmbeddings
 
         hub_auth = self.spec.hf_hub_auth
-        return HuggingFaceEmbeddings(
+        return HuggingFaceTEIEmbeddings(
             model=self.spec.inference_server_url,
             batch_size=self.spec.batch_size,
-            huggingfacehub_api_token=hub_auth.get_token(ctx) if hub_auth else None,
+            hf_api_token=hub_auth.get_token(ctx) if hub_auth else None,
         )
 
 

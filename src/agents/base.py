@@ -44,7 +44,7 @@
 
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import Callable, Optional
 import knime.extension as knext
 import util
 
@@ -425,25 +425,30 @@ class AgentPrompter2:
         from langgraph.prebuilt import create_react_agent
         import pandas as pd
 
+        data_registry = DataRegistry()
+
         # TODO check if JSON output format is compatible with tool calling
         chat_model: BaseChatModel = chat_model.create_model(
             ctx, output_format=OutputFormatOptions.Text
         )
 
+        tool_converter = LangchainToolConverter(
+            data_registry, ctx, _render_message_as_json
+        )
         tool_cells = self._extract_tools(tools_table)
 
-        data_registry = DataRegistry()
         for table in input_tables:
             data_registry.add_table(table)
 
         tools = [
-            self._to_langchain_tool(ctx, data_registry, tool) for tool in tool_cells
+            tool_converter.to_langchain_tool(ctx, data_registry, tool)
+            for tool in tool_cells
         ]
         graph = create_react_agent(
             chat_model, tools=tools, prompt=self.developer_message
         )
 
-        initial_message = self._render_message(
+        initial_message = _render_message_as_json(
             initial_data=data_registry.llm_representation(),
             user_message=self.user_message,
         )
@@ -472,31 +477,35 @@ class AgentPrompter2:
             item.data for item in data_registry._data[-num_data_outputs:]
         ]
 
-    def _render_message(self, **kwargs) -> str:
-        import json
-
-        return json.dumps(kwargs)
-
     def _extract_tools(self, tools_table: knext.Table) -> list:
         tools_df = tools_table[self.tool_column].to_pandas()
         tool_list = tools_df[self.tool_column].tolist()
         return tool_list
 
-    def _to_langchain_tool(
+
+def _render_message_as_json(**kwargs) -> str:
+    import json
+
+    return json.dumps(kwargs)
+
+
+class LangchainToolConverter:
+    def __init__(self, data_registry: DataRegistry, ctx, message_renderer: Callable):
+        self._data_registry = data_registry
+        self._ctx = ctx
+        self._message_renderer = message_renderer
+
+    def to_langchain_tool(
         self,
-        ctx: knext.ExecutionContext,
-        data_registry: DataRegistry,
         tool: WorkflowTool,
     ):
         _logger.error(f"Tool: {tool.input_ports}")
         if tool.input_ports or tool.output_ports:
-            return self._to_langchain_tool_with_data(ctx, data_registry, tool)
+            return self._to_langchain_tool_with_data(tool)
         else:
-            return self._to_langchain_tool_without_data(ctx, tool)
+            return self._to_langchain_tool_without_data(tool)
 
-    def _to_langchain_tool_without_data(
-        self, ctx: knext.ExecutionContext, tool: WorkflowTool
-    ):
+    def _to_langchain_tool_without_data(self, tool: WorkflowTool):
         import json
         from langchain.tools import StructuredTool
         import base64
@@ -511,7 +520,7 @@ class AgentPrompter2:
 
         def func(**params):
             params_json = json.dumps(params)
-            return ctx.execute_tool(tool_bytes_base64, params_json, [])[0]
+            return self._ctx.execute_tool(tool_bytes_base64, params_json, [])[0]
 
         return StructuredTool.from_function(
             func=func,
@@ -522,8 +531,6 @@ class AgentPrompter2:
 
     def _to_langchain_tool_with_data(
         self,
-        ctx: knext.ExecutionContext,
-        data_registry: DataRegistry,
         tool: WorkflowTool,
     ):
         import json
@@ -549,10 +556,14 @@ class AgentPrompter2:
         input_ports = tool.input_ports if tool.input_ports else []
         output_ports = tool.output_ports if tool.output_ports else []
 
-        description_with_data_info = self._render_message(
+        description_with_data_info = self._message_renderer(
             description=tool.description,
-            input_ports=list(map(data_registry.create_port_description, input_ports)),
-            output_ports=list(map(data_registry.create_port_description, output_ports)),
+            input_ports=list(
+                map(self._data_registry.create_port_description, input_ports)
+            ),
+            output_ports=list(
+                map(self._data_registry.create_port_description, output_ports)
+            ),
         )
         _logger.error(json.dumps(args_schema, indent=2))
 
@@ -560,19 +571,21 @@ class AgentPrompter2:
             _logger.error(f"Data inputs: {data_inputs}")
             _logger.error(f"Parameters: {configuration}")
             try:
-                inputs = [data_registry.get_data(i) for i in data_inputs.values()]
+                inputs = [self._data_registry.get_data(i) for i in data_inputs.values()]
                 params_json = json.dumps(configuration)
-                message, outputs = ctx.execute_tool(
+                message, outputs = self._ctx.execute_tool(
                     tool_bytes_base64, params_json, inputs
                 )
                 _logger.error(f"Message: {message}")
                 _logger.error(f"Outputs: {outputs}")
                 output_references = {}
                 for output in outputs:
-                    output_reference = data_registry.add_table(output)
+                    output_reference = self._data_registry.add_table(output)
                     output_references.update(output_reference)
 
-                return self._render_message(message=message, outputs=output_references)
+                return self._message_renderer(
+                    message=message, outputs=output_references
+                )
             except Exception as e:
                 _logger.exception(e)
                 raise
@@ -683,6 +696,7 @@ class ChatAgentPrompterDataService:
 
     def get_data(self, param: str):
         from langchain.chat_models.base import BaseChatModel
+
         # Implement the logic to retrieve the data from the agent
         self.chat_model: BaseChatModel = self.chat_model
         return self.chat_model.invoke(param).content

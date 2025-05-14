@@ -97,14 +97,19 @@ chat_models = [
     "gpt-3.5-turbo-16k",
     "gpt-4",
     "gpt-4-32k",
+    "gpt-4-turbo",
+    "gpt-4.1",
+    "gpt-4.1-mini",
+    "gpt-4.1-nano",
     "gpt-4o",
     "gpt-4o-mini",
-    "gpt-4-turbo",
     "o1",
     "o1-mini",
+    "o3",
     "o3-mini",
+    "o4-mini"
 ]
-chat_default = "gpt-4o-mini"
+chat_default = "gpt-4.1-nano"
 embeddings_models = [
     "text-embedding-3-small",
     "text-embedding-3-large",

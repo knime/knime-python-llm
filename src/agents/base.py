@@ -518,7 +518,11 @@ class LangchainToolConverter:
 
         def func(**params):
             params_json = json.dumps(params)
-            return self._ctx.execute_tool(tool_bytes_base64, params_json, [])[0]
+            try:
+                return self._ctx.execute_tool(tool_bytes_base64, params_json, [])[0]
+            except Exception as e:
+                _logger.exception(e)
+                raise
 
         return StructuredTool.from_function(
             func=func,

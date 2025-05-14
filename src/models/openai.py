@@ -1184,7 +1184,9 @@ class OpenAIAuthenticator:
             )
         except NotFoundError:
             raise knext.InvalidParametersError(
-                f"Invalid OpenAI base URL provided: '{self.base_url}'"
+                f"""The OpenAI base URL '{self.base_url}' is invalid or does not support OpenAI's '/v1/models' endpoint.
+                This endpoint is used to list the models available for your API key.
+                If your base URL does not support this endpoint, consider disabling the 'Verify settings' option."""
             )
 
     def create_spec(self) -> OpenAIAuthenticationPortObjectSpec:

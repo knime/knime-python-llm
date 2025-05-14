@@ -440,10 +440,7 @@ class AgentPrompter2:
 
         tool_cells = _extract_tools_from_table(tools_table, self.tool_column)
 
-        tools = [
-            tool_converter.to_langchain_tool(ctx, data_registry, tool)
-            for tool in tool_cells
-        ]
+        tools = [tool_converter.to_langchain_tool(tool) for tool in tool_cells]
         graph = create_react_agent(
             chat_model, tools=tools, prompt=self.developer_message
         )
@@ -686,10 +683,7 @@ class ChatAgentPrompter:
             data_registry, ctx, _render_message_as_json
         )
         tool_cells = _extract_tools_from_table(tools_table, self.tool_column)
-        tools = [
-            tool_converter.to_langchain_tool(ctx, data_registry, tool)
-            for tool in tool_cells
-        ]
+        tools = [tool_converter.to_langchain_tool(tool) for tool in tool_cells]
         agent = create_react_agent(
             chat_model, tools=tools, prompt=self.developer_message
         )
@@ -701,15 +695,13 @@ class ChatAgentPrompterDataService:
     def __init__(self, agent_graph, data_registry):
         self._agent_graph = agent_graph
         self._data_registry = data_registry
+        self._messages = []
 
     def get_data(self, param: str):
-        from langchain.chat_models.base import BaseChatModel
-
-        # Implement the logic to retrieve the data from the agent
-        self.chat_model: BaseChatModel = self.chat_model
-        final_state = self._agent_graph.invoke(param)
-        messages = final_state["messages"]
-        return messages[-1].content
+        self._messages.append({"role": "user", "content": param})
+        final_state = self._agent_graph.invoke({"messages": self._messages})
+        self.messages = final_state["messages"]
+        return self.messages[-1].content
 
     def get_final_data(self):
         # Called to get the final data from the view (e.g. tables)

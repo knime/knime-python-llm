@@ -19,9 +19,7 @@ const isLoading = ref(false);
 const sendMessageToBackend = async (message: string) => {
   const jsonDataService = await JsonDataService.getInstance();
   const res = jsonDataService.data({options: [ message]})
-
-  console.log("res", res);
-  alert(res);
+  console.log("response", res);
 }
 
 const sendMessage = async () => {

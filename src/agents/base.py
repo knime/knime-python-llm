@@ -682,8 +682,10 @@ class ChatAgentPrompterDataService:
         self.input_tables = input_tables
 
     def get_data(self, param: str):
+        from langchain.chat_models.base import BaseChatModel
         # Implement the logic to retrieve the data from the agent
-        return "blub " + param
+        self.chat_model: BaseChatModel = self.chat_model
+        return self.chat_model.invoke(param).content
 
     def get_final_data(self):
         # Called to get the final data from the view (e.g. tables)

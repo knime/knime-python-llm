@@ -44,7 +44,7 @@
 
 
 from dataclasses import dataclass
-from typing import Callable, Optional
+from typing import Callable, Optional, Sequence
 import knime.extension as knext
 import util
 
@@ -308,8 +308,11 @@ class DataItem:
 
 
 class DataRegistry:
-    def __init__(self):
+    def __init__(self, initial_tables: Sequence[knext.Table] = None):
         self._data: list[DataItem] = []
+        if initial_tables:
+            for table in initial_tables:
+                self.add_table(table)
 
     def add_table(self, table: knext.Table) -> dict:
         table_representation = self._table_representation(table)
@@ -425,20 +428,17 @@ class AgentPrompter2:
         from langgraph.prebuilt import create_react_agent
         import pandas as pd
 
-        data_registry = DataRegistry()
+        data_registry = DataRegistry(input_tables)
+        tool_converter = LangchainToolConverter(
+            data_registry, ctx, _render_message_as_json
+        )
 
         # TODO check if JSON output format is compatible with tool calling
         chat_model: BaseChatModel = chat_model.create_model(
             ctx, output_format=OutputFormatOptions.Text
         )
 
-        tool_converter = LangchainToolConverter(
-            data_registry, ctx, _render_message_as_json
-        )
-        tool_cells = self._extract_tools(tools_table)
-
-        for table in input_tables:
-            data_registry.add_table(table)
+        tool_cells = _extract_tools_from_table(tools_table, self.tool_column)
 
         tools = [
             tool_converter.to_langchain_tool(ctx, data_registry, tool)
@@ -477,10 +477,11 @@ class AgentPrompter2:
             item.data for item in data_registry._data[-num_data_outputs:]
         ]
 
-    def _extract_tools(self, tools_table: knext.Table) -> list:
-        tools_df = tools_table[self.tool_column].to_pandas()
-        tool_list = tools_df[self.tool_column].tolist()
-        return tool_list
+
+def _extract_tools_from_table(tools_table: knext.Table, tool_column: str):
+    tools_df = tools_table[tool_column].to_pandas()
+    tool_list = tools_df[tool_column].tolist()
+    return tool_list
 
 
 def _render_message_as_json(**kwargs) -> str:
@@ -638,13 +639,6 @@ class ChatAgentPrompter:
         "Message provided to the agent that instructs it how to act.",
     )
 
-    # TODO better name + description
-    # TODO or does it come from the input table?
-    user_message = knext.MultilineStringParameter(
-        "User message",
-        "Message provided to the agent that instructs it how to act.",
-    )
-
     # TODO type filter for tool columns. How to declare the type?
     tool_column = knext.ColumnParameter(
         "Tool column", "The column holding the tools the agent can use.", port_index=1
@@ -682,24 +676,40 @@ class ChatAgentPrompter:
         tools_table: knext.Table,
         input_tables: list[knext.Table],
     ) -> "ChatAgentPrompterDataService":
+        from langgraph.prebuilt import create_react_agent
+
         chat_model = chat_model.create_model(
             ctx, output_format=OutputFormatOptions.Text
         )
-        return ChatAgentPrompterDataService(chat_model, tools_table, input_tables)
+        data_registry = DataRegistry(input_tables)
+        tool_converter = LangchainToolConverter(
+            data_registry, ctx, _render_message_as_json
+        )
+        tool_cells = _extract_tools_from_table(tools_table, self.tool_column)
+        tools = [
+            tool_converter.to_langchain_tool(ctx, data_registry, tool)
+            for tool in tool_cells
+        ]
+        agent = create_react_agent(
+            chat_model, tools=tools, prompt=self.developer_message
+        )
+
+        return ChatAgentPrompterDataService(agent, data_registry)
 
 
 class ChatAgentPrompterDataService:
-    def __init__(self, chat_model, tools_table, input_tables):
-        self.chat_model = chat_model
-        self.tools_table = tools_table
-        self.input_tables = input_tables
+    def __init__(self, agent_graph, data_registry):
+        self._agent_graph = agent_graph
+        self._data_registry = data_registry
 
     def get_data(self, param: str):
         from langchain.chat_models.base import BaseChatModel
 
         # Implement the logic to retrieve the data from the agent
         self.chat_model: BaseChatModel = self.chat_model
-        return self.chat_model.invoke(param).content
+        final_state = self._agent_graph.invoke(param)
+        messages = final_state["messages"]
+        return messages[-1].content
 
     def get_final_data(self):
         # Called to get the final data from the view (e.g. tables)

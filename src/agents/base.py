@@ -696,10 +696,17 @@ class ChatAgentPrompter:
 
 
 class ChatAgentPrompterDataService:
-    def __init__(self, agent_graph, data_registry):
+    def __init__(self, agent_graph, data_registry: DataRegistry):
         self._agent_graph = agent_graph
         self._data_registry = data_registry
-        self._messages = []
+        self._messages = [
+            {
+                "role": "user",
+                "content": _render_message_as_json(
+                    data=data_registry.llm_representation()
+                ),
+            }
+        ]
 
     def get_data(self, param: str):
         self._messages.append({"role": "user", "content": param})

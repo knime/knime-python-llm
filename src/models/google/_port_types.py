@@ -572,7 +572,8 @@ class GoogleAiStudioAuthenticationPortObjectSpec(GenericGeminiConnectionPortObje
 
         from google.genai import Client
 
-        key = ctx.get_credentials(self.credentials).password
+        # use a placeholder key to allow the dialog to render even if credentials are not saved
+        key = ctx.get_credentials(self.credentials).password or "placeholder"
         client = Client(api_key=key)
 
         try:

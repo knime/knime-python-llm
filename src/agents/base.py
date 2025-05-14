@@ -652,7 +652,9 @@ class ChatAgentPrompter:
         tools_schema: knext.Schema,
         data_schemas: list[knext.Schema],
     ) -> knext.Schema:
-        pass
+        if self.tool_column is None:
+            # TODO instead pick the last tool column from the table (requires type)
+            self.tool_column = tools_schema.column_names[-1]
 
     def execute(
         self,

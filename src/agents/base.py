@@ -617,9 +617,7 @@ class AgentPrompter2:
     "Data inputs",
     "The data inputs for the agent.",
 )
-@knext.output_view(
-    "KNIME Icon", "Shows the KNIME icon", static_resources="assets"
-)
+@knext.output_view("KNIME Icon", "Shows the KNIME icon", static_resources="assets")
 class ChatAgentPrompter:
     # TODO better name + description
     developer_message = knext.MultilineStringParameter(
@@ -661,11 +659,32 @@ class ChatAgentPrompter:
 
         with open(html_file_path, "r", encoding="utf-8") as html_file:
             html_content = html_file.read()
-        
+
         return knext.view_html(html_content)
 
-    def getData(self, param: str) -> str:
-        
+    def get_data_service(
+        self,
+        ctx,
+        chat_model: ChatModelPortObject,
+        tools_table: knext.Table,
+        input_tables: list[knext.Table],
+    ) -> "ChatAgentPrompterDataService":
+        chat_model = chat_model.create_model(
+            ctx, output_format=OutputFormatOptions.Text
+        )
+        return ChatAgentPrompterDataService(chat_model, tools_table, input_tables)
+
+
+class ChatAgentPrompterDataService:
+    def __init__(self, chat_model, tools_table, input_tables):
+        self.chat_model = chat_model
+        self.tools_table = tools_table
+        self.input_tables = input_tables
+
+    def get_data(self, param: str):
+        # Implement the logic to retrieve the data from the agent
         return "blub " + param
 
-
+    def get_final_data(self):
+        # Called to get the final data from the view (e.g. tables)
+        pass

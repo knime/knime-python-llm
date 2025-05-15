@@ -3,6 +3,7 @@ import { ref, defineProps } from 'vue';
 import MessageBubble from './MessageBubble.vue';
 import TypingIndicator from './TypingIndicator.vue';
 import { type Message, type Model } from '../types';
+import UIExtensionBubble from './UIExtensionBubble.vue';
 
 const props = defineProps<{
   messages: Message[];
@@ -68,7 +69,11 @@ const formatDate = (date: Date): string => {
       <!-- User or AI message -->
       <div v-else class="message-wrapper" :class="message.role">
         <div class="message-content">
+          <UIExtensionBubble
+            v-if="message.views"
+            :viewNodeIds="message.views" />
           <MessageBubble
+            v-else
             :content="message.content"
             :role="message.role"
             :timestamp="formatTime(message.timestamp)"

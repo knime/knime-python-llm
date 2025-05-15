@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@knime/ui-extension-service": "^2.2.0",
+    "@knime/ui-extension-renderer": "^2.0.42",
     "dompurify": "^3.0.6",
     "highlight.js": "^11.9.0",
     "marked": "^9.1.5",

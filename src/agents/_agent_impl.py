@@ -53,6 +53,10 @@ from typing import Annotated, TypedDict
 from langchain.chat_models.base import BaseChatModel
 from langchain_core.tools import BaseTool
 
+import json
+from langchain.tools import StructuredTool
+import base64
+from langchain_core.messages import AIMessage
 
 import logging
 
@@ -129,18 +133,14 @@ class LangchainToolConverter:
     def to_langchain_tool(
         self,
         tool: WorkflowTool,
-    ):
+    ) -> StructuredTool:
         _logger.error(f"Tool: {tool.input_ports}")
         if tool.input_ports or tool.output_ports:
             return self._to_langchain_tool_with_data(tool)
         else:
             return self._to_langchain_tool_without_data(tool)
 
-    def _to_langchain_tool_without_data(self, tool: WorkflowTool):
-        import json
-        from langchain.tools import StructuredTool
-        import base64
-
+    def _to_langchain_tool_without_data(self, tool: WorkflowTool) -> StructuredTool:
         tool_bytes_base64 = base64.b64encode(tool.tool_bytes).decode("utf-8")
 
         args_schema = {
@@ -167,11 +167,7 @@ class LangchainToolConverter:
     def _to_langchain_tool_with_data(
         self,
         tool: WorkflowTool,
-    ):
-        import json
-        from langchain.tools import StructuredTool
-        import base64
-
+    ) -> StructuredTool:
         tool_bytes_base64 = base64.b64encode(tool.tool_bytes).decode("utf-8")
 
         args_schema = {
@@ -272,8 +268,6 @@ class LangchainToolConverter:
 
 
 def _render_message_as_json(**kwargs) -> str:
-    import json
-
     return json.dumps(kwargs)
 
 
@@ -307,38 +301,37 @@ class State(TypedDict):
 
 
 def build_agent_graph(
-    self, chat_model: BaseChatModel, tools: list[BaseTool], num_data_outputs: int
+    chat_model: BaseChatModel, tools: list[BaseTool], num_data_outputs: int
 ):
-    chat_model = chat_model.bind_tools(tools)
     output_selection_tool = _output_selection_tool(num_data_outputs)
-    model_with_selection = chat_model.bind_tools([output_selection_tool])
-
+    chat_model = chat_model.bind_tools(tools + [output_selection_tool])
     agent_node = _build_agent_node(chat_model)
-    selection_node = _build_selection_node(model_with_selection, num_data_outputs)
-    graph = _compile_graph(agent_node, selection_node, tools, num_data_outputs)
+    graph = _compile_graph(agent_node, tools)
     return graph
 
 
-def _output_selection_tool(self, num_data_outputs: int):
-    from langchain.tools import StructuredTool
-
-    def func(output_table_ids: list[str]):
-        return {"selected_output_ids": output_table_ids}
+def _output_selection_tool(num_data_outputs: int) -> StructuredTool:
+    def func(content: str, output_table_ids: list[str]):
+        return {"content": content, "selected_output_ids": output_table_ids}
 
     return StructuredTool.from_function(
         func=func,
         name="Output_Table_Selection",
-        description="Use this tool to return the final output table IDs. "
+        description="Use this tool to reply to the user. "
         "You should select a number of table IDs from the list of output table "
         "IDs based on their relevance to the user prompt and how many output tables are expected.",
         args_schema={
             "type": "object",
             "properties": {
+                "content": {
+                    "type": "string",
+                    "description": "The content of the message to be sent to the user.",
+                },
                 "output_table_ids": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "The IDs of the output tables.",
-                }
+                    "description": f"The IDs of the {num_data_outputs} output tables that are returned to the user.",
+                },
             },
             "required": ["output_table_ids"],
         },
@@ -346,42 +339,13 @@ def _output_selection_tool(self, num_data_outputs: int):
 
 
 def _build_agent_node(chat_model: BaseChatModel):
-    def agent_node(state):
+    def agent_node(state: State):
         messages = state["messages"]
         response = chat_model.invoke(messages)
         messages.append(response)
         return {"messages": messages}
 
     return agent_node
-
-
-def _build_selection_node(chat_model: BaseChatModel, num_data_outputs: int):
-    def selection_node(state):
-        from langchain_core.messages import AIMessage
-
-        prompt = AIMessage(
-            content=f"""The number of expected output tables: {num_data_outputs}.
-            You must return exactly {num_data_outputs} output table ID(s).
-            Do not return more or fewer than {num_data_outputs} ID(s)."""
-        )
-
-        messages = state["messages"]
-        messages[-1] = prompt
-
-        response = chat_model.invoke(messages)
-        tool_call = response.tool_calls[0]
-        output_table_ids = tool_call["args"]["output_table_ids"]
-
-        final_msg = AIMessage(
-            content=f"""The number of output tables does not match the number of input tables. 
-            Therefore, a special selection tool was used to identify the most relevant output tables. 
-            {len(output_table_ids)} table(s) have been selected as the final output."""
-        )
-        messages[-1] = final_msg
-
-        return {"messages": messages, "output_table_ids": output_table_ids}
-
-    return selection_node
 
 
 def _router(state: State):
@@ -391,25 +355,19 @@ def _router(state: State):
     if getattr(last_msg, "tool_calls", None):
         return "tools"
 
-    # no tool calls, route to selection node
-    return "select_output"
+    return "END"
 
 
-def _compile_graph(agent_node, selection_node, tools):
+def _compile_graph(agent_node, tools):
     builder = StateGraph(State)
 
     builder.add_node("agent", agent_node)
     builder.add_node("tools", ToolNode(tools))
-    builder.add_node("select_output", selection_node)
 
     builder.set_entry_point("agent")
     builder.add_conditional_edges(
         "agent",
         _router,
-        {
-            "tools": "tools",
-            "select_output": "select_output",
-        },
     )
     builder.add_edge("tools", "agent")
     builder.add_edge("select_output", END)

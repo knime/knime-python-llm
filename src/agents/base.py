@@ -388,6 +388,7 @@ class AgentPrompter2:
             _render_message_as_json,
             build_agent_graph,
         )
+        from langgraph.prebuilt import create_react_agent
 
         data_registry = DataRegistry(input_tables)
         tool_converter = LangchainToolConverter(
@@ -409,7 +410,12 @@ class AgentPrompter2:
         )
         num_data_outputs = ctx.get_connected_output_port_numbers()[1]
 
-        graph = build_agent_graph(chat_model, tools, num_data_outputs)
+        # graph = build_agent_graph(chat_model, tools, num_data_outputs)
+        graph = create_react_agent(
+            chat_model,
+            tools=tools,
+            prompt=self.developer_message,
+        )
 
         inputs = {"messages": [{"role": "user", "content": initial_message}]}
         config = {"recursion_limit": self.recursion_limit}
@@ -428,7 +434,7 @@ class AgentPrompter2:
                 )
 
         messages = final_state["messages"]
-        output_table_ids = final_state.get("output_table_ids", [])
+        # output_table_ids = final_state.get("output_table_ids", [])
 
         result_df = pd.DataFrame(
             {
@@ -448,7 +454,7 @@ class AgentPrompter2:
         else:
             # allow the model to pick which output tables to return
             return conversation_table, [
-                data_registry.get_data(int(table_id)) for table_id in output_table_ids
+                data.data for data in data_registry._data[-num_data_outputs:]
             ]
 
 

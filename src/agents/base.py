@@ -469,8 +469,9 @@ class ChatAgentPrompter:
         input_tables: list[knext.Table],
     ):
         # Load the index.html file as a string
-        current_dir = os.path.dirname(__file__)
-        html_file_path = os.path.join(current_dir, "chat_app", "dist", "index.html")
+        # Assume the repository root is two levels up from this file
+        repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+        html_file_path = os.path.join(repo_root, "index.html")
 
         with open(html_file_path, "r", encoding="utf-8") as html_file:
             html_content = html_file.read()

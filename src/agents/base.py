@@ -542,8 +542,9 @@ class ChatAgentPrompter:
             ctx, output_format=OutputFormatOptions.Text
         )
         data_registry = DataRegistry(input_tables)
+        view_node_ids = []
         tool_converter = LangchainToolConverter(
-            data_registry, ctx, _render_message_as_json
+            data_registry, ctx, _render_message_as_json, view_node_ids
         )
         tool_cells = _extract_tools_from_table(tools_table, self.tool_column)
         tools = [tool_converter.to_langchain_tool(tool) for tool in tool_cells]
@@ -551,4 +552,4 @@ class ChatAgentPrompter:
             chat_model, tools=tools, prompt=self.developer_message
         )
 
-        return ChatAgentPrompterDataService(agent, data_registry)
+        return ChatAgentPrompterDataService(agent, data_registry, view_node_ids)

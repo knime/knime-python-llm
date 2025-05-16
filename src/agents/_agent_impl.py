@@ -125,10 +125,18 @@ class DataRegistry:
 
 
 class LangchainToolConverter:
-    def __init__(self, data_registry: DataRegistry, ctx, message_renderer: Callable):
+    def __init__(
+        self,
+        data_registry: DataRegistry,
+        ctx,
+        message_renderer: Callable,
+        view_node_ids: list = None,
+    ):
         self._data_registry = data_registry
         self._ctx = ctx
         self._message_renderer = message_renderer
+        # we need to check explicitly for None to also allow empty lists as input
+        self._view_node_ids = [] if view_node_ids is None else view_node_ids
 
     def to_langchain_tool(
         self,
@@ -152,7 +160,11 @@ class LangchainToolConverter:
         def func(**params):
             params_json = json.dumps(params)
             try:
-                return self._ctx.execute_tool(tool_bytes_base64, params_json, [])[0]
+                message, _, view_node_ids = self._ctx.execute_tool(
+                    tool_bytes_base64, params_json, []
+                )
+                self._view_node_ids.extend(view_node_ids)
+                return message
             except Exception as e:
                 _logger.exception(e)
                 raise
@@ -224,9 +236,10 @@ class LangchainToolConverter:
             try:
                 inputs = [self._data_registry.get_data(i) for i in data_inputs.values()]
                 params_json = json.dumps(configuration)
-                message, outputs = self._ctx.execute_tool(
+                message, outputs, view_node_ids = self._ctx.execute_tool(
                     tool_bytes_base64, params_json, inputs
                 )
+                self._view_node_ids.extend(view_node_ids)
                 _logger.error(f"Message: {message}")
                 _logger.error(f"Outputs: {outputs}")
                 output_references = {}
@@ -272,7 +285,7 @@ def _render_message_as_json(**kwargs) -> str:
 
 
 class ChatAgentPrompterDataService:
-    def __init__(self, agent_graph, data_registry: DataRegistry):
+    def __init__(self, agent_graph, data_registry: DataRegistry, view_node_ids: list):
         self._agent_graph = agent_graph
         self._data_registry = data_registry
         self._messages = [
@@ -283,12 +296,13 @@ class ChatAgentPrompterDataService:
                 ),
             }
         ]
+        self._view_node_ids = view_node_ids
 
     def get_data(self, param: str):
         self._messages.append({"role": "user", "content": param})
         final_state = self._agent_graph.invoke({"messages": self._messages})
         self.messages = final_state["messages"]
-        return self.messages[-1].content
+        return self.messages[-1].content + " view node ids: " + str(self._view_node_ids)
 
     def get_final_data(self):
         # Called to get the final data from the view (e.g. tables)

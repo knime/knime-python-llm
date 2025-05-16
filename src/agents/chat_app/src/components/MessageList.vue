@@ -70,7 +70,7 @@ const formatDate = (date: Date): string => {
       <div v-else class="message-wrapper" :class="message.role">
         <div class="message-content">
           <UIExtensionBubble
-            v-if="message.views"
+            v-if="message.views && message.role === 'assistant'"
             :viewNodeIds="message.views" />
           <MessageBubble
             v-else

@@ -34,7 +34,7 @@ const apiLayer: UIExtensionAPILayer = {
       "NodeService.callNodeDataService",
       {
         nodeId: props.viewNodeIds[0],
-        viewIdx: 0,
+        extensionType: "view",
         serviceType,
         dataServiceRequest,
       },
@@ -67,6 +67,7 @@ const apiLayer: UIExtensionAPILayer = {
 };
 
 onMounted(async () => {
+  console.log("Mounting UIExtensionBubble");
   baseService.value = (
     (await JsonDataService.getInstance()) as any
   ).baseService;
@@ -79,7 +80,6 @@ watchEffect(() => {
 
   baseService.value.callKnimeUiApi!("NodeService.getNodeView", {
     nodeId: props.viewNodeIds[0],
-    viewIdx: 0,
   })
     .then((response) => {
       if (response.isSome) {
@@ -99,8 +99,7 @@ watchEffect(() => {
 
 onUnmounted(() => {
   baseService.value?.callKnimeUiApi!("NodeService.deactivateNodeDataServices", {
-    nodeId: props.viewNodeIds[0],
-    viewIdx: 0,
+    nodeId: props.viewNodeIds[0]
   });
   dataAvailable.value = false;
 });

@@ -15,10 +15,10 @@ const messages = ref<Message[]>([
 const userInput = ref('');
 const isLoading = ref(false);
 
-const sendMessageToBackend = async (message: string) => {
+const sendMessageToBackend = async (message: string): Promise<{ content: any; views: string[] }> => {
   const jsonDataService = await JsonDataService.getInstance();
-  return jsonDataService.data({options: [ message]})
-}
+  return { content: await jsonDataService.data({ options: [message] }), views: ['root:10:7'] };
+};
 
 const sendMessage = async () => {
   if (!userInput.value.trim()) return;
@@ -40,7 +40,8 @@ const sendMessage = async () => {
     
     messages.value.push({
       id: (Date.now() + 1).toString(),
-      content: response,
+      content: response.content,
+      views: response.views,
       role: 'assistant',
       timestamp: new Date()
     });

@@ -27,13 +27,16 @@ const baseService = ref<UIExtensionService<UIExtensionAPILayer> | null>(null);
 const noop = () => {
   /* mock unused api fields */
 };
+const replaceRootIndex = (nodeId: string): string => {
+  return nodeId.replace(/^\d+:/, "root:");
+}
 const apiLayer: UIExtensionAPILayer = {
   registerPushEventService: () => () => {},
   callNodeDataService: async ({ dataServiceRequest, serviceType }) => {
     const response = await baseService.value?.callKnimeUiApi!(
       "NodeService.callNodeDataService",
       {
-        nodeId: props.viewNodeIds[0],
+        nodeId: replaceRootIndex(props.viewNodeIds[0]),
         extensionType: "view",
         serviceType,
         dataServiceRequest,
@@ -79,7 +82,7 @@ watchEffect(() => {
   }
 
   baseService.value.callKnimeUiApi!("NodeService.getNodeView", {
-    nodeId: props.viewNodeIds[0],
+    nodeId: replaceRootIndex(props.viewNodeIds[0]),
   })
     .then((response) => {
       if (response.isSome) {
@@ -99,7 +102,7 @@ watchEffect(() => {
 
 onUnmounted(() => {
   baseService.value?.callKnimeUiApi!("NodeService.deactivateNodeDataServices", {
-    nodeId: props.viewNodeIds[0]
+    nodeId: replaceRootIndex(props.viewNodeIds[0]),
   });
   dataAvailable.value = false;
 });
@@ -114,7 +117,6 @@ onUnmounted(() => {
       :resource-location="resourceLocation!"
       :shadow-app-style="{ height: '100%', width: '100%', overflowX: 'scroll' }"
     />
-    <div v-else>No data available</div>
   </div>
 </template>
 

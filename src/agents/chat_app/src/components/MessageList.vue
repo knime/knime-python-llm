@@ -69,15 +69,14 @@ const formatDate = (date: Date): string => {
       <!-- User or AI message -->
       <div v-else class="message-wrapper" :class="message.role">
         <div class="message-content">
-          <UIExtensionBubble
-            v-if="message.views && message.role === 'assistant'"
-            :viewNodeIds="message.views" />
           <MessageBubble
-            v-else
             :content="message.content"
             :role="message.role"
             :timestamp="formatTime(message.timestamp)"
           />
+          <UIExtensionBubble
+            v-if="message.views && message.role === 'assistant'"
+            :viewNodeIds="message.views" />
         </div>
       </div>
     </template>

@@ -17,7 +17,9 @@ const isLoading = ref(false);
 
 const sendMessageToBackend = async (message: string): Promise<{ content: any; views: string[] }> => {
   const jsonDataService = await JsonDataService.getInstance();
-  return { content: await jsonDataService.data({ options: [message] }), views: ['root:10:7'] };
+  const res = (await jsonDataService.data({ options: [message] })).split(' view node ids: ');
+  const views = res[1].replace(/[\[\]']/g, '').split(', ');
+  return { content: res[0], views};
 };
 
 const sendMessage = async () => {

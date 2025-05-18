@@ -181,3 +181,8 @@ class LLMChatModelAdapter(BaseChatModel):
     def _llm_type(self) -> str:
         """Return type of llm."""
         return "LLMChatModelAdapter"
+
+    def bind_tools(self, tools: Any):
+        raise RuntimeError(
+            "To use tool calling with HF Hub models, use the new HF Hub Chat Model Connector."
+        )

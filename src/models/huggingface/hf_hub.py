@@ -61,6 +61,7 @@ from .hf_base import (
     hf_icon,
     HFPromptTemplateSettings,
     HFModelSettings,
+    HFConversationalModelSettings,
     raise_for,
 )
 
@@ -280,6 +281,32 @@ class HFHubChatModelPortObject(HFHubLLMPortObject, ChatModelPortObject):
             llm=llm,
             system_prompt_template=self.spec.system_prompt_template,
             prompt_template=self.spec.prompt_template,
+        )
+
+
+class HFHubConversationalModelPortObjectSpec(
+    HFHubLLMPortObjectSpec, ChatModelPortObjectSpec
+):
+    """Spec of a HF Hub chat model that uses task 'conversational'."""
+
+
+class HFHubConversationalModelPortObject(HFHubLLMPortObject, ChatModelPortObject):
+    @property
+    def spec(self) -> HFHubChatModelPortObjectSpec:
+        return super().spec
+
+    def create_model(
+        self, ctx: knext.ExecutionContext, output_format: OutputFormatOptions
+    ):
+        from ._hf_llm import HFChat
+
+        return HFChat(
+            model=self.spec.repo_id,
+            provider=self.spec.provider,
+            hf_api_token=self.spec.credentials.get_token(ctx),
+            max_new_tokens=self.spec.model_kwargs.get("max_new_tokens"),
+            top_p=self.spec.model_kwargs.get("top_p"),
+            temperature=self.spec.model_kwargs.get("temperature"),
         )
 
 
@@ -544,6 +571,7 @@ hf_hub_chat_model_port_type = knext.port_type(
         "HuggingFace",
         "Hugging Face",
     ],
+    is_deprecated=True,
 )
 @knext.input_port(
     "HF Authentication",
@@ -641,6 +669,101 @@ def _validate_repo_id(repo_id: str, token: str):
         raise_for(
             e, knext.InvalidParametersError(f"Please provide a valid repo ID. {e}")
         )
+
+
+hf_hub_conversational_model_port_type = knext.port_type(
+    "HF Hub Chat Model",
+    HFHubConversationalModelPortObject,
+    HFHubConversationalModelPortObjectSpec,
+    id="org.knime.python.llm.models.huggingface.HFHubConversationalModelPortObject",
+)
+
+
+@knext.node(
+    "HF Hub Chat Model Connector",
+    knext.NodeType.SOURCE,
+    hf_icon,
+    category=hf_hub_category,
+    id="HFHubConversationalChatModelConnector",
+    keywords=[
+        "GenAI",
+        "Gen AI",
+        "Generative AI",
+        "HuggingFace",
+        "Hugging Face",
+    ],
+)
+@knext.input_port(
+    "HF Authentication",
+    "Validated authentication for Hugging Face Hub.",
+    hf_authentication_port_type,
+)
+@knext.output_port(
+    "HF Hub Chat Model",
+    "Connection to a specific chat model from Hugging Face Hub.",
+    hf_hub_conversational_model_port_type,
+)
+class HFHubConversationalChatModelConnector:
+    """
+    Connects to a chat model hosted on the Hugging Face Hub.
+
+    This node establishes a connection to a specific chat model hosted on the Hugging Face Hub.
+
+    To use this node, you need to successfully authenticate with the Hugging Face Hub using the **HF Hub Authenticator** node.
+
+    Provide the name of the desired chat model repository available on the
+    [Hugging Face Hub](https://huggingface.co/models)
+    as an input. The model will be executed with the
+    [Inference Provider](https://huggingface.co/docs/inference-providers/en/index) "HF Inference" for the
+    chat completion task.
+
+    Please ensure that you have the necessary permissions to access the model.
+    Failures with gated models may occur due to outdated tokens.
+
+    **Note**: Tool calling is currently not supported for HF Hub chat models.
+
+    **Note**: If you use the
+    [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
+    and do not select the "Save password in configuration (weakly encrypted)" option for passing the API key,
+    the Credentials Configuration node will need to be reconfigured upon reopening the workflow, as the credentials
+    flow variable was not saved and will therefore not be available to downstream nodes.
+    """
+
+    hub_settings = HFHubSettings()
+    model_settings = HFConversationalModelSettings()
+
+    def configure(
+        self,
+        ctx: knext.ConfigurationContext,
+        auth: HFAuthenticationPortObjectSpec,
+    ) -> HFHubConversationalModelPortObjectSpec:
+        auth.validate_context(ctx)
+        if not self.hub_settings.repo_id:
+            raise knext.InvalidParametersError("Please enter a repo ID.")
+        _validate_repo_id(self.hub_settings.repo_id, auth.get_token(ctx))
+        return self._create_spec(auth)
+
+    def _create_spec(
+        self, auth: HFAuthenticationPortObjectSpec
+    ) -> HFHubConversationalModelPortObjectSpec:
+        model_kwargs = {
+            "temperature": self.model_settings.temperature,
+            "top_p": self.model_settings.top_p,
+            "max_new_tokens": self.model_settings.max_new_tokens,
+        }
+
+        return HFHubConversationalModelPortObjectSpec(
+            auth,
+            self.hub_settings.repo_id,
+            HF_DEFAULT_INFERENCE_PROVIDER,
+            self.model_settings.n_requests,
+            model_kwargs,
+        )
+
+    def execute(
+        self, ctx, auth: HFAuthenticationPortObject
+    ) -> HFHubConversationalModelPortObject:
+        return HFHubConversationalModelPortObject(self._create_spec(auth.spec))
 
 
 hf_embeddings_port_type = knext.port_type(

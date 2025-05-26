@@ -46,8 +46,15 @@
 import knime.extension as knext
 import util
 
-
-from models.base import LLMPortObjectSpec, LLMPortObject, ChatConversationSettings
+from models.base import (
+    LLMPortObjectSpec,
+    LLMPortObject,
+    ChatConversationSettings,
+    ChatModelPortObjectSpec,
+    ChatModelPortObject,
+    OutputFormatOptions,
+    chat_model_port_type,
+)
 from tools.base import (
     tool_list_port_type,
     ToolListPortObject,
@@ -278,3 +285,234 @@ class AgentPrompter:
         chat_history_df.loc[f"Row{len(chat_history_df)}"] = agent_output_row
 
         return knext.Table.from_pandas(chat_history_df)
+
+
+def _tool_type():
+    import knime.types.tool as ktt
+
+    return knext.logical(ktt.WorkflowTool)
+
+
+def _tool_column_parameter():
+    return knext.ColumnParameter(
+        "Tool column",
+        "The column holding the tools the agent can use.",
+        port_index=1,
+        column_filter=util.create_type_filter(_tool_type()),
+    )
+
+
+def _last_tool_column(schema: knext.Schema):
+    tool_type = _tool_type()
+    tool_columns = [col for col in schema if col.ktype == tool_type]
+    if not tool_columns:
+        raise knext.InvalidParametersError(
+            "No tool column found in the tools table. Please provide a valid tool column."
+        )
+    return tool_columns[-1].name
+
+
+def _developer_message_parameter():
+    return knext.MultilineStringParameter(
+        "Developer message",
+        "Message provided to the agent that instructs it how to act.",
+        default_value="""
+## PERSISTENCE
+You are an agent - please keep going until the user's query is completely 
+resolved, before ending your turn and yielding back to the user. Only 
+terminate your turn when you are sure that the problem is solved.
+
+## TOOL CALLING
+If you are not sure about file content or codebase structure pertaining to 
+the user's request, use your tools to read files and gather the relevant 
+information: do NOT guess or make up an answer.
+
+## PLANNING
+You MUST plan extensively before each function call, and reflect 
+extensively on the outcomes of the previous function calls. DO NOT do this 
+entire process by making function calls only, as this can impair your 
+ability to solve the problem and think insightfully.
+""",
+    )
+
+
+@knext.node(
+    "Agent Prompter 2.0",
+    node_type=knext.NodeType.PREDICTOR,
+    icon_path=agent_icon,
+    category=agent_category,
+)
+@knext.input_port(
+    "Chat model", "The chat model to use.", port_type=chat_model_port_type
+)
+@knext.input_table("Tools", "The tools the agent can use.")
+@knext.output_table("Result", "The result of the agent execution.")
+@knext.input_table_group(
+    "Data inputs",
+    "The data inputs for the agent.",
+)
+@knext.output_table_group(
+    "Data outputs",
+    "The data outputs of the agent.",
+)
+class AgentPrompter2:
+    """
+    Combines a chat model with a set of tools to form an agent and prompts it with a user-provided prompt.
+
+    This node builds and executes an agent that responds to a single user prompt using a language model and a set of user-defined tools.
+
+    Each tool is represented as a KNIME workflow with configurations (e.g., strings, numbers, column selection) and can optionally accept input data tables.
+     While the agent does not have access to raw data, it is informed about available tables through metadata — including column names and types — enabling it to select suitable data for each tool as needed.
+
+    When the node is executed, the agent reasons step-by-step to fulfill the user’s prompt.
+    It may call one or more tools in sequence, using the output of one tool as input for another.
+    The model autonomously selects tools and input data based on the prompt and the tools’ names and descriptions.
+    Including clear tool descriptions and example use cases significantly improves the agent’s decision-making.
+
+    The entire internal reasoning process — including tool calls and decisions — is captured and available via the conversation output table.
+    This node is designed for non-interactive, one-shot execution. For interactive, multi-turn conversations, use the Chat Agent Prompter node.
+    """
+
+    developer_message = _developer_message_parameter()
+
+    # TODO better name + description
+    # TODO or does it come from the input table?
+    user_message = knext.MultilineStringParameter(
+        "User message",
+        "Message provided to the agent that instructs it how to act.",
+    )
+
+    tool_column = _tool_column_parameter()
+
+    recursion_limit = knext.IntParameter(
+        "Recursion limit",
+        """
+        The maximum number of times the agent can repeat its steps to
+        avoid getting stuck in an endless loop.
+        If not provided, defaults to 25.""",
+        default_value=25,
+        min_value=1,
+        is_advanced=True,
+    )
+
+    def configure(
+        self,
+        ctx: knext.ConfigurationContext,
+        chat_model_spec: ChatModelPortObjectSpec,
+        tools_schema: knext.Schema,
+        data_schemas: list[knext.Schema],
+    ) -> knext.Schema:
+        chat_model_spec.validate_context(ctx)
+        self._configure_tool_tables(tools_schema)
+
+        return self._create_conversation_schema(), [
+            None
+        ] * ctx.get_connected_output_port_numbers()[1]
+
+    def _configure_tool_tables(self, tools_schema: knext.Schema):
+        if self.tool_column is None:
+            self.tool_column = _last_tool_column(tools_schema)
+        elif self.tool_column not in tools_schema.column_names:
+            raise knext.InvalidParametersError(
+                f"Column {self.tool_column} not found in the tools table."
+            )
+
+    def _create_conversation_schema(self) -> knext.Schema:
+        return knext.Schema.from_columns(
+            [
+                knext.Column(knext.string(), "Role"),
+                knext.Column(knext.string(), "Content"),
+                knext.Column(knext.string(), "Tool Calls"),
+            ]
+        )
+
+    def execute(
+        self,
+        ctx: knext.ExecutionContext,
+        chat_model: ChatModelPortObject,
+        tools_table: knext.Table,
+        input_tables: list[knext.Table],
+    ):
+        from langchain.chat_models.base import BaseChatModel
+        import pandas as pd
+        from ._agent_impl import (
+            DataRegistry,
+            LangchainToolConverter,
+            render_message_as_json,
+        )
+        from langgraph.prebuilt import create_react_agent
+
+        data_registry = DataRegistry(input_tables)
+        tool_converter = LangchainToolConverter(
+            data_registry, ctx, render_message_as_json
+        )
+
+        chat_model: BaseChatModel = chat_model.create_model(
+            ctx, output_format=OutputFormatOptions.Text
+        )
+
+        tool_cells = _extract_tools_from_table(tools_table, self.tool_column)
+
+        tools = [tool_converter.to_langchain_tool(tool) for tool in tool_cells]
+
+        initial_message = render_message_as_json(
+            initial_data=data_registry.llm_representation(),
+            user_message=self.user_message,
+        )
+        num_data_outputs = ctx.get_connected_output_port_numbers()[1]
+
+        graph = create_react_agent(
+            chat_model,
+            tools=tools,
+            prompt=self.developer_message,
+        )
+
+        inputs = {"messages": [{"role": "user", "content": initial_message}]}
+        config = {"recursion_limit": self.recursion_limit}
+
+        try:
+            final_state = graph.invoke(inputs, config=config)
+        except Exception as e:
+            if "Recursion limit" in str(e):
+                raise knext.InvalidParametersError(
+                    f"""Recursion limit of {self.recursion_limit} reached. 
+                    You can increase the limit by setting the `recursion_limit` parameter."""
+                )
+            else:
+                raise knext.InvalidParametersError(
+                    f"An error occurred while executing the agent: {e}"
+                )
+
+        messages = final_state["messages"]
+        # output_table_ids = final_state.get("output_table_ids", [])
+
+        result_df = pd.DataFrame(
+            {
+                "Role": [msg.type for msg in messages],
+                "Content": [msg.content for msg in messages],
+                "Tool Calls": [
+                    str(msg.tool_calls) if hasattr(msg, "tool_calls") else None
+                    for msg in messages
+                ],
+            }
+        )
+
+        conversation_table = knext.Table.from_pandas(result_df)
+
+        if num_data_outputs == 0:
+            return conversation_table
+        else:
+            # allow the model to pick which output tables to return
+            return conversation_table, [
+                data.data for data in data_registry._data[-num_data_outputs:]
+            ]
+
+
+def _extract_tools_from_table(tools_table: knext.Table, tool_column: str):
+    tools_df = tools_table[tool_column].to_pandas().dropna()
+    if tools_df.empty:
+        raise knext.InvalidParametersError(
+            f"Tool column {tool_column} is empty. Please provide a valid tool column."
+        )
+    tool_list = tools_df[tool_column].tolist()
+    return tool_list

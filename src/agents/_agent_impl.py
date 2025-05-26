@@ -123,10 +123,13 @@ class DataRegistry:
 
 
 class LangchainToolConverter:
-    def __init__(self, data_registry: DataRegistry, ctx, message_renderer: Callable):
+    def __init__(
+        self, data_registry: DataRegistry, ctx, message_renderer: Callable, debug: bool
+    ):
         self._data_registry = data_registry
         self._ctx = ctx
         self._message_renderer = message_renderer
+        self._debug = debug
 
     def to_langchain_tool(
         self,
@@ -157,7 +160,7 @@ class LangchainToolConverter:
                 self._validate_required_fields(
                     tool.parameter_schema.keys(), params, "configuration parameters"
                 )
-                return self._ctx.execute_tool(tool, params, [])[0]
+                return self._ctx.execute_tool(tool, params, [], self._debug)[0]
             except Exception as e:
                 _logger.exception(e)
                 raise
@@ -218,7 +221,9 @@ class LangchainToolConverter:
 
             try:
                 inputs = [self._data_registry.get_data(i) for i in data_inputs.values()]
-                message, outputs = self._ctx.execute_tool(tool, configuration, inputs)
+                message, outputs = self._ctx.execute_tool(
+                    tool, configuration, inputs, self._debug
+                )
                 _logger.error(f"Message: {message}")
                 _logger.error(f"Outputs: {outputs}")
                 output_references = {}

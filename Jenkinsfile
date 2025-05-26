@@ -3,7 +3,7 @@ def BN = (BRANCH_NAME == 'master' || BRANCH_NAME.startsWith('releases/')) ? BRAN
 
 def repositoryName = 'knime-python-llm'
 
-library "knime-pipeline@$BN"
+library "knime-pipeline@todo/AP-23847-python-bundling-sharing"
 
 properties([
     /*
@@ -69,6 +69,8 @@ try {
                     'knime-ensembles',
                     'knime-distance',
                     'knime-base-expressions',
+                    'knime-conda-channels',
+                    'knime-conda',
                     repositoryName
                     ],
             ],

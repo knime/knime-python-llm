@@ -395,6 +395,13 @@ class AgentPrompter2:
         is_advanced=True,
     )
 
+    debug = knext.BoolParameter(
+        "Debug mode",
+        "In debug mode, tool executions are displayed as meta nodes in the agent workflow and the meta node is kept in case of an error in the tool.",
+        default_value=False,
+        is_advanced=True,
+    )
+
     def configure(
         self,
         ctx: knext.ConfigurationContext,
@@ -444,7 +451,7 @@ class AgentPrompter2:
 
         data_registry = DataRegistry(input_tables)
         tool_converter = LangchainToolConverter(
-            data_registry, ctx, render_message_as_json
+            data_registry, ctx, render_message_as_json, self.debug
         )
 
         chat_model: BaseChatModel = chat_model.create_model(

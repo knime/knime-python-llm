@@ -1,6 +1,6 @@
 name: llm
 author: Alexander Jauch-Walser, Seray Arslan, Adrian Nembach
-env_yml_path: env.yml
+pixi_toml_path: pixi.toml
 extension_module: src/knime_llm
 description: KNIME AI Extension
 long_description: The extension offers nodes for building LLM-powered no-code workflows, and supports interfacing with hosted services, as well as locally-running models.

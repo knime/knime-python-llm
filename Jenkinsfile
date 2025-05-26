@@ -69,6 +69,8 @@ try {
                     'knime-ensembles',
                     'knime-distance',
                     'knime-base-expressions',
+                    'knime-conda-channels',
+                    'knime-conda',
                     repositoryName
                     ],
             ],

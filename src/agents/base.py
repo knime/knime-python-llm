@@ -609,7 +609,7 @@ class ChatAgentPrompter:
             DataRegistry,
             LangchainToolConverter,
             ChatAgentPrompterDataService,
-            _render_message_as_json,
+            render_message_as_json,
         )
 
         chat_model = chat_model.create_model(
@@ -617,7 +617,7 @@ class ChatAgentPrompter:
         )
         data_registry = DataRegistry(input_tables)
         tool_converter = LangchainToolConverter(
-            data_registry, ctx, _render_message_as_json, self.debug
+            data_registry, ctx, render_message_as_json, self.debug
         )
         tool_cells = _extract_tools_from_table(tools_table, self.tool_column)
         tools = [tool_converter.to_langchain_tool(tool) for tool in tool_cells]

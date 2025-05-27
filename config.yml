@@ -1,0 +1,4 @@
+org.knime.python.llm:
+  src: /home/hornm/dev-knime/git/knime-python-llm
+  conda_env_path: /home/hornm/miniconda3/envs/llm_env
+  debug: true

@@ -281,7 +281,7 @@ class ChatAgentPrompterDataService:
             }
         ]
 
-    def get_data(self, param: str):
+    def getData(self, param: str):
         self._messages.append({"role": "user", "content": param})
         final_state = self._agent_graph.invoke({"messages": self._messages})
         self.messages = final_state["messages"]

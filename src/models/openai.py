@@ -1936,31 +1936,35 @@ class OpenAIFineTuneDeleter:
 )
 class OpenAIFineTuner:
     """
-    Fine-tunes an OpenAI Chat Model based on a conversation table.
+    Fine-tunes an OpenAI Chat Model using a table of example conversations.
 
-    This node allows you to fine-tune an OpenAI Chat Model based on a conversation table.
+    This node fine-tunes an OpenAI Chat Model using structured conversation data. 
+    It is useful when you want to adapt a model to a specific tone, domain, or workflow — for example, tailoring it for financial advice, customer support, or internal knowledge assistants.
 
-    The fine-tuning data needs to be in the following format and contain at least 10 conversations,
-    each of which must contain at least one system message:
+    Each row in the input table represents a message in a conversation. The table must contain at least 10 distinct conversations, and each must include at least one `system` message to define the assistant’s behavior.
+    The fine-tuning process learns from examples: it does not memorize answers, but generalizes from the patterns in the assistant replies. You define *how* the assistant should respond to user inputs by providing example dialogues with the desired outputs.
 
-    | ID | Role | Content |
-    |----|------------|-----------------------------------------------|
-    | 1 | system | You are a happy assistant that puts a positive spin on everything. |
-    | 1 | user | I lost my tennis match today. |
-    | 1 | assistant | It's ok, it happens to everyone. |
-    | 2 | user | I lost my book today. |
-    | 2 | assistant | You can read everything on ebooks these days! |
-    | id_string | system | You are a happy assistant that puts a positive spin on everything. |
-    | id_string | assistant | You're great! |
+    Fine-tuned models are stored on OpenAI's servers and can afterwards be selected in the `OpenAI Chat Model Connector`.
+    To delete a fine-tuned model, use the `OpenAI Fine-Tuned Model Deleter` node.
 
-    For a training file with 100,000 tokens trained over 3 epochs, the expected cost would be ~$2.40 USD. For
-    more information, visit [OpenAI](https://platform.openai.com/docs/guides/fine-tuning/estimate-costs)
+    For pricing, see the [OpenAI documentation](https://platform.openai.com/docs/pricing#fine-tuning).
 
-    **Note**: If you use the
-    [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
-    and do not select the "Save password in configuration (weakly encrypted)" option for passing the API key,
-    the Credentials Configuration node will need to be reconfigured upon reopening the workflow, as the credentials
-    flow variable was not saved and will therefore not be available to downstream nodes.
+    To fine-tune a model for the finance domain, you might provide example conversations that emphasize clear, compliant financial guidance.
+    Here is an example fine-tuning table:
+
+    | ID | Role     | Content                                                                 |
+    |----|----------|-------------------------------------------------------------------------|
+    | 1  | system   | You are a financial assistant who gives concise, compliant guidance.    |
+    | 1  | user     | Should I invest in tech stocks right now?                               |
+    | 1  | assistant| I can't give specific advice, but tech stocks are volatile. Consider your risk profile. |
+    | 2  | user     | What's diversification?                                                  |
+    | 2  | assistant| Diversification spreads assets across sectors to reduce risk.           |
+    
+    
+    **Credential Handling**:
+    To pass your API key securely, use the
+    [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory).
+    If "Save password in configuration (weakly encrypted)" is not enabled, the credentials will not persist after closing the workflow.
     """
 
     file_settings = FineTuneFileSettings()

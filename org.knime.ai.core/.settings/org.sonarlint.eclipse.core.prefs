@@ -1,0 +1,8 @@
+autoEnabled=true
+bindingSuggestionsDisabled=false
+eclipse.preferences.version=1
+idePrefixKey=
+indexingBasedOnEclipsePlugIns=true
+projectKey=KNIME_knime-buildworkflows
+serverId=SonarCloud
+sqPrefixKey=org.knime.ai.core

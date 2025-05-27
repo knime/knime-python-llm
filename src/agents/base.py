@@ -337,6 +337,15 @@ ability to solve the problem and think insightfully.""",
     )
 
 
+def _debug_mode_parameter():
+    return knext.BoolParameter(
+        "Debug mode",
+        "In debug mode, tool executions are displayed as meta nodes in the agent workflow and the meta node is kept in case of an error in the tool.",
+        default_value=False,
+        is_advanced=True,
+    )
+
+
 @knext.node(
     "Agent Prompter 2.0",
     node_type=knext.NodeType.PREDICTOR,
@@ -396,12 +405,7 @@ class AgentPrompter2:
         is_advanced=True,
     )
 
-    debug = knext.BoolParameter(
-        "Debug mode",
-        "In debug mode, tool executions are displayed as meta nodes in the agent workflow and the meta node is kept in case of an error in the tool.",
-        default_value=False,
-        is_advanced=True,
-    )
+    debug = _debug_mode_parameter()
 
     def configure(
         self,
@@ -559,6 +563,8 @@ class ChatAgentPrompter:
 
     tool_column = _tool_column_parameter()
 
+    debug = _debug_mode_parameter()
+
     def configure(
         self,
         ctx: knext.ConfigurationContext,
@@ -611,7 +617,7 @@ class ChatAgentPrompter:
         )
         data_registry = DataRegistry(input_tables)
         tool_converter = LangchainToolConverter(
-            data_registry, ctx, _render_message_as_json
+            data_registry, ctx, _render_message_as_json, self.debug
         )
         tool_cells = _extract_tools_from_table(tools_table, self.tool_column)
         tools = [tool_converter.to_langchain_tool(tool) for tool in tool_cells]

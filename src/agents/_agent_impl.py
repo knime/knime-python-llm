@@ -319,6 +319,30 @@ def render_message_as_json(**kwargs) -> str:
     return json.dumps(kwargs)
 
 
+class ChatAgentPrompterDataService:
+    def __init__(self, agent_graph, data_registry: DataRegistry):
+        self._agent_graph = agent_graph
+        self._data_registry = data_registry
+        self._messages = [
+            {
+                "role": "user",
+                "content": render_message_as_json(
+                    data=data_registry.llm_representation()
+                ),
+            }
+        ]
+
+    def getData(self, param: str):
+        self._messages.append({"role": "user", "content": param})
+        final_state = self._agent_graph.invoke({"messages": self._messages})
+        self.messages = final_state["messages"]
+        return self.messages[-1].content
+
+    def get_final_data(self):
+        # Called to get the final data from the view (e.g. tables)
+        pass
+
+
 class State(TypedDict):
     messages: Annotated[list, add_messages]
     output_table_ids: list[str]

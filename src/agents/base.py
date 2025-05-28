@@ -71,6 +71,9 @@ from knime.extension.nodes import (
 from base import AIPortObjectSpec
 
 import os
+import logging
+
+_logger = logging.getLogger(__name__)
 
 
 agent_icon = "icons/generic/agent.png"
@@ -334,6 +337,15 @@ ability to solve the problem and think insightfully.""",
     )
 
 
+def _debug_mode_parameter():
+    return knext.BoolParameter(
+        "Debug mode",
+        "In debug mode, tool executions are displayed as meta nodes in the agent workflow and the meta node is kept in case of an error in the tool.",
+        default_value=False,
+        is_advanced=True,
+    )
+
+
 @knext.node(
     "Agent Prompter 2.0",
     node_type=knext.NodeType.PREDICTOR,
@@ -393,12 +405,7 @@ class AgentPrompter2:
         is_advanced=True,
     )
 
-    debug = knext.BoolParameter(
-        "Debug mode",
-        "In debug mode, tool executions are displayed as meta nodes in the agent workflow and the meta node is kept in case of an error in the tool.",
-        default_value=False,
-        is_advanced=True,
-    )
+    debug = _debug_mode_parameter()
 
     def configure(
         self,
@@ -521,3 +528,101 @@ def _extract_tools_from_table(tools_table: knext.Table, tool_column: str):
         )
     tool_list = tools_df[tool_column].tolist()
     return tool_list
+
+
+@knext.node(
+    "Chat Agent Prompter",
+    node_type=knext.NodeType.VISUALIZER,
+    icon_path=agent_icon,
+    category=agent_category,
+)
+@knext.input_port(
+    "Chat model", "The chat model to use.", port_type=chat_model_port_type
+)
+@knext.input_table("Tools", "The tools the agent can use.")
+@knext.input_table_group(
+    "Data inputs",
+    "The data inputs for the agent.",
+)
+@knext.output_view("KNIME Icon", "Shows the KNIME icon", static_resources="assets")
+class ChatAgentPrompter:
+    """Enables interactive, multi-turn conversations with an AI agent that uses tools and data to fulfill user prompts.
+
+    This node enables interactive, multi-turn conversations with an AI agent, combining a chat model with a set of tools and optional input data.
+
+    The agent is assembled from the provided chat model and tools, each defined as a KNIME workflow. Tools can include configurable parameters (e.g., string inputs, numeric settings, column selectors) and may optionally consume input data in the form of KNIME tables. While the agent does not access raw data directly, it is informed about the structure of available tables (i.e., column names and types). This allows the model to select and route data to tools during conversation.
+
+    Unlike the standard Agent Prompter node, which executes a single user prompt, this node supports multi-turn, interactive dialogue. The user can iteratively send prompts and receive responses, with the agent invoking tools as needed in each conversational turn. Tool outputs from earlier turns can be reused in later interactions, enabling rich, context-aware workflows.
+
+    This node is designed for real-time, interactive usage and does not produce a data output port. Instead, the conversation takes place directly within the KNIME view, where the agent’s responses and reasoning are shown incrementally as the dialogue progresses.
+
+    To ensure effective agent behavior, provide meaningful tool names and clear descriptions — including example use cases if applicable.
+    """
+
+    developer_message = _developer_message_parameter()
+
+    tool_column = _tool_column_parameter()
+
+    debug = _debug_mode_parameter()
+
+    def configure(
+        self,
+        ctx: knext.ConfigurationContext,
+        chat_model_spec: ChatModelPortObjectSpec,
+        tools_schema: knext.Schema,
+        data_schemas: list[knext.Schema],
+    ) -> knext.Schema:
+        chat_model_spec.validate_context(ctx)
+        if self.tool_column is None:
+            self.tool_column = _last_tool_column(tools_schema)
+        elif self.tool_column not in tools_schema.column_names:
+            raise knext.InvalidParametersError(
+                f"Column {self.tool_column} not found in the tools table."
+            )
+
+    def execute(
+        self,
+        ctx: knext.ExecutionContext,
+        chat_model: ChatModelPortObject,
+        tools_table: knext.Table,
+        input_tables: list[knext.Table],
+    ):
+        # Load the index.html file as a string
+        # Assume the repository root is two levels up from this file
+        repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+        html_file_path = os.path.join(repo_root, "index.html")
+
+        with open(html_file_path, "r", encoding="utf-8") as html_file:
+            html_content = html_file.read()
+
+        return knext.view_html(html_content)
+
+    def get_data_service(
+        self,
+        ctx,
+        chat_model: ChatModelPortObject,
+        tools_table: knext.Table,
+        input_tables: list[knext.Table],
+    ):
+        from langgraph.prebuilt import create_react_agent
+        from ._agent_impl import (
+            DataRegistry,
+            LangchainToolConverter,
+            ChatAgentPrompterDataService,
+            render_message_as_json,
+        )
+
+        chat_model = chat_model.create_model(
+            ctx, output_format=OutputFormatOptions.Text
+        )
+        data_registry = DataRegistry(input_tables)
+        tool_converter = LangchainToolConverter(
+            data_registry, ctx, render_message_as_json, self.debug
+        )
+        tool_cells = _extract_tools_from_table(tools_table, self.tool_column)
+        tools = [tool_converter.to_langchain_tool(tool) for tool in tool_cells]
+        agent = create_react_agent(
+            chat_model, tools=tools, prompt=self.developer_message
+        )
+
+        return ChatAgentPrompterDataService(agent, data_registry)

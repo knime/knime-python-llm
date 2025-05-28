@@ -50,14 +50,30 @@ package org.knime.ai.core.data.message;
 
 import org.knime.ai.core.data.message.MessageValue.MessageContentPart;
 
-public class StringContentPart implements MessageContentPart {
+/**
+ * Represents a part of a message that contains text content.
+ *
+ * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
+ */
+public class TextContentPart implements MessageContentPart {
     private final String m_content;
 
-    public StringContentPart(final String content) {
+    public TextContentPart(final String content) {
         m_content = content;
     }
 
     public String getContent() {
         return m_content;
     }
+
+    @Override
+    public String getType() {
+        return "text";
+    }
+
+    @Override
+    public byte[] getData() {
+        return m_content.getBytes();
+    }
+
 }

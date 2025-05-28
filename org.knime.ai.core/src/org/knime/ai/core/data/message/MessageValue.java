@@ -60,24 +60,63 @@ import org.knime.core.data.DataValue;
  */
 public interface MessageValue extends DataValue {
 
+    /**
+     * Enumeration of the different types of messages.
+     *
+     * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
+     */
     public enum MessageType {
             USER, TOOL, AI
     }
 
+    /**
+     * Represents a part of the message content.
+     *
+     * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
+     */
     public interface MessageContentPart {
-        // Marker interface for content parts
+
+        /**
+         * @return the type of the content part, e.g., "text", "image", etc.
+         */
+        String getType();
+
+        /**
+         * @return the data of the content part as a byte array.
+         */
+        byte[] getData();
     }
 
+    /**
+     * Represents a tool call within an AI message.
+     *
+     * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
+     * @param toolName the name of the tool being called
+     * @param id the unique identifier for the tool call
+     * @param arguments the arguments passed to the tool in JSON format
+     */
     public record ToolCall(String toolName, String id, String arguments) {
 
     }
 
+    /**
+     * @return the type of the message, e.g., USER, TOOL, or AI
+     */
     MessageType getMessageType();
 
+    /**
+     * @return the content of the message, which can be a list of different content parts
+     */
     List<MessageContentPart> getContent();
 
+    /**
+     * @return an optional list of tool calls associated with the message, if any
+     */
     Optional<List<ToolCall>> getToolCalls();
 
+    /**
+     * @return an optional ID of the tool call associated with this message, if any
+     */
     Optional<String> getToolCallId();
 
 }

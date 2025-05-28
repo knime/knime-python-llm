@@ -44,32 +44,70 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   May 23, 2025 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
+ *   May 28, 2025 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
  */
 package org.knime.ai.core.data.message;
 
-import org.knime.ai.core.data.message.MessageValue.MessageContentPart;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Supplier;
+
+import org.knime.core.table.access.ListAccess.ListReadAccess;
+import org.knime.core.table.access.ListAccess.ListWriteAccess;
+import org.knime.core.table.access.ReadAccess;
+import org.knime.core.table.access.WriteAccess;
 
 /**
- * A content part of a message that contains image data.
+ * Contains utility methods for implemtning a ValueFactory.
  *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
-public class ImageContentPart implements MessageContentPart {
+final class ValueFactoryUtils {
 
-    private final byte[] m_imageData;
-
-    public ImageContentPart(final byte[] imageData) {
-        this.m_imageData = imageData;
+    private ValueFactoryUtils() {
+        // Utility class, no instantiation
     }
 
-    @Override
-    public String getType() {
-        return "image";
+    static <S, T> Supplier<T> chain(final Supplier<S> source, final Function<S, T> mapper) {
+        return () -> mapper.apply(source.get());
     }
 
-    @Override
-    public byte[] getData() {
-        return m_imageData;
+    static <T> Supplier<List<T>> readList(final ListReadAccess listAccess, final Supplier<T> itemReader) {
+        return () -> {
+            var list = new ArrayList<T>();
+            var numItems = listAccess.size();
+            for (int i = 0; i < numItems; i++) {
+                listAccess.setIndex(i);
+                list.add(itemReader.get());
+            }
+            return list;
+        };
     }
+
+    static <T> Supplier<Optional<T>> readOptional(final ReadAccess access,
+            final Supplier<T> valueReader) {
+        return () -> access.isMissing() ? Optional.empty() : Optional.of(valueReader.get());
+    }
+
+    static <T> Consumer<List<T>> writeList(final ListWriteAccess access, final Consumer<T> itemWriter) {
+        return (list) -> {
+            for (int i = 0; i < list.size(); i++) {
+                access.setWriteIndex(i);
+                var item = list.get(i);
+                if (item == null) {
+                    access.setMissing();
+                } else {
+                    itemWriter.accept(item);
+                }
+            }
+        };
+    }
+
+    static <T> Consumer<Optional<T>> writeOptional(final WriteAccess access, final Consumer<T> valueWriter) {
+        return (value) -> value.ifPresentOrElse(valueWriter, access::setMissing);
+    }
+
 }

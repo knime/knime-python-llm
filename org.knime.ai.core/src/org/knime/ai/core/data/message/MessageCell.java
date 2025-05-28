@@ -51,9 +51,11 @@ package org.knime.ai.core.data.message;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 import org.knime.core.data.DataCell;
+import org.knime.core.data.DataType;
 import org.knime.core.node.util.CheckUtils;
 
 /**
@@ -74,12 +76,18 @@ public final class MessageCell extends DataCell implements MessageValue {
     private final String m_toolCallId;
 
     /**
+     * Data type for MessageCell.
+     */
+    public static final DataType TYPE = DataType.getType(MessageCell.class);
+
+    /**
      * Constructor for MessageCell.
      *
      * @param messageType The type of the message
      * @param content The content of the message
      */
-    private MessageCell(final MessageType messageType, final List<MessageContentPart> content, final List<ToolCall> toolCalls, final String toolCallId) {
+    MessageCell(final MessageType messageType, final List<MessageContentPart> content, final List<ToolCall> toolCalls,
+        final String toolCallId) {
         m_messageType = messageType;
         m_content = immutableCopy(content);
         m_toolCalls = toolCalls != null ? immutableCopy(toolCalls) : null;
@@ -90,32 +98,57 @@ public final class MessageCell extends DataCell implements MessageValue {
         return Collections.unmodifiableList(new ArrayList<>(list));
     }
 
-
-
-    public static MessageCell createAIMessageCell(final List<MessageContentPart> content, final List<ToolCall> toolCalls) {
-        checkContent(content);
-        return new MessageCell(MessageType.AI, content, toolCalls, null);
+    /**
+     * Creates an AI message with the given content.
+     * @param content the content of the message
+     * @return a new MessageCell representing an AI message
+     */
+    public static MessageCell createAIMessageCell(final List<MessageContentPart> content) {
+        return createAIMessageCell(content, null);
     }
 
 
+    /**
+     * Creates an AI message.
+     *
+     * @param content the content of the message
+     * @param toolCalls the tool calls associated with the message, can be null
+     * @return a new MessageCell representing an AI message
+     */
+    public static MessageCell createAIMessageCell(final List<MessageContentPart> content,
+        final List<ToolCall> toolCalls) {
+        checkContent(content);
+        return new MessageCell(MessageType.AI, content, toolCalls, null);
+    }
 
     private static void checkContent(final List<MessageContentPart> content) {
         CheckUtils.checkNotNull(content, "Content cannot be null");
         CheckUtils.checkArgument(!content.isEmpty(), "Content cannot be empty");
     }
 
+    /**
+     * Creates a user message cell with the given content.
+     *
+     * @param content the content of the message
+     * @return a new MessageCell representing a user message
+     */
     public static MessageCell createUserMessageCell(final List<MessageContentPart> content) {
         checkContent(content);
         return new MessageCell(MessageType.USER, content, null, null);
     }
 
+    /**
+     * Creates a tool message cell with the given content and tool call ID.
+     *
+     * @param content the content of the message
+     * @param toolCallId the ID of the tool call associated with this message, must not be null
+     * @return a new MessageCell representing a tool message
+     */
     public static MessageCell createToolMessageCell(final List<MessageContentPart> content, final String toolCallId) {
         CheckUtils.checkNotNull(toolCallId, "Tool call ID cannot be null");
         checkContent(content);
         return new MessageCell(MessageType.TOOL, content, null, toolCallId);
     }
-
-
 
     @Override
     public MessageType getMessageType() {
@@ -139,20 +172,22 @@ public final class MessageCell extends DataCell implements MessageValue {
 
     @Override
     public String toString() {
-        // TODO Auto-generated method stub
-        return null;
+        return "MessageCell [messageType=" + m_messageType + ", content=" + m_content + ", toolCalls=" + m_toolCalls
+            + ", toolCallId=" + m_toolCallId + "]";
     }
 
     @Override
     protected boolean equalsDataCell(final DataCell dc) {
-        // TODO Auto-generated method stub
-        return false;
+        MessageCell other = (MessageCell)dc;
+        return m_messageType == other.m_messageType && m_content.equals(other.m_content)
+            && Objects.equals(m_toolCalls, other.m_toolCalls) && Objects.equals(m_toolCallId, other.m_toolCallId);
     }
 
     @Override
     public int hashCode() {
-        // TODO Auto-generated method stub
-        return 0;
+        return Objects.hash(m_messageType, m_content, m_toolCalls, m_toolCallId);
     }
+
+
 
 }

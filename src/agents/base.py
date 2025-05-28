@@ -565,6 +565,12 @@ class ChatAgentPrompter:
 
     debug = _debug_mode_parameter()
 
+    show_tool_messages = knext.BoolParameter(
+        "Show tool messages",
+        "TODO",
+        default_value=False,
+    )
+
     def configure(
         self,
         ctx: knext.ConfigurationContext,
@@ -589,6 +595,7 @@ class ChatAgentPrompter:
     ):
         # Load the index.html file as a string
         # Assume the repository root is two levels up from this file
+        # Workaround until AP-24397 is resolved
         repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
         html_file_path = os.path.join(repo_root, "index.html")
 
@@ -625,4 +632,4 @@ class ChatAgentPrompter:
             chat_model, tools=tools, prompt=self.developer_message
         )
 
-        return ChatAgentPrompterDataService(agent, data_registry)
+        return ChatAgentPrompterDataService(agent, data_registry, self.show_tool_messages)

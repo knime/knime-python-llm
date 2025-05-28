@@ -320,7 +320,7 @@ def render_message_as_json(**kwargs) -> str:
 
 
 class ChatAgentPrompterDataService:
-    def __init__(self, agent_graph, data_registry: DataRegistry):
+    def __init__(self, agent_graph, data_registry: DataRegistry, show_tool_messages: bool):
         self._agent_graph = agent_graph
         self._data_registry = data_registry
         self._messages = [
@@ -331,17 +331,39 @@ class ChatAgentPrompterDataService:
                 ),
             }
         ]
+        self._show_tool_messages = show_tool_messages
 
-    def getData(self, param: str):
-        self._messages.append({"role": "user", "content": param})
-        final_state = self._agent_graph.invoke({"messages": self._messages})
-        self.messages = final_state["messages"]
-        return self.messages[-1].content
-
-    def get_final_data(self):
-        # Called to get the final data from the view (e.g. tables)
+    def init(self):
         pass
 
+    def post_user_message(self, user_message: str):
+        self._messages.append({"role": "user", "content": user_message})
+        final_state = self._agent_graph.invoke({"messages": self._messages})
+        self.messages = final_state["messages"]
+        if(self._show_tool_messages):
+            last_human_index = next(
+                (i for i in reversed(range(len(self.messages))) if self.messages[i].type == "human"),
+                -1
+            ) 
+            return [
+                {
+                    "role": msg.type,
+                    "content": msg.content,
+                    "tool_calls": str(msg.tool_calls) if hasattr(msg, "tool_calls") else None,
+                } 
+                for msg in self.messages[last_human_index + 1 :]
+            ]
+        else:
+            # only the last message, 1 item list
+            return [
+                {
+                    "role": self.messages[-1].type,
+                    "content": self.messages[-1].content,
+                    "tool_calls": str(self.messages[-1].tool_calls)
+                    if hasattr(self.messages[-1], "tool_calls")
+                    else None,
+                }
+            ]
 
 class State(TypedDict):
     messages: Annotated[list, add_messages]

@@ -5,4 +5,4 @@ idePrefixKey=
 indexingBasedOnEclipsePlugIns=true
 projectKey=KNIME_knime-buildworkflows
 serverId=SonarCloud
-sqPrefixKey=org.knime.python.llm.java
+sqPrefixKey=org.knime.ai.core

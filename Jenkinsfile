@@ -36,6 +36,7 @@ try {
             dependencies: [
                 repositories: [
                     'knime-python',
+                    'knime-conda-channels',
                     'knime-python-types',
                     'knime-core-columnar',
                     'knime-testing-internal',

@@ -48,21 +48,24 @@
  */
 package org.knime.ai.core.data.message;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
-import org.knime.ai.core.data.message.MessageValue.ToolCall;
+import org.knime.ai.core.data.message.MessageValue.MessageContentPart;
 import org.knime.core.data.DataCell;
 import org.knime.core.data.v2.ReadValue;
 import org.knime.core.data.v2.ValueFactory;
 import org.knime.core.data.v2.WriteValue;
 import org.knime.core.table.access.ListAccess.ListReadAccess;
-import org.knime.core.table.access.ReadAccess;
+import org.knime.core.table.access.ListAccess.ListWriteAccess;
 import org.knime.core.table.access.StringAccess.StringReadAccess;
+import org.knime.core.table.access.StringAccess.StringWriteAccess;
 import org.knime.core.table.access.StructAccess.StructReadAccess;
 import org.knime.core.table.access.StructAccess.StructWriteAccess;
+import org.knime.core.table.access.VarBinaryAccess.VarBinaryReadAccess;
+import org.knime.core.table.access.VarBinaryAccess.VarBinaryWriteAccess;
 import org.knime.core.table.schema.DataSpec;
 import org.knime.core.table.schema.ListDataSpec;
 import org.knime.core.table.schema.StringDataSpec;
@@ -70,6 +73,7 @@ import org.knime.core.table.schema.StructDataSpec;
 import org.knime.core.table.schema.VarBinaryDataSpec;
 
 /**
+ * ValueFactory for writing and reading {@link MessageValue} instances.
  *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
@@ -99,39 +103,100 @@ public final class MessageValueFactory implements ValueFactory<StructReadAccess,
 
     @Override
     public ReadValue createReadValue(final StructReadAccess access) {
-        // TODO Auto-generated method stub
-        return null;
+        return new MessageReadValue(access);
     }
 
     @Override
     public WriteValue<?> createWriteValue(final StructWriteAccess access) {
-        // TODO Auto-generated method stub
-        return null;
+        return new MessageWriteValue(access);
+    }
+
+    private static final class MessageWriteValue implements WriteValue<MessageValue> {
+
+        private final Consumer<String> m_typeWriter;
+
+        private final Consumer<List<MessageContentPart>> m_contentWriter;
+
+        private final Consumer<Optional<List<MessageValue.ToolCall>>> m_toolCallsWriter;
+
+        private final Consumer<Optional<String>> m_toolCallIdWriter;
+
+        MessageWriteValue(final StructWriteAccess access) {
+            m_typeWriter = access.<StringWriteAccess>getWriteAccess(0)::setStringValue;
+            ListWriteAccess contentAccess = access.getWriteAccess(1);
+            m_contentWriter = ValueFactoryUtils.writeList(contentAccess,
+                createContentPartWriter(access.getWriteAccess(1)));
+            ListWriteAccess toolCallsAccess = access.getWriteAccess(2);
+            m_toolCallsWriter = ValueFactoryUtils.writeOptional(toolCallsAccess,
+                ValueFactoryUtils.writeList(toolCallsAccess, createToolCallWriter(toolCallsAccess.getWriteAccess())));
+            StringWriteAccess toolCallIdAccess = access.getWriteAccess(3);
+            m_toolCallIdWriter = ValueFactoryUtils.writeOptional(toolCallIdAccess, toolCallIdAccess::setStringValue);
+
+        }
+
+        @Override
+        public void setValue(final MessageValue value) {
+            m_typeWriter.accept(value.getMessageType().name());
+            m_contentWriter.accept(value.getContent());
+            m_toolCallsWriter.accept(value.getToolCalls());
+            m_toolCallIdWriter.accept(value.getToolCallId());
+        }
+
+        private static Consumer<MessageContentPart> createContentPartWriter(final StructWriteAccess access) {
+            StringWriteAccess typeAccess = access.getWriteAccess(0);
+            VarBinaryWriteAccess dataAccess = access.getWriteAccess(1);
+            return (part) -> {
+                if (part instanceof TextContentPart stringPart) {
+                    typeAccess.setStringValue("string");
+                    dataAccess.setByteArray(stringPart.getContent().getBytes());
+                } else if (part instanceof ImageContentPart imagePart) {
+                    typeAccess.setStringValue("image");
+                    dataAccess.setByteArray(imagePart.getData());
+                } else {
+                    throw new IllegalArgumentException("Unknown content part type: " + part.getClass());
+                }
+            };
+        }
+
+        private static Consumer<MessageValue.ToolCall> createToolCallWriter(final StructWriteAccess access) {
+            StringWriteAccess idAccess = access.getWriteAccess(0);
+            StringWriteAccess nameAccess = access.getWriteAccess(1);
+            StringWriteAccess argumentsAccess = access.getWriteAccess(2);
+            return (toolCall) -> {
+                idAccess.setStringValue(toolCall.id());
+                nameAccess.setStringValue(toolCall.toolName());
+                argumentsAccess.setStringValue(toolCall.arguments());
+            };
+        }
+
     }
 
     private static final class MessageReadValue implements ReadValue, MessageValue {
 
-        private final StringReadAccess m_typeAccess;
+        private final Supplier<MessageType> m_typeReader;
 
-        private final ListReadAccess m_contentAccess;
+        private final Supplier<Optional<List<ToolCall>>> m_toolCallsReader;
 
-        private final OptionalReader<List<ToolCall>> m_toolCallsReader;
+        private final Supplier<Optional<String>> m_toolCallIdReader;
 
-        private final OptionalReader<String> m_toolCallIdReader;
+        private final Supplier<List<MessageContentPart>> m_contentReader;
 
         protected MessageReadValue(final StructReadAccess access) {
-            m_typeAccess = access.getAccess(0);
-            m_contentAccess = access.getAccess(1);
+            StringReadAccess typeAccess = access.getAccess(0);
+            m_typeReader = ValueFactoryUtils.chain(typeAccess::getStringValue, MessageType::valueOf);
+            ListReadAccess contentAccess = access.getAccess(1);
+            m_contentReader =
+                    ValueFactoryUtils.readList(contentAccess, createContentPartReader(contentAccess.getAccess()));
             ListReadAccess toolCallsAccess = access.getAccess(2);
-            m_toolCallsReader = new OptionalReader<>(toolCallsAccess,
-                    new ListReader<>(toolCallsAccess, new ToolCallReader(toolCallsAccess.getAccess())));
+            m_toolCallsReader = ValueFactoryUtils.readOptional(toolCallsAccess,
+                ValueFactoryUtils.readList(toolCallsAccess, createToolCallReader(toolCallsAccess.getAccess())));
             StringReadAccess toolCallIdAccess = access.getAccess(3);
-            m_toolCallIdReader = new OptionalReader<>(toolCallIdAccess, toolCallIdAccess::getStringValue);
+            m_toolCallIdReader = ValueFactoryUtils.readOptional(toolCallIdAccess, toolCallIdAccess::getStringValue);
         }
 
         @Override
         public MessageType getMessageType() {
-            return MessageType.valueOf(m_typeAccess.getStringValue());
+            return m_typeReader.get();
         }
 
         @Override
@@ -141,90 +206,44 @@ public final class MessageValueFactory implements ValueFactory<StructReadAccess,
 
         @Override
         public DataCell getDataCell() {
-            // TODO Auto-generated method stub
-            return null;
+            return new MessageCell(m_typeReader.get(), m_contentReader.get(),
+                m_toolCallsReader.get().orElse(null), m_toolCallIdReader.get().orElse(null));
         }
 
         @Override
         public List<MessageContentPart> getContent() {
-            // TODO Auto-generated method stub
-            return null;
+            return m_contentReader.get();
         }
 
         @Override
         public Optional<List<ToolCall>> getToolCalls() {
-            return null;
-        }
-    }
-
-    private static final class OptionalReader<T> implements Supplier<Optional<T>> {
-        private final ReadAccess m_access;
-
-        private final Supplier<T> m_valueReader;
-
-        OptionalReader(final ReadAccess access, final Supplier<T> valueReader) {
-            m_access = access;
-            m_valueReader = valueReader;
+            return m_toolCallsReader.get();
         }
 
-        @Override
-        public Optional<T> get() {
-            if (m_access.isMissing()) {
-                return Optional.empty();
-            }
-            return Optional.of(m_valueReader.get());
-        }
-    }
-
-    private static final class ListReader<T> implements Supplier<List<T>> {
-        private final ListReadAccess m_listAccess;
-
-        private final Supplier<T> m_itemReader;
-
-        ListReader(final ListReadAccess listAccess, final Supplier<T> itemReader) {
-            m_listAccess = listAccess;
-            m_itemReader = itemReader;
+        private static Supplier<ToolCall> createToolCallReader(final StructReadAccess access) {
+            StringReadAccess idAccess = access.getAccess(0);
+            StringReadAccess nameAccess = access.getAccess(1);
+            StringReadAccess argumentsAccess = access.getAccess(2);
+            return () -> new ToolCall(nameAccess.getStringValue(), idAccess.getStringValue(),
+                argumentsAccess.getStringValue());
         }
 
-        @Override
-        public List<T> get() {
-            var list = new ArrayList<T>();
-            var numItems = m_listAccess.size();
-            for (int i = 0; i < numItems; i++) {
-                m_listAccess.setIndex(i);
-                list.add(m_itemReader.get());
-            }
-            return list;
+        private static Supplier<MessageContentPart> createContentPartReader(final StructReadAccess access) {
+            StringReadAccess typeAccess = access.getAccess(0);
+            VarBinaryReadAccess dataAccess = access.getAccess(1);
+            // TODO use deserializer instead?
+            return () -> readContentPart(typeAccess.getStringValue(), dataAccess.getByteArray());
         }
 
-    }
-
-    private static final class ToolCallReader implements Supplier<ToolCall> {
-
-        private final StringReadAccess m_idAccess;
-
-        private final StringReadAccess m_nameAccess;
-
-        private final StringReadAccess m_argumentsAccess;
-
-        ToolCallReader(final StructReadAccess access) {
-            m_idAccess = access.getAccess(0);
-            m_nameAccess = access.getAccess(1);
-            m_argumentsAccess = access.getAccess(2);
+        private static MessageContentPart readContentPart(final String type, final byte[] data) {
+            return switch (type) {
+                case "string" -> new TextContentPart(new String(data));
+                case "image" -> new ImageContentPart(data);
+                // Add other content types as needed
+                default -> throw new IllegalArgumentException("Unknown content type: " + type);
+            };
         }
 
-        @Override
-        public ToolCall get() {
-            return new ToolCall(m_nameAccess.getStringValue(), m_idAccess.getStringValue(),
-                m_argumentsAccess.getStringValue());
-        }
-    }
-
-    private static final class MessageContentReadValue {
-
-        MessageContentReadValue(final StructReadAccess access) {
-            // TODO Auto-generated constructor stub
-        }
     }
 
 }

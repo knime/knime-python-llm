@@ -1,5 +1,9 @@
 <script setup lang="ts">
-import { ref, defineEmits, defineProps, nextTick } from 'vue';
+import { ref, defineEmits, defineProps, nextTick, computed } from "vue";
+
+import { FunctionButton } from "@knime/components";
+import AbortIcon from "@knime/styles/img/icons/close.svg";
+import SendIcon from "@knime/styles/img/icons/paper-flier.svg";
 
 const props = defineProps<{
   value: string;
@@ -7,155 +11,123 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (e: 'update:value', value: string): void;
-  (e: 'send'): void;
+  (e: "update:value", value: string): void;
+  (e: "send"): void;
 }>();
 
 const inputElement = ref<HTMLTextAreaElement | null>(null);
 
 const handleInput = (event: Event) => {
   const target = event.target as HTMLTextAreaElement;
-  emit('update:value', target.value);
+  emit("update:value", target.value);
   resizeTextarea();
 };
 
 const resizeTextarea = () => {
   if (!inputElement.value) return;
-  
-  inputElement.value.style.height = 'auto';
-  inputElement.value.style.height = `${Math.min(inputElement.value.scrollHeight, 150)}px`;
+
+  inputElement.value.style.height = "auto";
+  inputElement.value.style.height = `${Math.min(
+    inputElement.value.scrollHeight,
+    150
+  )}px`;
 };
 
 const sendMessage = () => {
   if (props.isLoading || !props.value.trim()) return;
-  emit('send');
-  
+  emit("send");
+
   // Reset height after sending
   nextTick(() => {
     if (inputElement.value) {
-      inputElement.value.style.height = 'auto';
+      inputElement.value.style.height = "auto";
     }
   });
 };
 
 const handleKeydown = (event: KeyboardEvent) => {
-  if (event.key === 'Enter' && !event.shiftKey) {
+  if (event.key === "Enter" && !event.shiftKey) {
     event.preventDefault();
     sendMessage();
   }
 };
+
+const isInputValid = computed(
+  () => props.value && props.value.trim().length > 0
+);
+const disabled = computed(() => !isInputValid.value && !props.isLoading);
 </script>
 
 <template>
-  <div class="message-input-container">
-    <div class="input-wrapper">
-      <textarea
-        ref="inputElement"
-        class="message-input"
-        placeholder="Type a message..."
-        :value="value"
-        @input="handleInput"
-        @keydown="handleKeydown"
-        :disabled="isLoading"
-      ></textarea>
-      
-      <button 
-        class="send-button" 
-        :class="{ 'active': value.trim(), 'loading': isLoading }"
-        :disabled="!value.trim() || isLoading"
-        @click="sendMessage"
-        aria-label="Send message"
-      >
-        <span v-if="isLoading" class="loading-spinner"></span>
-        <svg v-else xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="22" y1="2" x2="11" y2="13"></line>
-          <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-        </svg>
-      </button>
-    </div>
+  <div class="chat-controls">
+    <!-- TODO: Use the same constant for character limit as knime-ui -->
+    <textarea
+      :value="value"
+      class="textarea"
+      aria-label="Type your message"
+      :maxlength="300"
+      placeholder=""
+      @input="handleInput"
+      @keydown="handleKeydown"
+    />
+    <FunctionButton
+      class="send-button"
+      primary
+      :disabled="disabled"
+      @click="sendMessage"
+    >
+      <AbortIcon
+        v-if="isLoading"
+        class="abort-icon"
+        aria-hidden="true"
+        focusable="false"
+      />
+      <SendIcon v-else class="send-icon" aria-hidden="true" focusable="false" />
+    </FunctionButton>
   </div>
 </template>
 
-<style scoped>
-.message-input-container {
-  padding: 16px 24px;
-  background-color: var(--color-bg-secondary);
-  border-top: 1px solid var(--color-border);
-}
+<style lang="postcss" scoped>
+@import "@knime/styles/css/mixins";
 
-.input-wrapper {
+.chat-controls {
   display: flex;
-  background-color: var(--color-bg-primary);
-  border-radius: 24px;
+  flex-direction: column;
+  align-items: flex-end;
+  min-height: 120px;
+  background-color: white;
+  border: 1px solid var(--knime-stone-gray);
   overflow: hidden;
-  border: 1px solid var(--color-border);
-  transition: box-shadow 0.2s ease, border-color 0.2s ease;
-}
+  cursor: text;
 
-.input-wrapper:focus-within {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
-}
+  & .textarea {
+    font-size: 13px;
+    font-weight: 300;
+    line-height: 150%;
+    padding: 10px 8px 0;
+    flex-grow: 1;
+    width: 100%;
+    resize: none;
+    border: none;
+    box-sizing: border-box;
 
-.message-input {
-  flex-grow: 1;
-  padding: 12px 16px;
-  min-height: 24px;
-  max-height: 150px;
-  border: none;
-  background: transparent;
-  color: var(--color-text-primary);
-  font-family: inherit;
-  font-size: 0.95rem;
-  line-height: 1.5;
-  resize: none;
-  outline: none;
-}
+    &:focus {
+      outline: none;
+    }
+  }
 
-.message-input::placeholder {
-  color: var(--color-text-secondary);
-  opacity: 0.7;
-}
+  & .send-button {
+    align-self: flex-end;
+    margin-right: 8px;
+    margin-bottom: 8px;
 
-.send-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  margin: 4px;
-  border: none;
-  border-radius: 50%;
-  background-color: var(--color-gray-200);
-  color: var(--color-gray-500);
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
+    & svg {
+      stroke: var(--knime-dove-gray);
 
-.send-button.active {
-  background-color: var(--color-primary);
-  color: white;
-}
-
-.send-button.active:hover {
-  background-color: var(--color-primary-dark);
-}
-
-.send-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.loading-spinner {
-  width: 18px;
-  height: 18px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-radius: 50%;
-  border-top-color: white;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
+      &.send-icon {
+        margin-left: -1px;
+      }
+    }
+  }
 }
 </style>

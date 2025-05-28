@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref, nextTick, onMounted, watch, defineProps, defineEmits } from 'vue';
-import MessageList from './MessageList.vue';
-import MessageInput from './MessageInput.vue';
-import { type Message } from '../types';
+import { ref, nextTick, onMounted, watch, defineProps, defineEmits } from "vue";
+import MessageList from "./MessageList.vue";
+import MessageInput from "./MessageInput.vue";
+import { type Message } from "../types";
 
 const props = defineProps<{
   messages: Message[];
@@ -11,8 +11,8 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (e: 'sendMessage'): void;
-  (e: 'update:userInput', value: string): void;
+  (e: "sendMessage"): void;
+  (e: "update:userInput", value: string): void;
 }>();
 
 const messagesContainer = ref<HTMLElement | null>(null);
@@ -21,7 +21,7 @@ const showScrollToBottom = ref(false);
 
 const scrollToBottom = () => {
   if (!messagesContainer.value) return;
-  
+
   nextTick(() => {
     if (messagesContainer.value) {
       messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
@@ -33,24 +33,27 @@ const scrollToBottom = () => {
 const handleScroll = (event: Event) => {
   const target = event.target as HTMLElement;
   const { scrollTop, scrollHeight, clientHeight } = target;
-  
+
   const bottomThreshold = 100;
   isAtBottom.value = scrollHeight - scrollTop - clientHeight < bottomThreshold;
-  
+
   showScrollToBottom.value = !isAtBottom.value;
 };
 
 const updateUserInput = (value: string) => {
-  emit('update:userInput', value);
+  emit("update:userInput", value);
 };
 
-watch(() => props.messages.length, () => {
-  if (isAtBottom.value) {
-    scrollToBottom();
-  } else {
-    showScrollToBottom.value = true;
+watch(
+  () => props.messages.length,
+  () => {
+    if (isAtBottom.value) {
+      scrollToBottom();
+    } else {
+      showScrollToBottom.value = true;
+    }
   }
-});
+);
 
 onMounted(() => {
   scrollToBottom();
@@ -59,29 +62,36 @@ onMounted(() => {
 
 <template>
   <main class="chat-interface">
-    <div 
-      ref="messagesContainer" 
-      class="messages-container" 
+    <div
+      ref="messagesContainer"
+      class="messages-container"
       @scroll="handleScroll"
     >
-      <MessageList 
-        :messages="messages" 
-        :is-loading="isLoading"
-      />
+      <MessageList :messages="messages" :is-loading="isLoading" />
     </div>
-    
-    <button 
-      v-if="showScrollToBottom" 
-      class="scroll-to-bottom" 
+
+    <button
+      v-if="showScrollToBottom"
+      class="scroll-to-bottom"
       @click="scrollToBottom"
       aria-label="Scroll to bottom"
     >
-      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="20"
+        height="20"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
         <polyline points="6 9 12 15 18 9"></polyline>
       </svg>
     </button>
-    
-    <MessageInput 
+
+    <MessageInput
       :value="userInput"
       :is-loading="isLoading"
       @update:value="updateUserInput"
@@ -102,7 +112,7 @@ onMounted(() => {
 .messages-container {
   flex-grow: 1;
   overflow-y: auto;
-  padding: 16px 0;
+  padding: 24px 0;
   scroll-behavior: smooth;
 }
 

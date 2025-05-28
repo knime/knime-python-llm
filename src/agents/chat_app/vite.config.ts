@@ -8,4 +8,7 @@ import { svgoConfig } from "@knime/styles/config/svgo.config";
 export default defineConfig({
   plugins: [vue(), svgLoader({ svgoConfig })],
   base: "",
+  build: {
+    outDir: '../../../',
+  },
 });

@@ -2,29 +2,16 @@
 import { ref } from "vue";
 import ChatInterface from "./components/ChatInterface.vue";
 import { type Message } from "./types";
-// import { JsonDataService } from "@knime/ui-extension-service";
+import { JsonDataService } from "@knime/ui-extension-service";
 
-const messages = ref<Message[]>([
-  {
-    id: "1",
-    content: "Hello! I'm your AI assistant. How can I help you today?",
-    role: "assistant",
-    timestamp: new Date(),
-  },
-]);
+const messages = ref<Message[]>([]);
 
 const userInput = ref("");
 const isLoading = ref(false);
 
 const sendMessageToBackend = async (message: string): Promise<string> => {
-  // const jsonDataService = await JsonDataService.getInstance();
-  // return jsonDataService.data({ options: [message] });
-  // TODO: Only mock for now
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve("Response message!");
-    }, 1000);
-  });
+  const jsonDataService = await JsonDataService.getInstance();
+  return jsonDataService.data({ options: [message] });
 };
 
 const sendMessage = async () => {

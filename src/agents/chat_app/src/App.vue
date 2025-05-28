@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, onMounted } from "vue";
 import ChatInterface from "./components/ChatInterface.vue";
 import { type Message } from "./types";
 import { JsonDataService } from "@knime/ui-extension-service";
@@ -9,9 +9,16 @@ const messages = ref<Message[]>([]);
 const userInput = ref("");
 const isLoading = ref(false);
 
-const sendMessageToBackend = async (message: string): Promise<string> => {
+
+onMounted(async () => {
+  // initializes the python backend (e.g. starting the python process)
   const jsonDataService = await JsonDataService.getInstance();
-  return jsonDataService.data({ options: [message] });
+  jsonDataService.data({ method: "init"});
+});
+
+const sendMessageToBackend = async (message: string): Promise<any[]> => {
+  const jsonDataService = await JsonDataService.getInstance();
+  return jsonDataService.data({ method: "post_user_message", options: [message] });
 };
 
 const sendMessage = async () => {
@@ -32,12 +39,15 @@ const sendMessage = async () => {
   try {
     const response = await sendMessageToBackend(userMessage.content);
 
-    messages.value.push({
-      id: (Date.now() + 1).toString(),
-      content: response,
-      role: "assistant",
-      timestamp: new Date(),
-    });
+    for(const message of response) {
+      const tool_calls = message.tool_calls ? `;tool calls: ${message.tool_calls}` : "";
+      messages.value.push({
+        id: (Date.now() + 1).toString(),
+        content: `${message.role}: ${message.content}${tool_calls}`,
+        role: message.role,
+        timestamp: new Date(),
+      });
+    }
   } catch (error) {
     // TODO: Real logging
     console.error("Error generating response:", error);

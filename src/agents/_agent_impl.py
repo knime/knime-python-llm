@@ -320,7 +320,9 @@ def render_message_as_json(**kwargs) -> str:
 
 
 class ChatAgentPrompterDataService:
-    def __init__(self, agent_graph, data_registry: DataRegistry, show_tool_messages: bool):
+    def __init__(
+        self, agent_graph, data_registry: DataRegistry, show_tool_messages: bool
+    ):
         self._agent_graph = agent_graph
         self._data_registry = data_registry
         self._messages = [
@@ -340,17 +342,23 @@ class ChatAgentPrompterDataService:
         self._messages.append({"role": "user", "content": user_message})
         final_state = self._agent_graph.invoke({"messages": self._messages})
         self.messages = final_state["messages"]
-        if(self._show_tool_messages):
+        if self._show_tool_messages:
             last_human_index = next(
-                (i for i in reversed(range(len(self.messages))) if self.messages[i].type == "human"),
-                -1
-            ) 
+                (
+                    i
+                    for i in reversed(range(len(self.messages)))
+                    if self.messages[i].type == "human"
+                ),
+                -1,
+            )
             return [
                 {
                     "role": msg.type,
                     "content": msg.content,
-                    "tool_calls": str(msg.tool_calls) if hasattr(msg, "tool_calls") else None,
-                } 
+                    "tool_calls": str(msg.tool_calls)
+                    if hasattr(msg, "tool_calls")
+                    else None,
+                }
                 for msg in self.messages[last_human_index + 1 :]
             ]
         else:
@@ -364,6 +372,7 @@ class ChatAgentPrompterDataService:
                     else None,
                 }
             ]
+
 
 class State(TypedDict):
     messages: Annotated[list, add_messages]

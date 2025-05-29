@@ -632,4 +632,6 @@ class ChatAgentPrompter:
             chat_model, tools=tools, prompt=self.developer_message
         )
 
-        return ChatAgentPrompterDataService(agent, data_registry, self.show_tool_messages)
+        return ChatAgentPrompterDataService(
+            agent, data_registry, self.show_tool_messages
+        )

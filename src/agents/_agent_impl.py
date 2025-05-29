@@ -353,12 +353,9 @@ class ChatAgentPrompterDataService:
             return []
         elif self._thread.is_alive():
             # wait with timeout to enable long-polling
-            self._thread.join(timeout=10)
+            self._thread.join(timeout=5)
 
-        if self._thread.is_alive():
-            return []
-        else:
-            return self._last_messages
+        return self._last_messages
 
     def _post_user_message(self, user_message: str, last_messages: list):
         self._messages.append({"role": "user", "content": user_message})

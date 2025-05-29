@@ -563,13 +563,13 @@ class ChatAgentPrompter:
 
     tool_column = _tool_column_parameter()
 
-    debug = _debug_mode_parameter()
-
     show_tool_messages = knext.BoolParameter(
         "Show tool messages",
         "TODO",
         default_value=False,
     )
+
+    debug = _debug_mode_parameter()
 
     def configure(
         self,

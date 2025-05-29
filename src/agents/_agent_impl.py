@@ -339,6 +339,28 @@ class ChatAgentPrompterDataService:
         pass
 
     def post_user_message(self, user_message: str):
+        import threading
+
+        if not hasattr(self, "_thread") or not self._thread.is_alive():
+            self._last_messages = []
+            self._thread = threading.Thread(
+                target=self._post_user_message, args=(user_message, self._last_messages)
+            )
+            self._thread.start()
+
+    def get_last_messages(self):
+        if not hasattr(self, "_thread"):
+            return []
+        elif self._thread.is_alive():
+            # wait with timeout to enable long-polling
+            self._thread.join(timeout=10)
+
+        if self._thread.is_alive():
+            return []
+        else:
+            return self._last_messages
+
+    def _post_user_message(self, user_message: str, last_messages: list):
         self._messages.append({"role": "user", "content": user_message})
         final_state = self._agent_graph.invoke({"messages": self._messages})
         self.messages = final_state["messages"]
@@ -351,19 +373,20 @@ class ChatAgentPrompterDataService:
                 ),
                 -1,
             )
-            return [
-                {
-                    "role": msg.type,
-                    "content": msg.content,
-                    "tool_calls": str(msg.tool_calls)
-                    if hasattr(msg, "tool_calls")
-                    else None,
-                }
-                for msg in self.messages[last_human_index + 1 :]
-            ]
+            last_messages.extend(
+                [
+                    {
+                        "role": msg.type,
+                        "content": msg.content,
+                        "tool_calls": str(msg.tool_calls)
+                        if hasattr(msg, "tool_calls")
+                        else None,
+                    }
+                    for msg in self.messages[last_human_index + 1 :]
+                ]
+            )
         else:
-            # only the last message, 1 item list
-            return [
+            last_messages.append(
                 {
                     "role": self.messages[-1].type,
                     "content": self.messages[-1].content,
@@ -371,7 +394,7 @@ class ChatAgentPrompterDataService:
                     if hasattr(self.messages[-1], "tool_calls")
                     else None,
                 }
-            ]
+            )
 
 
 class State(TypedDict):

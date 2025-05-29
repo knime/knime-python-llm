@@ -18,7 +18,26 @@ onMounted(async () => {
 
 const sendMessageToBackend = async (message: string): Promise<any[]> => {
   const jsonDataService = await JsonDataService.getInstance();
-  return jsonDataService.data({ method: "post_user_message", options: [message] });
+  jsonDataService.data({ method: "post_user_message", options: [message] });
+
+  // long polling for response
+  // TODO cancel polling eventually?
+  return new Promise((resolve, reject) => {
+    const poll = async () => {
+      try {
+        const response = await jsonDataService.data({ method: "get_last_messages" });
+        if (response && response.length > 0) {
+          resolve(response);
+        } else {
+          poll();
+        }
+      } catch (error) {
+        reject(error);
+      }
+    };
+
+    poll(); 
+  });
 };
 
 const sendMessage = async () => {

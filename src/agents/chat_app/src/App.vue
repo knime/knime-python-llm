@@ -18,7 +18,7 @@ onMounted(async () => {
 
 const sendMessageToBackend = async (message: string): Promise<any[]> => {
   const jsonDataService = await JsonDataService.getInstance();
-  jsonDataService.data({ method: "post_user_message", options: [message] });
+  await jsonDataService.data({ method: "post_user_message", options: [message] });
 
   // long polling for response
   // TODO cancel polling eventually?

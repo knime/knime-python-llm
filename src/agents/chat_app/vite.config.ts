@@ -1,3 +1,5 @@
+import { URL, fileURLToPath } from "node:url";
+
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 import svgLoader from "vite-svg-loader";
@@ -9,6 +11,18 @@ export default defineConfig({
   plugins: [vue(), svgLoader({ svgoConfig })],
   base: "",
   build: {
-    outDir: '../../../',
+    target: "esnext",
+    outDir: "../../../",
+  },
+
+  // TODO: remove this when we have builds fo that libs, without them the optimizer can break things
+  optimizeDeps: {
+    exclude: ["@knime/components", "@knime/utils"],
+  },
+
+  resolve: {
+    alias: {
+      "@": fileURLToPath(new URL("./src", import.meta.url)),
+    },
   },
 });

@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import { defineProps, computed } from "vue";
+import { computed, defineProps } from "vue";
 
 import KnimeIcon from "@knime/styles/img/KNIME_Triangle.svg";
 import UserIcon from "@knime/styles/img/icons/user.svg";
 
+import type { Role } from "../types";
+
 import MarkdownRenderer from "./MarkdownRenderer.vue";
 import MessagePlaceholder from "./MessagePlaceholder.vue";
-import type { Role } from "../types";
 
 const props = defineProps<{
   content: string;
@@ -38,7 +39,7 @@ const isUser = computed(() => {
 </template>
 
 <style lang="postcss" scoped>
-@import "@knime/styles/css/mixins";
+@import url("@knime/styles/css/mixins");
 
 .message {
   position: relative;

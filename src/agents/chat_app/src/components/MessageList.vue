@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { defineProps } from "vue";
-import MessageBox from "./MessageBox.vue";
+
 import { type Message } from "../types";
+
+import MessageBox from "./MessageBox.vue";
 
 defineProps<{
   messages: Message[];
@@ -41,14 +43,15 @@ defineProps<{
 .message-wrapper {
   display: flex;
   margin-bottom: 8px;
-  animation: fadeIn 0.3s ease;
+  animation: fade-in 0.3s ease;
 }
 
-@keyframes fadeIn {
+@keyframes fade-in {
   from {
     opacity: 0;
     transform: translateY(10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -82,7 +85,7 @@ defineProps<{
   border-radius: 16px;
   background-color: var(--color-bg-secondary);
   align-self: center;
-  animation: fadeIn 0.3s ease;
+  animation: fade-in 0.3s ease;
 }
 
 .date-separator {

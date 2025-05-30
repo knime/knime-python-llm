@@ -52,6 +52,7 @@ import java.util.List;
 import java.util.Optional;
 
 import org.knime.core.data.DataValue;
+import org.knime.core.data.ExtensibleUtilityFactory;
 
 /**
  * Represents a message to or from an AI model.
@@ -59,6 +60,15 @@ import org.knime.core.data.DataValue;
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
 public interface MessageValue extends DataValue {
+
+    @SuppressWarnings("javadoc")
+    UtilityFactory UTILITY = new ExtensibleUtilityFactory(MessageValue.class) {
+
+        @Override
+        public String getName() {
+            return "Message";
+        }
+    };
 
     /**
      * Enumeration of the different types of messages.

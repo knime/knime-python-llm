@@ -1,7 +1,8 @@
 import knime.api.types as kt
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
+import json
 
 
 class MessageType(Enum):
@@ -28,7 +29,7 @@ class ToolCall:
 
     tool_name: str
     id: str
-    arguments: str  # JSON format
+    arguments: Dict[str, Any]  # JSON as dict
 
 
 @dataclass
@@ -64,7 +65,9 @@ class MessageValueFactory(kt.PythonValueFactory):
                 ToolCall(
                     tool_name=tc["1"],
                     id=tc["0"],
-                    arguments=tc["2"],
+                    arguments=json.loads(tc["2"])
+                    if isinstance(tc["2"], str)
+                    else tc["2"],
                 )
                 for tc in storage["2"]
             ]
@@ -76,7 +79,7 @@ class MessageValueFactory(kt.PythonValueFactory):
             tool_call_id=tool_call_id,
         )
 
-    def encode(self, value: MessageValue):
+    def encode(self, value: "MessageValue"):
         # value: MessageValue
         storage = {
             "0": value.message_type.value,
@@ -93,7 +96,9 @@ class MessageValueFactory(kt.PythonValueFactory):
                 {
                     "0": tc.id,
                     "1": tc.tool_name,
-                    "2": tc.arguments,
+                    "2": json.dumps(tc.arguments)
+                    if not isinstance(tc.arguments, str)
+                    else tc.arguments,
                 }
                 for tc in value.tool_calls
             ]
@@ -216,9 +221,9 @@ def from_langchain_message(lc_msg) -> MessageValue:
                 ToolCall(
                     tool_name=tc.get("name", ""),
                     id=tc.get("id", ""),
-                    arguments=tc.get("args", "")
-                    if isinstance(tc.get("args", ""), str)
-                    else str(tc.get("args", "")),
+                    arguments=tc.get("args", {})
+                    if isinstance(tc.get("args", {}), dict)
+                    else json.loads(tc.get("args", "{}")),
                 )
                 for tc in lc_msg.tool_calls
             ]

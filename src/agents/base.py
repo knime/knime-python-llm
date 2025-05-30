@@ -43,6 +43,7 @@
 # ------------------------------------------------------------------------
 
 
+from typing import Optional
 import knime.extension as knext
 import util
 
@@ -290,7 +291,7 @@ class AgentPrompter:
         return knext.Table.from_pandas(chat_history_df)
 
 
-def _tool_type():
+def _tool_type() -> knext.LogicalType:
     import knime.types.tool as ktt
 
     return knext.logical(ktt.WorkflowTool)
@@ -313,6 +314,16 @@ def _last_tool_column(schema: knext.Schema):
             "No tool column found in the tools table. Please provide a valid tool column."
         )
     return tool_columns[-1].name
+
+
+def _last_history_column(schema: knext.Schema):
+    message_type = _message_type()
+    history_columns = [col for col in schema if col.ktype == message_type]
+    if not history_columns:
+        raise knext.InvalidParametersError(
+            "No history column found in the conversation history table. Please provide a valid history column."
+        )
+    return history_columns[-1].name
 
 
 def _developer_message_parameter():
@@ -346,6 +357,24 @@ def _debug_mode_parameter():
     )
 
 
+def _message_type() -> knext.LogicalType:
+    from knime.types.message import MessageValue
+
+    return knext.logical(MessageValue)
+
+
+def _history_column_parameter() -> knext.ColumnParameter:
+    def has_history(ctx: knext.DialogCreationContext):
+        return ctx.get_input_specs()[2] is not None
+
+    return knext.ColumnParameter(
+        "History column",
+        "The column containing the conversation history.",
+        port_index=2,
+        column_filter=util.create_type_filter(_message_type()),
+    ).rule(knext.DialogContextCondition(has_history), knext.Effect.SHOW)
+
+
 @knext.node(
     "Agent Prompter 2.0",
     node_type=knext.NodeType.PREDICTOR,
@@ -356,11 +385,12 @@ def _debug_mode_parameter():
     "Chat model", "The chat model to use.", port_type=chat_model_port_type
 )
 @knext.input_table("Tools", "The tools the agent can use.")
-@knext.output_table("Result", "The result of the agent execution.")
+@knext.input_table("Conversation", "The conversation history table.", optional=True)
 @knext.input_table_group(
     "Data inputs",
     "The data inputs for the agent.",
 )
+@knext.output_table("Result", "The result of the agent execution.")
 @knext.output_table_group(
     "Data outputs",
     "The data outputs of the agent.",
@@ -392,6 +422,8 @@ class AgentPrompter2:
         "Message provided to the agent that instructs it how to act.",
     )
 
+    history_column = _history_column_parameter()
+
     tool_column = _tool_column_parameter()
 
     recursion_limit = knext.IntParameter(
@@ -412,12 +444,13 @@ class AgentPrompter2:
         ctx: knext.ConfigurationContext,
         chat_model_spec: ChatModelPortObjectSpec,
         tools_schema: knext.Schema,
+        history_schema: Optional[knext.Schema],
         data_schemas: list[knext.Schema],
     ) -> knext.Schema:
         chat_model_spec.validate_context(ctx)
         self._configure_tool_tables(tools_schema)
 
-        return self._create_conversation_schema(), [
+        return self._create_conversation_schema(history_schema), [
             None
         ] * ctx.get_connected_output_port_numbers()[1]
 
@@ -429,18 +462,30 @@ class AgentPrompter2:
                 f"Column {self.tool_column} not found in the tools table."
             )
 
-    def _create_conversation_schema(self) -> knext.Schema:
-        from knime.types.message import MessageValue
-
-        return knext.Schema.from_columns(
-            [knext.Column(knext.logical(MessageValue), "Message")]
-        )
+    def _create_conversation_schema(
+        self, history_schema: Optional[knext.Schema]
+    ) -> knext.Schema:
+        if history_schema is not None:
+            if self.history_column is None:
+                self.history_column = _last_history_column(history_schema)
+            if self.history_column not in history_schema.column_names:
+                raise knext.InvalidParametersError(
+                    f"Column {self.history_column} not found in the conversation history table."
+                )
+            return knext.Schema.from_columns(
+                [
+                    knext.Column(_message_type(), self.history_column),
+                ]
+            )
+        # TODO allow to specify column name if no history table is given
+        return knext.Schema.from_columns([knext.Column(_message_type(), "Message")])
 
     def execute(
         self,
         ctx: knext.ExecutionContext,
         chat_model: ChatModelPortObject,
         tools_table: knext.Table,
+        history_table: Optional[knext.Table],
         input_tables: list[knext.Table],
     ):
         from langchain.chat_models.base import BaseChatModel
@@ -451,7 +496,7 @@ class AgentPrompter2:
             render_message_as_json,
         )
         from langgraph.prebuilt import create_react_agent
-        from knime.types.message import from_langchain_message
+        from knime.types.message import to_langchain_message, from_langchain_message
 
         # import debugpy
 
@@ -472,10 +517,23 @@ class AgentPrompter2:
 
         tools = [tool_converter.to_langchain_tool(tool) for tool in tool_cells]
 
+        messages = []
+
+        if history_table is not None:
+            if self.history_column not in history_table.column_names:
+                raise knext.InvalidParametersError(
+                    f"Column {self.history_column} not found in the conversation history table."
+                )
+            history_df = history_table[self.history_column].to_pandas()
+            messages = [
+                to_langchain_message(msg) for msg in history_df[self.history_column]
+            ]
+
         initial_message = render_message_as_json(
             initial_data=data_registry.llm_representation(),
             user_message=self.user_message,
         )
+        messages.append({"role": "user", "content": initial_message})
         num_data_outputs = ctx.get_connected_output_port_numbers()[1]
 
         graph = create_react_agent(
@@ -484,7 +542,7 @@ class AgentPrompter2:
             prompt=self.developer_message,
         )
 
-        inputs = {"messages": [{"role": "user", "content": initial_message}]}
+        inputs = {"messages": messages}
         config = {"recursion_limit": self.recursion_limit}
 
         try:

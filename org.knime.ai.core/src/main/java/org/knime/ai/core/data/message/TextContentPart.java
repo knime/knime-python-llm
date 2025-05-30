@@ -55,13 +55,22 @@ import org.knime.ai.core.data.message.MessageValue.MessageContentPart;
  *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
-public class TextContentPart implements MessageContentPart {
+public final class TextContentPart implements MessageContentPart {
+
     private final String m_content;
 
+    /**
+     * Creates a new text content part with the given content.
+     *
+     * @param content the text content of this part
+     */
     public TextContentPart(final String content) {
         m_content = content;
     }
 
+    /**
+     * @return the content of this text part
+     */
     public String getContent() {
         return m_content;
     }
@@ -74,6 +83,11 @@ public class TextContentPart implements MessageContentPart {
     @Override
     public byte[] getData() {
         return m_content.getBytes();
+    }
+
+    @Override
+    public String toString() {
+        return m_content;
     }
 
 }

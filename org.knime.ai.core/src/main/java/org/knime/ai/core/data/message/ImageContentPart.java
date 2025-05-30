@@ -55,10 +55,15 @@ import org.knime.ai.core.data.message.MessageValue.MessageContentPart;
  *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
-public class ImageContentPart implements MessageContentPart {
+public final class ImageContentPart implements MessageContentPart {
 
     private final byte[] m_imageData;
 
+    /**
+     * Creates a new image content part with the given PNG image data.
+     *
+     * @param imageData the PNG image data as a byte array
+     */
     public ImageContentPart(final byte[] imageData) {
         this.m_imageData = imageData;
     }

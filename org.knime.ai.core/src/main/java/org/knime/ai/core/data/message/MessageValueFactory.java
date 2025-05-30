@@ -237,7 +237,7 @@ public final class MessageValueFactory implements ValueFactory<StructReadAccess,
 
         private static MessageContentPart readContentPart(final String type, final byte[] data) {
             return switch (type) {
-                case "string" -> new TextContentPart(new String(data));
+                case "text" -> new TextContentPart(new String(data));
                 case "image" -> new ImageContentPart(data);
                 // Add other content types as needed
                 default -> throw new IllegalArgumentException("Unknown content type: " + type);

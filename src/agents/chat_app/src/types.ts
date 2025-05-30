@@ -1,8 +1,11 @@
 export type Role = "user" | "assistant" | "system";
 
-export interface Message {
-  id: string;
+export interface MessageResponse {
   content: string;
   role: Role;
-  timestamp: Date;
+  toolCalls?: any[];
+}
+
+export interface Message extends MessageResponse {
+  id: string;
 }

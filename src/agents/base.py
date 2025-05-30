@@ -432,12 +432,10 @@ class AgentPrompter2:
             )
 
     def _create_conversation_schema(self) -> knext.Schema:
+        from knime.types.message import MessageValue
+
         return knext.Schema.from_columns(
-            [
-                knext.Column(knext.string(), "Role"),
-                knext.Column(knext.string(), "Content"),
-                knext.Column(knext.string(), "Tool Calls"),
-            ]
+            [knext.Column(knext.logical(MessageValue), "Message")]
         )
 
     def execute(
@@ -455,6 +453,13 @@ class AgentPrompter2:
             render_message_as_json,
         )
         from langgraph.prebuilt import create_react_agent
+        from knime.types.message import from_langchain_message
+
+        # import debugpy
+
+        # debugpy.listen(5678)
+        # print("Waiting for debugger attach")
+        # debugpy.wait_for_client()
 
         data_registry = DataRegistry(input_tables)
         tool_converter = LangchainToolConverter(
@@ -501,14 +506,7 @@ class AgentPrompter2:
         # output_table_ids = final_state.get("output_table_ids", [])
 
         result_df = pd.DataFrame(
-            {
-                "Role": [msg.type for msg in messages],
-                "Content": [msg.content for msg in messages],
-                "Tool Calls": [
-                    str(msg.tool_calls) if hasattr(msg, "tool_calls") else None
-                    for msg in messages
-                ],
-            }
+            {"Message": [from_langchain_message(msg) for msg in messages]}
         )
 
         conversation_table = knext.Table.from_pandas(result_df)

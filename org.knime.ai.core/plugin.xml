@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.4"?>
+<plugin>
+   <extension
+         point="org.knime.core.DataType">
+      <DataType
+            cellClass="org.knime.ai.core.data.message.MessageCell">
+         <serializer
+               cellClass="org.knime.ai.core.data.message.MessageCell"
+               serializerClass="org.knime.ai.core.data.message.MessageCellSerializer">
+         </serializer>
+         <ValueFactory
+               cellClass="org.knime.ai.core.data.message.MessageCell"
+               deprecated="false"
+               valueFactoryClass="org.knime.ai.core.data.message.MessageValueFactory">
+         </ValueFactory>
+      </DataType>
+   </extension>
+   <extension
+         point="org.knime.python3.types.PythonValueFactory">
+      <Module
+            moduleName="knime.types.message"
+            modulePath="src/main/python">
+         <PythonValueFactory
+               PythonClassName="MessageValueFactory"
+               ValueFactory="org.knime.ai.core.data.message.MessageValueFactory"
+               ValueTypeName="knime.types.message.MessageValue"
+               isDefaultPythonRepresentation="true">
+         </PythonValueFactory>
+      </Module>
+   </extension>
+
+</plugin>

@@ -101,3 +101,140 @@ class MessageValueFactory(kt.PythonValueFactory):
             storage["2"] = None
         storage["3"] = value.tool_call_id
         return storage
+
+
+def to_langchain_message(msg: "MessageValue"):
+    """
+    Convert a MessageValue to a langchain_core.messages.BaseMessage instance.
+    """
+    from langchain_core.messages.human import HumanMessage
+    from langchain_core.messages.ai import AIMessage
+    from langchain_core.messages.tool import ToolMessage
+
+    # Convert content parts to string or dict as appropriate
+    def _convert_content(content_parts):
+        # If all parts are type "text", join as string, else use list of dicts
+        if not content_parts:
+            return ""
+        if all(part.type == "text" for part in content_parts):
+            return "".join(
+                part.data.decode("utf-8")
+                if isinstance(part.data, bytes)
+                else str(part.data)
+                for part in content_parts
+            )
+        # Otherwise, return as list of dicts
+        result = []
+        for part in content_parts:
+            if part.type == "text":
+                result.append(
+                    part.data.decode("utf-8")
+                    if isinstance(part.data, bytes)
+                    else str(part.data)
+                )
+            elif part.type == "image":
+                # Example: OpenAI expects {"type": "image_url", "image_url": {"url": ...}}
+                result.append({"type": "image_url", "image_url": {"url": part.data}})
+            else:
+                result.append({"type": part.type, "data": part.data})
+        return result
+
+    content = _convert_content(msg.content)
+
+    if msg.message_type == MessageType.USER:
+        return HumanMessage(content=content)
+    elif msg.message_type == MessageType.AI:
+        tool_calls = []
+        if msg.tool_calls:
+            for tc in msg.tool_calls:
+                tool_calls.append(
+                    {
+                        "name": tc.tool_name,
+                        "args": tc.arguments,
+                        "id": tc.id,
+                        "type": "tool_call",
+                    }
+                )
+        return AIMessage(content=content, tool_calls=tool_calls, id=msg.tool_call_id)
+    elif msg.message_type == MessageType.TOOL:
+        return ToolMessage(content=content, tool_call_id=msg.tool_call_id)
+    else:
+        raise ValueError(f"Unknown MessageType: {msg.message_type}")
+
+
+def from_langchain_message(lc_msg) -> MessageValue:
+    """
+    Convert a langchain_core.messages.BaseMessage instance to a MessageValue.
+    """
+    from langchain_core.messages.human import HumanMessage
+    from langchain_core.messages.ai import AIMessage
+    from langchain_core.messages.tool import ToolMessage
+
+    # Helper to convert content to MessageContentPart list
+    def _to_content_parts(content):
+        parts = []
+        if isinstance(content, str):
+            parts.append(MessageContentPart(type="text", data=content.encode("utf-8")))
+        elif isinstance(content, list):
+            for part in content:
+                if isinstance(part, str):
+                    parts.append(
+                        MessageContentPart(type="text", data=part.encode("utf-8"))
+                    )
+                elif isinstance(part, dict):
+                    if part.get("type") == "image_url":
+                        # OpenAI format: {"type": "image_url", "image_url": {"url": ...}}
+                        url = part.get("image_url", {}).get("url", b"")
+                        if isinstance(url, str):
+                            url = url.encode("utf-8")
+                        parts.append(MessageContentPart(type="image", data=url))
+                    elif part.get("type") == "text":
+                        text = part.get("text", "")
+                        parts.append(
+                            MessageContentPart(type="text", data=text.encode("utf-8"))
+                        )
+                    else:
+                        # fallback: store as bytes
+                        parts.append(
+                            MessageContentPart(
+                                type=part.get("type", "unknown"),
+                                data=bytes(str(part), "utf-8"),
+                            )
+                        )
+        return parts
+
+    if isinstance(lc_msg, HumanMessage):
+        msg_type = MessageType.USER
+        content = _to_content_parts(lc_msg.content)
+        return MessageValue(message_type=msg_type, content=content)
+    elif isinstance(lc_msg, AIMessage):
+        msg_type = MessageType.AI
+        content = _to_content_parts(lc_msg.content)
+        tool_calls = None
+        if getattr(lc_msg, "tool_calls", None):
+            tool_calls = [
+                ToolCall(
+                    tool_name=tc.get("name", ""),
+                    id=tc.get("id", ""),
+                    arguments=tc.get("args", "")
+                    if isinstance(tc.get("args", ""), str)
+                    else str(tc.get("args", "")),
+                )
+                for tc in lc_msg.tool_calls
+            ]
+        return MessageValue(
+            message_type=msg_type,
+            content=content,
+            tool_calls=tool_calls,
+            tool_call_id=getattr(lc_msg, "id", None),
+        )
+    elif isinstance(lc_msg, ToolMessage):
+        msg_type = MessageType.TOOL
+        content = _to_content_parts(lc_msg.content)
+        return MessageValue(
+            message_type=msg_type,
+            content=content,
+            tool_call_id=getattr(lc_msg, "tool_call_id", None),
+        )
+    else:
+        raise ValueError(f"Unsupported langchain message type: {type(lc_msg)}")

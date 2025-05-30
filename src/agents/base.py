@@ -379,16 +379,17 @@ def _message_type() -> knext.LogicalType:
     return knext.logical(MessageValue)
 
 
-def _history_column_parameter() -> knext.ColumnParameter:
-    def has_history(ctx: knext.DialogCreationContext):
-        return ctx.get_input_specs()[2] is not None
+def has_history_table(ctx: knext.DialogCreationContext):
+    return ctx.get_input_specs()[2] is not None
 
+
+def _history_column_parameter() -> knext.ColumnParameter:
     return knext.ColumnParameter(
         "History column",
         "The column containing the conversation history.",
         port_index=2,
         column_filter=util.create_type_filter(_message_type()),
-    ).rule(knext.DialogContextCondition(has_history), knext.Effect.SHOW)
+    ).rule(knext.DialogContextCondition(has_history_table), knext.Effect.SHOW)
 
 
 @knext.node(
@@ -440,6 +441,13 @@ class AgentPrompter2:
 
     history_column = _history_column_parameter()
 
+    # New parameter for column name if no history table is connected
+    history_column_name = knext.StringParameter(
+        "Conversation column name",
+        "Name of the conversation column if no history table is connected.",
+        default_value="Conversation",
+    ).rule(knext.DialogContextCondition(has_history_table), knext.Effect.HIDE)
+
     tool_column = _tool_column_parameter()
 
     recursion_limit = _recursion_limit_parameter()
@@ -484,8 +492,10 @@ class AgentPrompter2:
                     knext.Column(_message_type(), self.history_column),
                 ]
             )
-        # TODO allow to specify column name if no history table is given
-        return knext.Schema.from_columns([knext.Column(_message_type(), "Message")])
+        # Use user-provided column name if no history table is given
+        return knext.Schema.from_columns(
+            [knext.Column(_message_type(), self.history_column_name)]
+        )
 
     def execute(
         self,
@@ -570,8 +580,16 @@ class AgentPrompter2:
         desanitized_messages = [
             tool_converter.desanitize_tool_calls(msg) for msg in messages
         ]
+        
+
+        output_column_name = (
+            self.history_column_name
+            if history_table is None
+            else self.history_column_name
+        )
+
         result_df = pd.DataFrame(
-            {"Message": [from_langchain_message(msg) for msg in desanitized_messages]}
+            {output_column_name: [from_langchain_message(msg) for msg in desanitized_messages]}
         )
 
         conversation_table = knext.Table.from_pandas(result_df)

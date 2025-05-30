@@ -359,14 +359,15 @@ class ChatAgentPrompterDataService:
 
     def _post_user_message(self, user_message: str, last_messages: list):
         self._messages.append({"role": "user", "content": user_message})
+        _logger.warning("_messages: " + repr(self._messages))
         final_state = self._agent_graph.invoke({"messages": self._messages})
-        self.messages = final_state["messages"]
+        self._messages = final_state["messages"]
         if self._show_tool_messages:
             last_human_index = next(
                 (
                     i
-                    for i in reversed(range(len(self.messages)))
-                    if self.messages[i].type == "human"
+                    for i in reversed(range(len(self._messages)))
+                    if self._messages[i].type == "human"
                 ),
                 -1,
             )
@@ -379,16 +380,16 @@ class ChatAgentPrompterDataService:
                         if hasattr(msg, "tool_calls")
                         else None,
                     }
-                    for msg in self.messages[last_human_index + 1 :]
+                    for msg in self._messages[last_human_index + 1 :]
                 ]
             )
         else:
             last_messages.append(
                 {
-                    "role": self.messages[-1].type,
-                    "content": self.messages[-1].content,
-                    "tool_calls": str(self.messages[-1].tool_calls)
-                    if hasattr(self.messages[-1], "tool_calls")
+                    "role": self._messages[-1].type,
+                    "content": self._messages[-1].content,
+                    "tool_calls": str(self._messages[-1].tool_calls)
+                    if hasattr(self._messages[-1], "tool_calls")
                     else None,
                 }
             )

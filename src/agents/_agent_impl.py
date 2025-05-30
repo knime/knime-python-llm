@@ -359,7 +359,6 @@ class ChatAgentPrompterDataService:
 
     def _post_user_message(self, user_message: str, last_messages: list):
         self._messages.append({"role": "user", "content": user_message})
-        _logger.warning("_messages: " + repr(self._messages))
         final_state = self._agent_graph.invoke({"messages": self._messages})
         self._messages = final_state["messages"]
         if self._show_tool_messages:

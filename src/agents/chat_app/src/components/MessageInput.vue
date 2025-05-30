@@ -1,21 +1,16 @@
 <script setup lang="ts">
-import { computed, defineEmits, defineProps, nextTick, ref } from "vue";
+import { computed, nextTick, ref } from "vue";
 
 import { FunctionButton } from "@knime/components";
 import AbortIcon from "@knime/styles/img/icons/close.svg";
 import SendIcon from "@knime/styles/img/icons/paper-flier.svg";
 
-const props = defineProps<{
-  value: string;
-  isLoading: boolean;
-}>();
+import { useSendMessage } from "@/composables/useSendMessage";
 
-const emit = defineEmits<{
-  (e: "update:value", value: string): void;
-  (e: "send"): void;
-}>();
-
+const userInput = ref("");
 const inputElement = ref<HTMLTextAreaElement | null>(null);
+
+const { isLoading, sendMessage } = useSendMessage();
 
 const resizeTextarea = () => {
   if (!inputElement.value) {
@@ -29,17 +24,19 @@ const resizeTextarea = () => {
   )}px`;
 };
 
-const handleInput = (event: Event) => {
-  const target = event.target as HTMLTextAreaElement;
-  emit("update:value", target.value);
+const handleInput = () => {
   resizeTextarea();
 };
 
-const sendMessage = () => {
-  if (props.isLoading || !props.value.trim()) {
+const handleSubmit = () => {
+  // TODO: Handle canceling?
+  if (isLoading.value || !userInput.value.trim()) {
     return;
   }
-  emit("send");
+
+  sendMessage(userInput.value);
+
+  userInput.value = "";
 
   // Reset height after sending
   nextTick(() => {
@@ -52,21 +49,21 @@ const sendMessage = () => {
 const handleKeydown = (event: KeyboardEvent) => {
   if (event.key === "Enter" && !event.shiftKey) {
     event.preventDefault();
-    sendMessage();
+    handleSubmit();
   }
 };
 
 const isInputValid = computed(
-  () => props.value && props.value.trim().length > 0,
+  () => userInput.value && userInput.value.trim().length > 0,
 );
-const disabled = computed(() => !isInputValid.value && !props.isLoading);
+const disabled = computed(() => !isInputValid.value && !isLoading.value);
 </script>
 
 <template>
   <div class="chat-controls">
     <!-- TODO: Use the same constant for character limit as knime-ui -->
     <textarea
-      :value="value"
+      v-model="userInput"
       class="textarea"
       aria-label="Type your message"
       :maxlength="300"
@@ -78,7 +75,7 @@ const disabled = computed(() => !isInputValid.value && !props.isLoading);
       class="send-button"
       primary
       :disabled="disabled"
-      @click="sendMessage"
+      @click="handleSubmit"
     >
       <AbortIcon
         v-if="isLoading"

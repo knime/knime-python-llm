@@ -1,14 +1,9 @@
 <script setup lang="ts">
-import { defineProps } from "vue";
-
-import { type Message } from "../types";
+import { useSendMessage } from "@/composables/useSendMessage";
 
 import MessageBox from "./MessageBox.vue";
 
-defineProps<{
-  messages: Message[];
-  isLoading: boolean;
-}>();
+const { messages, isLoading } = useSendMessage();
 </script>
 
 <template>

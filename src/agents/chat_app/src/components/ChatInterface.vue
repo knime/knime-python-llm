@@ -1,26 +1,18 @@
 <script setup lang="ts">
-import { defineEmits, defineProps, nextTick, onMounted, ref, watch } from "vue";
+import { nextTick, onMounted, ref, watch } from "vue";
 
-import { type Message } from "../types";
+import { useSendMessage } from "@/composables/useSendMessage";
 
 import MessageInput from "./MessageInput.vue";
 import MessageList from "./MessageList.vue";
-
-const props = defineProps<{
-  messages: Message[];
-  isLoading: boolean;
-  userInput: string;
-}>();
-
-const emit = defineEmits<{
-  (e: "sendMessage"): void;
-  (e: "update:userInput", value: string): void;
-}>();
 
 const messagesContainer = ref<HTMLElement | null>(null);
 const isAtBottom = ref(true);
 const showScrollToBottom = ref(false);
 
+const { messages } = useSendMessage();
+
+// TODO: Check if this functionality is necessary/useful
 const scrollToBottom = () => {
   if (!messagesContainer.value) {
     return;
@@ -44,12 +36,8 @@ const handleScroll = (event: Event) => {
   showScrollToBottom.value = !isAtBottom.value;
 };
 
-const updateUserInput = (value: string) => {
-  emit("update:userInput", value);
-};
-
 watch(
-  () => props.messages.length,
+  () => messages.value.length,
   () => {
     if (isAtBottom.value) {
       scrollToBottom();
@@ -71,7 +59,7 @@ onMounted(() => {
       class="messages-container"
       @scroll="handleScroll"
     >
-      <MessageList :messages="messages" :is-loading="isLoading" />
+      <MessageList />
     </div>
 
     <button
@@ -95,12 +83,7 @@ onMounted(() => {
       </svg>
     </button>
 
-    <MessageInput
-      :value="userInput"
-      :is-loading="isLoading"
-      @update:value="updateUserInput"
-      @send="emit('sendMessage')"
-    />
+    <MessageInput />
   </main>
 </template>
 

@@ -160,7 +160,7 @@ class LangchainToolConverter:
                 self._validate_required_fields(
                     tool.parameter_schema.keys(), params, "configuration parameters"
                 )
-                return self._ctx.execute_tool(tool, params, [], self._debug)[0]
+                return self._ctx._execute_tool(tool, params, [], self._debug)[0]
             except Exception as e:
                 _logger.exception(e)
                 raise
@@ -221,7 +221,7 @@ class LangchainToolConverter:
 
             try:
                 inputs = [self._data_registry.get_data(i) for i in data_inputs.values()]
-                message, outputs = self._ctx.execute_tool(
+                message, outputs = self._ctx._execute_tool(
                     tool, configuration, inputs, self._debug
                 )
                 _logger.error(f"Message: {message}")

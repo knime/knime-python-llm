@@ -29,5 +29,13 @@
          </PythonValueFactory>
       </Module>
    </extension>
+   <extension
+         point="org.knime.workbench.repository.nodes">
+      <node
+            deprecated="false"
+            factory-class="org.knime.ai.core.node.message.extract.MessagePartExtractorNodeFactory"
+            hidden="false">
+      </node>
+   </extension>
 
 </plugin>

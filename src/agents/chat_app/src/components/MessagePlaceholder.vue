@@ -6,7 +6,7 @@
 </template>
 
 <style lang="postcss" scoped>
-@import "@knime/styles/css/mixins";
+@import url("@knime/styles/css/mixins");
 
 @keyframes rotate-animation {
   0% {

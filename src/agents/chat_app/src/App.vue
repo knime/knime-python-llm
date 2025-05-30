@@ -1,31 +1,37 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { onMounted, ref } from "vue";
+
+import { JsonDataService } from "@knime/ui-extension-service";
+
 import ChatInterface from "./components/ChatInterface.vue";
 import { type Message } from "./types";
-import { JsonDataService } from "@knime/ui-extension-service";
 
 const messages = ref<Message[]>([]);
 
 const userInput = ref("");
 const isLoading = ref(false);
 
-
 onMounted(async () => {
   // initializes the python backend (e.g. starting the python process)
   const jsonDataService = await JsonDataService.getInstance();
-  jsonDataService.data({ method: "init"});
+  jsonDataService.data({ method: "init" });
 });
 
 const sendMessageToBackend = async (message: string): Promise<any[]> => {
   const jsonDataService = await JsonDataService.getInstance();
-  await jsonDataService.data({ method: "post_user_message", options: [message] });
+  await jsonDataService.data({
+    method: "post_user_message",
+    options: [message],
+  });
 
   // long polling for response
   // TODO cancel polling eventually?
   return new Promise((resolve, reject) => {
     const poll = async () => {
       try {
-        const response = await jsonDataService.data({ method: "get_last_messages" });
+        const response = await jsonDataService.data({
+          method: "get_last_messages",
+        });
         if (response && response.length > 0) {
           resolve(response);
         } else {
@@ -36,12 +42,14 @@ const sendMessageToBackend = async (message: string): Promise<any[]> => {
       }
     };
 
-    poll(); 
+    poll();
   });
 };
 
 const sendMessage = async () => {
-  if (!userInput.value.trim()) return;
+  if (!userInput.value.trim()) {
+    return;
+  }
 
   const userMessage: Message = {
     id: Date.now().toString(),
@@ -58,17 +66,20 @@ const sendMessage = async () => {
   try {
     const response = await sendMessageToBackend(userMessage.content);
 
-    for(const message of response) {
-      const tool_calls = message.tool_calls ? `;tool calls: ${message.tool_calls}` : "";
+    for (const message of response) {
+      const toolCalls = message.toolCalls
+        ? `;tool calls: ${message.toolCalls}`
+        : "";
       messages.value.push({
         id: (Date.now() + 1).toString(),
-        content: `${message.role}: ${message.content}${tool_calls}`,
+        content: `${message.role}: ${message.content}${toolCalls}`,
         role: message.role,
         timestamp: new Date(),
       });
     }
   } catch (error) {
     // TODO: Real logging
+    // eslint-disable-next-line no-console
     console.error("Error generating response:", error);
     messages.value.push({
       id: (Date.now() + 1).toString(),
@@ -85,10 +96,10 @@ const sendMessage = async () => {
 <template>
   <div class="app-container">
     <ChatInterface
+      v-model:user-input="userInput"
       :messages="messages"
       :is-loading="isLoading"
       @send-message="sendMessage"
-      v-model:user-input="userInput"
     />
   </div>
 </template>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, defineEmits, defineProps, nextTick, computed } from "vue";
+import { computed, defineEmits, defineProps, nextTick, ref } from "vue";
 
 import { FunctionButton } from "@knime/components";
 import AbortIcon from "@knime/styles/img/icons/close.svg";
@@ -17,24 +17,28 @@ const emit = defineEmits<{
 
 const inputElement = ref<HTMLTextAreaElement | null>(null);
 
+const resizeTextarea = () => {
+  if (!inputElement.value) {
+    return;
+  }
+
+  inputElement.value.style.height = "auto";
+  inputElement.value.style.height = `${Math.min(
+    inputElement.value.scrollHeight,
+    150,
+  )}px`;
+};
+
 const handleInput = (event: Event) => {
   const target = event.target as HTMLTextAreaElement;
   emit("update:value", target.value);
   resizeTextarea();
 };
 
-const resizeTextarea = () => {
-  if (!inputElement.value) return;
-
-  inputElement.value.style.height = "auto";
-  inputElement.value.style.height = `${Math.min(
-    inputElement.value.scrollHeight,
-    150
-  )}px`;
-};
-
 const sendMessage = () => {
-  if (props.isLoading || !props.value.trim()) return;
+  if (props.isLoading || !props.value.trim()) {
+    return;
+  }
   emit("send");
 
   // Reset height after sending
@@ -53,7 +57,7 @@ const handleKeydown = (event: KeyboardEvent) => {
 };
 
 const isInputValid = computed(
-  () => props.value && props.value.trim().length > 0
+  () => props.value && props.value.trim().length > 0,
 );
 const disabled = computed(() => !isInputValid.value && !props.isLoading);
 </script>
@@ -88,7 +92,7 @@ const disabled = computed(() => !isInputValid.value && !props.isLoading);
 </template>
 
 <style lang="postcss" scoped>
-@import "@knime/styles/css/mixins";
+@import url("@knime/styles/css/mixins");
 
 .chat-controls {
   display: flex;

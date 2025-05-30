@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { ref, nextTick, onMounted, watch, defineProps, defineEmits } from "vue";
-import MessageList from "./MessageList.vue";
-import MessageInput from "./MessageInput.vue";
+import { defineEmits, defineProps, nextTick, onMounted, ref, watch } from "vue";
+
 import { type Message } from "../types";
+
+import MessageInput from "./MessageInput.vue";
+import MessageList from "./MessageList.vue";
 
 const props = defineProps<{
   messages: Message[];
@@ -20,7 +22,9 @@ const isAtBottom = ref(true);
 const showScrollToBottom = ref(false);
 
 const scrollToBottom = () => {
-  if (!messagesContainer.value) return;
+  if (!messagesContainer.value) {
+    return;
+  }
 
   nextTick(() => {
     if (messagesContainer.value) {
@@ -52,7 +56,7 @@ watch(
     } else {
       showScrollToBottom.value = true;
     }
-  }
+  },
 );
 
 onMounted(() => {
@@ -73,8 +77,8 @@ onMounted(() => {
     <button
       v-if="showScrollToBottom"
       class="scroll-to-bottom"
-      @click="scrollToBottom"
       aria-label="Scroll to bottom"
+      @click="scrollToBottom"
     >
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -87,7 +91,7 @@ onMounted(() => {
         stroke-linecap="round"
         stroke-linejoin="round"
       >
-        <polyline points="6 9 12 15 18 9"></polyline>
+        <polyline points="6 9 12 15 18 9" />
       </svg>
     </button>
 
@@ -130,10 +134,12 @@ onMounted(() => {
   justify-content: center;
   border: none;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 20%);
   opacity: 0;
   transform: translateY(20px);
-  transition: opacity 0.3s ease, transform 0.3s ease;
+  transition:
+    opacity 0.3s ease,
+    transform 0.3s ease;
   z-index: 5;
 }
 

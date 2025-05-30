@@ -76,4 +76,9 @@ public class TextContentPart implements MessageContentPart {
         return m_content.getBytes();
     }
 
+    @Override
+    public String toString() {
+        return m_content;
+    }
+
 }

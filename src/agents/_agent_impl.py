@@ -321,7 +321,11 @@ def render_message_as_json(**kwargs) -> str:
 
 class ChatAgentPrompterDataService:
     def __init__(
-        self, agent_graph, data_registry: DataRegistry, show_tool_messages: bool
+        self,
+        agent_graph,
+        data_registry: DataRegistry,
+        recursion_limit: int,
+        show_tool_messages: bool,
     ):
         self._agent_graph = agent_graph
         self._data_registry = data_registry
@@ -333,6 +337,7 @@ class ChatAgentPrompterDataService:
                 ),
             }
         ]
+        self._recursion_limit = recursion_limit
         self._show_tool_messages = show_tool_messages
 
     def init(self):
@@ -359,8 +364,28 @@ class ChatAgentPrompterDataService:
 
     def _post_user_message(self, user_message: str, last_messages: list):
         self._messages.append({"role": "user", "content": user_message})
-        final_state = self._agent_graph.invoke({"messages": self._messages})
-        self._messages = final_state["messages"]
+        config = {"recursion_limit": self._recursion_limit}
+        try:
+            final_state = self._agent_graph.invoke({"messages": self._messages}, config)
+            self._messages = final_state["messages"]
+        except Exception as e:
+            if "Recursion limit" in str(e):
+                last_messages.append(
+                    {
+                        "role": "error",  # TODO
+                        "content": f"""Recursion limit of {self._recursion_limit} reached. 
+                        You can increase the limit by setting the `recursion_limit` parameter.""",
+                    }
+                )
+                return
+            else:
+                last_messages.append(
+                    {
+                        "role": "error",  # TODO
+                        "content": f"An error occurred while executing the agent: {e}",
+                    }
+                )
+                return
         if self._show_tool_messages:
             last_human_index = next(
                 (

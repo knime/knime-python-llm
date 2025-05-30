@@ -337,6 +337,19 @@ ability to solve the problem and think insightfully.""",
     )
 
 
+def _recursion_limit_parameter():
+    return knext.IntParameter(
+        "Recursion limit",
+        """
+        The maximum number of times the agent can repeat its steps to
+        avoid getting stuck in an endless loop.
+        If not provided, defaults to 25.""",
+        default_value=25,
+        min_value=1,
+        is_advanced=True,
+    )
+
+
 def _debug_mode_parameter():
     return knext.BoolParameter(
         "Debug mode",
@@ -394,16 +407,7 @@ class AgentPrompter2:
 
     tool_column = _tool_column_parameter()
 
-    recursion_limit = knext.IntParameter(
-        "Recursion limit",
-        """
-        The maximum number of times the agent can repeat its steps to
-        avoid getting stuck in an endless loop.
-        If not provided, defaults to 25.""",
-        default_value=25,
-        min_value=1,
-        is_advanced=True,
-    )
+    recursion_limit = _recursion_limit_parameter()
 
     debug = _debug_mode_parameter()
 
@@ -569,6 +573,8 @@ class ChatAgentPrompter:
         default_value=False,
     )
 
+    recursion_limit = _recursion_limit_parameter()
+
     debug = _debug_mode_parameter()
 
     def configure(
@@ -633,5 +639,5 @@ class ChatAgentPrompter:
         )
 
         return ChatAgentPrompterDataService(
-            agent, data_registry, self.show_tool_messages
+            agent, data_registry, self.recursion_limit, self.show_tool_messages
         )

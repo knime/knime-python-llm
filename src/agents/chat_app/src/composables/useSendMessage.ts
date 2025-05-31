@@ -18,8 +18,8 @@ const createNewMessage = (response: MessageResponse): Message => {
     : "";
   return {
     id: (Date.now() + 1).toString(),
-    content: `${response.role}: ${response.content}${toolCalls}`,
-    role: response.role,
+    content: `${response.type}: ${response.content}${toolCalls}`,
+    type: response.type,
   };
 };
 
@@ -34,13 +34,14 @@ const pollForNewMessages = async () => {
       method: "get_last_messages",
     });
     if (response?.length > 0) {
+      console.log("Chat Agent: New messages received:", response);
       displayNewMessages(response);
     } else {
       await pollForNewMessages();
     }
   } catch (error) {
     consola.error("Chat Agent: Error generating message response:", error);
-    displayNewMessages([{ content: processingError, role: "system" }]);
+    displayNewMessages([{ content: processingError, type: "error" }]);
   }
 };
 
@@ -54,7 +55,7 @@ const postMessage = async (message: string) => {
     await pollForNewMessages();
   } catch (error) {
     consola.error("Chat Agent: Error posting message:", error);
-    displayNewMessages([{ content: sendingError, role: "system" }]);
+    displayNewMessages([{ content: sendingError, type: "error" }]);
   }
 };
 
@@ -63,7 +64,7 @@ const sendMessage = async (message: string) => {
     return;
   }
   isLoading.value = true;
-  displayNewMessages([{ content: message, role: "user" }]);
+  displayNewMessages([{ content: message, type: "human" }]);
   await postMessage(message);
   isLoading.value = false;
 };

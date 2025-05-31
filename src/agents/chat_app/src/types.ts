@@ -1,9 +1,15 @@
-export type Role = "user" | "assistant" | "system";
+export type Type = "human" | "ai" | "error";
+
+export interface ToolCall  {
+  id: string;
+  name: string;
+}
 
 export interface MessageResponse {
-  content: string;
-  role: Role;
-  toolCalls?: any[];
+  type: Type;
+  content?: string;
+  toolCalls?: ToolCall[];
+  toolCallId?: string;
 }
 
 export interface Message extends MessageResponse {

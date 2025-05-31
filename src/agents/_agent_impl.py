@@ -372,7 +372,7 @@ class ChatAgentPrompterDataService:
             if "Recursion limit" in str(e):
                 last_messages.append(
                     {
-                        "role": "error",  # TODO
+                        "type": "error",
                         "content": f"""Recursion limit of {self._recursion_limit} reached. 
                         You can increase the limit by setting the `recursion_limit` parameter.""",
                     }
@@ -381,7 +381,7 @@ class ChatAgentPrompterDataService:
             else:
                 last_messages.append(
                     {
-                        "role": "error",  # TODO
+                        "type": "error",
                         "content": f"An error occurred while executing the agent: {e}",
                     }
                 )
@@ -395,28 +395,31 @@ class ChatAgentPrompterDataService:
                 ),
                 -1,
             )
-            last_messages.extend(
-                [
-                    {
-                        "role": msg.type,
-                        "content": msg.content,
-                        "tool_calls": str(msg.tool_calls)
-                        if hasattr(msg, "tool_calls")
-                        else None,
-                    }
-                    for msg in self._messages[last_human_index + 1 :]
-                ]
-            )
+            for msg in self._messages[last_human_index + 1:]:
+                last_messages.append(self._to_frontend_message(msg))
         else:
-            last_messages.append(
+            last_messages.append(self._to_frontend_message(self._messages[-1]))
+
+    def _to_frontend_message(self, message):
+        fe_message = {
+            "id": message.id if hasattr(message, "id") else None,
+            "type": message.type,
+            "content": message.content if hasattr(message, "content") else None,
+            "name": message.name if hasattr(message, "name") else None,
+        }
+
+        if message.type == "ai" and hasattr(message, "tool_calls"):
+            fe_message["toolCalls"] = [
                 {
-                    "role": self._messages[-1].type,
-                    "content": self._messages[-1].content,
-                    "tool_calls": str(self._messages[-1].tool_calls)
-                    if hasattr(self._messages[-1], "tool_calls")
-                    else None,
+                   "id": tool_call["id"], 
+                   "name": tool_call["name"],
+                   "args": str(tool_call["args"]) if "args" in tool_call else None,
                 }
-            )
+                for tool_call in message.tool_calls
+            ]
+        elif message.type == "tool":
+            fe_message["toolCallId"] = message.tool_call_id
+        return fe_message
 
 
 class State(TypedDict):

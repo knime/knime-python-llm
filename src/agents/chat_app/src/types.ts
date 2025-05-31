@@ -1,8 +1,9 @@
 export type Type = "human" | "ai" | "error";
 
-export interface ToolCall  {
+export interface ToolCall {
   id: string;
   name: string;
+  args?: string;
 }
 
 export interface MessageResponse {

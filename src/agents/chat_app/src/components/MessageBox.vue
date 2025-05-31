@@ -4,18 +4,18 @@ import { computed, defineProps } from "vue";
 import KnimeIcon from "@knime/styles/img/KNIME_Triangle.svg";
 import UserIcon from "@knime/styles/img/icons/user.svg";
 
-import type { Role } from "../types";
+import type { Type } from "../types";
 
 import MarkdownRenderer from "./MarkdownRenderer.vue";
 import MessagePlaceholder from "./MessagePlaceholder.vue";
 
 const props = defineProps<{
-  content: string;
-  role: Role;
+  content?: string;
+  type: Type;
 }>();
 
-const isUser = computed(() => {
-  return props.role === "user";
+const isHuman = computed(() => {
+  return props.type === "human";
 });
 </script>
 
@@ -23,16 +23,16 @@ const isUser = computed(() => {
   <div class="message">
     <!-- Message's sender icon -->
     <div class="header">
-      <div class="icon" :class="{ user: isUser }">
-        <UserIcon v-if="isUser" />
+      <div class="icon" :class="{ user: isHuman }">
+        <UserIcon v-if="isHuman" />
         <KnimeIcon v-else />
       </div>
     </div>
 
     <!-- Message content -->
     <!-- TODO: Error logic -->
-    <div class="body" :class="{ user: isUser, error: false }">
-      <MarkdownRenderer v-if="content" :markdown="props.content" />
+    <div class="body" :class="{ user: isHuman, error: false }">
+      <MarkdownRenderer v-if="props.content" :markdown="props.content" />
       <MessagePlaceholder v-else />
     </div>
   </div>

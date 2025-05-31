@@ -9,21 +9,21 @@ const { messages, isLoading } = useSendMessage();
 <template>
   <div class="message-list">
     <template v-for="message in messages" :key="message.id">
-      <!-- System message -->
-      <div v-if="message.role === 'system'" class="system-message">
+      <!-- Error message -->
+      <div v-if="message.type === 'error'" class="error-message">
         {{ message.content }}
       </div>
 
       <!-- User or AI message -->
-      <div v-else class="message-wrapper" :class="message.role">
+      <div v-else class="message-wrapper" :class="message.type">
         <div class="message-content">
-          <MessageBox :content="message.content" :role="message.role" />
+          <MessageBox :content="message.content" :type="message.type" />
         </div>
       </div>
     </template>
 
     <!-- TODO: Improve isLoading state (maybe approach like in K-AI?) -->
-    <MessageBox v-if="isLoading" content="" role="assistant" />
+    <MessageBox v-if="isLoading" content="" type="ai" />
   </div>
 </template>
 
@@ -53,11 +53,11 @@ const { messages, isLoading } = useSendMessage();
   }
 }
 
-.message-wrapper.user {
+.message-wrapper.human {
   justify-content: flex-end;
 }
 
-.message-wrapper.assistant {
+.message-wrapper.ai {
   justify-content: flex-start;
 }
 
@@ -71,7 +71,7 @@ const { messages, isLoading } = useSendMessage();
   }
 }
 
-.system-message {
+.error-message {
   text-align: center;
   font-size: 0.825rem;
   color: var(--color-text-secondary);

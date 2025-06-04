@@ -48,21 +48,34 @@
  */
 package org.knime.ai.core.node.message.extract;
 
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.function.BinaryOperator;
+import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.IntFunction;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
+import java.util.stream.IntStream;
 
 import org.knime.ai.core.data.message.MessageValue;
+import org.knime.ai.core.data.message.MessageValue.MessageContentPart;
 import org.knime.ai.core.data.message.MessageValue.ToolCall;
 import org.knime.core.data.DataCell;
+import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataColumnSpecCreator;
 import org.knime.core.data.DataRow;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.DataType;
-import org.knime.core.data.collection.CollectionCellFactory;
-import org.knime.core.data.collection.ListCell;
+import org.knime.core.data.container.AbstractCellFactory;
+import org.knime.core.data.container.CellFactory;
 import org.knime.core.data.container.ColumnRearranger;
 import org.knime.core.data.container.SingleCellFactory;
 import org.knime.core.data.def.StringCell;
+import org.knime.core.data.image.png.PNGImageCellFactory;
+import org.knime.core.data.json.JSONCellFactory;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.ExecutionContext;
 import org.knime.core.node.InvalidSettingsException;
@@ -90,8 +103,17 @@ final class MessagePartExtractorNodeModel extends WebUINodeModel<MessagePartExtr
             throw new InvalidSettingsException("The specified message column '" + modelSettings.m_messageColumn
                 + "' does not exist in the input table.");
         }
-
-        return new DataTableSpec[]{createColumnRearranger(modelSettings, messageTableSpec).createSpec()};
+        int messageColumnIndex = messageTableSpec.findColumnIndex(modelSettings.m_messageColumn);
+        var splitterFactories = createCellSplitterFactories(modelSettings, messageColumnIndex);
+        // If any splitterFactory is stateful (i.e., depends on data), return null DataTableSpec
+        boolean hasStateful = splitterFactories.stream().anyMatch(f -> f.isStateful());
+        if (hasStateful) {
+            return new DataTableSpec[]{null};
+        }
+        // Otherwise, safe to simulate scan with empty state
+        List<CellFactory> cellFactories = splitterFactories.stream().map(Supplier::get).toList();
+        var columnRearranger = createColumnRearranger(modelSettings, messageTableSpec, cellFactories);
+        return new DataTableSpec[]{columnRearranger.createSpec()};
     }
 
     @Override
@@ -99,50 +121,210 @@ final class MessagePartExtractorNodeModel extends WebUINodeModel<MessagePartExtr
         final MessagePartExtractorSettings modelSettings) throws Exception {
         var messageTable = inData[0];
         var messageTableSpec = messageTable.getDataTableSpec();
-        var columRearranger = createColumnRearranger(modelSettings, messageTableSpec);
-
-        var resultTable = exec.createColumnRearrangeTable(messageTable, columRearranger, exec);
-
+        int messageColumnIndex = messageTableSpec.findColumnIndex(modelSettings.m_messageColumn);
+        var splitterFactories = createCellSplitterFactories(modelSettings, messageColumnIndex);
+        // Scan the data for extractors that need it
+        for (var row : messageTable) {
+            var cell = row.getCell(messageColumnIndex);
+            for (var splitter : splitterFactories) {
+                splitter.accept(cell);
+            }
+        }
+        List<CellFactory> cellFactories = splitterFactories.stream().map(Supplier::get).toList();
+        var columnRearranger = createColumnRearranger(modelSettings, messageTableSpec, cellFactories);
+        var resultTable = exec.createColumnRearrangeTable(messageTable, columnRearranger, exec);
         return new BufferedDataTable[]{resultTable};
     }
 
     private static ColumnRearranger createColumnRearranger(final MessagePartExtractorSettings modelSettings,
-        final DataTableSpec messageTableSpec) {
+        final DataTableSpec messageTableSpec, final List<CellFactory> cellFactories) {
         var columnRearranger = new ColumnRearranger(messageTableSpec);
         int columnIndex = messageTableSpec.findColumnIndex(modelSettings.m_messageColumn);
-
-        if (modelSettings.m_extractRole) {
-            columnRearranger.append(new PartExtractorCellFactory("Role", StringCell.TYPE,
-                MessagePartExtractorNodeModel::extractRole, columnIndex));
+        for (CellFactory factory : cellFactories) {
+            columnRearranger.append(factory);
         }
-        if (modelSettings.m_extractTextParts) {
-            columnRearranger
-                .append(new PartExtractorCellFactory("Text Content", ListCell.getCollectionType(StringCell.TYPE),
-                    MessagePartExtractorNodeModel::extractTextContent, columnIndex));
-        }
-        if (modelSettings.m_extractToolCalls) {
-            columnRearranger
-                .append(new PartExtractorCellFactory("Tool Calls", ListCell.getCollectionType(StringCell.TYPE),
-                    MessagePartExtractorNodeModel::extractToolCalls, columnIndex));
-        }
-        if (modelSettings.m_extractToolCallIds) {
-            columnRearranger.append(new PartExtractorCellFactory("Tool Call ID", StringCell.TYPE,
-                MessagePartExtractorNodeModel::extractToolCallId, columnIndex));
-        }
-
         if (!modelSettings.m_keepOriginalColumn) {
             columnRearranger.remove(columnIndex);
         }
         return columnRearranger;
     }
 
-    private static final class PartExtractorCellFactory extends SingleCellFactory {
+    private static List<CellSplitterFactory<?>> createCellSplitterFactories(final MessagePartExtractorSettings settings,
+        final int messageColumnIndex) {
+        var list = new ArrayList<CellSplitterFactory<?>>();
+        if (settings.m_extractRole) {
+            list.add(
+                createStatelessCellSplitterFactory(() -> new PartExtractorSingleCellFactory(settings.m_roleColumnName,
+                    StringCell.TYPE, MessagePartExtractorNodeModel::extractRole, messageColumnIndex)));
+        }
+        if (settings.m_extractTextParts) {
+            list.add(createMultiCellSplitterFactory(createContentCounter("text"),
+                createColumnSpecCreator(settings.m_textPartsPrefix, StringCell.TYPE), messageColumnIndex,
+                createContentPartExtractor("text", data -> new StringCell(new String(data)))));
+        }
+        if (settings.m_extractImageParts) {
+            list.add(createMultiCellSplitterFactory(createContentCounter("image"),
+                createColumnSpecCreator(settings.m_imagePartsPrefix, PNGImageCellFactory.TYPE), messageColumnIndex,
+                createContentPartExtractor("image", PNGImageCellFactory::create)));
+        }
+        if (settings.m_extractToolCalls) {
+            list.add(createMultiCellSplitterFactory(
+                MessagePartExtractorNodeModel::countToolCalls,
+                createColumnSpecCreator(settings.m_toolCallsPrefix, JSONCellFactory.TYPE),
+                messageColumnIndex,
+                MessagePartExtractorNodeModel::extractToolCalls
+            ));
+        }
+        if (settings.m_extractToolCallIds) {
+            list.add(createStatelessCellSplitterFactory(
+                () -> new PartExtractorSingleCellFactory(settings.m_toolCallIdColumnName, StringCell.TYPE,
+                    MessagePartExtractorNodeModel::extractToolCallId, messageColumnIndex)));
+        }
+        return list;
+    }
+
+    private static IntFunction<DataColumnSpec> createColumnSpecCreator(final String prefix, final DataType type) {
+        return j -> new DataColumnSpecCreator(prefix + (j + 1), type).createSpec();
+    }
+
+    private static CellSplitterFactory<Integer> createMultiCellSplitterFactory(
+        final Function<DataCell, Integer> numCellsCalculator, final IntFunction<DataColumnSpec> columnSpecCreator,
+        final int messageColumnIndex, final Function<MessageValue, DataCell[]> cellExtractor) {
+        return new CellSplitterFactory<>(0, numCellsCalculator, Integer::max,
+            i -> new MultiCellFactory(IntStream.range(0, i).mapToObj(columnSpecCreator).toArray(DataColumnSpec[]::new),
+                r -> Optional.of(r.getCell(messageColumnIndex)).filter(Predicate.not(DataCell::isMissing))//
+                    .map(MessageValue.class::cast)//
+                    .map(cellExtractor)//
+                    .map(c -> padWithMissing(c, i))//
+                    .orElseGet(() -> padWithMissing(new DataCell[0], i))));
+    }
+
+    private static CellSplitterFactory<?>
+        createStatelessCellSplitterFactory(final Supplier<CellFactory> cellFactorySupplier) {
+        return new CellSplitterFactory<>(null, noopExtractor(), noopAggregator(), c -> cellFactorySupplier.get(),
+            false);
+    }
+
+    private static Function<DataCell, Integer> createContentCounter(final String contentType) {
+        return cell -> {
+            if (cell.isMissing()) {
+                return 0;
+            }
+            var message = (MessageValue)cell;
+            return (int)message.getContent().stream()//
+                .filter(part -> contentType.equals(part.getType()))//
+                .count();
+        };
+    }
+
+
+    private static Integer countToolCalls(final DataCell cell) {
+        if (cell.isMissing()) {
+            return 0;
+        }
+        var message = (MessageValue)cell;
+        return message.getToolCalls().map(List::size).orElse(0);
+    }
+
+    private static DataCell[] extractToolCalls(final MessageValue message) {
+        return message.getToolCalls()
+            .map(list -> list.stream().map(MessagePartExtractorNodeModel::toJsonCell).toArray(DataCell[]::new))
+            .orElseGet(() -> new DataCell[0]);
+    }
+
+    private static <S, T> Function<S, T> noopExtractor() {
+        return s -> null;
+    }
+
+    private static <T> BinaryOperator<T> noopAggregator() {
+        return (a, b) -> null;
+    }
+
+    private static final class CellSplitterFactory<T> implements Consumer<DataCell>, Supplier<CellFactory> {
+
+        private final BinaryOperator<T> m_stateAggregator;
+
+        private final Function<DataCell, T> m_stateExtractor;
+
+        private final Function<T, CellFactory> m_cellFactoryCreator;
+
+        private final boolean m_stateful;
+
+        private T m_state;
+
+        CellSplitterFactory(final T initialState, final Function<DataCell, T> stateExtractor,
+            final BinaryOperator<T> stateAggregator, final Function<T, CellFactory> cellFactoryCreator) {
+            this(initialState, stateExtractor, stateAggregator, cellFactoryCreator, true);
+        }
+
+        CellSplitterFactory(final T initialState, final Function<DataCell, T> stateExtractor,
+            final BinaryOperator<T> stateAggregator, final Function<T, CellFactory> cellFactoryCreator,
+            final boolean stateful) {
+            m_state = initialState;
+            m_stateExtractor = stateExtractor;
+            m_stateAggregator = stateAggregator;
+            m_cellFactoryCreator = cellFactoryCreator;
+            m_stateful = stateful;
+        }
+
+        @Override
+        public void accept(final DataCell t) {
+            m_state = m_stateAggregator.apply(m_state, m_stateExtractor.apply(t));
+        }
+
+        @Override
+        public CellFactory get() {
+            return m_cellFactoryCreator.apply(m_state);
+        }
+
+        public boolean isStateful() {
+            return m_stateful;
+        }
+    }
+
+    private static final class MultiCellFactory extends AbstractCellFactory {
+
+        private final Function<DataRow, DataCell[]> m_extractor;
+
+        MultiCellFactory(final DataColumnSpec[] columnSpecs, final Function<DataRow, DataCell[]> extractor) {
+            super(columnSpecs);
+            m_extractor = extractor;
+        }
+
+        @Override
+        public DataCell[] getCells(final DataRow row) {
+            return m_extractor.apply(row);
+        }
+    }
+
+    private static Function<MessageValue, DataCell[]> createContentPartExtractor(final String contentType,
+        final Function<byte[], DataCell> contentCellFactory) {
+        return message -> message.getContent().stream()//
+            .filter(part -> contentType.equals(part.getType()))//
+            .map(MessageContentPart::getData)//
+            .map(contentCellFactory)//
+            .toArray(DataCell[]::new);
+    }
+
+    private static DataCell[] padWithMissing(final DataCell[] cells, final int length) {
+        if (cells.length >= length) {
+            return cells;
+        }
+        var paddedCells = new DataCell[length];
+        System.arraycopy(cells, 0, paddedCells, 0, cells.length);
+        for (int i = cells.length; i < length; i++) {
+            paddedCells[i] = DataType.getMissingCell();
+        }
+        return paddedCells;
+    }
+
+    private static final class PartExtractorSingleCellFactory extends SingleCellFactory {
 
         private final int m_messageColumnIndex;
 
         private final Function<MessageValue, DataCell> m_extractor;
 
-        PartExtractorCellFactory(final String columnName, final DataType contentType,
+        PartExtractorSingleCellFactory(final String columnName, final DataType contentType,
             final Function<MessageValue, DataCell> extractor, final int messageColumnIndex) {
             super(true, new DataColumnSpecCreator(columnName, contentType).createSpec());
             m_extractor = extractor;
@@ -164,29 +346,17 @@ final class MessagePartExtractorNodeModel extends WebUINodeModel<MessagePartExtr
         return new StringCell(message.getMessageType().name());
     }
 
-    private static final DataCell extractTextContent(final MessageValue message) {
-        return CollectionCellFactory
-            .createListCell(message.getContent().stream().filter(part -> "text".equals(part.getType()))
-                .map(part -> new StringCell(new String(part.getData()))).toList());
-    }
-
     private static DataCell extractToolCallId(final MessageValue message) {
         return message.getToolCallId().map(s -> (DataCell)new StringCell(s)).orElseGet(DataType::getMissingCell);
     }
 
-    private static DataCell extractToolCalls(final MessageValue message) {
-        var toolCalls = message.getToolCalls();
-        return toolCalls.map(list -> toListCell(list, MessagePartExtractorNodeModel::toJsonCell))
-            .orElseGet(DataType::getMissingCell);
-    }
-
-    private static <T> DataCell toListCell(final List<T> list, final Function<T, DataCell> mapper) {
-        return CollectionCellFactory.createListCell(list.stream().map(mapper).toList());
-    }
-
     private static DataCell toJsonCell(final ToolCall toolCall) {
-        return new StringCell("{\"toolName\":\"" + toolCall.toolName() + "\", \"id\":\"" + toolCall.id()
-            + "\", \"arguments\":" + toolCall.arguments() + "}");
+        try {
+            return JSONCellFactory.create("{\"toolName\":\"" + toolCall.toolName() + "\", \"id\":\"" + toolCall.id()
+                + "\", \"arguments\":" + toolCall.arguments() + "}");
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to create JSON cell for tool call: " + toolCall, e);
+        }
     }
 
 }

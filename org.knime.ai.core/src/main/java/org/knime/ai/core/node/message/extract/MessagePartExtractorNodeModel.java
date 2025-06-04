@@ -158,7 +158,7 @@ final class MessagePartExtractorNodeModel extends WebUINodeModel<MessagePartExtr
         }
         if (settings.m_extractTextParts) {
             list.add(new CellSplitterFactory<>(0, MessagePartExtractorNodeModel::numTextContents,
-                Integer::sum,
+                Integer::max,
                 i -> new MultiCellFactory(IntStream.range(0, i).mapToObj(j -> new DataColumnSpecCreator(settings.m_textPartsPrefix + (j + 1),
                     StringCell.TYPE).createSpec()).toArray(DataColumnSpec[]::new),
                     r -> Optional.of(r.getCell(messageColumnIndex))
@@ -326,6 +326,9 @@ final class MessagePartExtractorNodeModel extends WebUINodeModel<MessagePartExtr
         try {
             return JSONCellFactory.create("{\"toolName\":\"" + toolCall.toolName() + "\", \"id\":\"" + toolCall.id()
             + "\", \"arguments\":" + toolCall.arguments() + "}");
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to create JSON cell for tool call: " + toolCall, e);
+        }
     }
 
 }

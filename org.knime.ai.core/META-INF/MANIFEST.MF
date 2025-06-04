@@ -11,3 +11,5 @@ Require-Bundle: org.knime.core;bundle-version="[5.5.0,6.0.0)",
  org.knime.json;bundle-version="[5.5.0,6.0.0)"
 Bundle-RequiredExecutionEnvironment: JavaSE-17
 Automatic-Module-Name: org.knime.ai.core
+Bundle-ClassPath: .,
+ lib/j2html-1.6.0.jar

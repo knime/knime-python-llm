@@ -94,6 +94,7 @@ final class ValueFactoryUtils {
 
     static <T> Consumer<List<T>> writeList(final ListWriteAccess access, final Consumer<T> itemWriter) {
         return (list) -> {
+            access.create(list.size());
             for (int i = 0; i < list.size(); i++) {
                 access.setWriteIndex(i);
                 var item = list.get(i);

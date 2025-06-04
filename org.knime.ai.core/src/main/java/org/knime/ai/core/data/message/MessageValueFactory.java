@@ -125,7 +125,7 @@ public final class MessageValueFactory implements ValueFactory<StructReadAccess,
             m_typeWriter = access.<StringWriteAccess>getWriteAccess(0)::setStringValue;
             ListWriteAccess contentAccess = access.getWriteAccess(1);
             m_contentWriter = ValueFactoryUtils.writeList(contentAccess,
-                createContentPartWriter(access.getWriteAccess(1)));
+                createContentPartWriter(contentAccess.getWriteAccess()));
             ListWriteAccess toolCallsAccess = access.getWriteAccess(2);
             m_toolCallsWriter = ValueFactoryUtils.writeOptional(toolCallsAccess,
                 ValueFactoryUtils.writeList(toolCallsAccess, createToolCallWriter(toolCallsAccess.getWriteAccess())));
@@ -147,7 +147,7 @@ public final class MessageValueFactory implements ValueFactory<StructReadAccess,
             VarBinaryWriteAccess dataAccess = access.getWriteAccess(1);
             return (part) -> {
                 if (part instanceof TextContentPart stringPart) {
-                    typeAccess.setStringValue("string");
+                    typeAccess.setStringValue("text");
                     dataAccess.setByteArray(stringPart.getContent().getBytes());
                 } else if (part instanceof ImageContentPart imagePart) {
                     typeAccess.setStringValue("image");

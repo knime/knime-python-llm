@@ -36,6 +36,10 @@
             factory-class="org.knime.ai.core.node.message.extract.MessagePartExtractorNodeFactory"
             hidden="false">
       </node>
+      <node
+            deprecated="false"
+            factory-class="org.knime.ai.core.node.message.creator.MessageCreatorNodeFactory"
+            hidden="false">
+      </node>
    </extension>
-
 </plugin>

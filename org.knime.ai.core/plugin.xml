@@ -37,5 +37,13 @@
             hidden="false">
       </node>
    </extension>
+   
+   <extension point="org.knime.core.DataValueRenderer">
+  	<dataValue valueClass="org.knime.ai.core.data.message.MessageValue">
+    	<renderer
+          rendererFactoryClass="org.knime.ai.core.ui.message.renderer.MessageValueRenderer$Factory"
+          suggestAsDefault="true"/>
+  	</dataValue>
+	</extension>
 
 </plugin>

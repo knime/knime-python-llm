@@ -55,8 +55,10 @@ from langchain_core.tools import BaseTool
 
 import json
 from langchain.tools import StructuredTool
+from langchain_core.messages import AIMessage, BaseMessage
 
 import logging
+import re
 
 _logger = logging.getLogger(__name__)
 
@@ -130,16 +132,47 @@ class LangchainToolConverter:
         self._ctx = ctx
         self._message_renderer = message_renderer
         self._debug = debug
+        self.sanitized_to_original = {}
+
+    def _sanitize_tool_name(self, name: str) -> str:
+        """Replaces characters that are not alphanumeric, underscores, or hyphens because
+        OpenAI rejects the tools otherwise. Also handles duplicates by appending a suffix."""
+        sanitized = re.sub(r"[^a-zA-Z0-9_-]", "_", name)
+        # Handle duplicates by appending a suffix if needed
+        base = sanitized
+        i = 1
+        while (
+            sanitized in self.sanitized_to_original
+            and self.sanitized_to_original[sanitized] != name
+        ):
+            sanitized = f"{base}_{i}"
+            i += 1
+        self.sanitized_to_original[sanitized] = name
+        return sanitized
+
+    def desanitize_tool_name(self, sanitized_name: str) -> str:
+        return self.sanitized_to_original.get(sanitized_name, sanitized_name)
+
+    def desanitize_tool_calls(self, msg: BaseMessage) -> BaseMessage:
+        """Desanitizes tool calls in a message by reverting the name back to the original user-provided name."""
+        if isinstance(msg, AIMessage) and msg.tool_calls:
+            # Tool calls can be either a dict or a ToolCall object, so we handle both cases
+            for tool_call in msg.tool_calls:
+                if isinstance(tool_call, dict):
+                    tool_call["name"] = self.desanitize_tool_name(tool_call["name"])
+                else:
+                    tool_call.name = self.desanitize_tool_name(tool_call.name)
+        return msg
 
     def to_langchain_tool(
         self,
         tool: WorkflowTool,
     ) -> StructuredTool:
-        _logger.error(f"Tool: {tool.input_ports}")
+        sanitized_name = self._sanitize_tool_name(tool.name)
         if tool.input_ports or tool.output_ports:
-            return self._to_langchain_tool_with_data(tool)
+            return self._to_langchain_tool_with_data(tool, sanitized_name)
         else:
-            return self._to_langchain_tool_without_data(tool)
+            return self._to_langchain_tool_without_data(tool, sanitized_name)
 
     def _validate_required_fields(self, required_fields, provided_dict, error_prefix):
         missing = [field for field in required_fields if field not in provided_dict]
@@ -148,7 +181,9 @@ class LangchainToolConverter:
                 f"Missing {error_prefix}: {', '.join(missing)}"
             )
 
-    def _to_langchain_tool_without_data(self, tool: WorkflowTool) -> StructuredTool:
+    def _to_langchain_tool_without_data(
+        self, tool: WorkflowTool, sanitized_name: str
+    ) -> StructuredTool:
         args_schema = {
             "type": "object",
             "properties": tool.parameter_schema,
@@ -167,7 +202,7 @@ class LangchainToolConverter:
 
         return StructuredTool.from_function(
             func=func,
-            name=tool.name,
+            name=sanitized_name,
             description=tool.description,
             args_schema=args_schema,
         )
@@ -175,6 +210,7 @@ class LangchainToolConverter:
     def _to_langchain_tool_with_data(
         self,
         tool: WorkflowTool,
+        sanitized_name: str,
     ) -> StructuredTool:
         args_schema = {
             "type": "object",
@@ -240,7 +276,7 @@ class LangchainToolConverter:
 
         return StructuredTool.from_function(
             func=func,
-            name=tool.name,
+            name=sanitized_name,
             description=description_with_data_info,
             args_schema=args_schema,
         )

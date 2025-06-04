@@ -493,13 +493,16 @@ class AgentPrompter2:
         messages = final_state["messages"]
         # output_table_ids = final_state.get("output_table_ids", [])
 
+        desanitized_messages = [
+            tool_converter.desanitize_tool_calls(msg) for msg in messages
+        ]
         result_df = pd.DataFrame(
             {
                 "Role": [msg.type for msg in messages],
                 "Content": [msg.content for msg in messages],
                 "Tool Calls": [
                     str(msg.tool_calls) if hasattr(msg, "tool_calls") else None
-                    for msg in messages
+                    for msg in desanitized_messages
                 ],
             }
         )

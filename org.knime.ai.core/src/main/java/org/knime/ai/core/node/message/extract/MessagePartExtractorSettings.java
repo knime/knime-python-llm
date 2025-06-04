@@ -152,10 +152,10 @@ final class MessagePartExtractorSettings implements DefaultNodeSettings {
     @Layout(ToolCallsSettings.class)
     public boolean m_extractToolCalls = true;
 
-    @Widget(title = "Tool calls column name", description = "Name of the output column for extracted tool calls.",
+    @Widget(title = "Tool calls column prefix", description = "Prefix for the output columns for extracted tool calls.",
         effect = @Effect(predicate = ShowToolCallsColumnName.class, type = Effect.EffectType.ENABLE))
     @Layout(ToolCallsSettings.class)
-    public String m_toolCallsColumnName = "Tool Calls";
+    public String m_toolCallsPrefix = "Tool Call ";
 
     @Widget(title = "Extract tool call IDs",
         description = "Whether to extract tool call IDs from the messages. If enabled, a new column with the tool call IDs will be added.")

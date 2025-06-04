@@ -69,8 +69,6 @@ import org.knime.core.data.DataColumnSpecCreator;
 import org.knime.core.data.DataRow;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.DataType;
-import org.knime.core.data.collection.CollectionCellFactory;
-import org.knime.core.data.collection.ListCell;
 import org.knime.core.data.container.AbstractCellFactory;
 import org.knime.core.data.container.CellFactory;
 import org.knime.core.data.container.ColumnRearranger;
@@ -170,9 +168,12 @@ final class MessagePartExtractorNodeModel extends WebUINodeModel<MessagePartExtr
                 createContentPartExtractor("image", PNGImageCellFactory::create)));
         }
         if (settings.m_extractToolCalls) {
-            list.add(createStatelessCellSplitterFactory(() -> new PartExtractorSingleCellFactory(
-                settings.m_toolCallsColumnName, ListCell.getCollectionType(JSONCellFactory.TYPE),
-                MessagePartExtractorNodeModel::extractToolCalls, messageColumnIndex)));
+            list.add(createMultiCellSplitterFactory(
+                MessagePartExtractorNodeModel::countToolCalls,
+                createColumnSpecCreator(settings.m_toolCallsPrefix, JSONCellFactory.TYPE),
+                messageColumnIndex,
+                MessagePartExtractorNodeModel::extractToolCalls
+            ));
         }
         if (settings.m_extractToolCallIds) {
             list.add(createStatelessCellSplitterFactory(
@@ -214,6 +215,21 @@ final class MessagePartExtractorNodeModel extends WebUINodeModel<MessagePartExtr
                 .filter(part -> contentType.equals(part.getType()))//
                 .count();
         };
+    }
+
+
+    private static Integer countToolCalls(final DataCell cell) {
+        if (cell.isMissing()) {
+            return 0;
+        }
+        var message = (MessageValue)cell;
+        return message.getToolCalls().map(List::size).orElse(0);
+    }
+
+    private static DataCell[] extractToolCalls(final MessageValue message) {
+        return message.getToolCalls()
+            .map(list -> list.stream().map(MessagePartExtractorNodeModel::toJsonCell).toArray(DataCell[]::new))
+            .orElseGet(() -> new DataCell[0]);
     }
 
     private static <S, T> Function<S, T> noopExtractor() {
@@ -332,16 +348,6 @@ final class MessagePartExtractorNodeModel extends WebUINodeModel<MessagePartExtr
 
     private static DataCell extractToolCallId(final MessageValue message) {
         return message.getToolCallId().map(s -> (DataCell)new StringCell(s)).orElseGet(DataType::getMissingCell);
-    }
-
-    private static DataCell extractToolCalls(final MessageValue message) {
-        var toolCalls = message.getToolCalls();
-        return toolCalls.map(list -> toListCell(list, MessagePartExtractorNodeModel::toJsonCell))
-            .orElseGet(DataType::getMissingCell);
-    }
-
-    private static <T> DataCell toListCell(final List<T> list, final Function<T, DataCell> mapper) {
-        return CollectionCellFactory.createListCell(list.stream().map(mapper).toList());
     }
 
     private static DataCell toJsonCell(final ToolCall toolCall) {

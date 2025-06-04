@@ -48,6 +48,7 @@
  */
 package org.knime.ai.core.node.message.extract;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -73,6 +74,7 @@ import org.knime.core.data.container.CellFactory;
 import org.knime.core.data.container.ColumnRearranger;
 import org.knime.core.data.container.SingleCellFactory;
 import org.knime.core.data.def.StringCell;
+import org.knime.core.data.json.JSONCellFactory;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.ExecutionContext;
 import org.knime.core.node.InvalidSettingsException;
@@ -168,7 +170,7 @@ final class MessagePartExtractorNodeModel extends WebUINodeModel<MessagePartExtr
         }
         if (settings.m_extractToolCalls) {
             list.add(createStatelessCellSplitterFactory(
-                () -> new PartExtractorSingleCellFactory(settings.m_toolCallsColumnName, ListCell.getCollectionType(StringCell.TYPE),
+                () -> new PartExtractorSingleCellFactory(settings.m_toolCallsColumnName, ListCell.getCollectionType(JSONCellFactory.TYPE),
                     MessagePartExtractorNodeModel::extractToolCalls, messageColumnIndex)));
         }
         if (settings.m_extractToolCallIds) {
@@ -321,7 +323,8 @@ final class MessagePartExtractorNodeModel extends WebUINodeModel<MessagePartExtr
     }
 
     private static DataCell toJsonCell(final ToolCall toolCall) {
-        return new StringCell("{\"toolName\":\"" + toolCall.toolName() + "\", \"id\":\"" + toolCall.id()
+        try {
+            return JSONCellFactory.create("{\"toolName\":\"" + toolCall.toolName() + "\", \"id\":\"" + toolCall.id()
             + "\", \"arguments\":" + toolCall.arguments() + "}");
     }
 

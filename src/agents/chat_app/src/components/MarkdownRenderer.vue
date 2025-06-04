@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 
-import { renderMarkdown } from "./markdown";
+import { renderMarkdown } from "../utils/markdown";
 
 interface Props {
   markdown: string;

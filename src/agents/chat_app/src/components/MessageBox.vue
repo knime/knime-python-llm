@@ -1,39 +1,43 @@
 <script setup lang="ts">
 import { computed, defineProps } from "vue";
 
-import KnimeIcon from "@knime/styles/img/KNIME_Triangle.svg";
+import AiIcon from "@knime/styles/img/icons/ai-general.svg";
 import UserIcon from "@knime/styles/img/icons/user.svg";
+import WrenchIcon from "@knime/styles/img/icons/wrench.svg";
 
-import type { Type } from "../types";
+import type { ToolCall, Type } from "../types";
 
 import MarkdownRenderer from "./MarkdownRenderer.vue";
 import MessagePlaceholder from "./MessagePlaceholder.vue";
+import ToolCalls from "./ToolCalls.vue";
 
 const props = defineProps<{
-  content?: string;
+  name?: string | null;
+  content: string;
   type: Type;
+  toolCalls?: ToolCall[];
 }>();
 
-const isHuman = computed(() => {
-  return props.type === "human";
-});
+const isHuman = computed(() => props.type === "human");
 </script>
 
 <template>
   <div class="message">
     <!-- Message's sender icon -->
     <div class="header">
-      <div class="icon" :class="{ user: isHuman }">
+      <div class="icon" :class="{ human: isHuman }">
         <UserIcon v-if="isHuman" />
-        <KnimeIcon v-else />
+        <WrenchIcon v-else-if="type === 'tool'" />
+        <AiIcon v-else />
       </div>
     </div>
 
     <!-- Message content -->
-    <!-- TODO: Error logic -->
-    <div class="body" :class="{ user: isHuman, error: false }">
-      <MarkdownRenderer v-if="props.content" :markdown="props.content" />
-      <MessagePlaceholder v-else />
+    <div class="body" :class="{ human: isHuman, error: false }">
+      <div v-if="type === 'tool'">{{ name }}:</div>
+      <ToolCalls v-if="toolCalls" :tool-calls="toolCalls" />
+      <MarkdownRenderer v-if="content" :markdown="content" />
+      <MessagePlaceholder v-if="!content && !toolCalls?.length" />
     </div>
   </div>
 </template>
@@ -64,8 +68,8 @@ const isHuman = computed(() => {
       background-color: var(--knime-white);
       border: 2px solid var(--knime-porcelain);
       border-radius: 100%;
-      height: 26px;
-      width: 26px;
+      height: var(--space-24);
+      width: var(--space-24);
       display: flex;
       justify-content: center;
       align-items: center;
@@ -75,57 +79,21 @@ const isHuman = computed(() => {
 
         @mixin svg-icon-size 16;
       }
-
-      &.user svg.assistant {
-        margin-top: -4px;
-      }
     }
   }
 
   & .body {
     border: 1px solid var(--knime-silver-sand);
-    border-radius: 0 5px 5px;
+    border-radius: 0 var(--space-4) var(--space-4);
     background-color: var(--knime-white);
-    padding: 10px 8px;
+    padding: var(--space-12) var(--space-8);
 
-    &.user {
-      border-radius: 5px 0 5px 5px;
+    &.human {
+      border-radius: var(--space-4) var(--space-4) 0 var(--space-4);
     }
 
     &.error {
       background-color: var(--knime-coral-light);
-    }
-  }
-
-  & .footer {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    min-height: 25px;
-
-    & .footer-left {
-      flex: 1;
-      text-align: left;
-    }
-
-    & .footer-right {
-      text-align: right;
-    }
-
-    & .show-full-content-button {
-      all: unset;
-      cursor: pointer;
-      font-weight: 500;
-      font-size: 11px;
-      padding-top: 10px;
-      color: var(--knime-dove-grey);
-      margin-top: -5px;
-      margin-left: 2px;
-    }
-
-    & .show-full-content-button:active,
-    & .show-full-content-button:hover {
-      text-decoration: underline;
     }
   }
 }

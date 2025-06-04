@@ -10,9 +10,8 @@ const messagesContainer = ref<HTMLElement | null>(null);
 const isAtBottom = ref(true);
 const showScrollToBottom = ref(false);
 
-const { messages } = useSendMessage();
+const { messages, isLoading, sendMessage } = useSendMessage();
 
-// TODO: Check if this functionality is necessary/useful
 const scrollToBottom = () => {
   if (!messagesContainer.value) {
     return;
@@ -59,35 +58,15 @@ onMounted(() => {
       class="messages-container"
       @scroll="handleScroll"
     >
-      <MessageList />
+      <MessageList :messages="messages" :is-loading="isLoading" />
     </div>
-
-    <button
-      v-if="showScrollToBottom"
-      class="scroll-to-bottom"
-      aria-label="Scroll to bottom"
-      @click="scrollToBottom"
-    >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="20"
-        height="20"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      >
-        <polyline points="6 9 12 15 18 9" />
-      </svg>
-    </button>
-
-    <MessageInput />
+    <MessageInput :is-loading="isLoading" :send-message="sendMessage" />
   </main>
 </template>
 
 <style scoped>
+@import url("@knime/styles/css/mixins");
+
 .chat-interface {
   display: flex;
   flex-direction: column;
@@ -99,39 +78,7 @@ onMounted(() => {
 .messages-container {
   flex-grow: 1;
   overflow-y: auto;
-  padding: 24px 0;
+  padding: var(--space-24) 0;
   scroll-behavior: smooth;
-}
-
-.scroll-to-bottom {
-  position: absolute;
-  right: 24px;
-  bottom: 80px;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background-color: var(--color-primary);
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  cursor: pointer;
-  box-shadow: 0 2px 8px rgb(0 0 0 / 20%);
-  opacity: 0;
-  transform: translateY(20px);
-  transition:
-    opacity 0.3s ease,
-    transform 0.3s ease;
-  z-index: 5;
-}
-
-.scroll-to-bottom:hover {
-  background-color: var(--color-primary-dark);
-}
-
-.scroll-to-bottom[v-if="showScrollToBottom"] {
-  opacity: 1;
-  transform: translateY(0);
 }
 </style>

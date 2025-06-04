@@ -1,105 +1,53 @@
 <script setup lang="ts">
-import { useSendMessage } from "@/composables/useSendMessage";
+import type { MessageResponse } from "@/types";
 
+import ErrorMessage from "./ErrorMessage.vue";
 import MessageBox from "./MessageBox.vue";
 
-const { messages, isLoading } = useSendMessage();
+defineProps<{
+  messages: MessageResponse[];
+  isLoading: boolean;
+}>();
 </script>
 
 <template>
   <div class="message-list">
     <template v-for="message in messages" :key="message.id">
-      <!-- Error message -->
-      <div v-if="message.type === 'error'" class="error-message">
-        {{ message.content }}
-      </div>
+      <ErrorMessage v-if="message.type === 'error'" v-bind="message" />
 
       <!-- User or AI message -->
       <div v-else class="message-wrapper" :class="message.type">
         <div class="message-content">
-          <MessageBox :content="message.content" :type="message.type" />
+          <MessageBox v-bind="message" />
         </div>
       </div>
     </template>
 
-    <!-- TODO: Improve isLoading state (maybe approach like in K-AI?) -->
-    <MessageBox v-if="isLoading" content="" type="ai" />
+    <!-- Loading new messages -->
+    <MessageBox v-if="isLoading" name="" content="" type="ai" />
   </div>
 </template>
 
 <style scoped>
+@import url("@knime/styles/css/mixins");
+
 .message-list {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 0 16px;
+  gap: var(--space-16);
+  padding: 0 var(--space-16);
 }
 
 .message-wrapper {
   display: flex;
-  margin-bottom: 8px;
-  animation: fade-in 0.3s ease;
-}
-
-@keyframes fade-in {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  margin-bottom: var(--space-8);
 }
 
 .message-wrapper.human {
   justify-content: flex-end;
 }
 
-.message-wrapper.ai {
-  justify-content: flex-start;
-}
-
 .message-content {
   max-width: 80%;
-}
-
-@media (max-width: 768px) {
-  .message-content {
-    max-width: 90%;
-  }
-}
-
-.error-message {
-  text-align: center;
-  font-size: 0.825rem;
-  color: var(--color-text-secondary);
-  margin: 8px 0;
-  padding: 4px 12px;
-  border-radius: 16px;
-  background-color: var(--color-bg-secondary);
-  align-self: center;
-  animation: fade-in 0.3s ease;
-}
-
-.date-separator {
-  display: flex;
-  align-items: center;
-  margin: 16px 0;
-  gap: 16px;
-}
-
-.date-line {
-  flex-grow: 1;
-  height: 1px;
-  background-color: var(--color-border);
-}
-
-.date-text {
-  font-size: 0.75rem;
-  color: var(--color-text-secondary);
-  white-space: nowrap;
-  padding: 0 8px;
 }
 </style>

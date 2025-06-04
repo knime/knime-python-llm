@@ -2,39 +2,30 @@
 import { computed, nextTick, ref } from "vue";
 
 import { FunctionButton } from "@knime/components";
-import AbortIcon from "@knime/styles/img/icons/close.svg";
 import SendIcon from "@knime/styles/img/icons/paper-flier.svg";
 
-import { useSendMessage } from "@/composables/useSendMessage";
+const characterLimit = 300;
+
+const props = defineProps<{
+  isLoading: boolean;
+  sendMessage: (message: string) => void;
+}>();
 
 const userInput = ref("");
 const inputElement = ref<HTMLTextAreaElement | null>(null);
 
-const { isLoading, sendMessage } = useSendMessage();
-
-const resizeTextarea = () => {
-  if (!inputElement.value) {
-    return;
-  }
-
-  inputElement.value.style.height = "auto";
-  inputElement.value.style.height = `${Math.min(
-    inputElement.value.scrollHeight,
-    150,
-  )}px`;
-};
-
-const handleInput = () => {
-  resizeTextarea();
-};
+const isInputValid = computed(
+  () => userInput.value && userInput.value.trim().length > 0,
+);
+const disabled = computed(() => !isInputValid.value || props.isLoading);
 
 const handleSubmit = () => {
   // TODO: Handle canceling?
-  if (isLoading.value || !userInput.value.trim()) {
+  if (props.isLoading || !userInput.value.trim()) {
     return;
   }
 
-  sendMessage(userInput.value);
+  props.sendMessage(userInput.value);
 
   userInput.value = "";
 
@@ -47,28 +38,21 @@ const handleSubmit = () => {
 };
 
 const handleKeydown = (event: KeyboardEvent) => {
-  if (event.key === "Enter" && !event.shiftKey) {
+  if (event.key === "Enter" && !event.shiftKey && !disabled.value) {
     event.preventDefault();
     handleSubmit();
   }
 };
-
-const isInputValid = computed(
-  () => userInput.value && userInput.value.trim().length > 0,
-);
-const disabled = computed(() => !isInputValid.value && !isLoading.value);
 </script>
 
 <template>
   <div class="chat-controls">
-    <!-- TODO: Use the same constant for character limit as knime-ui -->
     <textarea
       v-model="userInput"
       class="textarea"
       aria-label="Type your message"
-      :maxlength="300"
+      :maxlength="characterLimit"
       placeholder=""
-      @input="handleInput"
       @keydown="handleKeydown"
     />
     <FunctionButton
@@ -77,13 +61,7 @@ const disabled = computed(() => !isInputValid.value && !isLoading.value);
       :disabled="disabled"
       @click="handleSubmit"
     >
-      <AbortIcon
-        v-if="isLoading"
-        class="abort-icon"
-        aria-hidden="true"
-        focusable="false"
-      />
-      <SendIcon v-else class="send-icon" aria-hidden="true" focusable="false" />
+      <SendIcon class="send-icon" aria-hidden="true" focusable="false" />
     </FunctionButton>
   </div>
 </template>

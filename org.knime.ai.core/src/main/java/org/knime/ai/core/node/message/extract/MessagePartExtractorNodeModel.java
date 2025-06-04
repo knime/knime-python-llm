@@ -55,11 +55,13 @@ import java.util.Optional;
 import java.util.function.BinaryOperator;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.IntFunction;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.IntStream;
 
 import org.knime.ai.core.data.message.MessageValue;
+import org.knime.ai.core.data.message.MessageValue.MessageContentPart;
 import org.knime.ai.core.data.message.MessageValue.ToolCall;
 import org.knime.core.data.DataCell;
 import org.knime.core.data.DataColumnSpec;
@@ -74,6 +76,7 @@ import org.knime.core.data.container.CellFactory;
 import org.knime.core.data.container.ColumnRearranger;
 import org.knime.core.data.container.SingleCellFactory;
 import org.knime.core.data.def.StringCell;
+import org.knime.core.data.image.png.PNGImageCellFactory;
 import org.knime.core.data.json.JSONCellFactory;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.ExecutionContext;
@@ -150,28 +153,26 @@ final class MessagePartExtractorNodeModel extends WebUINodeModel<MessagePartExtr
 
     private static List<CellSplitterFactory<?>> createCellSplitterFactories(final MessagePartExtractorSettings settings,
         final int messageColumnIndex) {
-        var list = new ArrayList<CellSplitterFactory<?>>(4);
+        var list = new ArrayList<CellSplitterFactory<?>>();
         if (settings.m_extractRole) {
-            list.add(createStatelessCellSplitterFactory(
-                () -> new PartExtractorSingleCellFactory(settings.m_roleColumnName, StringCell.TYPE, MessagePartExtractorNodeModel::extractRole,
-                    messageColumnIndex)));
+            list.add(
+                createStatelessCellSplitterFactory(() -> new PartExtractorSingleCellFactory(settings.m_roleColumnName,
+                    StringCell.TYPE, MessagePartExtractorNodeModel::extractRole, messageColumnIndex)));
         }
         if (settings.m_extractTextParts) {
-            list.add(new CellSplitterFactory<>(0, MessagePartExtractorNodeModel::numTextContents,
-                Integer::max,
-                i -> new MultiCellFactory(IntStream.range(0, i).mapToObj(j -> new DataColumnSpecCreator(settings.m_textPartsPrefix + (j + 1),
-                    StringCell.TYPE).createSpec()).toArray(DataColumnSpec[]::new),
-                    r -> Optional.of(r.getCell(messageColumnIndex))
-                        .filter(Predicate.not(DataCell::isMissing))//
-                        .map(MessageValue.class::cast)//
-                        .map(MessagePartExtractorNodeModel::extractTextContentParts)//
-                        .map(c -> padWithMissing(c, i))//
-                        .orElseGet(() -> padWithMissing(new DataCell[0], i)))));
+            list.add(createMultiCellSplitterFactory(createContentCounter("text"),
+                createColumnSpecCreator(settings.m_textPartsPrefix, StringCell.TYPE), messageColumnIndex,
+                createContentPartExtractor("text", data -> new StringCell(new String(data)))));
+        }
+        if (settings.m_extractImageParts) {
+            list.add(createMultiCellSplitterFactory(createContentCounter("image"),
+                createColumnSpecCreator(settings.m_imagePartsPrefix, PNGImageCellFactory.TYPE), messageColumnIndex,
+                createContentPartExtractor("image", PNGImageCellFactory::create)));
         }
         if (settings.m_extractToolCalls) {
-            list.add(createStatelessCellSplitterFactory(
-                () -> new PartExtractorSingleCellFactory(settings.m_toolCallsColumnName, ListCell.getCollectionType(JSONCellFactory.TYPE),
-                    MessagePartExtractorNodeModel::extractToolCalls, messageColumnIndex)));
+            list.add(createStatelessCellSplitterFactory(() -> new PartExtractorSingleCellFactory(
+                settings.m_toolCallsColumnName, ListCell.getCollectionType(JSONCellFactory.TYPE),
+                MessagePartExtractorNodeModel::extractToolCalls, messageColumnIndex)));
         }
         if (settings.m_extractToolCallIds) {
             list.add(createStatelessCellSplitterFactory(
@@ -181,20 +182,38 @@ final class MessagePartExtractorNodeModel extends WebUINodeModel<MessagePartExtr
         return list;
     }
 
-    private static CellSplitterFactory<?> createStatelessCellSplitterFactory(final Supplier<CellFactory> cellFactorySupplier) {
-        return new CellSplitterFactory<>(null, noopExtractor(),
-            noopAggregator(),
-            c -> cellFactorySupplier.get(), false);
+    private static IntFunction<DataColumnSpec> createColumnSpecCreator(final String prefix, final DataType type) {
+        return j -> new DataColumnSpecCreator(prefix + (j + 1), type).createSpec();
     }
 
-    private static Integer numTextContents(final DataCell cell) {
-        if (cell.isMissing()) {
-            return 0;
-        }
-        var message = (MessageValue)cell;
-        return (int)message.getContent().stream()//
-            .filter(part -> "text".equals(part.getType()))//
-            .count();
+    private static CellSplitterFactory<Integer> createMultiCellSplitterFactory(
+        final Function<DataCell, Integer> numCellsCalculator, final IntFunction<DataColumnSpec> columnSpecCreator,
+        final int messageColumnIndex, final Function<MessageValue, DataCell[]> cellExtractor) {
+        return new CellSplitterFactory<>(0, numCellsCalculator, Integer::max,
+            i -> new MultiCellFactory(IntStream.range(0, i).mapToObj(columnSpecCreator).toArray(DataColumnSpec[]::new),
+                r -> Optional.of(r.getCell(messageColumnIndex)).filter(Predicate.not(DataCell::isMissing))//
+                    .map(MessageValue.class::cast)//
+                    .map(cellExtractor)//
+                    .map(c -> padWithMissing(c, i))//
+                    .orElseGet(() -> padWithMissing(new DataCell[0], i))));
+    }
+
+    private static CellSplitterFactory<?>
+        createStatelessCellSplitterFactory(final Supplier<CellFactory> cellFactorySupplier) {
+        return new CellSplitterFactory<>(null, noopExtractor(), noopAggregator(), c -> cellFactorySupplier.get(),
+            false);
+    }
+
+    private static Function<DataCell, Integer> createContentCounter(final String contentType) {
+        return cell -> {
+            if (cell.isMissing()) {
+                return 0;
+            }
+            var message = (MessageValue)cell;
+            return (int)message.getContent().stream()//
+                .filter(part -> contentType.equals(part.getType()))//
+                .count();
+        };
     }
 
     private static <S, T> Function<S, T> noopExtractor() {
@@ -217,13 +236,14 @@ final class MessagePartExtractorNodeModel extends WebUINodeModel<MessagePartExtr
 
         private T m_state;
 
-        CellSplitterFactory(final T initialState, final Function<DataCell, T> stateExtractor, final BinaryOperator<T> stateAggregator,
-            final Function<T, CellFactory> cellFactoryCreator) {
+        CellSplitterFactory(final T initialState, final Function<DataCell, T> stateExtractor,
+            final BinaryOperator<T> stateAggregator, final Function<T, CellFactory> cellFactoryCreator) {
             this(initialState, stateExtractor, stateAggregator, cellFactoryCreator, true);
         }
 
-        CellSplitterFactory(final T initialState, final Function<DataCell, T> stateExtractor, final BinaryOperator<T> stateAggregator,
-            final Function<T, CellFactory> cellFactoryCreator, final boolean stateful) {
+        CellSplitterFactory(final T initialState, final Function<DataCell, T> stateExtractor,
+            final BinaryOperator<T> stateAggregator, final Function<T, CellFactory> cellFactoryCreator,
+            final boolean stateful) {
             m_state = initialState;
             m_stateExtractor = stateExtractor;
             m_stateAggregator = stateAggregator;
@@ -261,10 +281,12 @@ final class MessagePartExtractorNodeModel extends WebUINodeModel<MessagePartExtr
         }
     }
 
-    private static DataCell[] extractTextContentParts(final MessageValue message) {
-        return message.getContent().stream()//
-            .filter(part -> "text".equals(part.getType()))//
-            .map(part -> new StringCell(new String(part.getData())))//
+    private static Function<MessageValue, DataCell[]> createContentPartExtractor(final String contentType,
+        final Function<byte[], DataCell> contentCellFactory) {
+        return message -> message.getContent().stream()//
+            .filter(part -> contentType.equals(part.getType()))//
+            .map(MessageContentPart::getData)//
+            .map(contentCellFactory)//
             .toArray(DataCell[]::new);
     }
 
@@ -325,7 +347,7 @@ final class MessagePartExtractorNodeModel extends WebUINodeModel<MessagePartExtr
     private static DataCell toJsonCell(final ToolCall toolCall) {
         try {
             return JSONCellFactory.create("{\"toolName\":\"" + toolCall.toolName() + "\", \"id\":\"" + toolCall.id()
-            + "\", \"arguments\":" + toolCall.arguments() + "}");
+                + "\", \"arguments\":" + toolCall.arguments() + "}");
         } catch (IOException e) {
             throw new RuntimeException("Failed to create JSON cell for tool call: " + toolCall, e);
         }

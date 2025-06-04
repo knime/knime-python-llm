@@ -1,4 +1,4 @@
-export type Type = "human" | "ai" | "error";
+export type Type = "human" | "ai" | "tool" | "error";
 
 export interface ToolCall {
   id: string;
@@ -6,13 +6,36 @@ export interface ToolCall {
   args?: string;
 }
 
-export interface MessageResponse {
-  type: Type;
-  content?: string;
-  toolCalls?: ToolCall[];
-  toolCallId?: string;
+export interface AiResponse {
+  id: string;
+  type: "ai";
+  name: string | null;
+  content: string;
+  toolCalls: ToolCall[];
 }
 
-export interface Message extends MessageResponse {
+export interface ToolResponse {
   id: string;
+  toolCallId: string;
+  type: "tool";
+  name: string;
+  content: string;
 }
+
+export interface ErrorResponse {
+  id: string;
+  content: string;
+  type: "error";
+}
+
+export interface UserResponse {
+  id: string;
+  content: string;
+  type: "human";
+}
+
+export type MessageResponse =
+  | AiResponse
+  | ToolResponse
+  | ErrorResponse
+  | UserResponse;

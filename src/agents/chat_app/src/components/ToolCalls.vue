@@ -7,7 +7,7 @@ import "vue-json-pretty/lib/styles.css";
 
 import type { ToolCall } from "../types";
 
-import MarkdownRenderer from "./MarkdownRenderer.vue";
+import MarkdownRenderer from "./chat/MarkdownRenderer.vue";
 
 const props = defineProps<{
   toolCalls: ToolCall[];
@@ -15,6 +15,7 @@ const props = defineProps<{
 
 const visibilityMap = reactive({});
 
+// TODO: Remove
 const mockJsonString = '{"name":"John", "age":30, "car":null}';
 
 const treeSource: ComputedRef<TreeNodeOptions[]> = computed(() =>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 
-import { renderMarkdown } from "../utils/markdown";
+import { renderMarkdown } from "../../utils/markdown";
 
 interface Props {
   markdown: string;
@@ -11,6 +11,7 @@ const htmlContent = computed(() => renderMarkdown(props.markdown));
 </script>
 
 <template>
+  <!-- eslint-disable-next-line vue/no-v-html -->
   <div class="content" v-html="htmlContent" />
 </template>
 

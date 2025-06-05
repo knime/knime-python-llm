@@ -1,20 +1,36 @@
-import { ref } from "vue";
+import { type Component, onMounted, ref } from "vue";
 
 import { JsonDataService } from "@knime/ui-extension-service";
 
-import type { MessageResponse } from "@/types";
+import type { MessageResponse, Type } from "@/types";
+import AiMessage from "../components/AiMessage.vue";
+import HumanMessage from "../components/HumanMessage.vue";
+import ToolMessage from "../components/ToolMessage.vue";
+import ErrorMessage from "../components/chat/ErrorMessage.vue";
 
 const sendingError = "There was an error while sending your message.";
 const processingError = "There was an error while processing your request.";
 
 const createId = () => (Date.now() + 1).toString();
 
-// TODO: optional Intro message from backend
+// TODO: Enforce that key and component's type prop match (DefineComponent from knime-ui?)
+const messageComponents: Record<Type, Component> = {
+  ai: AiMessage,
+  tool: ToolMessage,
+  human: HumanMessage,
+  error: ErrorMessage,
+};
+
 const messages = ref<MessageResponse[]>([]);
 const isLoading = ref(false);
 
 const displayNewMessages = (responses: MessageResponse[]) => {
-  messages.value.push(...responses);
+  messages.value.push(
+    ...responses.map((response) => ({
+      ...response,
+      id: response.id ?? createId(),
+    })),
+  );
 };
 
 const pollForNewMessages = async () => {
@@ -62,4 +78,19 @@ const sendMessage = async (message: string) => {
   isLoading.value = false;
 };
 
-export const useSendMessage = () => ({ isLoading, messages, sendMessage });
+const init = async () => {
+  const jsonDataService = await JsonDataService.getInstance();
+  isLoading.value = true;
+  const initialMessage = await jsonDataService.data({
+    method: "get_initial_message",
+  });
+  if (initialMessage) {
+    displayNewMessages([initialMessage]);
+  }
+  isLoading.value = false;
+};
+
+export const useChat = () => {
+  onMounted(init);
+  return { messageComponents, messages, isLoading, sendMessage };
+};

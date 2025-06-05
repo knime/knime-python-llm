@@ -23,18 +23,12 @@ const { handleScroll } = useScrollToBottom(messagesContainer);
 
 <template>
   <main class="chat-interface">
-    <div
-      ref="messagesContainer"
-      class="messages-container"
-      @scroll="handleScroll"
-    >
-      <div class="message-list">
-        <slot />
+    <div ref="messagesContainer" class="message-list" @scroll="handleScroll">
+      <slot />
 
-        <MessageBox v-if="isLoading">
-          <SkeletonItem height="24px" />
-        </MessageBox>
-      </div>
+      <MessageBox v-if="isLoading">
+        <SkeletonItem height="24px" />
+      </MessageBox>
     </div>
 
     <MessageInput
@@ -56,18 +50,14 @@ const { handleScroll } = useScrollToBottom(messagesContainer);
   padding: var(--space-8) 3px;
 }
 
-.messages-container {
+.message-list {
   flex-grow: 1;
   overflow-y: auto;
-  padding: var(--space-24) 0;
   scroll-behavior: smooth;
-}
-
-.message-list {
   display: flex;
   flex-direction: column;
   gap: var(--space-24);
-  padding: 0 var(--space-16);
+  padding: var(--space-24) var(--space-16);
 
   & :deep(.icon svg) {
     @mixin svg-icon-size 16;

@@ -25,7 +25,7 @@ export const useScrollToBottom = (container: Ref) => {
   let observer: MutationObserver;
 
   onMounted(() => {
-    const config = { childList: true, subtree: true };
+    const config = { childList: true };
     observer = new MutationObserver(scrollToBottom);
 
     if (container.value) {

@@ -324,6 +324,7 @@ class ChatAgentPrompterDataService:
         self,
         agent_graph,
         data_registry: DataRegistry,
+        initial_message: str,
         recursion_limit: int,
         show_tool_calls_and_results: bool,
     ):
@@ -337,11 +338,18 @@ class ChatAgentPrompterDataService:
                 ),
             }
         ]
+        self._initial_message = initial_message
         self._recursion_limit = recursion_limit
         self._show_tool_calls_and_results = show_tool_calls_and_results
 
-    def init(self):
-        pass
+    def get_initial_message(self):
+        if self._initial_message:
+            return {
+                "type": "ai",
+                "content": self._initial_message,
+            }
+        else:
+            pass
 
     def post_user_message(self, user_message: str):
         import threading
@@ -395,7 +403,7 @@ class ChatAgentPrompterDataService:
                 ),
                 -1,
             )
-            for msg in self._messages[last_human_index + 1:]:
+            for msg in self._messages[last_human_index + 1 :]:
                 last_messages.append(self._to_frontend_message(msg))
         else:
             last_messages.append(self._to_frontend_message(self._messages[-1]))
@@ -411,9 +419,9 @@ class ChatAgentPrompterDataService:
         if message.type == "ai" and hasattr(message, "tool_calls"):
             fe_message["toolCalls"] = [
                 {
-                   "id": tool_call["id"], 
-                   "name": tool_call["name"],
-                   "args": str(tool_call["args"]) if "args" in tool_call else None,
+                    "id": tool_call["id"],
+                    "name": tool_call["name"],
+                    "args": str(tool_call["args"]) if "args" in tool_call else None,
                 }
                 for tool_call in message.tool_calls
             ]

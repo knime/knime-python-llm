@@ -1,24 +1,15 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 
-import { FunctionButton } from "@knime/components";
+import { FunctionButton, TextArea } from "@knime/components";
 import SendIcon from "@knime/styles/img/icons/paper-flier.svg";
 
-const characterLimit = 300;
-
-const props = defineProps<{
-  isLoading: boolean;
-}>();
-
-const emit = defineEmits<{
-  sendMessage: [message: string];
-}>();
+const props = defineProps<{ isLoading: boolean }>();
+const emit = defineEmits<{ sendMessage: [message: string] }>();
 
 const userInput = ref("");
 
-const isInputValid = computed(
-  () => userInput.value && userInput.value.trim().length > 0,
-);
+const isInputValid = computed(() => userInput.value?.trim().length > 0);
 const isDisabled = computed(() => !isInputValid.value || props.isLoading);
 
 const handleSubmit = () => {
@@ -36,12 +27,9 @@ const handleKeydown = (event: KeyboardEvent) => {
 
 <template>
   <div class="chat-controls">
-    <textarea
+    <TextArea
       v-model="userInput"
-      class="textarea"
-      aria-label="Type your message"
-      :maxlength="characterLimit"
-      placeholder=""
+      class="textarea-wrapper"
       @keydown="handleKeydown"
     />
     <FunctionButton
@@ -59,42 +47,31 @@ const handleKeydown = (event: KeyboardEvent) => {
 @import url("@knime/styles/css/mixins");
 
 .chat-controls {
-  display: flex;
-  flex-direction: column;
+  position: relative;
   align-items: flex-end;
-  min-height: 120px;
-  background-color: white;
-  border: 1px solid var(--knime-stone-gray);
+  height: 120px;
+  background-color: var(--knime-white);
   overflow: hidden;
-  cursor: text;
+}
 
-  & .textarea {
+.textarea-wrapper {
+  max-width: 100%;
+  height: 100%;
+
+  & :deep(textarea) {
     font-size: 13px;
     font-weight: 300;
-    line-height: 150%;
+    line-height: 1.5;
     padding: 10px 8px 0;
-    flex-grow: 1;
     width: 100%;
+    height: 100%;
     resize: none;
-    border: none;
-
-    &:focus {
-      outline: none;
-    }
   }
+}
 
-  & .send-button {
-    align-self: flex-end;
-    margin-right: 8px;
-    margin-bottom: 8px;
-
-    & svg {
-      stroke: var(--knime-dove-gray);
-
-      &.send-icon {
-        margin-left: -1px;
-      }
-    }
-  }
+.send-button {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
 }
 </style>

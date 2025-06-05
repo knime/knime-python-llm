@@ -72,5 +72,9 @@ const getJson = (str: string): boolean => {
       background-color: var(--knime-white);
     }
   }
+
+  & :deep(.tree-node.expandable) {
+    font-weight: normal;
+  }
 }
 </style>

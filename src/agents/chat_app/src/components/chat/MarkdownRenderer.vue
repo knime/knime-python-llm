@@ -3,10 +3,10 @@ import { computed } from "vue";
 
 import { renderMarkdown } from "../../utils/markdown";
 
-interface Props {
+const props = defineProps<{
   markdown: string;
-}
-const props = defineProps<Props>();
+}>();
+
 const htmlContent = computed(() => renderMarkdown(props.markdown));
 </script>
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref } from "vue";
+import { computed, ref } from "vue";
 
 import { FunctionButton } from "@knime/components";
 import SendIcon from "@knime/styles/img/icons/paper-flier.svg";
@@ -12,33 +12,19 @@ const props = defineProps<{
 }>();
 
 const userInput = ref("");
-const inputElement = ref<HTMLTextAreaElement | null>(null);
 
 const isInputValid = computed(
   () => userInput.value && userInput.value.trim().length > 0,
 );
-const disabled = computed(() => !isInputValid.value || props.isLoading);
+const isDisabled = computed(() => !isInputValid.value || props.isLoading);
 
 const handleSubmit = () => {
-  // TODO: Handle canceling?
-  if (props.isLoading || !userInput.value.trim()) {
-    return;
-  }
-
   props.sendMessage(userInput.value);
-
   userInput.value = "";
-
-  // Reset height after sending
-  nextTick(() => {
-    if (inputElement.value) {
-      inputElement.value.style.height = "auto";
-    }
-  });
 };
 
 const handleKeydown = (event: KeyboardEvent) => {
-  if (event.key === "Enter" && !event.shiftKey && !disabled.value) {
+  if (event.key === "Enter" && !event.shiftKey && !isDisabled.value) {
     event.preventDefault();
     handleSubmit();
   }
@@ -58,7 +44,7 @@ const handleKeydown = (event: KeyboardEvent) => {
     <FunctionButton
       class="send-button"
       primary
-      :disabled="disabled"
+      :disabled="isDisabled"
       @click="handleSubmit"
     >
       <SendIcon class="send-icon" aria-hidden="true" focusable="false" />

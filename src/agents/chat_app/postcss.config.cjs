@@ -3,6 +3,7 @@ const { preset } = require("@knime/styles/config/postcss.config.cjs"); // eslint
 module.exports = {
   plugins: {
     "postcss-mixins": {},
+    "postcss-nested": {},
     "postcss-preset-env": preset,
   },
 };

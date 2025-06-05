@@ -73,6 +73,7 @@ onMounted(() => {
   flex-grow: 1;
   position: relative;
   overflow: hidden;
+  padding: var(--space-8) 3px;
 }
 
 .messages-container {

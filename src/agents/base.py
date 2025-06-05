@@ -567,8 +567,8 @@ class ChatAgentPrompter:
 
     tool_column = _tool_column_parameter()
 
-    show_tool_messages = knext.BoolParameter(
-        "Show tool messages",
+    show_tool_calls_and_results = knext.BoolParameter(
+        "Show tool calls and results",
         "TODO",
         default_value=False,
     )
@@ -639,5 +639,5 @@ class ChatAgentPrompter:
         )
 
         return ChatAgentPrompterDataService(
-            agent, data_registry, self.recursion_limit, self.show_tool_messages
+            agent, data_registry, self.recursion_limit, self.show_tool_calls_and_results
         )

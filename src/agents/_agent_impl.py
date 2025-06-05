@@ -409,6 +409,8 @@ class ChatAgentPrompterDataService:
             last_messages.append(self._to_frontend_message(self._messages[-1]))
 
     def _to_frontend_message(self, message):
+        import json
+
         fe_message = {
             "id": message.id if hasattr(message, "id") else None,
             "type": message.type,
@@ -421,7 +423,7 @@ class ChatAgentPrompterDataService:
                 {
                     "id": tool_call["id"],
                     "name": tool_call["name"],
-                    "args": str(tool_call["args"]) if "args" in tool_call else None,
+                    "args": json.dumps(tool_call["args"]) if "args" in tool_call else None,
                 }
                 for tool_call in message.tool_calls
             ]

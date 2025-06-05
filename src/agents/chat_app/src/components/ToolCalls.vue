@@ -15,9 +15,6 @@ const props = defineProps<{
 
 const visibilityMap = reactive({});
 
-// TODO: Remove
-const mockJsonString = '{"name":"John", "age":30, "car":null}';
-
 const treeSource: ComputedRef<TreeNodeOptions[]> = computed(() =>
   props.toolCalls.map((toolCall) => ({
     nodeKey: toolCall.id,
@@ -48,8 +45,8 @@ const getJson = (str: string): boolean => {
       <template #leaf="{ treeNode }">
         <template v-if="treeNode.name">
           <VueJsonPretty
-            v-if="getJson(mockJsonString)"
-            :data="getJson(mockJsonString)"
+            v-if="getJson(treeNode.name)"
+            :data="getJson(treeNode.name)"
             show-line-number
           />
           <MarkdownRenderer v-else :markdown="treeNode.name" />

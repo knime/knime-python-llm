@@ -1,31 +1,24 @@
 <script setup lang="ts">
-import { computed, defineProps, useSlots } from "vue";
+import { defineProps, useSlots } from "vue";
 
-withDefaults(defineProps<{ isUser?: boolean }>(), {
-  isUser: false,
-});
+withDefaults(defineProps<{ isUser?: boolean }>(), { isUser: false });
 
 const slots = useSlots();
-const hasNameSlot = computed(() => (slots.name?.().length ?? 0) > 0);
-const hasIconSlot = computed(() => (slots.icon?.().length ?? 0) > 0);
+const hasNameSlot = slots.name;
+const hasIconSlot = slots.icon;
 </script>
 
 <template>
-  <div class="wrapper" :class="{ user: isUser, 'has-name': hasNameSlot }">
-    <div class="container">
-      <div class="message">
-        <div v-if="hasIconSlot || hasNameSlot" class="header">
-          <div class="icon">
-            <slot name="icon" />
-          </div>
-          <div v-if="hasNameSlot" class="name">
-            <slot name="name" />
-          </div>
+  <div class="wrapper" :class="{ user: isUser, 'with-name': hasNameSlot }">
+    <div class="message">
+      <div v-if="hasIconSlot || hasNameSlot" class="header">
+        <div class="icon">
+          <slot name="icon" />
         </div>
-
-        <div class="body">
-          <slot />
-        </div>
+        <slot name="name" />
+      </div>
+      <div class="body">
+        <slot />
       </div>
     </div>
   </div>
@@ -43,14 +36,10 @@ const hasIconSlot = computed(() => (slots.icon?.().length ?? 0) > 0);
   }
 }
 
-.container {
+.message {
   min-width: 20%;
   max-width: 80%;
-}
-
-.message {
   position: relative;
-  width: 100%;
   font-size: 13px;
   font-weight: 400;
 }
@@ -64,8 +53,9 @@ const hasIconSlot = computed(() => (slots.icon?.().length ?? 0) > 0);
   background-color: var(--knime-white);
   border: 2px solid var(--knime-porcelain);
   border-radius: 100%;
+  padding: var(--space-4);
 
-  .has-name & {
+  .with-name & {
     border-radius: 16px;
   }
 
@@ -76,15 +66,8 @@ const hasIconSlot = computed(() => (slots.icon?.().length ?? 0) > 0);
 }
 
 .icon {
-  height: var(--space-24);
-  width: var(--space-24);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.name {
-  margin-right: var(--space-4);
+  height: var(--space-16);
+  width: var(--space-16);
 }
 
 .body {

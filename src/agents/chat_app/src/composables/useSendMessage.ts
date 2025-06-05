@@ -9,6 +9,7 @@ const processingError = "There was an error while processing your request.";
 
 const createId = () => (Date.now() + 1).toString();
 
+// TODO: optional Intro message from backend
 const messages = ref<MessageResponse[]>([]);
 const isLoading = ref(false);
 

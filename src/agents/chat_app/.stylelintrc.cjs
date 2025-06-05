@@ -8,5 +8,6 @@ module.exports = {
         ignoreAtRules: ["define-mixin", "mixin"],
       },
     ],
+    "selector-nested-pattern": "^([\\w\\-\\.]+|&)",
   },
 };

@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { defineProps, reactive } from "vue";
+import { type ComputedRef, computed, defineProps, reactive } from "vue";
 import VueJsonPretty from "vue-json-pretty";
 
-import { Collapser } from "@knime/components";
+import { Tree, type TreeNodeOptions } from "@knime/virtual-tree";
+import "vue-json-pretty/lib/styles.css";
 
 import type { ToolCall } from "../types";
 
@@ -12,23 +13,26 @@ const props = defineProps<{
   toolCalls: ToolCall[];
 }>();
 
-// Create a reactive object to store booleans keyed by ID
 const visibilityMap = reactive({});
 
-// Initialize visibility dynamically
+const mockJsonString = '{"name":"John", "age":30, "car":null}';
+
+const treeSource: ComputedRef<TreeNodeOptions[]> = computed(() =>
+  props.toolCalls.map((toolCall) => ({
+    nodeKey: toolCall.id,
+    name: toolCall.name,
+    hasChildren: true,
+    children: [{ nodeKey: `${toolCall.id}-args`, name: toolCall.args ?? "" }],
+  })),
+);
+
 props.toolCalls.forEach((message) => {
   visibilityMap[message.id] = false;
 });
 
-// Optional helper to toggle visibility
-const toggleVisibility = (id: string, value: boolean) => {
-  visibilityMap[id] = value;
-};
-
 const getJson = (str: string): boolean => {
   try {
     const parsed = JSON.parse(str);
-    // Optional: Ensure the parsed result is an object or array
     return typeof parsed === "object" && parsed !== null && parsed;
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
   } catch (e) {
@@ -39,48 +43,36 @@ const getJson = (str: string): boolean => {
 
 <template>
   <div class="tool-calls">
-    <Collapser
-      v-for="call in toolCalls"
-      :key="call.id"
-      v-model="visibilityMap[call.id]"
-      class="collapser"
-      @update:model-value="(value: boolean) => toggleVisibility(call.id, value)"
-    >
-      <template #title>
-        <h5>Tool: {{ call.name }}</h5>
+    <Tree :source="treeSource" :selectable="false">
+      <template #leaf="{ treeNode }">
+        <template v-if="treeNode.name">
+          <VueJsonPretty
+            v-if="getJson(mockJsonString)"
+            :data="getJson(mockJsonString)"
+            show-line-number
+          />
+          <MarkdownRenderer v-else :markdown="treeNode.name" />
+        </template>
+        <template v-else>No arguments</template>
       </template>
-      <div v-if="call.args" class="tool-call-content">
-        Call arguments:
-        <VueJsonPretty v-if="getJson(call.args)" :data="getJson(call.args)" />
-        <MarkdownRenderer v-else :markdown="call.args" />
-      </div>
-      <div v-else>No arguments</div>
-    </Collapser>
+    </Tree>
   </div>
 </template>
 
 <style lang="postcss" scoped>
 @import url("@knime/styles/css/mixins");
-@import url("vue-json-pretty/lib/styles.css");
 
 .tool-calls {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-}
 
-.collapser {
-  background-color: var(--knime-porcelain);
-  width: 350px;
+  & :deep(.vir-tree-node:has(.node-arrow:empty)) {
+    height: auto;
 
-  & :deep(h5) {
-    padding: var(--space-12) var(--space-24);
-    margin: 0;
-    position: relative;
+    &:hover {
+      background-color: var(--knime-white);
+    }
   }
-}
-
-.tool-call-content {
-  padding: var(--space-12) var(--space-24);
 }
 </style>

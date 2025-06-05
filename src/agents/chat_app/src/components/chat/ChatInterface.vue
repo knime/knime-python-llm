@@ -8,13 +8,8 @@ import { useScrollToBottom } from "@/composables/useScrollToBottom";
 import MessageBox from "./MessageBox.vue";
 import MessageInput from "./MessageInput.vue";
 
-defineProps<{
-  isLoading: boolean;
-}>();
-
-const emit = defineEmits<{
-  sendMessage: [message: string];
-}>();
+defineProps<{ isLoading: boolean }>();
+const emit = defineEmits<{ sendMessage: [message: string] }>();
 
 const messagesContainer = ref<HTMLElement | null>(null);
 
@@ -25,12 +20,10 @@ const { handleScroll } = useScrollToBottom(messagesContainer);
   <main class="chat-interface">
     <div ref="messagesContainer" class="message-list" @scroll="handleScroll">
       <slot />
-
       <MessageBox v-if="isLoading">
         <SkeletonItem height="24px" />
       </MessageBox>
     </div>
-
     <MessageInput
       :is-loading="isLoading"
       @send-message="emit('sendMessage', $event)"

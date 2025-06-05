@@ -274,7 +274,7 @@ class ChatAgentPrompterDataService:
         agent_graph,
         data_registry: DataRegistry,
         recursion_limit: int,
-        show_tool_messages: bool,
+        show_tool_calls_and_results: bool,
     ):
         self._agent_graph = agent_graph
         self._data_registry = data_registry
@@ -287,7 +287,7 @@ class ChatAgentPrompterDataService:
             }
         ]
         self._recursion_limit = recursion_limit
-        self._show_tool_messages = show_tool_messages
+        self._show_tool_calls_and_results = show_tool_calls_and_results
 
     def init(self):
         pass
@@ -335,7 +335,7 @@ class ChatAgentPrompterDataService:
                     }
                 )
                 return
-        if self._show_tool_messages:
+        if self._show_tool_calls_and_results:
             last_human_index = next(
                 (
                     i

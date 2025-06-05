@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Tooltip } from "@knime/components";
 import UserIcon from "@knime/styles/img/icons/user.svg";
 
 import type { HumanResponse } from "@/types";
@@ -12,7 +13,9 @@ defineProps<HumanResponse>();
 <template>
   <MessageBox :is-user="true">
     <template #icon>
-      <UserIcon />
+      <Tooltip text="User">
+        <UserIcon />
+      </Tooltip>
     </template>
     <MarkdownRenderer v-if="content" :markdown="content" />
   </MessageBox>

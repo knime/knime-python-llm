@@ -18,7 +18,7 @@ const visibilityMap = reactive({});
 const treeSource: ComputedRef<TreeNodeOptions[]> = computed(() =>
   props.toolCalls.map((toolCall) => ({
     nodeKey: toolCall.id,
-    name: toolCall.name,
+    name: `Tool: ${toolCall.name}`,
     hasChildren: true,
     children: [{ nodeKey: `${toolCall.id}-args`, name: toolCall.args ?? "" }],
   })),

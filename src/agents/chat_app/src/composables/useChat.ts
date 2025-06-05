@@ -80,14 +80,12 @@ const sendMessage = async (message: string) => {
 
 const init = async () => {
   const jsonDataService = await JsonDataService.getInstance();
-  isLoading.value = true;
   const initialMessage = await jsonDataService.data({
     method: "get_initial_message",
   });
   if (initialMessage) {
     displayNewMessages([initialMessage]);
   }
-  isLoading.value = false;
 };
 
 export const useChat = () => {

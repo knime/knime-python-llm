@@ -1,20 +1,17 @@
 <script setup lang="ts">
-import { onMounted } from "vue";
+import ChatInterface from "./components/chat/ChatInterface.vue";
+import { useChat } from "./composables/useChat";
 
-import { JsonDataService } from "@knime/ui-extension-service";
-
-import ChatInterface from "./components/ChatInterface.vue";
-
-onMounted(async () => {
-  // initializes the python backend (e.g. starting the python process)
-  const jsonDataService = await JsonDataService.getInstance();
-  jsonDataService.data({ method: "init" });
-});
+const { messageComponents, messages, isLoading, sendMessage } = useChat();
 </script>
 
 <template>
   <div class="app-container">
-    <ChatInterface />
+    <ChatInterface :is-loading="isLoading" @send-message="sendMessage">
+      <template v-for="message in messages" :key="message.id">
+        <component :is="messageComponents[message.type]" v-bind="message" />
+      </template>
+    </ChatInterface>
   </div>
 </template>
 
@@ -22,7 +19,7 @@ onMounted(async () => {
 .app-container {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  height: 100vh;
   background-color: var(--knime-white);
   color: var(--knime-masala);
 }

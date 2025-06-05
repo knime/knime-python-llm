@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import type { ErrorResponse } from "@/types";
-
-defineProps<ErrorResponse>();
+defineProps<{
+  content: string;
+}>();
 </script>
 
 <template>
@@ -13,11 +13,11 @@ defineProps<ErrorResponse>();
 <style scoped>
 .error-message {
   text-align: center;
-  font-size: 0.825rem;
+  font-size: 13px;
   color: var(--knime-white);
-  margin: 8px 0;
-  padding: 4px 12px;
-  border-radius: 16px;
+  margin: var(--knime-space-8) 0;
+  padding: var(--knime-space-4) var(--knime-space-12);
+  border-radius: var(--knime-space-16);
   background-color: var(--knime-dove-gray);
   align-self: center;
   animation: fade-in 0.3s ease;

@@ -8,7 +8,10 @@ const characterLimit = 300;
 
 const props = defineProps<{
   isLoading: boolean;
-  sendMessage: (message: string) => void;
+}>();
+
+const emit = defineEmits<{
+  sendMessage: [message: string];
 }>();
 
 const userInput = ref("");
@@ -19,7 +22,7 @@ const isInputValid = computed(
 const isDisabled = computed(() => !isInputValid.value || props.isLoading);
 
 const handleSubmit = () => {
-  props.sendMessage(userInput.value);
+  emit("sendMessage", userInput.value);
   userInput.value = "";
 };
 
@@ -74,7 +77,6 @@ const handleKeydown = (event: KeyboardEvent) => {
     width: 100%;
     resize: none;
     border: none;
-    box-sizing: border-box;
 
     &:focus {
       outline: none;

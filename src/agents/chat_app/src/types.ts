@@ -6,30 +6,31 @@ export interface ToolCall {
   args?: string;
 }
 
-export interface AiResponse {
+interface BaseMessageResponse {
   id: string;
-  type: "ai";
-  name: string | null;
-  content: string;
-  toolCalls: ToolCall[];
+  type: Type;
 }
 
-export interface ToolResponse {
-  id: string;
+export interface AiResponse extends BaseMessageResponse {
+  type: "ai";
+  name?: string | null;
+  content: string;
+  toolCalls?: ToolCall[];
+}
+
+export interface ToolResponse extends BaseMessageResponse {
   toolCallId: string;
   type: "tool";
   name: string;
   content: string;
 }
 
-export interface ErrorResponse {
-  id: string;
+export interface ErrorResponse extends BaseMessageResponse {
   content: string;
   type: "error";
 }
 
-export interface UserResponse {
-  id: string;
+export interface HumanResponse extends BaseMessageResponse {
   content: string;
   type: "human";
 }
@@ -38,4 +39,4 @@ export type MessageResponse =
   | AiResponse
   | ToolResponse
   | ErrorResponse
-  | UserResponse;
+  | HumanResponse;

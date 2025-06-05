@@ -7,13 +7,14 @@ withDefaults(defineProps<{ isUser?: boolean }>(), {
 
 const slots = useSlots();
 const hasNameSlot = computed(() => (slots.name?.().length ?? 0) > 0);
+const hasIconSlot = computed(() => (slots.icon?.().length ?? 0) > 0);
 </script>
 
 <template>
   <div class="wrapper" :class="{ user: isUser, 'has-name': hasNameSlot }">
     <div class="container">
       <div class="message">
-        <div class="header">
+        <div v-if="hasIconSlot || hasNameSlot" class="header">
           <div class="icon">
             <slot name="icon" />
           </div>
@@ -58,7 +59,6 @@ const hasNameSlot = computed(() => (slots.name?.().length ?? 0) > 0);
   position: absolute;
   left: 0;
   top: calc(var(--space-24) * -1);
-  height: var(--space-24);
   display: flex;
   align-items: center;
   background-color: var(--knime-white);

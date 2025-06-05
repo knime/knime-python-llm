@@ -26,8 +26,7 @@
     "highlight.js": "^11.9.0",
     "lodash-es": "^4.17.21",
     "markdown-it": "^14.1.0",
-    "vue": "^3.4.38",
-    "vue-json-pretty": "^2.4.0"
+    "vue": "^3.4.38"
   },
   "devDependencies": {
     "@knime/eslint-config": "^9.0.2",

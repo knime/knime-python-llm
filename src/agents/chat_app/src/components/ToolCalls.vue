@@ -1,13 +1,10 @@
 <script setup lang="ts">
 import { type ComputedRef, computed, defineProps, reactive } from "vue";
-import VueJsonPretty from "vue-json-pretty";
 
 import { Tree, type TreeNodeOptions } from "@knime/virtual-tree";
 import "vue-json-pretty/lib/styles.css";
 
 import type { ToolCall } from "../types";
-
-import MarkdownRenderer from "./chat/MarkdownRenderer.vue";
 
 const props = defineProps<{
   toolCalls: ToolCall[];
@@ -27,16 +24,6 @@ const treeSource: ComputedRef<TreeNodeOptions[]> = computed(() =>
 props.toolCalls.forEach((message) => {
   visibilityMap[message.id] = false;
 });
-
-const getJson = (str: string): boolean => {
-  try {
-    const parsed = JSON.parse(str);
-    return typeof parsed === "object" && parsed !== null && parsed;
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  } catch (e) {
-    return false;
-  }
-};
 </script>
 
 <template>
@@ -44,12 +31,7 @@ const getJson = (str: string): boolean => {
     <Tree :source="treeSource" :selectable="false">
       <template #leaf="{ treeNode }">
         <template v-if="treeNode.name">
-          <VueJsonPretty
-            v-if="getJson(treeNode.name)"
-            :data="getJson(treeNode.name)"
-            show-line-number
-          />
-          <MarkdownRenderer v-else :markdown="treeNode.name" />
+          <pre>{{ treeNode.name }}</pre>
         </template>
         <template v-else>No arguments</template>
       </template>
@@ -76,5 +58,12 @@ const getJson = (str: string): boolean => {
   & :deep(.tree-node.expandable) {
     font-weight: normal;
   }
+}
+
+.tool-calls pre {
+  background: var(--knime-gray-light-semi);
+  border: 1px solid var(--knime-silver-sand);
+  font-family: "Roboto Mono", monospace;
+  padding: 8px 12px;
 }
 </style>

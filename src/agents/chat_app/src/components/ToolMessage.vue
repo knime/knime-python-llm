@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Tooltip } from "@knime/components";
 import WrenchIcon from "@knime/styles/img/icons/wrench.svg";
 
 import type { ToolResponse } from "@/types";
@@ -12,7 +13,9 @@ defineProps<ToolResponse>();
 <template>
   <MessageBox>
     <template #icon>
-      <WrenchIcon />
+      <Tooltip text="Tool">
+        <WrenchIcon />
+      </Tooltip>
     </template>
     <template #name>
       {{ name }}

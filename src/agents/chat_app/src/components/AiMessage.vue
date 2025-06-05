@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Tooltip } from "@knime/components";
 import AiIcon from "@knime/styles/img/icons/ai-general.svg";
 
 import type { AiResponse } from "@/types";
@@ -13,7 +14,9 @@ defineProps<AiResponse>();
 <template>
   <MessageBox>
     <template #icon>
-      <AiIcon />
+      <Tooltip text="AI">
+        <AiIcon />
+      </Tooltip>
     </template>
     <ToolCalls v-if="toolCalls?.length" :tool-calls="toolCalls" />
     <MarkdownRenderer v-if="content" :markdown="content" />

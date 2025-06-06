@@ -85,8 +85,10 @@ public final class MessageCell extends DataCell implements MessageValue {
      *
      * @param messageType The type of the message
      * @param content The content of the message
+     * @param toolCalls The tool calls associated with the message, can be null
+     * @param toolCallId The ID of the tool call associated with this message, can be null
      */
-    MessageCell(final MessageType messageType, final List<MessageContentPart> content, final List<ToolCall> toolCalls,
+    public MessageCell(final MessageType messageType, final List<MessageContentPart> content, final List<ToolCall> toolCalls,
         final String toolCallId) {
         m_messageType = messageType;
         m_content = immutableCopy(content);

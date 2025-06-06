@@ -199,7 +199,7 @@ class ModelSettings(GeneralSettings):
 
 
 @knext.node(
-    name="KNIME Hub Chat Model Connector",
+    name="KNIME Hub Chat Model Selector",
     node_type=knext.NodeType.SOURCE,
     icon_path=hub_connector_icon,
     category=knime_category,
@@ -217,7 +217,7 @@ class ModelSettings(GeneralSettings):
 )
 class KnimeHubChatModelConnector:
     """
-    Connects to a Chat Model configured in the GenAI Gateway of the connected KNIME Hub.
+    Select a Chat Model configured in the GenAI Gateway of the connected KNIME Hub.
 
     Connects to a Chat Model configured in the GenAI Gateway of the connected KNIME Hub using the authentication
     provided via the input port.

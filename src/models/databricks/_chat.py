@@ -187,7 +187,7 @@ class DatabricksChatModelSettings(GeneralRemoteSettings):
 
 
 @knext.node(
-    "Databricks Chat Model Connector",
+    "Databricks Chat Model Selector",
     node_type=knext.NodeType.SOURCE,
     icon_path="icons/databricks/Databricks-chat-model-connector.png",
     category=databricks_category,
@@ -204,7 +204,7 @@ class DatabricksChatModelSettings(GeneralRemoteSettings):
     databricks_chat_model_port_type,
 )
 class DatabricksChatModelConnector:
-    """Connects to chat models served by a Databricks workspace.
+    """Select a chat model served by a Databricks workspace.
 
     This node connects to a chat model served by the Databricks workspace that is provided as an input.
     See the

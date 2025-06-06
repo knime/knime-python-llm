@@ -180,7 +180,7 @@ ibm_watsonx_chat_model_port_type = knext.port_type(
 
 
 @knext.node(
-    name="IBM watsonx.ai Chat Model Connector",
+    name="IBM watsonx.ai Chat Model Selector",
     node_type=knext.NodeType.SOURCE,
     icon_path=ibm_watsonx_icon,
     category=ibm_watsonx_category,
@@ -197,7 +197,7 @@ ibm_watsonx_chat_model_port_type = knext.port_type(
     ibm_watsonx_chat_model_port_type,
 )
 class IBMwatsonxChatModelConnector:
-    """Connects to a chat model provided by the IBM watsonx.ai API.
+    """Select a chat model provided by the IBM watsonx.ai API.
 
     In order to use IBM watsonx.ai models, you'll need to create an IBM watsonx.ai account and obtain an API key.
     After successfully authenticating using the **IBM watsonx.ai Authenticator** node, you can select a chat

@@ -152,7 +152,7 @@ def _list_models(ctx: knext.ConfigurationContext):
 
 
 @knext.node(
-    name="DeepSeek Chat Model Connector",
+    name="DeepSeek Chat Model Selector",
     node_type=knext.NodeType.SOURCE,
     icon_path=deepseek_icon,
     category=deepseek_category,
@@ -169,7 +169,7 @@ def _list_models(ctx: knext.ConfigurationContext):
     deepseek_chat_model_port_type,
 )
 class DeepSeekChatModelConnector:
-    """Connects to a chat model provided by the DeepSeek API.
+    """Select a chat model provided by the DeepSeek API.
 
     This node establishes a connection with a DeepSeek Chat Model. After successfully authenticating
     using the **DeepSeek Authenticator** node, you can select a chat model from a predefined list.

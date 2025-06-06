@@ -484,7 +484,7 @@ class TestLLMConnector:
 
 
 @knext.node(
-    "Test Chat Model Connector",
+    "Test Chat Model Selector",
     knext.NodeType.SOURCE,
     fake_icon,
     category=test_category,

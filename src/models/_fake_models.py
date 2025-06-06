@@ -148,7 +148,7 @@ class TestChatModel(SimpleChatModel):
             self.default_response,
             prompt,
             self.missing_value_strategy,
-            "Test Chat Model Connector",
+            "Test Chat Model Selector",
         )
 
     @property

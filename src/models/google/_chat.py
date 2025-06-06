@@ -44,7 +44,7 @@
 
 
 # Nodes:
-# - Gemini Chat Model Connector
+# - Gemini Chat Model Selector
 
 import knime.extension as knext
 
@@ -79,7 +79,7 @@ def _list_gemini_chat_models(
 
 
 @knext.node(
-    "Gemini Chat Model Connector",
+    "Gemini Chat Model Selector",
     node_type=knext.NodeType.SOURCE,
     icon_path=gemini_icon,
     category=google_category,
@@ -96,7 +96,7 @@ def _list_gemini_chat_models(
     port_type=gemini_chat_model_port_type,
 )
 class GeminiChatModelConnector:
-    """Connects to Gemini chat models available through either Vertex AI or Google AI Studio.
+    """Select a Gemini chat model available through either Vertex AI or Google AI Studio.
 
     This node allows selecting a Gemini chat model using an authenticated connection obtained
     either from the **Vertex AI Connector** node, or from the **Google AI Studio Authenticator** node.

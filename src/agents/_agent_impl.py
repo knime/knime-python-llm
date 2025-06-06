@@ -238,7 +238,6 @@ class LangchainToolConverter:
                 map(self._data_registry.create_port_description, output_ports)
             ),
         )
-        _logger.error(json.dumps(args_schema, indent=2))
 
         def func(configuration: dict = None, data_inputs: dict = None) -> str:
             configuration = configuration or {}
@@ -260,8 +259,6 @@ class LangchainToolConverter:
                 message, outputs = self._ctx._execute_tool(
                     tool, configuration, inputs, self._debug
                 )
-                _logger.error(f"Message: {message}")
-                _logger.error(f"Outputs: {outputs}")
                 output_references = {}
                 for output in outputs:
                     output_reference = self._data_registry.add_table(output)

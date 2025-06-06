@@ -138,6 +138,9 @@ final class MessageCreatorNodeSettings implements DefaultNodeSettings {
     @Widget(title = "Message Column Name", description = "Name of the output message column.")
     String m_messageColumnName = "Message";
 
+    @Widget(title = "Remove Input Columns", description = "Remove columns used as input from the output table.")
+    boolean m_removeInputColumns = false;
+
     static final class ToolCallSettings implements DefaultNodeSettings {
         @Widget(title = "Tool Name Column", description = "Select the input table column containing the tool name.")
         @ChoicesProvider(StringColumns.class)

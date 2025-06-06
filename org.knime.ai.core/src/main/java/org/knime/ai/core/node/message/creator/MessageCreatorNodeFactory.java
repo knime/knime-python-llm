@@ -52,9 +52,11 @@ import org.knime.core.webui.node.impl.WebUINodeConfiguration;
 import org.knime.core.webui.node.impl.WebUINodeFactory;
 
 /**
+ * Factory for the Message Creator node, which creates a KNIME MessageCell
  *
  * @author Seray Arslan, KNIME GmbH, Konstanz, Germany
  */
+@SuppressWarnings("restriction")
 public final class MessageCreatorNodeFactory extends WebUINodeFactory<MessageCreatorNodeModel>{
 
     private static final WebUINodeConfiguration CONFIG = WebUINodeConfiguration.builder()
@@ -70,6 +72,9 @@ public final class MessageCreatorNodeFactory extends WebUINodeFactory<MessageCre
             .sinceVersion(5, 5, 0)
             .build();
 
+    /**
+     * Constructor for the Message Creator node factory.
+     */
     public MessageCreatorNodeFactory() {
         super(CONFIG);
     }

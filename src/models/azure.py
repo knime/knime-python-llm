@@ -449,7 +449,7 @@ class AzureOpenAIAuthenticator:
 
 
 @knext.node(
-    "Azure OpenAI LLM Connector",
+    "Azure OpenAI Instruct Model Selector",
     knext.NodeType.SOURCE,
     azure_icon,
     category=azure_openai_category,
@@ -474,7 +474,7 @@ class AzureOpenAIAuthenticator:
 )
 class AzureOpenAILLMConnector:
     """
-    Connects to an Azure OpenAI Large Language Model.
+    Select an instruct LLM from Azure OpenAI.
 
     This node establishes a connection with an Azure OpenAI Large Language Model (LLM).
     After successfully authenticating using the **Azure OpenAI Authenticator** node, enter the deployment name of

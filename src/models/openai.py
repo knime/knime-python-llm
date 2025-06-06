@@ -107,7 +107,7 @@ chat_models = [
     "o1-mini",
     "o3",
     "o3-mini",
-    "o4-mini"
+    "o4-mini",
 ]
 chat_default = "gpt-4.1-nano"
 embeddings_models = [
@@ -1163,7 +1163,7 @@ class OpenAIAuthenticator:
 # TODO: Check proxy settings and add them to configuration
 # TODO: Generate prompts as configuration dialog as seen on langchain llm.generate(["Tell me a joke", "Tell me a poem"]*15)
 @knext.node(
-    "OpenAI LLM Connector",
+    "OpenAI Instruct Model Selector",
     knext.NodeType.SOURCE,
     openai_icon,
     category=openai_category,
@@ -1181,17 +1181,15 @@ class OpenAIAuthenticator:
 )
 class OpenAILLMConnector:
     """
-    Connects to an OpenAI Large Language Model (LLM).
+    Select an instruct LLM from OpenAI.
 
     This node establishes a connection with an OpenAI LLM.
 
     After successfully authenticating using the **OpenAI Authenticator node**, you can select an LLM from a predefined list
-    or explore advanced options to get a list of all models available for your API key (including fine-tunes).
+    or explore advanced options to get a list of all models available for your API key (including fine-tuned models).
 
     Note that only models compatible with OpenAI's Completions API will work with this node (unfortunately this information is not available programmatically).
     Find documentation about all models at [OpenAI](https://platform.openai.com/docs/models/models).
-
-    If you are looking for gpt-3.5-turbo or gpt-4, check out the **OpenAI Chat Model Connector** node.
 
     **Note**: If you use the [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
     and do not select the "Save password in configuration (weakly encrypted)" option for passing the API key,
@@ -1721,11 +1719,11 @@ class OpenAIDALLEView:
 )
 class OpenAIFineTuneDeleter:
     """
-    Deletes a fine-tuned model from an OpenAI Account.
+    Deletes a fine-tuned model from an OpenAI account.
 
     This node allows you to delete a fine-tuned model from your OpenAI account.
 
-    The fine-tuned model must be selected via either the **OpenAI LLM Connector**, or the **OpenAI Chat Model Connector** node.
+    The fine-tuned model must be selected via either the **OpenAI Instruct Model Selector**, or the **OpenAI Chat Model Connector** node.
 
     If the provided API key possesses the necessary permissions, the model will then be irreversibly removed from the
     authenticated OpenAI account.
@@ -1811,7 +1809,7 @@ class OpenAIFineTuner:
     """
     Fine-tunes an OpenAI Chat Model using a table of example conversations.
 
-    This node fine-tunes an OpenAI Chat Model using structured conversation data. 
+    This node fine-tunes an OpenAI Chat Model using structured conversation data.
     It is useful when you want to adapt a model to a specific tone, domain, or workflow — for example, tailoring it for financial advice, customer support, or internal knowledge assistants.
 
     Each row in the input table represents a message in a conversation. The table must contain at least 10 distinct conversations, and each must include at least one `system` message to define the assistant’s behavior.
@@ -1832,8 +1830,8 @@ class OpenAIFineTuner:
     | 1  | assistant| I can't give specific advice, but tech stocks are volatile. Consider your risk profile. |
     | 2  | user     | What's diversification?                                                  |
     | 2  | assistant| Diversification spreads assets across sectors to reduce risk.           |
-    
-    
+
+
     **Credential Handling**:
     To pass your API key securely, use the
     [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory).

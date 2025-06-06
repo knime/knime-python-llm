@@ -315,7 +315,7 @@ huggingface_textGenInference_chat_port_type = knext.port_type(
 
 
 @knext.node(
-    "HF TGI LLM Connector",
+    "HF TGI Instruct Model Selector",
     knext.NodeType.SOURCE,
     hf_icon,
     category=hf_tgi_category,
@@ -344,7 +344,7 @@ huggingface_textGenInference_chat_port_type = knext.port_type(
 )
 class HFTGILLMConnector:
     """
-    Connects to a dedicated Text Generation Inference Server.
+    Select an instruct model from a dedicated Text Generation Inference Server.
 
     This node can connect to locally or remotely hosted TGI servers which includes
     [Text Generation Inference Endpoints](https://huggingface.co/docs/inference-endpoints/) of popular

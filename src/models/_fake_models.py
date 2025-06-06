@@ -100,7 +100,7 @@ class TestDictLLM(LLM):
             self.default_response,
             prompt,
             self.missing_value_strategy,
-            "Test LLM Connector",
+            "Test Instruct Model Selector",
         )
 
     async def _acall(
@@ -116,7 +116,7 @@ class TestDictLLM(LLM):
             self.default_response,
             prompt,
             self.missing_value_strategy,
-            "Test LLM Connector",
+            "Test Instruct Model Selector",
         )
 
     @property

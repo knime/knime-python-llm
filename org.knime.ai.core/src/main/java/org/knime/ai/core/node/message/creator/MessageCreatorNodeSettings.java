@@ -70,6 +70,7 @@ import org.knime.core.webui.node.dialog.defaultdialog.persistence.api.Migration;
 import org.knime.core.webui.node.dialog.defaultdialog.persistence.api.NodeSettingsMigration;
 import org.knime.core.webui.node.dialog.defaultdialog.widget.ArrayWidget;
 import org.knime.core.webui.node.dialog.defaultdialog.widget.Label;
+import org.knime.core.webui.node.dialog.defaultdialog.widget.TextAreaWidget;
 import org.knime.core.webui.node.dialog.defaultdialog.widget.ValueSwitchWidget;
 import org.knime.core.webui.node.dialog.defaultdialog.widget.Widget;
 import org.knime.core.webui.node.dialog.defaultdialog.widget.choices.ChoicesProvider;
@@ -159,6 +160,7 @@ final class MessageCreatorNodeSettings implements DefaultNodeSettings {
 
         @Layout(ContentsValueLayout.class)
         @Widget(title = "Text Value", description = "Enter the text content.")
+        @TextAreaWidget
         @Effect(predicate = IsTextTypePredicate.class, type = EffectType.SHOW)
         String m_value;
 

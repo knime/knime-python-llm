@@ -48,27 +48,34 @@
  */
 package org.knime.ai.core.node.message.creator;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Stream;
 
 import org.knime.ai.core.data.message.ImageContentPart;
 import org.knime.ai.core.data.message.MessageCell;
-import org.knime.ai.core.data.message.MessageValue;
+import org.knime.ai.core.data.message.MessageValue.MessageContentPart;
 import org.knime.ai.core.data.message.MessageValue.MessageType;
 import org.knime.ai.core.data.message.TextContentPart;
-import org.knime.ai.core.node.message.creator.MessageCreatorNodeSettings.Contents.TextOrImage;
+import org.knime.ai.core.node.message.creator.MessageCreatorNodeSettings.Contents.ContentType;
+import org.knime.core.data.DataCell;
+import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataColumnSpecCreator;
+import org.knime.core.data.DataRow;
 import org.knime.core.data.DataTableSpec;
-import org.knime.core.data.DataTableSpecCreator;
+import org.knime.core.data.StringValue;
+import org.knime.core.data.container.ColumnRearranger;
+import org.knime.core.data.container.SingleCellFactory;
 import org.knime.core.data.image.png.PNGImageValue;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.ExecutionContext;
 import org.knime.core.node.InvalidSettingsException;
-import org.knime.core.node.port.PortObjectSpec;
 import org.knime.core.webui.node.impl.WebUINodeConfiguration;
 import org.knime.core.webui.node.impl.WebUINodeModel;
 
 /**
+ * Node model of the Message Creator node.
  *
  * @author Seray Arslan, KNIME GmbH, Konstanz, Germany
  */
@@ -76,68 +83,126 @@ import org.knime.core.webui.node.impl.WebUINodeModel;
 final class MessageCreatorNodeModel extends WebUINodeModel<MessageCreatorNodeSettings> {
 
     /**
-     * @param configuration
-     * @param modelSettingsClass
+     * @param configuration of the node
      */
     protected MessageCreatorNodeModel(final WebUINodeConfiguration configuration) {
         super(configuration, MessageCreatorNodeSettings.class);
     }
 
     @Override
-    protected DataTableSpec[] configure(final PortObjectSpec[] inSpecs, final MessageCreatorNodeSettings modelSettings)
+    protected DataTableSpec[] configure(final DataTableSpec[] inSpecs, final MessageCreatorNodeSettings modelSettings)
         throws InvalidSettingsException {
-        return new DataTableSpec[]{createTableSpec()};
-    }
-
-    private static DataTableSpec createTableSpec() {
-        var specCreator = new DataTableSpecCreator();
-        specCreator.addColumns(new DataColumnSpecCreator("Message", MessageCell.TYPE).createSpec());
-        return specCreator.createSpec();
+        return new DataTableSpec[]{createRearranger(modelSettings, inSpecs[0]).createSpec()};
     }
 
     @Override
     protected BufferedDataTable[] execute(final BufferedDataTable[] inData, final ExecutionContext exec,
         final MessageCreatorNodeSettings modelSettings) throws Exception {
         var table = inData[0];
-        var role = modelSettings.m_role;
-        var content = modelSettings.m_content;
-
-        var dataContainer = exec.createDataContainer(createTableSpec());
-
-        var rowIter = table.iterator();
-        while (rowIter.hasNext()) {
-            var row = rowIter.next();
-            List<MessageValue.MessageContentPart> parts = new ArrayList<>();
-            for (var c : content) {
-                if (c.m_textOrImage == TextOrImage.TEXT) {
-                    if (c.m_textValue != null && !c.m_textValue.isEmpty()) {
-                        parts.add(new TextContentPart(c.m_textValue));
-                    }
-                } else if (c.m_textOrImage == TextOrImage.IMAGE) {
-                    if (c.m_imageColumn != null && !c.m_imageColumn.isEmpty()) {
-                        int imageColIdx1 = table.getDataTableSpec().findColumnIndex(c.m_imageColumn);
-                        if (imageColIdx1 >= 0) {
-                            var imgCell = row.getCell(imageColIdx1);
-                            if (!imgCell.isMissing()) {
-                                // TODO get ref instead of storing in memory
-                                parts.add(new ImageContentPart(
-                                    ((PNGImageValue) imgCell).getImageContent().getByteArray()
-                                ));
-                            }
-                        }
-                    }
-                }
-            }
-            MessageCell msg = null;
-            if (role == MessageType.USER) {
-                msg = MessageCell.createUserMessageCell(parts);
-            } else if (role == MessageType.AI) {
-                msg = MessageCell.createAIMessageCell(parts);
-            }
-            // TODO add tool message
-            dataContainer.addRowToTable(new org.knime.core.data.def.DefaultRow(row.getKey(), msg));
-        }
-        dataContainer.close();
-        return new BufferedDataTable[]{dataContainer.getTable()};
+        var messageTable = exec.createColumnRearrangeTable(table, createRearranger(modelSettings, table.getDataTableSpec()), exec);
+        return new BufferedDataTable[]{messageTable};
     }
+
+    private static ColumnRearranger createRearranger(final MessageCreatorNodeSettings modelSettings,
+        final DataTableSpec inSpec) {
+        var rearranger = new ColumnRearranger(inSpec);
+        var messageCellCreator = createMessageCellCreator(modelSettings, inSpec);
+        // TODO make column name configurable
+        var columnSpec = new DataColumnSpecCreator("Message", MessageCell.TYPE).createSpec();
+        rearranger.append(new SingleCelLFactoryImpl(columnSpec, messageCellCreator));
+        return rearranger;
+    }
+
+    private static Function<DataRow, DataCell> createMessageCellCreator(
+        final MessageCreatorNodeSettings modelSettings, final DataTableSpec inSpec) {
+        var roleExtractor = createRoleExtractor(modelSettings, inSpec);
+        var contentExtractor = createContentExtractor(modelSettings, inSpec);
+        return r -> {
+            var role = roleExtractor.apply(r);
+            var parts = contentExtractor.apply(r);
+            return new MessageCell(role, parts, null, null);
+        };
+    }
+
+    private static Function<DataRow, List<MessageContentPart>>
+        createContentExtractor(final MessageCreatorNodeSettings modelSettings, final DataTableSpec inSpec) {
+        var extractors = Stream.of(modelSettings.m_content)//
+                .map(c -> createContentPartExtractor(c, inSpec))//
+                .toList();
+        return r -> extractors.stream()
+            .map(extractor -> extractor.apply(r))
+            .flatMap(Optional::stream)
+            .toList();
+    }
+
+    private static Function<DataRow, Optional<MessageContentPart>>
+        createContentPartExtractor(final MessageCreatorNodeSettings.Contents contentPartSettings, final DataTableSpec inSpec) {
+        if (contentPartSettings.m_contentType == ContentType.TEXT) {
+            return createTextContentExtractor(contentPartSettings, inSpec);
+        } else if (contentPartSettings.m_contentType == ContentType.IMAGE) {
+            return createImageContentExtractor(contentPartSettings, inSpec);
+        }
+        throw new IllegalArgumentException("Unknown content type: " + contentPartSettings.m_contentType);
+    }
+
+    private static Function<DataRow, Optional<MessageContentPart>>
+        createTextContentExtractor(final MessageCreatorNodeSettings.Contents content, final DataTableSpec inSpec) {
+        if (content.m_inputType == MessageCreatorNodeSettings.InputType.COLUMN) {
+            int textColIdx = inSpec.findColumnIndex(content.m_textColumn);
+            return r -> {
+                var cell = r.getCell(textColIdx);
+                if (cell.isMissing()) {
+                    return Optional.empty();
+                }
+                return Optional.of(new TextContentPart(((StringValue)cell).getStringValue()));
+            };
+        }
+        return r -> Optional.of(new TextContentPart(content.m_textValue));
+    }
+
+    private static Function<DataRow, Optional<MessageContentPart>>
+        createImageContentExtractor(final MessageCreatorNodeSettings.Contents content, final DataTableSpec inSpec) {
+        int imageColIdx = inSpec.findColumnIndex(content.m_imageColumn);
+        return r -> {
+            var cell = r.getCell(imageColIdx);
+            if (cell.isMissing()) {
+                return Optional.empty();
+            }
+            return Optional.of(new ImageContentPart(((PNGImageValue)cell).getImageContent().getByteArray()));
+        };
+    }
+
+    private static Function<DataRow, MessageType> createRoleExtractor(final MessageCreatorNodeSettings modelSettings,
+        final DataTableSpec inSpec) {
+        if (modelSettings.m_roleInputType == MessageCreatorNodeSettings.InputType.VALUE) {
+            return r -> modelSettings.m_roleValue;
+        } else {
+            int roleColIdx = inSpec.findColumnIndex(modelSettings.m_roleColumn);
+            return r -> {
+                var cell = r.getCell(roleColIdx);
+                if (cell.isMissing()) {
+                    throw new IllegalArgumentException(
+                        "Role column '%s' contains missing values.".formatted(modelSettings.m_roleColumn));
+                }
+                return MessageType.valueOf(((StringValue)cell).getStringValue().toUpperCase());
+            };
+        }
+    }
+
+    private static final class SingleCelLFactoryImpl extends SingleCellFactory {
+
+        private final Function<DataRow, DataCell> m_mapper;
+
+        SingleCelLFactoryImpl(final DataColumnSpec columnSpec, final Function<DataRow, DataCell> mapper) {
+            super(columnSpec);
+            m_mapper = mapper;
+        }
+
+        @Override
+        public DataCell getCell(final DataRow row) {
+            return m_mapper.apply(row);
+        }
+
+    }
+
 }

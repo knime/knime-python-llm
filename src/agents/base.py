@@ -489,7 +489,6 @@ class AgentPrompter2:
                 )
 
         messages = final_state["messages"]
-        # output_table_ids = final_state.get("output_table_ids", [])
 
         desanitized_messages = [
             tool_converter.desanitize_tool_calls(msg) for msg in messages
@@ -511,9 +510,7 @@ class AgentPrompter2:
             return conversation_table
         else:
             # allow the model to pick which output tables to return
-            return conversation_table, [
-                data.data for data in data_registry._data[-num_data_outputs:]
-            ]
+            return conversation_table, data_registry.get_last_tables(num_data_outputs)
 
 
 def _extract_tools_from_table(tools_table: knext.Table, tool_column: str):

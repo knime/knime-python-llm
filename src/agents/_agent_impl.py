@@ -52,6 +52,8 @@ from langgraph.prebuilt import ToolNode
 from typing import Annotated, TypedDict
 from langchain.chat_models.base import BaseChatModel
 from langchain_core.tools import BaseTool
+import pandas as pd
+
 
 import json
 from langchain.tools import StructuredTool
@@ -75,6 +77,12 @@ class Port:
     description: str
     type: str
     spec: Optional[str]
+
+
+def _empty_table():
+    """Returns an empty knext.Table."""
+    # Assuming knext.Table() creates an empty table, adjust as necessary
+    return knext.Table.from_pandas(pd.DataFrame())
 
 
 @dataclass
@@ -105,6 +113,16 @@ class DataRegistry:
         if index < 0 or index >= len(self._data):
             raise IndexError("Index out of range")
         return self._data[index].data
+
+    def get_last_tables(self, num_tables: int) -> list[knext.Table]:
+        """Returns the last `num_tables` tables added to the registry."""
+        if num_tables <= 0:
+            return []
+        tables = [data_item.data for data_item in self._data[-num_tables:]]
+        if len(tables) < num_tables:
+            empty_table = _empty_table()
+            tables = tables + [empty_table] * (num_tables - len(tables))
+        return tables
 
     def create_port_description(self, port: Port) -> dict:
         return {

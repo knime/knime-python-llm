@@ -325,7 +325,7 @@ local_chroma_vector_store_port_type = knext.port_type(
 )
 @knext.input_port(
     "Embeddings",
-    "The embeddings model to use for the vector store.",
+    "The embedding model to use for the vector store.",
     embeddings_model_port_type,
 )
 @knext.input_table(
@@ -339,12 +339,12 @@ local_chroma_vector_store_port_type = knext.port_type(
 )
 class ChromaVectorStoreCreator(BaseVectorStoreCreator):
     """
-    Creates a Chroma vector store from a string column and an embeddings model.
+    Creates a Chroma vector store from a string column and an embedding model.
 
-    The node generates a Chroma vector store that uses the given embeddings model to map documents to a numerical vector that captures
+    The node generates a Chroma vector store that uses the given embedding model to map documents to a numerical vector that captures
     the semantic meaning of the document.
 
-    By default, the node embeds the selected documents using the embeddings model, but it is also possible to create the vector store
+    By default, the node embeds the selected documents using the embedding model, but it is also possible to create the vector store
     from existing embeddings by specifying the corresponding embeddings column in the node dialog.
 
     Downstream nodes, such as the **Vector Store Retriever**, utilize the vector store to find documents with similar
@@ -352,7 +352,7 @@ class ChromaVectorStoreCreator(BaseVectorStoreCreator):
 
     **Note**: If you use the
     [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
-    and do not select the "Save password in configuration (weakly encrypted)" option for passing the API key for the embeddings connector node,
+    and do not select the "Save password in configuration (weakly encrypted)" option for passing the API key for the Embedding Model Selector node,
     the Credentials Configuration node will need to be reconfigured upon reopening the workflow, as the credentials flow variable
     was not saved and will therefore not be available to downstream nodes.
 
@@ -432,7 +432,7 @@ class ChromaVectorStoreCreator(BaseVectorStoreCreator):
 )
 @knext.input_port(
     "Embeddings",
-    "The embeddings model to use for the vector store.",
+    "The embedding model to use for the vector store.",
     embeddings_model_port_type,
 )
 @knext.output_port(
@@ -451,13 +451,13 @@ class ChromaVectorStoreReader:
     along with their corresponding documents. The vector store enables efficient storage, retrieval, and similarity
     search operations on these vectors and their associated data.
 
-    If the vector store was created with LangChain in Python, the embeddings model is not stored with the vectorstore, so it has to be provided separately via the matching **Embeddings Model Connector** node.
+    If the vector store was created with LangChain in Python, the embedding model is not stored with the vectorstore, so it has to be provided separately via the matching **Embedding Model Selector** node.
 
     On execution, the node will extract a document from the store to obtain information about the document's metadata. This assumes that each document in the vector store has the same kind of metadata attached to it.
 
     **Note**: If you use the
     [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
-    and do not select the "Save password in configuration (weakly encrypted)" option for passing the API key for the embeddings connector node,
+    and do not select the "Save password in configuration (weakly encrypted)" option for passing the API key for the Embedding Model Selector node,
     the Credentials Configuration node will need to be reconfigured upon reopening the workflow, as the credentials flow variable
     was not saved and will therefore not be available to downstream nodes.
     """

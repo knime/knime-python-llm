@@ -1043,7 +1043,7 @@ class OpenAIEmbeddingsPortObject(EmbeddingsPortObject):
 
 
 openai_embeddings_port_type = knext.port_type(
-    "OpenAI Embeddings Model",
+    "OpenAI Embedding Model",
     OpenAIEmbeddingsPortObject,
     OpenAIEmbeddingsPortObjectSpec,
 )
@@ -1336,7 +1336,7 @@ class OpenAIChatModelConnector:
 
 
 @knext.node(
-    "OpenAI Embeddings Connector",
+    "OpenAI Embedding Model Selector",
     knext.NodeType.SOURCE,
     openai_icon,
     category=openai_category,
@@ -1356,12 +1356,12 @@ class OpenAIChatModelConnector:
 )
 @knext.output_port(
     "OpenAI Embedding Model",
-    "Configured OpenAI Embeddings Model connection.",
+    "Configured OpenAI Embedding Model connection.",
     openai_embeddings_port_type,
 )
 class OpenAIEmbeddingsConnector:
     """
-    Connects to an OpenAI Embedding Model.
+    Select an OpenAI embedding model.
 
     This node establishes a connection with an OpenAI Embedding Model. After successfully authenticating
     using the **OpenAI Authenticator** node, you can select an embedding model. Follow

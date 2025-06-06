@@ -44,7 +44,7 @@
 
 
 # Nodes:
-# - Gemini Embedding Model Connector
+# - Gemini Embedding Model Selector
 
 import knime.extension as knext
 
@@ -81,7 +81,7 @@ def _list_gemini_embedding_models(
 
 
 @knext.node(
-    "Gemini Embedding Model Connector",
+    "Gemini Embedding Model Selector",
     node_type=knext.NodeType.SOURCE,
     icon_path=gemini_icon,
     category=google_category,
@@ -105,7 +105,7 @@ def _list_gemini_embedding_models(
     port_type=gemini_embedding_model_port_type,
 )
 class GeminiEmbeddingModelConnector:
-    """Connects to embedding models available through either Vertex AI or Google AI Studio.
+    """Select from embedding models available through either Vertex AI or Google AI Studio.
 
     This node allows selecting a Google-published embedding model using an authenticated connection obtained
     either from the **Vertex AI Connector** node, or from the **Google AI Studio Authenticator** node.

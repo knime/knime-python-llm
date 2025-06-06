@@ -517,7 +517,7 @@ chat_model_port_type = knext.port_type(
 
 
 class EmbeddingsPortObjectSpec(AIPortObjectSpec):
-    """Most generic embeddings model spec. Used to define the most generic embeddings model PortType."""
+    """Most generic embedding model spec. Used to define the most generic embedding model PortType."""
 
 
 class EmbeddingsPortObject(knext.PortObject):
@@ -1424,7 +1424,7 @@ class TextEmbedder:
 
     **Note**: If you use the
     [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
-    and do not select the "Save password in configuration (weakly encrypted)" option for passing the API key for the embeddings connector node,
+    and do not select the "Save password in configuration (weakly encrypted)" option for passing the API key for the Embedding Model Selector node,
     the Credentials Configuration node will need to be reconfigured upon reopening the workflow, as the credentials flow variable
     was not saved and will therefore not be available to downstream nodes.
     """

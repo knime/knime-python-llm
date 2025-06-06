@@ -123,7 +123,7 @@ knime_embeddings_port_type = knext.port_type(
 
 
 @knext.node(
-    name="KNIME Hub Embeddings Connector",
+    name="KNIME Hub Embedding Model Selector",
     node_type=knext.NodeType.SOURCE,
     icon_path=hub_connector_icon,
     category=knime_category,
@@ -143,14 +143,14 @@ knime_embeddings_port_type = knext.port_type(
 )
 @knext.output_port(
     name="KNIME Hub Embeddings",
-    description="An embeddings model that connects to a KNIME Hub to embed documents.",
+    description="An embedding model that connects to a KNIME Hub to embed documents.",
     port_type=knime_embeddings_port_type,
 )
 class KnimeHubEmbeddingsConnector:
     """
-    Connects to an embedding model configured in the GenAI Gateway of the connected KNIME Hub.
+    Select an embedding model configured in the GenAI Gateway of the connected KNIME Hub.
 
-    Connects to an embeddings model configured in the GenAI Gateway of the connected KNIME Hub using the authentication
+    Connects to an embedding model configured in the GenAI Gateway of the connected KNIME Hub using the authentication
     provided via the input port.
 
     Use this node to generate embeddings, which are dense vector representations of text input data.

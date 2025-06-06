@@ -169,7 +169,7 @@ class TestEmbeddings(Embeddings, BaseModel):
         except KeyError:
             if self.fail_on_mismatch:
                 raise knext.InvalidParametersError(
-                    f"""Could not find document '{text}' in the Test Embeddings Model. Please ensure that 
+                    f"""Could not find document '{text}' in the Test Embedding Model. Please ensure that 
                     the query exactly matches one of the embedded documents."""
                 )
             else:

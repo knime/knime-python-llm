@@ -652,7 +652,7 @@ hf_embeddings_port_type = knext.port_type(
 
 
 @knext.node(
-    "HF Hub Embeddings Connector",
+    "HF Hub Embedding Model Selector",
     knext.NodeType.SOURCE,
     hf_icon,
     category=hf_hub_category,
@@ -674,12 +674,12 @@ hf_embeddings_port_type = knext.port_type(
 )
 @knext.output_port(
     "HF Hub Embeddings",
-    "An embeddings model connected to Hugging Face Hub.",
+    "An embedding model connected to Hugging Face Hub.",
     hf_embeddings_port_type,
 )
 class HFHubEmbeddingsConnector:
     """
-    Connects to an embedding model hosted on the Hugging Face Hub.
+    Select an embedding model hosted on the Hugging Face Hub.
 
     This node establishes a connection to a specific embedding model hosted on the Hugging Face Hub.
 

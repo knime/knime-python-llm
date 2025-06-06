@@ -119,7 +119,7 @@ ibm_watsonx_embedding_port_type = knext.port_type(
 
 
 @knext.node(
-    name="IBM watsonx.ai Embedding Model Connector",
+    name="IBM watsonx.ai Embedding Model Selector",
     category=ibm_watsonx_category,
     icon_path=ibm_watsonx_icon,
     keywords=["IBMwatsonx", "Embedding", "GenAI"],
@@ -136,7 +136,7 @@ ibm_watsonx_embedding_port_type = knext.port_type(
     ibm_watsonx_embedding_port_type,
 )
 class IBMwatsonxEmbeddingModelConnector:
-    """Connects to an embedding model provided by IBM watsonx.ai.
+    """Select an embedding model provided by IBM watsonx.ai.
 
     After successfully authenticating using the **IBM watsonx.ai Authenticator** node, you can select an embedding model. Refer to
     [IBM watsonx.ai documentation](https://dataplatform.cloud.ibm.com/docs/content/wsj/analyze-data/fm-models-embed.html?context=wx#embed) for more information on available embedding models. At the moment, only the embedding models from foundation models are supported.

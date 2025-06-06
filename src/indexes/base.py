@@ -482,13 +482,13 @@ class VectorStoreRetriever:
 
     **Note**: *Dissimilarity scores* calculated using FAISS or Chroma with L2 distance are not bound to a
     specific range, therefore allowing only for ordinal comparison of scores. These scores also depend
-    on the embeddings model used to generate the embeddings, as different models produce embeddings
+    on the embedding model used to generate the embeddings, as different models produce embeddings
     with varying scales and distributions. Therefore, understanding or comparing similarity across
     different models or spaces without contextual normalization is not meaningful.
 
     **Note**: If you use the
     [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
-    and do not select the "Save password in configuration (weakly encrypted)" option for passing the API key for the embeddings connector node,
+    and do not select the "Save password in configuration (weakly encrypted)" option for passing the API key for the Embedding Model Selector node,
     the Credentials Configuration node will need to be reconfigured upon reopening the workflow, as the credentials flow variable
     was not saved and will therefore not be available to downstream nodes.
     """
@@ -778,7 +778,7 @@ class VectorStoreDataExtractor:
 
     **Note**: If you use the
     [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
-    and do not select the "Save password in configuration (weakly encrypted)" option for passing the API key for the embeddings connector node,
+    and do not select the "Save password in configuration (weakly encrypted)" option for passing the API key for the Embedding Model Selector node,
     the Credentials Configuration node will need to be reconfigured upon reopening the workflow, as the credentials flow variable
     was not saved and will therefore not be available to downstream nodes.
     """

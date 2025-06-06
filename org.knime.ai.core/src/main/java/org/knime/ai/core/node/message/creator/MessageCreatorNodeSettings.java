@@ -49,10 +49,10 @@
 package org.knime.ai.core.node.message.creator;
 
 import org.knime.ai.core.data.message.MessageValue.MessageType;
-import org.knime.ai.core.node.message.creator.SettingsUtils.ColumnProviders.JsonColumns;
-import org.knime.ai.core.node.message.creator.SettingsUtils.ColumnProviders.PngColumns;
-import org.knime.ai.core.node.message.creator.SettingsUtils.ColumnProviders.StringColumns;
-import org.knime.ai.core.node.message.creator.SettingsUtils.CompositePredicateProvider;
+import org.knime.ai.core.node.message.SettingsUtils.CompositePredicateProvider;
+import org.knime.ai.core.node.message.SettingsUtils.ColumnProviders.JsonColumns;
+import org.knime.ai.core.node.message.SettingsUtils.ColumnProviders.PngColumns;
+import org.knime.ai.core.node.message.SettingsUtils.ColumnProviders.StringColumns;
 import org.knime.core.webui.node.dialog.defaultdialog.DefaultNodeSettings;
 import org.knime.core.webui.node.dialog.defaultdialog.layout.After;
 import org.knime.core.webui.node.dialog.defaultdialog.layout.HorizontalLayout;

@@ -46,7 +46,7 @@
  * History
  *   Jun 6, 2025 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
  */
-package org.knime.ai.core.node.message.creator;
+package org.knime.ai.core.node.message;
 
 import java.util.List;
 import java.util.function.BinaryOperator;

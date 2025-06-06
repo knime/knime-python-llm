@@ -42,6 +42,7 @@ class MessageValue:
     content: List[MessageContentPart]
     tool_calls: Optional[List[ToolCall]] = None
     tool_call_id: Optional[str] = None
+    tool_name: Optional[str] = None
 
 
 class MessageValueFactory(kt.PythonValueFactory):
@@ -53,7 +54,7 @@ class MessageValueFactory(kt.PythonValueFactory):
         super().__init__(MessageValue)
 
     def decode(self, storage):
-        # storage: dict with keys "0", "1", "2", "3"
+        # storage: dict with keys "0", "1", "2", "3", "4"
         message_type = MessageType(storage["0"])
         content = [
             MessageContentPart(type=part["0"], data=part["1"]) for part in storage["1"]
@@ -72,15 +73,20 @@ class MessageValueFactory(kt.PythonValueFactory):
                 for tc in storage["2"]
             ]
         tool_call_id = storage.get("3")
+        tool_name = storage.get("4")
         return MessageValue(
             message_type=message_type,
             content=content,
             tool_calls=tool_calls,
             tool_call_id=tool_call_id,
+            tool_name=tool_name,
         )
 
     def encode(self, value: "MessageValue"):
-        # value: MessageValue
+        # handle missing values
+        if value is None:
+            return None
+
         storage = {
             "0": value.message_type.value,
             "1": [
@@ -105,6 +111,7 @@ class MessageValueFactory(kt.PythonValueFactory):
         else:
             storage["2"] = None
         storage["3"] = value.tool_call_id
+        storage["4"] = value.tool_name
         return storage
 
 
@@ -240,6 +247,7 @@ def from_langchain_message(lc_msg) -> MessageValue:
             message_type=msg_type,
             content=content,
             tool_call_id=getattr(lc_msg, "tool_call_id", None),
+            tool_name=getattr(lc_msg, "name", None),
         )
     else:
         raise ValueError(f"Unsupported langchain message type: {type(lc_msg)}")

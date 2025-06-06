@@ -72,6 +72,7 @@ public final class MessageCellSerializer implements DataCellSerializer<MessageCe
         writeContentParts(cell.getContent(), output);
         writeToolCalls(cell.getToolCalls().orElse(null), output);
         output.writeUTF(cell.getToolCallId().orElse(""));
+        output.writeUTF(cell.getToolName().orElse(""));
     }
 
     @Override
@@ -80,8 +81,9 @@ public final class MessageCellSerializer implements DataCellSerializer<MessageCe
         List<MessageContentPart> content = readContentParts(input);
         List<ToolCall> toolCalls = readToolCalls(input);
         String toolCallId = input.readUTF();
+        String toolName = input.readUTF();
         return new MessageCell(messageType, content, toolCalls.isEmpty() ? null : toolCalls,
-            toolCallId.isEmpty() ? null : toolCallId);
+            toolCallId.isEmpty() ? null : toolCallId, toolName.isEmpty() ? null : toolName);
     }
 
     private static void writeContentParts(final List<MessageContentPart> content, final DataCellDataOutput output)

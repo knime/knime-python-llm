@@ -75,6 +75,8 @@ public final class MessageCell extends DataCell implements MessageValue {
 
     private final String m_toolCallId;
 
+    private final String m_toolName;
+
     /**
      * Data type for MessageCell.
      */
@@ -87,11 +89,12 @@ public final class MessageCell extends DataCell implements MessageValue {
      * @param content The content of the message
      */
     MessageCell(final MessageType messageType, final List<MessageContentPart> content, final List<ToolCall> toolCalls,
-        final String toolCallId) {
+        final String toolCallId, final String toolName) {
         m_messageType = messageType;
         m_content = immutableCopy(content);
         m_toolCalls = toolCalls != null ? immutableCopy(toolCalls) : null;
         m_toolCallId = toolCallId;
+        m_toolName = toolName;
     }
 
     private static <T> List<T> immutableCopy(final List<T> list) {
@@ -118,7 +121,7 @@ public final class MessageCell extends DataCell implements MessageValue {
     public static MessageCell createAIMessageCell(final List<MessageContentPart> content,
         final List<ToolCall> toolCalls) {
         checkContent(content);
-        return new MessageCell(MessageType.AI, content, toolCalls, null);
+        return new MessageCell(MessageType.AI, content, toolCalls, null, null);
     }
 
     private static void checkContent(final List<MessageContentPart> content) {
@@ -134,7 +137,7 @@ public final class MessageCell extends DataCell implements MessageValue {
      */
     public static MessageCell createUserMessageCell(final List<MessageContentPart> content) {
         checkContent(content);
-        return new MessageCell(MessageType.USER, content, null, null);
+        return new MessageCell(MessageType.USER, content, null, null, null);
     }
 
     /**
@@ -142,12 +145,14 @@ public final class MessageCell extends DataCell implements MessageValue {
      *
      * @param content the content of the message
      * @param toolCallId the ID of the tool call associated with this message, must not be null
+     * @param toolName
      * @return a new MessageCell representing a tool message
      */
-    public static MessageCell createToolMessageCell(final List<MessageContentPart> content, final String toolCallId) {
+    public static MessageCell createToolMessageCell(final List<MessageContentPart> content, final String toolCallId,
+        final String toolName) {
         CheckUtils.checkNotNull(toolCallId, "Tool call ID cannot be null");
         checkContent(content);
-        return new MessageCell(MessageType.TOOL, content, null, toolCallId);
+        return new MessageCell(MessageType.TOOL, content, null, toolCallId, toolName);
     }
 
     @Override
@@ -171,9 +176,14 @@ public final class MessageCell extends DataCell implements MessageValue {
     }
 
     @Override
+    public Optional<String> getToolName() {
+        return Optional.ofNullable(m_toolName);
+    }
+
+    @Override
     public String toString() {
         return "MessageCell [messageType=" + m_messageType + ", content=" + m_content + ", toolCalls=" + m_toolCalls
-            + ", toolCallId=" + m_toolCallId + "]";
+            + ", toolCallId=" + m_toolCallId + ", toolName=" + m_toolName + "]";
     }
 
     @Override

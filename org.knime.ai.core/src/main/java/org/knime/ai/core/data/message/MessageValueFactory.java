@@ -96,7 +96,8 @@ public final class MessageValueFactory implements ValueFactory<StructReadAccess,
                     StringDataSpec.INSTANCE // arguments
                 )//
             ), //
-            StringDataSpec.INSTANCE // tool call id (only present for tool messages)
+            StringDataSpec.INSTANCE, // tool call id (only present for tool messages)
+            StringDataSpec.INSTANCE // tool name (only present for tool messages)
         );
 
     }
@@ -121,6 +122,8 @@ public final class MessageValueFactory implements ValueFactory<StructReadAccess,
 
         private final Consumer<Optional<String>> m_toolCallIdWriter;
 
+        private final Consumer<Optional<String>> m_toolNameWriter;
+
         MessageWriteValue(final StructWriteAccess access) {
             m_typeWriter = access.<StringWriteAccess>getWriteAccess(0)::setStringValue;
             ListWriteAccess contentAccess = access.getWriteAccess(1);
@@ -131,6 +134,8 @@ public final class MessageValueFactory implements ValueFactory<StructReadAccess,
                 ValueFactoryUtils.writeList(toolCallsAccess, createToolCallWriter(toolCallsAccess.getWriteAccess())));
             StringWriteAccess toolCallIdAccess = access.getWriteAccess(3);
             m_toolCallIdWriter = ValueFactoryUtils.writeOptional(toolCallIdAccess, toolCallIdAccess::setStringValue);
+            StringWriteAccess toolNameAccess = access.getWriteAccess(4);
+            m_toolNameWriter = ValueFactoryUtils.writeOptional(toolNameAccess, toolNameAccess::setStringValue);
 
         }
 
@@ -140,6 +145,7 @@ public final class MessageValueFactory implements ValueFactory<StructReadAccess,
             m_contentWriter.accept(value.getContent());
             m_toolCallsWriter.accept(value.getToolCalls());
             m_toolCallIdWriter.accept(value.getToolCallId());
+            m_toolNameWriter.accept(value.getToolName());
         }
 
         private static Consumer<MessageContentPart> createContentPartWriter(final StructWriteAccess access) {
@@ -179,6 +185,8 @@ public final class MessageValueFactory implements ValueFactory<StructReadAccess,
 
         private final Supplier<Optional<String>> m_toolCallIdReader;
 
+        private final Supplier<Optional<String>> m_toolNameReader;
+
         private final Supplier<List<MessageContentPart>> m_contentReader;
 
         protected MessageReadValue(final StructReadAccess access) {
@@ -192,6 +200,8 @@ public final class MessageValueFactory implements ValueFactory<StructReadAccess,
                 ValueFactoryUtils.readList(toolCallsAccess, createToolCallReader(toolCallsAccess.getAccess())));
             StringReadAccess toolCallIdAccess = access.getAccess(3);
             m_toolCallIdReader = ValueFactoryUtils.readOptional(toolCallIdAccess, toolCallIdAccess::getStringValue);
+            StringReadAccess toolNameAccess = access.getAccess(4);
+            m_toolNameReader = ValueFactoryUtils.readOptional(toolNameAccess, toolNameAccess::getStringValue);
         }
 
         @Override
@@ -207,7 +217,8 @@ public final class MessageValueFactory implements ValueFactory<StructReadAccess,
         @Override
         public DataCell getDataCell() {
             return new MessageCell(m_typeReader.get(), m_contentReader.get(),
-                m_toolCallsReader.get().orElse(null), m_toolCallIdReader.get().orElse(null));
+                m_toolCallsReader.get().orElse(null), m_toolCallIdReader.get().orElse(null),
+                m_toolNameReader.get().orElse(null));
         }
 
         @Override
@@ -218,6 +229,11 @@ public final class MessageValueFactory implements ValueFactory<StructReadAccess,
         @Override
         public Optional<List<ToolCall>> getToolCalls() {
             return m_toolCallsReader.get();
+        }
+
+        @Override
+        public Optional<String> getToolName() {
+            return m_toolNameReader.get();
         }
 
         private static Supplier<ToolCall> createToolCallReader(final StructReadAccess access) {

@@ -563,7 +563,7 @@ def _isinstance_of_port_object(
 
 
 @knext.node(
-    "LLM Prompter",
+    "Chat Model Prompter (Table)",
     knext.NodeType.PREDICTOR,
     "icons/generic/brain.png",
     model_category,
@@ -575,7 +575,7 @@ def _isinstance_of_port_object(
     ],
 )
 @knext.input_port(
-    "LLM or Chat Model", "A large language model or chat model.", llm_port_type
+    "Instruct Model or Chat Model", "Instruct Model or Chat Model.", llm_port_type
 )
 @knext.input_table("Prompt Table", "A table containing a string column with prompts.")
 @knext.output_table(
@@ -583,7 +583,7 @@ def _isinstance_of_port_object(
 )
 class LLMPrompter:
     """
-    Prompts a Large Language Model.
+    Interact with an instruct or chat model using each row of the input table as an independent prompt.
 
     For each row in the input table, this node sends one prompt to the LLM and receives a corresponding response.
     Rows and the corresponding prompts are treated in isolation, i.e. the LLM cannot remember the contents of the previous rows or how it responded to them.
@@ -1353,7 +1353,7 @@ def _contains_json_keyword(messages: list) -> bool:
 
     Messages can be one of:
 
-        For LLM Prompter (checked in execute):
+        For Chat Model Prompter (Table) (checked in execute):
             - prompts ([list of strings])
             - system_message + prompt ([SystemMessage, HumanMessage])
 

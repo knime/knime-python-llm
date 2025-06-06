@@ -111,7 +111,7 @@ final class MessageCreatorNodeModel extends WebUINodeModel<MessageCreatorNodeSet
         var rearranger = new ColumnRearranger(inSpec);
         var messageCellCreator = createMessageCellCreator(modelSettings, inSpec);
         var columnSpec = new DataColumnSpecCreator(modelSettings.m_messageColumnName, MessageCell.TYPE).createSpec();
-        rearranger.append(new SingleCelLFactoryImpl(columnSpec, messageCellCreator));
+        rearranger.append(new SingleCellFactoryImpl(columnSpec, messageCellCreator));
         rearranger.remove(columnsToRemove(modelSettings).toArray(String[]::new));
         return rearranger;
     }
@@ -272,11 +272,11 @@ final class MessageCreatorNodeModel extends WebUINodeModel<MessageCreatorNodeSet
         };
     }
 
-    private static final class SingleCelLFactoryImpl extends SingleCellFactory {
+    private static final class SingleCellFactoryImpl extends SingleCellFactory {
 
         private final Function<DataRow, DataCell> m_mapper;
 
-        SingleCelLFactoryImpl(final DataColumnSpec columnSpec, final Function<DataRow, DataCell> mapper) {
+        SingleCellFactoryImpl(final DataColumnSpec columnSpec, final Function<DataRow, DataCell> mapper) {
             super(columnSpec);
             m_mapper = mapper;
         }

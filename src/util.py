@@ -235,6 +235,24 @@ def handle_missing_and_empty_values(
     return df
 
 
+def message_type() -> knext.LogicalType:
+    from knime.types.message import MessageValue
+
+    return knext.logical(MessageValue)
+
+
+def to_human_message(message):
+    from knime.types.message import MessageValue, to_langchain_message
+    import langchain_core.messages as lcm
+    import json
+
+    if isinstance(message, MessageValue):
+        return to_langchain_message(message)
+    elif isinstance(message, dict):
+        return lcm.HumanMessage(json.dumps(message))
+    return lcm.HumanMessage(message)
+
+
 class BaseMapper(ABC):
     def __init__(
         self,
@@ -245,9 +263,21 @@ class BaseMapper(ABC):
         self._columns = [columns] if isinstance(columns, str) else columns
         self._fn = fn
 
-    def _is_valid(self, text_array):
-        text_array = pc.utf8_trim_whitespace(text_array)
-        return pc.fill_null(pc.not_equal(text_array, pa.scalar("")), False)
+    def _is_valid(self, pa_array: pa.Array) -> pa.Array:
+        is_null_array = pc.is_null(pa_array)
+        is_not_null_array = pc.invert(is_null_array)
+
+        # Check if the array's type is a string type
+        if pa.types.is_string(pa_array.type) or pa.types.is_large_string(pa_array.type):
+            # For string types, trim whitespace and check for non-empty
+            text_array_trimmed = pc.utf8_trim_whitespace(pa_array)
+            is_empty_string = pc.equal(pc.utf8_length(text_array_trimmed), 0)
+            # A string is valid if it's not null AND not an empty string
+            return pc.and_(is_not_null_array, pc.invert(is_empty_string))
+
+        else:
+            # For any other data type, just check if it's not null.
+            return is_not_null_array
 
     @abstractmethod
     def map(self, table: pa.Table) -> pa.Array:

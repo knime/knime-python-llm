@@ -540,6 +540,12 @@ embeddings_model_port_type = knext.port_type(
 )
 
 
+def _message_cell_col_filter(column: knext.Column):
+    """Accept string, dict, or MessageCell"""
+
+    return column.ktype in [knext.string(), knext.logical(dict), util.message_type()]
+
+
 class SystemMessageHandling(knext.EnumParameterOptions):
     NONE = (
         "None",
@@ -651,7 +657,7 @@ class LLMPrompter:
         "Prompt column",
         "Column containing prompts for the LLM.",
         port_index=1,
-        column_filter=util.create_type_filter(knext.string(), knext.logical(dict)),
+        column_filter=_message_cell_col_filter,
     )
 
     response_column_name = knext.StringParameter(
@@ -717,7 +723,7 @@ class LLMPrompter:
             util.check_column(
                 input_table_spec,
                 self.prompt_column,
-                [knext.string(), knext.logical(dict)],
+                [knext.string(), knext.logical(dict), util.message_type()],
                 "prompt",
             )
         else:
@@ -798,40 +804,38 @@ class LLMPrompter:
         output_table: knext.BatchOutputTable = knext.BatchOutputTable.create()
 
         n_requests = llm_port.spec.n_requests
-        is_chat_model = self._is_chat_model(llm_port, ctx)
         progress_tracker = util.ProgressTracker(total_rows=num_rows, ctx=ctx)
         llm = _initialize_model(llm_port, ctx, self.output_format)
+        is_chat_model = self._is_chat_model(llm)
 
-        def apply_model(prompt_table: pa.Table):
-            """Applies the model to the given prompt table."""
-
-            prompts = self._include_system_messages(
-                is_chat_model, prompt_table.to_pandas()
-            )
-
-            output_schema = pa.schema([(self.response_column_name, pa.string())])
-
-            # Check if all prompts are empty/missing
-            if not prompts:
-                missing_values_table = pa.table(
-                    {self.response_column_name: [None] * len(prompts)},
-                    schema=output_schema,
-                )
-                return missing_values_table
-
-            _validate_json_output_format(self.output_format, prompts)
-
+        def _call_model(messages: list) -> list:
             def get_responses(model):
                 return self.process_batches_concurrently(
-                    prompts,
+                    messages,
                     model,
                     n_requests,
                     progress_tracker,
                 )
 
-            responses = _call_model_with_output_format_fallback(
+            return _call_model_with_output_format_fallback(
                 ctx, llm_port, get_responses, self.output_format, llm
             )
+
+        def apply_model(prompt_table: pa.Table):
+            messages = self._extract_messages(prompt_table, is_chat_model)
+            output_schema = pa.schema([(self.response_column_name, pa.string())])
+
+            # Check if all prompts are empty/missing
+            if not messages:
+                missing_values_table = pa.table(
+                    {self.response_column_name: [None] * len(messages)},
+                    schema=output_schema,
+                )
+                return missing_values_table
+
+            _validate_json_output_format(self.output_format, messages)
+
+            responses = _call_model(messages)
             response_table = pa.table({output_column_name: responses})
             return response_table
 
@@ -841,12 +845,7 @@ class LLMPrompter:
             util.check_canceled(ctx)
             pa_table = batch.to_pyarrow()
 
-            # Create a separate table for transformations (e.g. JSON conversion and mapping)
-            # since PyArrow tables are immutable.
             prompt_table = pa_table
-
-            if self._prompt_column_is_json(pa_table):
-                prompt_table = self._convert_dict_column_to_json(pa_table)
 
             table_from_batch = pa.Table.from_batches([prompt_table])
             response_table = mapper.map(table_from_batch)
@@ -881,78 +880,44 @@ class LLMPrompter:
                 fn=apply_model,
             )
 
-    def _is_chat_model(self, llm_port, ctx) -> bool:
+    def _is_chat_model(self, llm) -> bool:
         from langchain_core.language_models import BaseChatModel
 
-        llm = _initialize_model(llm_port, ctx)
         return isinstance(llm, BaseChatModel)
 
-    def _include_system_messages(
-        self, is_chat_model, data_frame
-    ) -> List[str] | List[List]:
-        import langchain_core.messages as lcm
+    
+    def _extract_messages(self, table, is_chat_model: bool):
+        system_messages = self._extract_system_messages(table, is_chat_model)
+        user_messages = self._extract_user_messages(table)
 
+        if system_messages is None:
+            return [[user_message] for user_message in user_messages]
+        else:
+            return [[system_message, user_message] for system_message, user_message in zip(system_messages, user_messages)]
+
+
+    def _extract_user_messages(self, table):
+        prompt_column = table.column(self.prompt_column)
+        # TODO make sure this is always a human message
+        return [util.to_human_message(prompt.as_py()) for prompt in prompt_column]
+    
+    def _extract_system_messages(self, table, is_chat_model: bool):
+        import langchain_core.messages as lcm
         if (
             not is_chat_model
             or self.system_message_handling == SystemMessageHandling.NONE.name
         ):
-            prompts = data_frame[self.prompt_column].tolist()
+            return None
+        elif self.system_message_handling == SystemMessageHandling.SINGLE.name:
+            system_message = lcm.SystemMessage(self.system_message)
+            return [system_message] * len(table)
+        elif self.system_message_handling == SystemMessageHandling.COLUMN.name:
+            system_column = table.column(self.system_message_column)
+            return [lcm.SystemMessage(val.as_py()) for val in system_column]
         else:
-            if self.system_message_handling == SystemMessageHandling.SINGLE.name:
-                prompts = data_frame[self.prompt_column].tolist()
-                prompts = self._add_global_system_message(prompts)
-            elif self.system_message_handling == SystemMessageHandling.COLUMN.name:
-                prompts = data_frame.apply(
-                    lambda row: [
-                        lcm.SystemMessage(row[self.system_message_column]),
-                        lcm.HumanMessage(row[self.prompt_column]),
-                    ],
-                    axis=1,
-                ).tolist()
-            else:
-                raise NotImplementedError(
-                    f"System messages handled via '{SystemMessageHandling[self.system_message_handling].label}' are not implemented yet."
-                )
-
-        return prompts
-
-    def _add_global_system_message(self, prompts: List[str]) -> List[List]:
-        import langchain_core.messages as lcm
-
-        return [
-            [
-                lcm.SystemMessage(self.system_message),
-                lcm.HumanMessage(x),
-            ]
-            for x in prompts
-        ]
-
-    def _convert_dict_column_to_json(self, pa_table):
-        import pyarrow as pa
-        import json
-
-        # Convert the dictionary column to a JSON formatted string column
-        # by checking if the dictionary is empty or None. If so, keep the value as None.
-        json_strings = pa.array(
-            [
-                (json.dumps(val_py) if (val_py := val.as_py()) is not None else None)
-                for val in pa_table[self.prompt_column]
-            ],
-            type=pa.string(),
-        )
-
-        # Replace the column with the converted string values
-        pa_table = pa_table.set_column(
-            pa_table.schema.get_field_index(self.prompt_column),
-            self.prompt_column,
-            json_strings,
-        )
-        return pa_table
-
-    def _prompt_column_is_json(self, pa_table) -> bool:
-        return (
-            pa_table.column(self.prompt_column).type == knext.logical(dict).to_pyarrow()
-        )
+            raise NotImplementedError(
+                f"System messages handled via '{SystemMessageHandling[self.system_message_handling].label}' are not implemented yet."
+            )
 
 
 @knext.node(

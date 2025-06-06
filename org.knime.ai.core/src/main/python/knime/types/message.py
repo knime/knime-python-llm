@@ -133,13 +133,17 @@ def to_langchain_message(msg: "MessageValue"):
         for part in content_parts:
             if part.type == "text":
                 result.append(
-                    part.data.decode("utf-8")
-                    if isinstance(part.data, bytes)
-                    else str(part.data)
+                    {"type": "text", "text": part.data.decode("utf-8")
+                     if isinstance(part.data, bytes)
+                     else str(part.data)}
                 )
             elif part.type == "image":
-                # Example: OpenAI expects {"type": "image_url", "image_url": {"url": ...}}
-                result.append({"type": "image_url", "image_url": {"url": part.data}})
+                if isinstance(part.data, bytes):
+                    import base64
+
+                    base64_image = base64.b64encode(part.data).decode("utf-8")
+                    image_url = f"data:image/png;base64,{base64_image}"
+                    result.append({"type": "image_url", "image_url": {"url": image_url}})
             else:
                 result.append({"type": part.type, "data": part.data})
         return result

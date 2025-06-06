@@ -131,14 +131,14 @@ class HFTEIEmbeddingsPortObject(EmbeddingsPortObject):
 
 
 huggingface_tei_embeddings_port_type = knext.port_type(
-    "Hugging Face TEI Embeddings Model",
+    "Hugging Face TEI Embedding Model",
     HFTEIEmbeddingsPortObject,
     HFTEIEmbeddingsPortObjectSpec,
 )
 
 
 @knext.node(
-    "HF TEI Embeddings Connector",
+    "HF TEI Embedding Model Selector",
     knext.NodeType.SOURCE,
     hf_icon,
     hf_tei_category,
@@ -161,13 +161,13 @@ huggingface_tei_embeddings_port_type = knext.port_type(
     optional=True,
 )
 @knext.output_port(
-    "Embeddings Model",
-    "Connection to an embeddings model hosted on a Text Embeddings Inference server.",
+    "Embedding Model",
+    "Connection to an embedding model hosted on a Text Embeddings Inference server.",
     huggingface_tei_embeddings_port_type,
 )
 class HFTEIEmbeddingsConnector:
     """
-    Connects to a dedicated Text Embeddings Inference Server.
+    Select a dedicated Text Embeddings Inference Server.
 
     This node can connect to locally or remotely hosted TEI servers which includes
     [Text Embedding Inference Endpoints](https://huggingface.co/docs/inference-endpoints/) of

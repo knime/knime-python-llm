@@ -303,7 +303,7 @@ class AzureOpenAIEmbeddingsPortObject(OpenAIEmbeddingsPortObject):
 
 
 azure_openai_embeddings_port_type = knext.port_type(
-    "Azure OpenAI Embeddings Model",
+    "Azure OpenAI Embedding Model",
     AzureOpenAIEmbeddingsPortObject,
     AzureOpenAIEmbeddingsPortObjectSpec,
 )
@@ -622,7 +622,7 @@ class AzureOpenAIChatModelConnector:
 
 
 @knext.node(
-    "Azure OpenAI Embeddings Connector",
+    "Azure OpenAI Embedding Model Selector",
     knext.NodeType.SOURCE,
     azure_icon,
     category=azure_openai_category,
@@ -642,16 +642,16 @@ class AzureOpenAIChatModelConnector:
     azure_openai_authentication_port_type,
 )
 @knext.output_port(
-    "Azure OpenAI Embeddings Model",
-    "Configured Azure OpenAI Embeddings Model connection.",
+    "Azure OpenAI Embedding Model",
+    "Configured Azure OpenAI Embedding Model connection.",
     azure_openai_embeddings_port_type,
 )
 class AzureOpenAIEmbeddingsConnector:
     """
-    Connects to an Azure OpenAI Embeddings Model.
+    Select an Azure OpenAI embedding model.
 
-    This node establishes a connection with an Azure OpenAI Embeddings Model. After successfully authenticating
-    using the **Azure OpenAI Authenticator** node, you need to provide the name of a deployed embeddings model
+    This node establishes a connection with an Azure OpenAI Embedding Model. After successfully authenticating
+    using the **Azure OpenAI Authenticator** node, you need to provide the name of a deployed embedding model
     found on the [Azure AI Studio](https://oai.azure.com).
 
     **Note**: If you use the

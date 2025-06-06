@@ -129,8 +129,8 @@ class Embeddings4AllPortObject(EmbeddingsPortObject, FilestorePortObject):
             )
             if str(e) == unsupported_model_exception:
                 raise knext.InvalidParametersError(
-                    "The current embeddings model is incompatible. "
-                    "Please run the GPT4All Embeddings Connector again to download the latest model, "
+                    "The current embedding model is incompatible. "
+                    "Please run the GPT4All Embedding Model Selector again to download the latest model, "
                     "or update it manually to a newer version. "
                     "For additional details on available models, please refer to: "
                     "https://raw.githubusercontent.com/nomic-ai/gpt4all/main/gpt4all-chat/metadata/models3.json"
@@ -187,7 +187,7 @@ class ModelRetrievalOptions(knext.EnumParameterOptions):
 
 
 @knext.node(
-    "GPT4All Embeddings Connector",
+    "GPT4All Embedding Model Selector",
     knext.NodeType.SOURCE,
     gpt4all_icon,
     gpt4all_category,
@@ -206,7 +206,7 @@ class ModelRetrievalOptions(knext.EnumParameterOptions):
 )
 class Embeddings4AllConnector:
     """
-    Connects to an embedding model that runs on the local machine.
+    Select an embedding model that runs on the local machine.
 
     This node connects to an embedding model that runs on the local machine via GPT4All.
 
@@ -271,8 +271,8 @@ class Embeddings4AllConnector:
                 )
                 if str(e) == unsupported_model_exception:
                     raise knext.InvalidParametersError(
-                        "The current embeddings model is incompatible. "
-                        "Please run the GPT4All Embeddings Connector again to download the latest model, "
+                        "The current embedding model is incompatible. "
+                        "Please run the GPT4All Embedding Model Selector again to download the latest model, "
                         "or update it manually to a newer version. "
                         "For additional details on available models, please refer to: "
                         "https://raw.githubusercontent.com/nomic-ai/gpt4all/main/gpt4all-chat/metadata/models3.json"

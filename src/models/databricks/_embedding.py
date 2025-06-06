@@ -120,7 +120,7 @@ databricks_embedding_port_type = knext.port_type(
 
 
 @knext.node(
-    name="Databricks Embedding Connector",
+    name="Databricks Embedding Model Selector",
     category=databricks_category,
     icon_path="icons/databricks/Databricks-embeddings-connector.png",
     keywords=["Databricks", "Embedding", "GenAI", "Mosaic"],
@@ -137,7 +137,7 @@ databricks_embedding_port_type = knext.port_type(
     databricks_embedding_port_type,
 )
 class DatabricksEmbeddingConnector:
-    """Connects to an embedding model served by a Databricks workspace.
+    """Select an embedding model served by a Databricks workspace.
 
     This node connects to an embedding model served by the Databricks workspace that is provided as an input.
     See the

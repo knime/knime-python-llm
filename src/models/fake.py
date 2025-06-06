@@ -120,7 +120,7 @@ class MismatchSettings:
     )
 
 
-@knext.parameter_group(label="Embeddings Model Configuration")
+@knext.parameter_group(label="Embedding Model Configuration")
 class TestEmbeddingsSettings:
     test_doc_col = knext.ColumnParameter(
         "Document column",
@@ -142,7 +142,7 @@ class TestEmbeddingsSettings:
 
     fail_on_mismatch = knext.BoolParameter(
         "Fail on retrieval mismatch",
-        "Whether the Test Embeddings Model should fail downstream on document mismatch.",
+        "Whether the Test Embedding Model should fail downstream on document mismatch.",
         default_value=False,
     )
 
@@ -559,7 +559,7 @@ class TestChatModelConnector:
 
 
 @knext.node(
-    "Test Embeddings Connector",
+    "Test Embedding Model Selector",
     knext.NodeType.SOURCE,
     fake_icon,
     category=test_category,
@@ -571,19 +571,19 @@ class TestChatModelConnector:
 )
 @knext.output_port(
     "Test Embeddings",
-    "Configured Test Embeddings Model",
+    "Configured Test Embedding Model",
     test_embeddings_port_type,
 )
 class TestEmbeddingsConnector:
     """
-    Creates a Test Embeddings Model.
+    Creates a Test Embedding Model.
 
-    This node creates a Test Embeddings Model implementation for testing purposes without
+    This node creates a Test Embedding Model implementation for testing purposes without
     the need for heavy computing power. Provide a set of documents and queries along with their
     corresponding vectors for the following nodes, e.g., Vector Store Creators and Vector Store Retriever,
     to use.
 
-    All downstream nodes working with the Test Embeddings Model need to be supplied with matching documents,
+    All downstream nodes working with the Test Embedding Model need to be supplied with matching documents,
     which should also be used as queries in the Vector Store Retriever node.
     Failure to do so will, based on the configuration, either result in errors or return documents closest to the
     zero vector.

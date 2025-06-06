@@ -956,7 +956,7 @@ class LLMPrompter:
 
 
 @knext.node(
-    "Chat Model Prompter",
+    "Chat Model Prompter (Conversation)",
     knext.NodeType.PREDICTOR,
     "icons/generic/brain.png",
     model_category,
@@ -983,7 +983,7 @@ class LLMPrompter:
 )
 class ChatModelPrompter:
     """
-    Prompts a Chat Model.
+    Interact with a chat model within a continuous conversation.
 
     This node prompts a chat model using the provided user message, using an existing conversation history as context.
     An optional table containing tool definitions can be provided to enable tool calling.
@@ -1010,7 +1010,7 @@ class ChatModelPrompter:
     The output of the tool can then be fed back into the node by appending a new 'tool' message to the
     conversation history table, with the tool's output being the message content.
 
-    A common way to ensure that the tool call output is presented back to the Chat Model Prompter is
+    A common way to ensure that the tool call output is presented back to the **Chat Model Prompter (Conversation)** node is
     to embed the node together with its tools in a [Recursive Loop](https://hub.knime.com/knime/extensions/org.knime.features.base/latest/org.knime.base.node.meta.looper.recursive.RecursiveLoopStartDynamicNodeFactory).
 
     A **tool definition** is a JSON object describing the corresponding tool and its parameters. The more
@@ -1357,7 +1357,7 @@ def _contains_json_keyword(messages: list) -> bool:
             - prompts ([list of strings])
             - system_message + prompt ([SystemMessage, HumanMessage])
 
-        For Chat Model Prompter (checked in configure):
+        For Chat Model Prompter (Conversation) (checked in configure):
             - system_message and/or chat_message (str)
 
     """

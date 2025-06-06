@@ -187,8 +187,8 @@ class ModelSettings(GeneralSettings):
 
     n_requests = knext.IntParameter(
         label="Number of concurrent requests",
-        description="""Maximum number of concurrent requests a single node (typically the LLM Prompter) can make to the GenAI Gateway.
-        The more requests a node can make in parallel, the faster it executes. Too many requests might get rate limitted by some
+        description="""Maximum number of concurrent requests a single node (e.g. LLM Prompter (Table)) can make to the GenAI Gateway.
+        The more requests a node can make in parallel, the faster it executes. Too many requests might get rate-limited by some
         GenAI providers.
         """,
         default_value=1,

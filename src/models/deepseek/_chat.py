@@ -165,7 +165,7 @@ def _list_models(ctx: knext.ConfigurationContext):
 )
 @knext.output_port(
     "DeepSeek Chat Model",
-    "The DeepSeek chat model which can be used in the LLM Prompter and Chat Model Prompter.",
+    "The DeepSeek chat model which can be used in the LLM Prompter (Table) and LLM Prompter (Conversation) nodes.",
     deepseek_chat_model_port_type,
 )
 class DeepSeekChatModelConnector:

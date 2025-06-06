@@ -141,7 +141,7 @@ class GeminiChatModelConnector:
         "Number of concurrent requests",
         """Specify the number of maximum requests that can be made concurrently.
 
-        Increasing this number is particularly useful in conjunction with the **LLM Prompter** node,
+        Increasing this number is particularly useful in conjunction with the **LLM Prompter (Table)** node,
         as it operates in a row-based manner (e.g. 10 concurrent requests would result
         in a batch of 10 rows being processed concurrently).
         """,

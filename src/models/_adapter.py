@@ -60,8 +60,8 @@ from langchain_core.outputs import ChatGeneration, ChatResult
 
 class LLMChatModelAdapter(BaseChatModel):
     """
-    This class adapts LLMs as chat models, allowing LLMs that have been fined tuned for
-    chat applications to be used as chat models with the Chat Model Prompter.
+    This class adapts LLMs as chat models, allowing LLMs that have been fine-tuned for
+    chat applications to be used as chat models with the LLM Prompter (Conversation).
     """
 
     llm: BaseLLM

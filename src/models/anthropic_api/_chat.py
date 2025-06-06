@@ -159,7 +159,7 @@ def _list_models(ctx: knext.ConfigurationContext):
 )
 @knext.output_port(
     "Anthropic Chat Model",
-    "The Anthropic chat model which can be used in the LLM Prompter and Chat Model Prompter.",
+    "The Anthropic chat model which can be used in the LLM Prompter (Table) and LLM Prompter (Conversation) nodes.",
     anthropic_chat_model_port_type,
 )
 class AnthropicChatModelConnector:

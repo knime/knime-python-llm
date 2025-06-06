@@ -563,7 +563,7 @@ def _isinstance_of_port_object(
 
 
 @knext.node(
-    "LLM Prompter",
+    "LLM Prompter (Table)",
     knext.NodeType.PREDICTOR,
     "icons/generic/brain.png",
     model_category,
@@ -575,7 +575,7 @@ def _isinstance_of_port_object(
     ],
 )
 @knext.input_port(
-    "LLM or Chat Model", "A large language model or chat model.", llm_port_type
+    "Instruct Model or Chat Model", "Instruct Model or Chat Model.", llm_port_type
 )
 @knext.input_table("Prompt Table", "A table containing a string column with prompts.")
 @knext.output_table(
@@ -583,7 +583,7 @@ def _isinstance_of_port_object(
 )
 class LLMPrompter:
     """
-    Prompts a Large Language Model.
+    Interact with an instruct or chat model using each row of the input table as an independent prompt.
 
     For each row in the input table, this node sends one prompt to the LLM and receives a corresponding response.
     Rows and the corresponding prompts are treated in isolation, i.e. the LLM cannot remember the contents of the previous rows or how it responded to them.
@@ -956,7 +956,7 @@ class LLMPrompter:
 
 
 @knext.node(
-    "Chat Model Prompter",
+    "LLM Prompter (Conversation)",
     knext.NodeType.PREDICTOR,
     "icons/generic/brain.png",
     model_category,
@@ -983,7 +983,7 @@ class LLMPrompter:
 )
 class ChatModelPrompter:
     """
-    Prompts a Chat Model.
+    Interact with a chat model within a continuous conversation.
 
     This node prompts a chat model using the provided user message, using an existing conversation history as context.
     An optional table containing tool definitions can be provided to enable tool calling.
@@ -1010,7 +1010,7 @@ class ChatModelPrompter:
     The output of the tool can then be fed back into the node by appending a new 'tool' message to the
     conversation history table, with the tool's output being the message content.
 
-    A common way to ensure that the tool call output is presented back to the Chat Model Prompter is
+    A common way to ensure that the tool call output is presented back to the **LLM Prompter (Conversation)** node is
     to embed the node together with its tools in a [Recursive Loop](https://hub.knime.com/knime/extensions/org.knime.features.base/latest/org.knime.base.node.meta.looper.recursive.RecursiveLoopStartDynamicNodeFactory).
 
     A **tool definition** is a JSON object describing the corresponding tool and its parameters. The more
@@ -1353,11 +1353,11 @@ def _contains_json_keyword(messages: list) -> bool:
 
     Messages can be one of:
 
-        For LLM Prompter (checked in execute):
+        For LLM Prompter (Table) (checked in execute):
             - prompts ([list of strings])
             - system_message + prompt ([SystemMessage, HumanMessage])
 
-        For Chat Model Prompter (checked in configure):
+        For LLM Prompter (Conversation) (checked in configure):
             - system_message and/or chat_message (str)
 
     """

@@ -108,8 +108,7 @@ final class MessageCreatorNodeModel extends WebUINodeModel<MessageCreatorNodeSet
         final DataTableSpec inSpec) {
         var rearranger = new ColumnRearranger(inSpec);
         var messageCellCreator = createMessageCellCreator(modelSettings, inSpec);
-        // TODO make column name configurable
-        var columnSpec = new DataColumnSpecCreator("Message", MessageCell.TYPE).createSpec();
+        var columnSpec = new DataColumnSpecCreator(modelSettings.m_messageColumnName, MessageCell.TYPE).createSpec();
         rearranger.append(new SingleCelLFactoryImpl(columnSpec, messageCellCreator));
         return rearranger;
     }

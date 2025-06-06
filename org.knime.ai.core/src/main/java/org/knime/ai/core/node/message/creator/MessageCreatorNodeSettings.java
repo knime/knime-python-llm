@@ -135,6 +135,9 @@ final class MessageCreatorNodeSettings implements DefaultNodeSettings {
     )
     ToolCallSettings[] m_toolCalls = new ToolCallSettings[]{};
 
+    @Widget(title = "Message Column Name", description = "Name of the output message column.")
+    String m_messageColumnName = "Message";
+
     static final class ToolCallSettings implements DefaultNodeSettings {
         @Widget(title = "Tool Name Column", description = "Select the input table column containing the tool name.")
         @ChoicesProvider(StringColumns.class)

@@ -1248,7 +1248,7 @@ class OpenAILLMConnector:
 
 
 @knext.node(
-    "OpenAI Chat Model Connector",
+    "OpenAI Chat Model Selector",
     knext.NodeType.SOURCE,
     openai_icon,
     category=openai_category,
@@ -1266,7 +1266,7 @@ class OpenAILLMConnector:
 )
 class OpenAIChatModelConnector:
     """
-    Connects to an OpenAI Chat Model.
+    Select a chat model from OpenAI or an OpenAI API-compatible provider.
 
     This node establishes a connection with an OpenAI Chat Model. After successfully authenticating
     using the **OpenAI Authenticator** node, you can select a chat model from a predefined list.
@@ -1723,7 +1723,7 @@ class OpenAIFineTuneDeleter:
 
     This node allows you to delete a fine-tuned model from your OpenAI account.
 
-    The fine-tuned model must be selected via either the **OpenAI Instruct Model Selector**, or the **OpenAI Chat Model Connector** node.
+    The fine-tuned model must be selected via either the **OpenAI Instruct Model Selector**, or the **OpenAI Chat Model Selector** node.
 
     If the provided API key possesses the necessary permissions, the model will then be irreversibly removed from the
     authenticated OpenAI account.
@@ -1815,7 +1815,7 @@ class OpenAIFineTuner:
     Each row in the input table represents a message in a conversation. The table must contain at least 10 distinct conversations, and each must include at least one `system` message to define the assistant’s behavior.
     The fine-tuning process learns from examples: it does not memorize answers, but generalizes from the patterns in the assistant replies. You define *how* the assistant should respond to user inputs by providing example dialogues with the desired outputs.
 
-    Fine-tuned models are stored on OpenAI's servers and can afterwards be selected in the `OpenAI Chat Model Connector`.
+    Fine-tuned models are stored on OpenAI's servers and can afterwards be selected in the `OpenAI Chat Model Selector`.
     To delete a fine-tuned model, use the `OpenAI Fine-Tuned Model Deleter` node.
 
     For pricing, see the [OpenAI documentation](https://platform.openai.com/docs/pricing#fine-tuning).

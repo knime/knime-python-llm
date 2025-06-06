@@ -90,7 +90,7 @@ class VertexAiConnector:
 
     This node allows you to connect with a Vertex AI project in Google Cloud. The Vertex AI
     connection produced by this node can then be used to select chat and embedding models
-    from the Gemini family using the **Gemini Chat Model Connector** and **Gemini Embedding Model Connector**
+    from the Gemini family using the **Gemini Chat Model Selector** and **Gemini Embedding Model Connector**
     nodes.
 
     ---
@@ -193,7 +193,7 @@ class GoogleAiStudioAuthenticator:
 
     This node authenticates with Google AI Studio via the provided API key. The Google AI Studio
     authentication produced by this node can then be used to select chat and embedding models
-    from the Gemini family using the **Gemini Chat Model Connector** and **Gemini Embedding Model Connector**
+    from the Gemini family using the **Gemini Chat Model Selector** and **Gemini Embedding Model Connector**
     nodes.
 
     Please refer to the Google AI Studio documentation for details on how to [create an API key](https://ai.google.dev/gemini-api/docs).

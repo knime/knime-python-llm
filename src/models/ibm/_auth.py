@@ -276,7 +276,7 @@ class IBMwatsonxAuthenticator:
 
     This nodes authenticates with IBM watsonx.ai via the provided API key. The resulting
     authenticated connection can then be used to select chat and embedding models available
-    in your IBM watsonx.ai project using the **IBM watsonx.ai Chat Model Connector** and
+    in your IBM watsonx.ai project using the **IBM watsonx.ai Chat Model Selector** and
     **IBM watsonx.ai Embedding Model Connector** nodes.
 
     Refer to [IBM watsonx.ai](https://www.ibm.com/products/watsonx-ai) for details on

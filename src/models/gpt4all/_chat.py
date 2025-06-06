@@ -134,7 +134,7 @@ gpt4all_chat_model_port_type = knext.port_type(
 
 
 @knext.node(
-    "Local GPT4All Chat Model Connector",
+    "Local GPT4All Chat Model Selector",
     knext.NodeType.SOURCE,
     gpt4all_icon,
     category=gpt4all_category,
@@ -152,7 +152,7 @@ gpt4all_chat_model_port_type = knext.port_type(
 )
 class GPT4AllChatModelConnector:
     """
-    Connects to a locally installed GPT4All LLM.
+    Select a local chat model available via GPT4All.
 
     This node allows you to connect to a local GPT4All LLM. To get started,
     you need to download a specific model either through the [GPT4All client](https://gpt4all.io)

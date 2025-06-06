@@ -146,7 +146,7 @@ def _list_models(ctx: knext.ConfigurationContext):
 
 
 @knext.node(
-    name="Anthropic Chat Model Connector",
+    name="Anthropic Chat Model Selector",
     node_type=knext.NodeType.SOURCE,
     icon_path=anthropic_icon,
     category=anthropic_category,
@@ -163,7 +163,7 @@ def _list_models(ctx: knext.ConfigurationContext):
     anthropic_chat_model_port_type,
 )
 class AnthropicChatModelConnector:
-    """Connects to a chat model provided by the Anthropic API.
+    """Select a chat model provided by the Anthropic API.
 
     This node establishes a connection with an Anthropic Chat Model. After successfully authenticating
     using the **Anthropic Authenticator** node, you can select a chat model from a predefined list.

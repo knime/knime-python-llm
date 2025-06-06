@@ -532,7 +532,7 @@ hf_hub_chat_model_port_type = knext.port_type(
 
 
 @knext.node(
-    "HF Hub Chat Model Connector",
+    "HF Hub Chat Model Selector",
     knext.NodeType.SOURCE,
     hf_icon,
     category=hf_hub_category,
@@ -557,7 +557,7 @@ hf_hub_chat_model_port_type = knext.port_type(
 )
 class HFHubChatModelConnector:
     """
-    Connects to a chat model hosted on the Hugging Face Hub.
+    Select a chat model hosted on the Hugging Face Hub.
 
     This node establishes a connection to a specific chat model hosted on the Hugging Face Hub.
     The difference to the HF Hub Instruct Model Selector is that this node allows you to provide prompt templates which are crucial for

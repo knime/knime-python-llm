@@ -8,3 +8,5 @@ group_id: org.knime.python
 version: 5.5.0
 vendor: KNIME AG, Zurich, Switzerland
 license_file: LICENSE.txt
+java_bundles:
+  - org.knime.ai.core

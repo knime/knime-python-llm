@@ -117,10 +117,12 @@ final class MessageCreatorNodeModel extends WebUINodeModel<MessageCreatorNodeSet
         final MessageCreatorNodeSettings modelSettings, final DataTableSpec inSpec) {
         var roleExtractor = createRoleExtractor(modelSettings, inSpec);
         var contentExtractor = createContentExtractor(modelSettings, inSpec);
+        var toolCallIdExtractor = createToolCallIdExtractor(modelSettings, inSpec);
         return r -> {
             var role = roleExtractor.apply(r);
             var parts = contentExtractor.apply(r);
-            return new MessageCell(role, parts, null, null);
+            var toolCallId = toolCallIdExtractor.apply(r);
+            return new MessageCell(role, parts, null, toolCallId);
         };
     }
 
@@ -187,6 +189,20 @@ final class MessageCreatorNodeModel extends WebUINodeModel<MessageCreatorNodeSet
                 return MessageType.valueOf(((StringValue)cell).getStringValue().toUpperCase());
             };
         }
+    }
+
+    private static Function<DataRow, String> createToolCallIdExtractor(final MessageCreatorNodeSettings modelSettings, final DataTableSpec inSpec) {
+        if (modelSettings.m_toolCallIdColumn.getEnumChoice().isPresent()) {
+            return r -> null;
+        }
+        int colIdx = inSpec.findColumnIndex(modelSettings.m_toolCallIdColumn.getStringChoice());
+        return r -> {
+            var cell = r.getCell(colIdx);
+            if (cell.isMissing()) {
+                return null;
+            }
+            return ((StringValue)cell).getStringValue();
+        };
     }
 
     private static final class SingleCelLFactoryImpl extends SingleCellFactory {

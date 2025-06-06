@@ -56,6 +56,8 @@ import org.knime.core.webui.node.dialog.defaultdialog.DefaultNodeSettings;
 import org.knime.core.webui.node.dialog.defaultdialog.layout.After;
 import org.knime.core.webui.node.dialog.defaultdialog.layout.HorizontalLayout;
 import org.knime.core.webui.node.dialog.defaultdialog.layout.Layout;
+import org.knime.core.webui.node.dialog.defaultdialog.setting.singleselection.NoneChoice;
+import org.knime.core.webui.node.dialog.defaultdialog.setting.singleselection.StringOrEnum;
 import org.knime.core.webui.node.dialog.defaultdialog.widget.ArrayWidget;
 import org.knime.core.webui.node.dialog.defaultdialog.widget.Label;
 import org.knime.core.webui.node.dialog.defaultdialog.widget.TextAreaWidget;
@@ -110,6 +112,10 @@ final class MessageCreatorNodeSettings implements DefaultNodeSettings {
     @ChoicesProvider(TextCellColumns.class)
     String m_roleColumn;
 
+    @Widget(title = "Tool Call Id Column",
+            description = "(Optional) Select the input table column containing the tool call id.")
+    @ChoicesProvider(TextCellColumns.class)
+    StringOrEnum<NoneChoice> m_toolCallIdColumn = new StringOrEnum<>(NoneChoice.NONE);
 
     @Widget(title = "Message Content", description = "Define the content parts (text, image) of the message.")
     @ArrayWidget(
@@ -218,10 +224,6 @@ final class MessageCreatorNodeSettings implements DefaultNodeSettings {
 
         }
 
-
-
-
-
         Contents(final String textValue, final String imageColumn) {
             m_textValue = textValue;
             m_imageColumn = imageColumn;
@@ -239,7 +241,6 @@ final class MessageCreatorNodeSettings implements DefaultNodeSettings {
 
         }
 
-
     }
 
     static final class TextCellColumns extends CompatibleColumnsProvider {
@@ -247,7 +248,6 @@ final class MessageCreatorNodeSettings implements DefaultNodeSettings {
         protected TextCellColumns() {
             super(StringValue.class);
         }
-
 
     }
 

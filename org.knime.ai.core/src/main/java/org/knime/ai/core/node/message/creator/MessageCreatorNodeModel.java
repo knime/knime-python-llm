@@ -57,6 +57,7 @@ import org.knime.ai.core.data.message.ImageContentPart;
 import org.knime.ai.core.data.message.MessageCell;
 import org.knime.ai.core.data.message.MessageValue.MessageContentPart;
 import org.knime.ai.core.data.message.MessageValue.MessageType;
+import org.knime.ai.core.data.message.MessageValue.ToolCall;
 import org.knime.ai.core.data.message.TextContentPart;
 import org.knime.ai.core.node.message.creator.MessageCreatorNodeSettings.Contents.ContentType;
 import org.knime.core.data.DataCell;
@@ -118,11 +119,13 @@ final class MessageCreatorNodeModel extends WebUINodeModel<MessageCreatorNodeSet
         var roleExtractor = createRoleExtractor(modelSettings, inSpec);
         var contentExtractor = createContentExtractor(modelSettings, inSpec);
         var toolCallIdExtractor = createToolCallIdExtractor(modelSettings, inSpec);
+        var toolCallsExtractor = createToolCallsExtractor(modelSettings, inSpec);
         return r -> {
             var role = roleExtractor.apply(r);
             var parts = contentExtractor.apply(r);
             var toolCallId = toolCallIdExtractor.apply(r);
-            return new MessageCell(role, parts, null, toolCallId);
+            var toolCalls = toolCallsExtractor.apply(r);
+            return new MessageCell(role, parts, toolCalls.isEmpty() ? null : toolCalls, toolCallId);
         };
     }
 
@@ -202,6 +205,35 @@ final class MessageCreatorNodeModel extends WebUINodeModel<MessageCreatorNodeSet
                 return null;
             }
             return ((StringValue)cell).getStringValue();
+        };
+    }
+
+    private static Function<DataRow, List<ToolCall>> createToolCallsExtractor(final MessageCreatorNodeSettings modelSettings, final DataTableSpec inSpec) {
+        var toolCallExtractors = Stream.of(modelSettings.m_toolCalls)
+            .map(tc -> createToolCallExtractor(tc, inSpec))
+            .toList();
+        return r -> toolCallExtractors.stream()
+            .map(f -> f.apply(r))
+            .flatMap(Optional::stream)
+            .toList();
+    }
+
+    private static Function<DataRow, Optional<ToolCall>> createToolCallExtractor(final MessageCreatorNodeSettings.ToolCallSettings tc, final DataTableSpec inSpec) {
+        int nameIdx = inSpec.findColumnIndex(tc.m_toolNameColumn);
+        int idIdx = inSpec.findColumnIndex(tc.m_toolIdColumn);
+        int argsIdx = inSpec.findColumnIndex(tc.m_argumentsColumn);
+        return r -> {
+            var nameCell = r.getCell(nameIdx);
+            var idCell = r.getCell(idIdx);
+            var argsCell = r.getCell(argsIdx);
+            if (nameCell.isMissing() || idCell.isMissing() || argsCell.isMissing()) {
+                return Optional.empty();
+            }
+            return Optional.of(new ToolCall(
+                ((StringValue)nameCell).getStringValue(),
+                ((StringValue)idCell).getStringValue(),
+                ((StringValue)argsCell).getStringValue()
+            ));
         };
     }
 

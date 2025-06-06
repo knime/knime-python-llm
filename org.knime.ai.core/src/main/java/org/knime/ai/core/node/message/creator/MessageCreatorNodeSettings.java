@@ -49,9 +49,10 @@
 package org.knime.ai.core.node.message.creator;
 
 import org.knime.ai.core.data.message.MessageValue.MessageType;
+import org.knime.ai.core.node.message.creator.SettingsUtils.ColumnProviders.JsonColumns;
+import org.knime.ai.core.node.message.creator.SettingsUtils.ColumnProviders.PngColumns;
+import org.knime.ai.core.node.message.creator.SettingsUtils.ColumnProviders.StringColumns;
 import org.knime.ai.core.node.message.creator.SettingsUtils.CompositePredicateProvider;
-import org.knime.core.data.StringValue;
-import org.knime.core.data.image.png.PNGImageValue;
 import org.knime.core.webui.node.dialog.defaultdialog.DefaultNodeSettings;
 import org.knime.core.webui.node.dialog.defaultdialog.layout.After;
 import org.knime.core.webui.node.dialog.defaultdialog.layout.HorizontalLayout;
@@ -64,7 +65,6 @@ import org.knime.core.webui.node.dialog.defaultdialog.widget.TextAreaWidget;
 import org.knime.core.webui.node.dialog.defaultdialog.widget.ValueSwitchWidget;
 import org.knime.core.webui.node.dialog.defaultdialog.widget.Widget;
 import org.knime.core.webui.node.dialog.defaultdialog.widget.choices.ChoicesProvider;
-import org.knime.core.webui.node.dialog.defaultdialog.widget.choices.column.CompatibleColumnsProvider;
 import org.knime.core.webui.node.dialog.defaultdialog.widget.updates.Effect;
 import org.knime.core.webui.node.dialog.defaultdialog.widget.updates.Effect.EffectType;
 import org.knime.core.webui.node.dialog.defaultdialog.widget.updates.Predicate;
@@ -109,12 +109,12 @@ final class MessageCreatorNodeSettings implements DefaultNodeSettings {
     @Widget(title = "Role Column",
             description = "Select the input table column containing message roles.")
     @Effect(predicate = IsValueRoleInputType.class, type = EffectType.HIDE)
-    @ChoicesProvider(TextCellColumns.class)
+    @ChoicesProvider(StringColumns.class)
     String m_roleColumn;
 
     @Widget(title = "Tool Call Id Column",
             description = "(Optional) Select the input table column containing the tool call id.")
-    @ChoicesProvider(TextCellColumns.class)
+    @ChoicesProvider(StringColumns.class)
     StringOrEnum<NoneChoice> m_toolCallIdColumn = new StringOrEnum<>(NoneChoice.NONE);
 
     @Widget(title = "Message Content", description = "Define the content parts (text, image) of the message.")
@@ -127,6 +127,27 @@ final class MessageCreatorNodeSettings implements DefaultNodeSettings {
         new Contents()
     };
 
+    @Widget(title = "Tool Calls", description = "Define tool calls for this message.")
+    @ArrayWidget(
+        addButtonText = "Add tool call",
+        showSortButtons = false,
+        elementTitle = "Tool Call"
+    )
+    ToolCallSettings[] m_toolCalls = new ToolCallSettings[]{};
+
+    static final class ToolCallSettings implements DefaultNodeSettings {
+        @Widget(title = "Tool Name Column", description = "Select the input table column containing the tool name.")
+        @ChoicesProvider(StringColumns.class)
+        String m_toolNameColumn;
+
+        @Widget(title = "Tool Id Column", description = "Select the input table column containing the tool id.")
+        @ChoicesProvider(StringColumns.class)
+        String m_toolIdColumn;
+
+        @Widget(title = "Arguments Column", description = "Select the input table column containing the tool arguments (JSON string).")
+        @ChoicesProvider(JsonColumns.class)
+        String m_argumentsColumn;
+    }
 
     static final class Contents implements DefaultNodeSettings {
 
@@ -158,7 +179,7 @@ final class MessageCreatorNodeSettings implements DefaultNodeSettings {
 
         @Layout(ContentsValueLayout.class)
         @Widget(title = "Image Column", description = "Select the input table column containing PNG images.")
-        @ChoicesProvider(ImageCellColumns.class)
+        @ChoicesProvider(PngColumns.class)
         @Effect(predicate = IsImageValue.class, type = EffectType.SHOW)
         String m_imageColumn;
 
@@ -172,7 +193,7 @@ final class MessageCreatorNodeSettings implements DefaultNodeSettings {
         @Layout(ContentsValueLayout.class)
         @Widget(title = "Text Column", description = "Select the input table column containing text values.")
         @Effect(predicate = IsTextColumn.class, type = EffectType.SHOW)
-        @ChoicesProvider(TextCellColumns.class)
+        @ChoicesProvider(StringColumns.class)
         String m_textColumn;
 
 
@@ -233,22 +254,8 @@ final class MessageCreatorNodeSettings implements DefaultNodeSettings {
             this("", "");
         }
 
-        static final class ImageCellColumns extends CompatibleColumnsProvider {
-
-            protected ImageCellColumns() {
-                super(PNGImageValue.class);
-            }
-
-        }
 
     }
 
-    static final class TextCellColumns extends CompatibleColumnsProvider {
-
-        protected TextCellColumns() {
-            super(StringValue.class);
-        }
-
-    }
 
 }

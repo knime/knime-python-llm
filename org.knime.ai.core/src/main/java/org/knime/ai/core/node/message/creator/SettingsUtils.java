@@ -51,6 +51,10 @@ package org.knime.ai.core.node.message.creator;
 import java.util.List;
 import java.util.function.BinaryOperator;
 
+import org.knime.core.data.StringValue;
+import org.knime.core.data.image.png.PNGImageValue;
+import org.knime.core.data.json.JSONValue;
+import org.knime.core.webui.node.dialog.defaultdialog.widget.choices.column.CompatibleColumnsProvider;
 import org.knime.core.webui.node.dialog.defaultdialog.widget.updates.Predicate;
 import org.knime.core.webui.node.dialog.defaultdialog.widget.updates.PredicateProvider;
 
@@ -74,16 +78,19 @@ public final class SettingsUtils {
 
         /**
          * Creates a new composite predicate provider that combines the given predicates using the given accumulator.
+         *
          * @param accumulator used to accumulate the predicates (starting with the initializer's always predicate)
          * @param predicates the predicates to combine
          */
-        protected CompositePredicateProvider(final BinaryOperator<Predicate> accumulator, final PredicateProvider... predicates) {
+        protected CompositePredicateProvider(final BinaryOperator<Predicate> accumulator,
+            final PredicateProvider... predicates) {
             m_predicates = List.of(predicates);
             m_aggregator = accumulator;
         }
 
         /**
          * Default constructor that combines the given predicates using a logical AND operation.
+         *
          * @param predicates the predicates to combine
          */
         protected CompositePredicateProvider(final PredicateProvider... predicates) {
@@ -92,9 +99,64 @@ public final class SettingsUtils {
 
         @Override
         public Predicate init(final PredicateInitializer i) {
-            return m_predicates.stream().map(p -> p.init(i))
-                    .reduce(i.always(), m_aggregator);
+            return m_predicates.stream().map(p -> p.init(i)).reduce(i.always(), m_aggregator);
         }
 
+    }
+
+    /**
+     * Utility class that provides compatible column providers for different data types.
+     *
+     * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
+     */
+    public static final class ColumnProviders {
+
+        /**
+         * Provides compatible columns for PNG image values.
+         *
+         * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
+         */
+        public static final class PngColumns extends CompatibleColumnsProvider {
+
+            /**
+             * Constructor for PngColumns.
+             */
+            protected PngColumns() {
+                super(PNGImageValue.class);
+            }
+
+        }
+
+        /**
+         * Provides compatible columns for string values.
+         *
+         * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
+         */
+        public static final class StringColumns extends CompatibleColumnsProvider {
+
+            /**
+             * Constructor for StringColumns.
+             */
+            protected StringColumns() {
+                super(StringValue.class);
+            }
+
+        }
+
+        /**
+         * Provides compatible columns for JSON values.
+         *
+         * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
+         */
+        public static final class JsonColumns extends CompatibleColumnsProvider {
+
+            /**
+             * Constructor for JsonColumns.
+             */
+            protected JsonColumns() {
+                super(JSONValue.class);
+            }
+
+        }
     }
 }

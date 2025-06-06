@@ -162,10 +162,10 @@ final class MessageCreatorNodeSettings implements DefaultNodeSettings {
         @Widget(title = "Text Value", description = "Enter the text content.")
         @TextAreaWidget
         @Effect(predicate = IsTextTypePredicate.class, type = EffectType.SHOW)
-        String m_value;
+        String m_textValue;
 
         Contents(final String textValue, final String imageColumn) {
-            m_value = textValue;
+            m_textValue = textValue;
             m_imageColumn = imageColumn;
         }
 

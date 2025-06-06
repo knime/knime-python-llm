@@ -110,8 +110,8 @@ final class MessageCreatorNodeModel extends WebUINodeModel<MessageCreatorNodeSet
             List<MessageValue.MessageContentPart> parts = new ArrayList<>();
             for (var c : content) {
                 if (c.m_textOrImage == TextOrImage.TEXT) {
-                    if (c.m_value != null && !c.m_value.isEmpty()) {
-                        parts.add(new TextContentPart(c.m_value));
+                    if (c.m_textValue != null && !c.m_textValue.isEmpty()) {
+                        parts.add(new TextContentPart(c.m_textValue));
                     }
                 } else if (c.m_textOrImage == TextOrImage.IMAGE) {
                     if (c.m_imageColumn != null && !c.m_imageColumn.isEmpty()) {

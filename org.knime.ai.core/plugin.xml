@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <?eclipse version="3.4"?>
 <plugin>
+
    <extension
          point="org.knime.core.DataType">
       <DataType
@@ -16,6 +17,7 @@
          </ValueFactory>
       </DataType>
    </extension>
+   
    <extension
          point="org.knime.python3.types.PythonValueFactory">
       <Module
@@ -29,6 +31,7 @@
          </PythonValueFactory>
       </Module>
    </extension>
+   
    <extension
          point="org.knime.workbench.repository.nodes">
       <node
@@ -45,5 +48,13 @@
           suggestAsDefault="true"/>
   	</dataValue>
 	</extension>
+	
+   <extension
+         point="org.knime.core.ui.dataValueViewProvider">
+         <DataValueViewProvider
+            dataValueViewProvider="org.knime.ai.core.ui.message.view.MessageValueViewProvider">
+      </DataValueViewProvider>
+   </extension>
+
 
 </plugin>

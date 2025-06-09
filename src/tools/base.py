@@ -176,6 +176,7 @@ tool_list_port_type = knext.port_type(
         "RAG",
         "Retrieval Augmented Generation",
     ],
+    is_deprecated=True,
 )
 @knext.input_port(
     "Agent Tool(s)", "One or more tools for an agent to use.", tool_list_port_type

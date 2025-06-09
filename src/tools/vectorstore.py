@@ -333,6 +333,7 @@ _filestore_vector_tool_port_type = knext.port_type(
         "RAG",
         "Retrieval Augmented Generation",
     ],
+    is_deprecated=True,
 )
 @knext.input_port("LLM", "A large language model.", llm_port_type)
 @knext.input_port("Vector Store", "A loaded vector store.", vector_store_port_type)

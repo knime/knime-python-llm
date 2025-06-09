@@ -44,46 +44,39 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   6 June 2025 (Ivan Prigarin, KNIME GmbH, Konstanz, Germany): created
+ *   9 June 2025 (Ivan Prigarin, KNIME GmbH, Konstanz, Germany): created
  */
-package org.knime.ai.core.ui.message.view;
+package org.knime.ai.core.ui.message.renderer;
 
-import java.util.Optional;
-
-import org.knime.ai.core.data.message.MessageValue;
-import org.knime.ai.core.ui.message.renderer.MessageValueRenderer;
-import org.knime.core.webui.data.InitialDataService;
-import org.knime.core.webui.data.RpcDataService;
-import org.knime.core.webui.node.view.table.datavalue.DataValueView;
-import org.knime.core.webui.page.Page;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
- * Data-value pop-out view for {@link MessageValue}.
+ * Provides access to KNIME design system tokens (CSS variables and their fallback values)
+ * for use in Java-based UI components.
  *
  * @author Ivan Prigarin, KNIME GmbH, Konstanz, Germany
  */
-public class MessageValueView implements DataValueView {
+public final class StyleUtil {
 
-    private final MessageValue m_value;
+    private StyleUtil() {}
 
-    public MessageValueView(final MessageValue value) {
-        m_value = value;
-    }
+    private static final Map<String, String> DESIGN_TOKENS = Map.of(
+        "--knime-wood-light", "#ffd9b3",
+        "--knime-cornflower-semi", "#d3e8f8",
+        "--knime-porcelain", "#eff1f2"
+    );
 
-    @Override
-    public Page getPage() {
-        return Page.builder(() -> MessageValueRenderer.renderMessageForView(m_value), "index.html").build();
-    }
 
-    @Override
-    public <D> Optional<InitialDataService<D>> createInitialDataService() {
-        // Static object, not needed.
-        return Optional.empty();
-    }
+    /**
+     * @return a string representation of the `:root` portion of a stylesheet
+     * containing CSS variables used by the {@link MessageValueRenderer}.
+     */
+    public static String getCssVariables() {
+        String definitions = DESIGN_TOKENS.entrySet().stream()
+            .map(entry -> "\t" + entry.getKey() + ": " + entry.getValue() + ";")
+            .collect(Collectors.joining("\n"));
 
-    @Override
-    public Optional<RpcDataService> createRpcDataService() {
-        // Static object, not needed.
-        return Optional.empty();
+        return ":root {\n" + definitions + "\n}";
     }
 }

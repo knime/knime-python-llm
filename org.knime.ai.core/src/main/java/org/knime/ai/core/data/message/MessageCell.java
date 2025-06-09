@@ -87,6 +87,9 @@ public final class MessageCell extends DataCell implements MessageValue {
      *
      * @param messageType The type of the message
      * @param content The content of the message
+     * @param toolCalls List of tools that AI decided to call
+     * @param toolCallId ID of the tool call which the tool message is the response to
+     * @param toolName Name of the tool that generated the tool message
      */
     MessageCell(final MessageType messageType, final List<MessageContentPart> content, final List<ToolCall> toolCalls,
         final String toolCallId, final String toolName) {
@@ -141,11 +144,11 @@ public final class MessageCell extends DataCell implements MessageValue {
     }
 
     /**
-     * Creates a tool message cell with the given content and tool call ID.
+     * Creates a tool message cell with the given content, tool call ID, and tool name.
      *
      * @param content the content of the message
      * @param toolCallId the ID of the tool call associated with this message, must not be null
-     * @param toolName
+     * @param toolName the name of tool that generated this message
      * @return a new MessageCell representing a tool message
      */
     public static MessageCell createToolMessageCell(final List<MessageContentPart> content, final String toolCallId,

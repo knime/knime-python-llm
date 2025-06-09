@@ -51,14 +51,17 @@ package org.knime.ai.core.ui.message.renderer;
 import static j2html.TagCreator.body;
 import static j2html.TagCreator.br;
 import static j2html.TagCreator.div;
+import static j2html.TagCreator.head;
 import static j2html.TagCreator.hr;
 import static j2html.TagCreator.html;
+import static j2html.TagCreator.i;
 import static j2html.TagCreator.img;
 import static j2html.TagCreator.pre;
-import static j2html.TagCreator.rawHtml;
 import static j2html.TagCreator.span;
+import static j2html.TagCreator.style;
 
 import java.util.Base64;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -74,10 +77,12 @@ import org.knime.core.data.renderer.DataValueRenderer;
 import org.knime.core.data.renderer.DefaultDataValueRenderer;
 import org.knime.core.webui.node.view.table.data.render.DataCellContentType;
 
-import j2html.tags.ContainerTag;
+import j2html.tags.DomContent;
+import j2html.tags.specialized.DivTag;
 
 /**
- * Chat-style renderer for {@link MessageValue} (static HTML, no JS).
+ * HTML-based renderer for {@link MessageValue}. The generated HTML is used for rendering messages both in cells and in
+ * pop-out views.
  *
  * @author Ivan Prigarin, KNIME GmbH, Konstanz, Germany
  */
@@ -85,6 +90,10 @@ import j2html.tags.ContainerTag;
 public final class MessageValueRenderer extends DefaultDataValueRenderer
     implements org.knime.core.webui.node.view.table.data.render.DataValueRenderer {
 
+    /**
+     * Factory necessary for making the renderer available for the data type. Otherwise, the default string renderer is
+     * used.
+     */
     public static final class Factory extends AbstractDataValueRendererFactory {
         @Override
         public String getDescription() {
@@ -108,171 +117,234 @@ public final class MessageValueRenderer extends DefaultDataValueRenderer
 
     @Override
     protected void setValue(final Object value) {
-        final String html;
-
-        if (value instanceof MessageValue messageValue) {
-            html = generateMessageValueHTML(messageValue);
+        if (value instanceof MessageValue message) {
+            super.setValue(renderMessageForCell(message));
         } else {
-            html = html(//
-                body( //
-                    span().withStyle("color: red").withText("?") //
-                )).render();
+            // TODO: clarify whether it's possible for value to not be MessageValue at this point
+            super.setValue(span("?").withClass("error-text").render());
         }
-
-        super.setValue(html);
     }
 
-    private static String esc(final String s) {
-        return (s == null) ? "" : s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-            .replace("\"", "&quot;").replace("'", "&#39;");
+    /**
+     * Generate the HTML representation of the given message to be used in its cell.
+     *
+     * @param message the message for which to generate the HTML
+     * @return a string containing the generated HTML
+     */
+    public static String renderMessageForCell(final MessageValue message) {
+        return buildMessageHtml(message, BASE_CSS);
     }
 
-    /* ---------- renderer core ---------- */
-    public static String generateMessageValueHTML(final MessageValue messageValue) {
-        final String html;
+    /**
+     * Generate the HTML representation of the given message to be used in its pop-out view. Such views don't have
+     * access to global CSS variables available, so we manually inject them into the CSS before rendering.
+     *
+     * @param message the message for which to generate the HTML
+     * @return a string containing the generated HTML
+     */
+    public static String renderMessageForView(final MessageValue message) {
+        String cssVars = StyleUtil.getCssVariables();
+        String fullCss = cssVars + "\n\n" + BASE_CSS;
+        return buildMessageHtml(message, fullCss);
+    }
 
-        /* ── basics ─────────────────────────────────────────────── */
-        MessageType type = messageValue.getMessageType();
-        List<MessageContentPart> parts = messageValue.getContent();
-        Optional<List<ToolCall>> toolOps = messageValue.getToolCalls();
-        Optional<String> toolIdOp = messageValue.getToolCallId();
-        Optional<String> toolNameOp = messageValue.getToolName();
+    /* --------------------------------------------------------------------- */
+    /* Builders                                                              */
+    /* --------------------------------------------------------------------- */
 
-        String typeText = type.getLabel();
+    private static String buildMessageHtml(final MessageValue message, final String cssContent) {
+        DivTag messageFrame = buildMessageFrame(message);
+        return html(head(style(cssContent).withType("text/css")), body(messageFrame)).render();
+    }
 
-        /* ── builders for different sections ────────────────────── */
-        StringBuilder toolCalls = new StringBuilder();
-        StringBuilder toolHeader = new StringBuilder();
-        StringBuilder userParts = new StringBuilder();
+    private static DivTag buildMessageFrame(final MessageValue message) {
+        DivTag typePill = buildTypePill(message.getMessageType());
+        DivTag messageBody = buildMessageBody(message);
 
-        /* ── aggregate content parts ────────────────────────────── */
-        if (parts == null || parts.isEmpty()) {
-            userParts.append("<i>No content parts defined.</i>");
+        // frame -> content-wrapper -> (pill, body)
+        return div().withClass("message-frame")
+            .with(div().withClass("message-content-wrapper").with(typePill, messageBody));
+    }
+
+    private static DivTag buildMessageBody(final MessageValue message) {
+        DivTag body = div().withClass("msg-body");
+        List<MessageContentPart> parts = Optional.ofNullable(message.getContent()).orElse(Collections.emptyList());
+
+        switch (message.getMessageType()) {
+            case AI:
+                message.getToolCalls().filter(list -> !list.isEmpty())
+                    .ifPresent(calls -> body.with(buildToolCallsSection(calls)));
+                addContentPartsToBody(body, parts);
+                break;
+            case TOOL:
+                body.with(buildToolHeader(message.getToolName(), message.getToolCallId()));
+                addContentPartsToBody(body, parts);
+                break;
+            case USER:
+                addContentPartsToBody(body, parts);
+                break;
+        }
+        return body;
+    }
+
+    private static DivTag buildTypePill(final MessageType type) {
+        String typeClass = switch (type) {
+            case USER -> "msg-pill-user";
+            case AI -> "msg-pill-ai";
+            case TOOL -> "msg-pill-tool";
+        };
+        return div(type.getLabel()).withClasses("msg-pill", typeClass);
+    }
+
+    private static void addContentPartsToBody(final DivTag container, final List<MessageContentPart> parts) {
+        if (parts.isEmpty()) {
+            // TODO: clarify whether we should render this.
+            container.with(i("Empty message."));
         } else {
             for (int i = 0; i < parts.size(); i++) {
                 if (i > 0) {
-                    userParts.append(hr().withStyle("border:0;border-top:1px dotted #eee;margin:5px 0;").render());
+                    container.with(hr().withClass("content-separator"));
                 }
-
-                MessageContentPart p = parts.get(i);
-
-                if (p instanceof TextContentPart t) {
-                    userParts.append(esc(t.getContent()).replace("\n", "<br>"));
-                } else if (p instanceof ImageContentPart imgPart) {
-                    byte[] raw = imgPart.getData();
-                    String mime = imgPart.getType();
-                    if (raw != null && raw.length > 0 && mime != null && !mime.isBlank()) {
-                        String uri = "data:%s;base64,%s".formatted(mime, Base64.getEncoder().encodeToString(raw));
-                        userParts.append(img().withSrc(uri).attr("alt", "[image]").withStyle("""
-                                max-width:240px;
-                                height:auto;
-                                border-radius:6px;
-                                border:1px solid #ccc;""").render());
-                    } else {
-                        userParts.append(span().withStyle("color:#555;font-style:italic;")
-                            .withText("[Image part is empty]").render());
-                    }
-                } else if (p != null) {
-                    userParts.append(span().withStyle("""
-                            color:#777;
-                            font-style:italic;""").withText("[Unsupported Content Part: " + esc(p.getType()) + "]")
-                        .render());
-                } else {
-                    userParts.append("<i>Null content part</i>");
-                }
+                container.with(buildContentPart(parts.get(i)));
             }
         }
-
-        /* ── tool-calls section (AI) ─────────────── */
-        if (MessageType.AI.equals(type) && toolOps.isPresent() && !toolOps.get().isEmpty()) {
-
-            toolCalls.append(div().withStyle("""
-                    font-weight:bold;
-                    margin-bottom:4px;""").withText("Tool calls:").render());
-
-            for (ToolCall tc : toolOps.get()) {
-                toolCalls.append(div().withStyle("""
-                        background:#f5f5f5;
-                        border:1px solid #ddd;
-                        border-radius:4px;
-                        padding:8px;
-                        margin-bottom:6px;
-                        font-size:0.9em;""")
-                    .with(div().with(span().withStyle("font-weight:bold;").withText("Tool: "))
-                        .withText(esc(tc.toolName())))
-                    .with(div().with(span().withStyle("font-weight:bold;").withText("Tool call ID: "))
-                        .withText(esc(tc.id())))
-                    .with(br()).with(br())
-                    .with(div().with(span().withStyle("font-weight:bold;").withText("Arguments:")))
-                    .with(pre().withText((tc.arguments() == null || tc.arguments().isBlank()) ? "{}" : tc.arguments()))
-                    .render());
-            }
-        }
-
-        /* ── header for TOOL messages ──────────────────────────── */
-        if (MessageType.TOOL.equals(type)) {
-            // Tool line only if name present
-            if (toolNameOp.isPresent() && !toolNameOp.get().isBlank()) {
-                toolHeader.append(div().with(span().withStyle("font-weight:bold;").withText("Tool: "))
-                    .withText(esc(toolNameOp.get())).render());
-            }
-            toolHeader.append(div().with(span().withStyle("font-weight:bold;").withText("Tool call ID: "))
-                .withText(esc(toolIdOp.orElse("-"))).render());
-            // dashed separator
-            toolHeader.append(div().withStyle("border-bottom:1px dashed #ddd;margin:6px 0;").render());
-        }
-
-        /* ── assemble final body ───────────────────────────────── */
-        String finalBody = "%s%s%s".formatted(toolCalls, toolHeader, userParts);
-
-        /* ── pill background & constant text colour ────────────── */
-        String pillBg = switch (type) {
-            case USER -> "#d9eeff";
-            case AI -> "#e8feec";
-            case TOOL -> "#eff1f2";
-            default -> "#f0f0f0";
-        };
-        String pillText = "#616161";
-
-        /* ── build HTML ───────────────────────────────────────── */
-        ContainerTag wrapper = div().withStyle("margin-bottom:8px;font-family: Roboto, sans-serif;")
-            .with(div().withStyle("""
-                    min-width:20%;
-                    max-width:80%;
-                    width:100%;
-                    max-width:600px;
-                    box-sizing:border-box;""").with(div().withStyle("""
-                    position:relative;
-                    width:100%;
-                    font-size:13px;
-                    font-weight:400;""").with(
-                /* type pill */
-                div().withStyle("""
-                        position:relative;z-index:2;
-                        display:inline-block;
-                        margin-left:10px;
-                        background:%s;
-                        outline:1px solid #ffffff;
-                        border-radius:16px;
-                        padding:0 8px;
-                        min-width:40px;
-                        text-align:center;
-                        font-size:.75em;font-weight:bold;
-                        color:%s;""".formatted(pillBg, pillText)).withText(typeText),
-
-                /* body bubble */
-                div().withStyle("""
-                        margin-top:-6px;
-                        border:1px solid #d1d1d1;
-                        border-radius:0 4px 4px 4px;
-                        background:#ffffff;
-                        padding:18px 8px 12px;
-                        color:#333;
-                        overflow-wrap:break-word;
-                        white-space:pre-wrap;""").with(rawHtml(finalBody)))));
-
-        html = wrapper.render();
-
-        return html;
     }
+
+    private static DomContent buildContentPart(final MessageContentPart part) {
+        if (part instanceof TextContentPart t) {
+            // TODO: add Markdown support.
+            return span(t.getContent());
+        }
+
+        if (part instanceof ImageContentPart imgPart) {
+            byte[] raw = imgPart.getData();
+            String mime = imgPart.getType();
+            if (raw != null && raw.length > 0 && mime != null && !mime.isBlank()) {
+                String uri = "data:%s;base64,%s".formatted(mime, Base64.getEncoder().encodeToString(raw));
+                return img().withSrc(uri).attr("alt", "[image]").withClass("content-image");
+            } else {
+                return i("Unable to render image.").withClass("content-unsupported");
+            }
+        }
+
+        if (part != null) {
+            return i("Unsupported content part type: " + part.getType() + ".").withClass("content-unsupported");
+        }
+
+        return i("Unable to render content part.");
+    }
+
+    private static DivTag buildToolCallsSection(final List<ToolCall> toolCalls) {
+        return div(div("Tool calls:").withClass("tool-calls-header"),
+            div().with(toolCalls.stream().map(MessageValueRenderer::buildToolCallTag)));
+    }
+
+    private static DivTag buildToolHeader(final Optional<String> toolName, final Optional<String> toolCallId) {
+        return div().with(
+            toolName.filter(name -> !name.isBlank())
+                .map(name -> div(span("Tool: ").withClass("tool-call-label"), span(name))).orElse(null), // Using map/orElse to make it more functional
+            div(span("Tool call ID: ").withClass("tool-call-label"), span(toolCallId.orElse("-"))),
+            div().withClass("tool-header-separator"));
+    }
+
+    private static DivTag buildToolCallTag(final ToolCall tc) {
+        return div().withClass("tool-call").with(div(span("Tool: ").withClass("tool-call-label"), span(tc.toolName())),
+            div(span("Tool call ID: ").withClass("tool-call-label"), span(tc.id())), br(), br(),
+            div(span("Arguments:").withClass("tool-call-label")),
+            pre((tc.arguments() == null || tc.arguments().isBlank()) ? "{}" : tc.arguments()));
+    }
+
+    // Note the use of CSS variables.
+    private static final String BASE_CSS = """
+            .message-frame {
+                font-family: Roboto, sans-serif;
+                min-width: 20%;
+                max-width: 80%;
+                width: 100%;
+                max-width: 600px;
+                box-sizing: border-box;
+            }
+
+            .message-content-wrapper {
+                position: relative;
+                width: 100%;
+                font-size: 13px;
+                font-weight: 400;
+            }
+
+            .msg-pill {
+                position: relative;
+                z-index: 2;
+                display: inline-block;
+                margin-left: 10px;
+                outline: 1px solid #ffffff;
+                border-radius: 16px;
+                padding: 0 8px;
+                min-width: 40px;
+                text-align: center;
+                font-size: .75em;
+                font-weight: bold;
+                color: #616161;
+            }
+
+            .msg-pill-user { background: var(--knime-cornflower-semi); }
+            .msg-pill-ai { background: var(--knime-wood-light); }
+            .msg-pill-tool { background: var(--knime-porcelain); }
+
+            .msg-body {
+                margin-top: -6px;
+                border: 1px solid #d1d1d1;
+                border-radius: 0 4px 4px 4px;
+                background: #ffffff;
+                padding: 18px 8px 12px;
+                color: #333;
+                overflow-wrap: break-word;
+                white-space: pre-wrap;
+            }
+
+            .content-separator {
+                border: 0;
+                border-top: 1px dotted #eee;
+                margin: 5px 0;
+            }
+
+            .content-image {
+                max-width: 240px;
+                height: auto;
+                border-radius: 6px;
+                border: 1px solid #ccc;
+            }
+
+            .content-unsupported {
+                color: #555;
+                font-style: italic;
+            }
+
+            .tool-calls-header {
+                font-weight: bold;
+                margin-bottom: 4px;
+            }
+
+            .tool-header-separator {
+                border-bottom: 1px dashed #ddd;
+                margin: 6px 0;
+            }
+
+            .tool-call {
+                background: #f5f5f5;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                padding: 8px;
+                margin-bottom: 6px;
+                font-size: 0.9em;
+            }
+
+            .tool-call-label {
+                font-weight: bold;
+            }
+
+            .error-text {
+                color: red;
+            }
+                        """;
 }

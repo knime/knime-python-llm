@@ -3,7 +3,7 @@
 
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>org.knime</groupId>
-	<artifactId>org.knime.ai.tests-fetch-jars</artifactId>
+	<artifactId>org.knime.ai.core</artifactId>
 	<version>${revision}</version>
 	<packaging>pom</packaging>
 

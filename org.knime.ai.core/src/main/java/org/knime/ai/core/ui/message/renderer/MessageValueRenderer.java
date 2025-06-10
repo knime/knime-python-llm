@@ -177,7 +177,7 @@ public final class MessageValueRenderer extends DefaultDataValueRenderer
                 addContentPartsToBody(body, parts);
                 break;
             case TOOL:
-                body.with(buildToolHeader(message.getToolName(), message.getToolCallId()));
+                body.with(buildToolHeader(message.getName(), message.getToolCallId()));
                 addContentPartsToBody(body, parts);
                 break;
             case USER:

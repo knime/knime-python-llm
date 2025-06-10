@@ -89,30 +89,31 @@ public final class MessageCell extends DataCell implements MessageValue {
      * @param content The content of the message
      * @param toolCalls List of tools that AI decided to call
      * @param toolCallId ID of the tool call which the tool message is the response to
-     * @param toolName Name of the tool that generated the tool message
+     * @param name An optional name for the participant. Provides the model information to differentiate between
+     *            participants of the same role (can be null
      */
-    public MessageCell(final MessageType messageType, final List<MessageContentPart> content, final List<ToolCall> toolCalls,
-        final String toolCallId, final String toolName) {
+    public MessageCell(final MessageType messageType, final List<? extends MessageContentPart> content,
+        final List<ToolCall> toolCalls, final String toolCallId, final String name) {
         m_messageType = messageType;
         m_content = immutableCopy(content);
         m_toolCalls = toolCalls != null ? immutableCopy(toolCalls) : null;
         m_toolCallId = toolCallId;
-        m_toolName = toolName;
+        m_toolName = name;
     }
 
-    private static <T> List<T> immutableCopy(final List<T> list) {
+    private static <T> List<T> immutableCopy(final List<? extends T> list) {
         return Collections.unmodifiableList(new ArrayList<>(list));
     }
 
     /**
      * Creates an AI message with the given content.
+     *
      * @param content the content of the message
      * @return a new MessageCell representing an AI message
      */
     public static MessageCell createAIMessageCell(final List<MessageContentPart> content) {
         return createAIMessageCell(content, null);
     }
-
 
     /**
      * Creates an AI message.
@@ -179,7 +180,7 @@ public final class MessageCell extends DataCell implements MessageValue {
     }
 
     @Override
-    public Optional<String> getToolName() {
+    public Optional<String> getName() {
         return Optional.ofNullable(m_toolName);
     }
 
@@ -200,7 +201,5 @@ public final class MessageCell extends DataCell implements MessageValue {
     public int hashCode() {
         return Objects.hash(m_messageType, m_content, m_toolCalls, m_toolCallId);
     }
-
-
 
 }

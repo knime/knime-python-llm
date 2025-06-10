@@ -76,11 +76,9 @@ public interface MessageValue extends DataValue {
      * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
      */
     public enum MessageType {
-            USER("User"),
-            TOOL("Tool"),
-            AI("AI");
+            USER("User"), TOOL("Tool"), AI("AI");
 
-            private final String label;
+        private final String label;
 
         MessageType(final String label) {
             this.label = label;
@@ -147,8 +145,9 @@ public interface MessageValue extends DataValue {
     Optional<String> getToolCallId();
 
     /**
-     * @return an optional name of the tool that sent the message, if any
+     * @return an optional name for the participant. Provides the model information to differentiate between
+     *         participants of the same role.
      */
-    Optional<String> getToolName();
+    Optional<String> getName();
 
 }

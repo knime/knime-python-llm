@@ -57,6 +57,7 @@ const hasIconSlot = slots.icon;
 
   .with-name & {
     border-radius: 16px;
+    padding-right: var(--space-8);
   }
 
   .user & {
@@ -68,6 +69,10 @@ const hasIconSlot = slots.icon;
 .icon {
   height: var(--space-16);
   width: var(--space-16);
+
+  .with-name & {
+    margin-right: var(--space-4);
+  }
 }
 
 .body {

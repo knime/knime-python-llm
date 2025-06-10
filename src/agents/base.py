@@ -77,6 +77,7 @@ _logger = logging.getLogger(__name__)
 
 
 agent_icon = "icons/generic/agent.png"
+chat_agent_icon = "icons/agentic/chat_agent.png"
 agent_category = knext.category(
     path=util.main_category,
     level_id="agents",
@@ -537,7 +538,7 @@ def _extract_tools_from_table(tools_table: knext.Table, tool_column: str):
 @knext.node(
     "Chat Agent Prompter",
     node_type=knext.NodeType.VISUALIZER,
-    icon_path=agent_icon,
+    icon_path=chat_agent_icon,
     category=agent_category,
 )
 @knext.input_port(

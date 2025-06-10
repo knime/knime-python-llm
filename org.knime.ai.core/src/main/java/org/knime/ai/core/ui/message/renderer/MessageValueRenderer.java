@@ -65,7 +65,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
-import org.knime.ai.core.data.message.ImageContentPart;
+import org.knime.ai.core.data.message.PngContentPart;
 import org.knime.ai.core.data.message.MessageValue;
 import org.knime.ai.core.data.message.MessageValue.MessageContentPart;
 import org.knime.ai.core.data.message.MessageValue.MessageType;
@@ -216,9 +216,9 @@ public final class MessageValueRenderer extends DefaultDataValueRenderer
             return span(t.getContent());
         }
 
-        if (part instanceof ImageContentPart imgPart) {
+        if (part instanceof PngContentPart imgPart) {
             byte[] raw = imgPart.getData();
-            String mime = imgPart.getType();
+            String mime = imgPart.getType().getMimeType();
             if (raw != null && raw.length > 0 && mime != null && !mime.isBlank()) {
                 String uri = "data:%s;base64,%s".formatted(mime, Base64.getEncoder().encodeToString(raw));
                 return img().withSrc(uri).attr("alt", "[image]").withClass("content-image");

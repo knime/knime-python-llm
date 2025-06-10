@@ -1,0 +1,15 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: Unit-Tests for org.knime.ai.core
+Bundle-SymbolicName: org.knime.ai.core.tests;singleton:=true
+Bundle-Version: 5.5.0.qualifier
+Bundle-Vendor: KNIME AG, Zurich, Switzerland
+Fragment-Host: org.knime.ai.core;bundle-version="[5.5.0,6.0.0)"
+Bundle-RequiredExecutionEnvironment: JavaSE-17
+Automatic-Module-Name: org.knime.ai.core.tests
+Bundle-ClassPath: .,
+ lib/Java-WebSocket-1.5.2.jar
+Require-Bundle: junit-jupiter-api;bundle-version="[5.9.2,6.0.0)",
+ org.mockito.mockito-core;bundle-version="[2.28.2,3.0.0)",
+ junit-jupiter-params;bundle-version="[5.9.2,6.0.0)",
+ com.github.tomakehurst.wiremock-jre8-standalone;bundle-version="[2.33.2,3.0.0)"

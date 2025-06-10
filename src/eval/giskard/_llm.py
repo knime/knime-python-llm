@@ -105,7 +105,7 @@ class GiskardLLMScanner:
     """
     Evaluate the performance of GenAI workflows with Giskard.
 
-    This node provides an open-source framework for detecting potential vulnerabilites in the GenAI model contained in the provided workflow.
+    This node provides an open-source framework for detecting potential vulnerabilites arising from GenAI models in the provided workflow.
     It evaluates the workflow by combining heuristics-based and LLM-assisted detectors.
     Giskard uses the provided LLM for the evaluation but applies different model parameters for some of the detectors.
     The viability of the LLM-assisted detectors can be improved by providing an optional

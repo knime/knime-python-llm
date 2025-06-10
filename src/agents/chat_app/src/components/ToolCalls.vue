@@ -71,6 +71,6 @@ props.toolCalls.forEach((message) => {
   background: var(--knime-gray-light-semi);
   border: 1px solid var(--knime-silver-sand);
   font-family: "Roboto Mono", monospace;
-  padding: 8px 12px;
+  padding: var(--space-8) var(--space-12);
 }
 </style>

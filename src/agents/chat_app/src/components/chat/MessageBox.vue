@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { defineProps, useSlots } from "vue";
 
-withDefaults(defineProps<{ isUser?: boolean }>(), { isUser: false });
+withDefaults(defineProps<{ isUser?: boolean; isError?: boolean }>(), {
+  isUser: false,
+  isError: false,
+});
 
 const slots = useSlots();
 const hasNameSlot = slots.name;
@@ -9,7 +12,10 @@ const hasIconSlot = slots.icon;
 </script>
 
 <template>
-  <div class="wrapper" :class="{ user: isUser, 'with-name': hasNameSlot }">
+  <div
+    class="wrapper"
+    :class="{ user: isUser, error: isError, 'with-name': hasNameSlot }"
+  >
     <div class="message">
       <div v-if="hasIconSlot || hasNameSlot" class="header">
         <div class="icon">
@@ -73,6 +79,10 @@ const hasIconSlot = slots.icon;
   .with-name & {
     margin-right: var(--space-4);
   }
+
+  & :deep(svg) {
+    @mixin svg-icon-size 16;
+  }
 }
 
 .body {
@@ -83,6 +93,11 @@ const hasIconSlot = slots.icon;
 
   .user & {
     border-radius: var(--space-4) var(--space-4) 0 var(--space-4);
+  }
+
+  .error & {
+    background-color: var(--knime-coral-light);
+    border-color: var(--knime-coral-light);
   }
 }
 </style>

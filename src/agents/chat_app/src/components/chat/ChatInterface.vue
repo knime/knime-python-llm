@@ -40,7 +40,7 @@ const { handleScroll } = useScrollToBottom(messagesContainer);
   flex-grow: 1;
   position: relative;
   overflow: hidden;
-  padding: var(--space-8) 3px;
+  padding: var(--space-8) var(--space-4);
 }
 
 .message-list {
@@ -51,9 +51,5 @@ const { handleScroll } = useScrollToBottom(messagesContainer);
   flex-direction: column;
   gap: var(--space-24);
   padding: var(--space-24) var(--space-16);
-
-  & :deep(.icon svg) {
-    @mixin svg-icon-size 16;
-  }
 }
 </style>

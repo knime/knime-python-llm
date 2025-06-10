@@ -76,21 +76,35 @@ public interface MessageValue extends DataValue {
      * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
      */
     public enum MessageType {
-            USER("User"), TOOL("Tool"), AI("AI");
+            /**
+             * User message, typically input from the user.
+             */
+            USER("User"),
+            /**
+             * A message that is the result of a tool call.
+             */
+            TOOL("Tool"),
+            /**
+             * AI message, typically a response from the AI model.
+             */
+            AI("AI");
 
-        private final String label;
+        private final String m_label;
 
         MessageType(final String label) {
-            this.label = label;
+            this.m_label = label;
         }
 
         @Override
         public String toString() {
-            return label;
+            return m_label;
         }
 
+        /**
+         * @return the label of the message type, e.g., "User", "Tool", or "AI"
+         */
         public String getLabel() {
-            return label;
+            return m_label;
         }
     }
 
@@ -102,9 +116,45 @@ public interface MessageValue extends DataValue {
     public interface MessageContentPart {
 
         /**
+         * The type of content part, e.g., "text", "image/png", etc.
+         *
+         * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
+         */
+        enum MessageContentPartType {
+            TEXT("text/markdown"), PNG("image/png");
+
+            private final String m_id;
+
+            private final String m_mimeType;
+
+            private MessageContentPartType(final String mimeType) {
+                m_id = name().toLowerCase();
+                m_mimeType = mimeType;
+            }
+
+            public String getId() {
+                return m_id;
+            }
+
+            public String getMimeType() {
+                return m_mimeType;
+            }
+
+            public static MessageContentPartType fromId(final String id) {
+                for (MessageContentPartType type : values()) {
+                    if (type.getId().equals(id)) {
+                        return type;
+                    }
+                }
+                throw new IllegalArgumentException("Unknown content part type: " + id);
+            }
+
+        }
+
+        /**
          * @return the type of the content part, e.g., "text", "image", etc.
          */
-        String getType();
+        MessageContentPartType getType();
 
         /**
          * @return the data of the content part as a byte array.

@@ -76,8 +76,8 @@ public final class TextContentPart implements MessageContentPart {
     }
 
     @Override
-    public String getType() {
-        return "text";
+    public MessageContentPartType getType() {
+        return MessageContentPartType.TEXT;
     }
 
     @Override

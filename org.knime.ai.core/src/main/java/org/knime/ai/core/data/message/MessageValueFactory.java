@@ -54,6 +54,7 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 import org.knime.ai.core.data.message.MessageValue.MessageContentPart;
+import org.knime.ai.core.data.message.MessageValue.MessageContentPart.MessageContentPartType;
 import org.knime.core.data.DataCell;
 import org.knime.core.data.v2.ReadValue;
 import org.knime.core.data.v2.ValueFactory;
@@ -152,15 +153,8 @@ public final class MessageValueFactory implements ValueFactory<StructReadAccess,
             StringWriteAccess typeAccess = access.getWriteAccess(0);
             VarBinaryWriteAccess dataAccess = access.getWriteAccess(1);
             return (part) -> {
-                if (part instanceof TextContentPart stringPart) {
-                    typeAccess.setStringValue("text");
-                    dataAccess.setByteArray(stringPart.getContent().getBytes());
-                } else if (part instanceof ImageContentPart imagePart) {
-                    typeAccess.setStringValue("image");
-                    dataAccess.setByteArray(imagePart.getData());
-                } else {
-                    throw new IllegalArgumentException("Unknown content part type: " + part.getClass());
-                }
+                typeAccess.setStringValue(part.getType().getId());
+                dataAccess.setByteArray(part.getData());
             };
         }
 
@@ -252,9 +246,10 @@ public final class MessageValueFactory implements ValueFactory<StructReadAccess,
         }
 
         private static MessageContentPart readContentPart(final String type, final byte[] data) {
-            return switch (type) {
-                case "text" -> new TextContentPart(new String(data));
-                case "image" -> new ImageContentPart(data);
+            var partType = MessageContentPartType.fromId(type);
+            return switch (partType) {
+                case TEXT -> new TextContentPart(new String(data));
+                case PNG -> new PngContentPart(data);
                 // Add other content types as needed
                 default -> throw new IllegalArgumentException("Unknown content type: " + type);
             };

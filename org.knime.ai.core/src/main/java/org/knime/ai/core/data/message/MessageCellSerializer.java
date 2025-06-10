@@ -90,7 +90,7 @@ public final class MessageCellSerializer implements DataCellSerializer<MessageCe
         throws IOException {
         output.writeInt(content.size());
         for (MessageContentPart part : content) {
-            output.writeUTF(part.getType());
+            output.writeUTF(part.getType().getId());
             byte[] data = part.getData();
             output.write(data.length);
             output.write(data);
@@ -115,7 +115,7 @@ public final class MessageCellSerializer implements DataCellSerializer<MessageCe
             case "text":
                 return new TextContentPart(new String(value));
             case "image":
-                return new ImageContentPart(value);
+                return new PngContentPart(value);
             default:
                 throw new IllegalArgumentException("Unknown content type: " + type);
         }

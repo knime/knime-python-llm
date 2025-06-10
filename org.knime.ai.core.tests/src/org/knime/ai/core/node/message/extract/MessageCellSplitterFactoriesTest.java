@@ -56,6 +56,7 @@ import java.util.List;
 import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
+import org.knime.ai.core.data.message.MessageValue.MessageContentPart.MessageContentPartType;
 import org.knime.ai.core.data.message.MessageValue.ToolCall;
 import org.knime.core.data.DataCell;
 import org.knime.core.data.DataColumnSpec;
@@ -92,7 +93,7 @@ final class MessageCellSplitterFactoriesTest {
     void testCreateContentCounter() {
         var msg = TestUtil.createMessageWithTextParts("foo", "bar");
         DataCell cell = msg;
-        var counter = MessageCellSplitterFactories.createContentCounter("text");
+        var counter = MessageCellSplitterFactories.createContentCounter(MessageContentPartType.TEXT);
         assertEquals(2, counter.apply(cell));
     }
 

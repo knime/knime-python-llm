@@ -62,6 +62,7 @@ import java.util.stream.IntStream;
 
 import org.knime.ai.core.data.message.MessageValue;
 import org.knime.ai.core.data.message.MessageValue.MessageContentPart;
+import org.knime.ai.core.data.message.MessageValue.MessageContentPart.MessageContentPartType;
 import org.knime.ai.core.data.message.MessageValue.ToolCall;
 import org.knime.core.data.DataCell;
 import org.knime.core.data.DataColumnSpec;
@@ -89,12 +90,12 @@ final class MessageCellSplitterFactories {
             MessageCellSplitterFactories::extractName, messageColumnIndex))
             .ifPresent(factory -> list.add(createStatelessCellSplitterFactory(() -> factory)));
         settings.m_textPartsPrefix.map(prefix -> createMultiCellSplitterFactory(
-            createContentCounter("text"), createColumnSpecCreator(prefix, StringCell.TYPE), messageColumnIndex,
-            createContentPartExtractor("text", data -> new StringCell(new String(data)))))
+            createContentCounter(MessageContentPartType.TEXT), createColumnSpecCreator(prefix, StringCell.TYPE), messageColumnIndex,
+            createContentPartExtractor(MessageContentPartType.TEXT, data -> new StringCell(new String(data)))))
             .ifPresent(list::add);
         settings.m_imagePartsPrefix.map(prefix -> createMultiCellSplitterFactory(
-            createContentCounter("image"), createColumnSpecCreator(prefix, PNGImageCellFactory.TYPE), messageColumnIndex,
-            createContentPartExtractor("image", PNGImageCellFactory::create)))
+            createContentCounter(MessageContentPartType.PNG), createColumnSpecCreator(prefix, PNGImageCellFactory.TYPE), messageColumnIndex,
+            createContentPartExtractor(MessageContentPartType.PNG, PNGImageCellFactory::create)))
             .ifPresent(list::add);
         settings.m_toolCallsPrefix.map(prefix -> createMultiCellSplitterFactory(
             MessageCellSplitterFactories::countToolCalls,
@@ -129,7 +130,7 @@ final class MessageCellSplitterFactories {
             false);
     }
 
-    static Function<DataCell, Integer> createContentCounter(final String contentType) {
+    static Function<DataCell, Integer> createContentCounter(final MessageContentPartType contentType) {
         return cell -> {
             if (cell.isMissing()) {
                 return 0;
@@ -207,12 +208,12 @@ final class MessageCellSplitterFactories {
         }
     }
 
-    static Function<MessageValue, DataCell[]> createContentPartExtractor(final String contentType,
-        final Function<byte[], DataCell> contentCellFactory) {
+    static Function<MessageValue, DataCell[]> createContentPartExtractor(final MessageContentPartType contentType,
+        final Function<byte[], DataCell> contentToCellFn) {
         return message -> message.getContent().stream()//
             .filter(part -> contentType.equals(part.getType()))//
             .map(MessageContentPart::getData)//
-            .map(contentCellFactory)//
+            .map(contentToCellFn)//
             .toArray(DataCell[]::new);
     }
 

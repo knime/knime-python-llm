@@ -1,4 +1,6 @@
-export type Type = "human" | "ai" | "tool" | "error";
+import type { DefineComponent } from "vue";
+
+type Type = "human" | "ai" | "tool" | "error";
 
 export interface ToolCall {
   id: string;
@@ -40,3 +42,11 @@ export type MessageResponse =
   | ToolResponse
   | ErrorResponse
   | HumanResponse;
+
+export type MessageComponentMap = {
+  [K in MessageResponse["type"]]: DefineComponent<
+    Extract<MessageResponse, { type: K }>,
+    {},
+    any
+  >;
+};

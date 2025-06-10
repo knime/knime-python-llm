@@ -1,8 +1,8 @@
-import { type Component, onMounted, ref } from "vue";
+import { onMounted, ref } from "vue";
 
 import { JsonDataService } from "@knime/ui-extension-service";
 
-import type { MessageResponse, Type } from "@/types";
+import type { MessageComponentMap, MessageResponse } from "@/types";
 import AiMessage from "../components/AiMessage.vue";
 import HumanMessage from "../components/HumanMessage.vue";
 import ToolMessage from "../components/ToolMessage.vue";
@@ -13,8 +13,7 @@ const processingError = "There was an error while processing your request.";
 
 const createId = () => (Date.now() + 1).toString();
 
-// TODO: Enforce that key and component's type prop match (DefineComponent from knime-ui?)
-const messageComponents: Record<Type, Component> = {
+const messageComponents: MessageComponentMap = {
   ai: AiMessage,
   tool: ToolMessage,
   human: HumanMessage,
@@ -24,13 +23,13 @@ const messageComponents: Record<Type, Component> = {
 const messages = ref<MessageResponse[]>([]);
 const isLoading = ref(false);
 
+const assignResponseId = (response: MessageResponse): MessageResponse => ({
+  ...response,
+  id: response.id ?? createId(),
+});
+
 const displayNewMessages = (responses: MessageResponse[]) => {
-  messages.value.push(
-    ...responses.map((response) => ({
-      ...response,
-      id: response.id ?? createId(),
-    })),
-  );
+  messages.value.push(...responses.map(assignResponseId));
 };
 
 const pollForNewMessages = async () => {

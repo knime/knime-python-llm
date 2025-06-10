@@ -1,7 +1,7 @@
 <script setup lang="ts">
-defineProps<{
-  content: string;
-}>();
+import type { ErrorResponse } from "@/types";
+
+defineProps<ErrorResponse>();
 </script>
 
 <template>

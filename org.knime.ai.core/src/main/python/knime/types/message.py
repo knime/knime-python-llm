@@ -42,7 +42,7 @@ class MessageValue:
     content: List[MessageContentPart]
     tool_calls: Optional[List[ToolCall]] = None
     tool_call_id: Optional[str] = None
-    tool_name: Optional[str] = None
+    name: Optional[str] = None
 
 
 class MessageValueFactory(kt.PythonValueFactory):
@@ -73,13 +73,13 @@ class MessageValueFactory(kt.PythonValueFactory):
                 for tc in storage["2"]
             ]
         tool_call_id = storage.get("3")
-        tool_name = storage.get("4")
+        name = storage.get("4")
         return MessageValue(
             message_type=message_type,
             content=content,
             tool_calls=tool_calls,
             tool_call_id=tool_call_id,
-            tool_name=tool_name,
+            name=name,
         )
 
     def encode(self, value: "MessageValue"):
@@ -111,7 +111,7 @@ class MessageValueFactory(kt.PythonValueFactory):
         else:
             storage["2"] = None
         storage["3"] = value.tool_call_id
-        storage["4"] = value.tool_name
+        storage["4"] = value.name
         return storage
 
 
@@ -158,7 +158,7 @@ def to_langchain_message(msg: "MessageValue"):
     content = _convert_content(msg.content)
 
     if msg.message_type == MessageType.USER:
-        return HumanMessage(content=content)
+        return HumanMessage(content=content, name=msg.name)
     elif msg.message_type == MessageType.AI:
         tool_calls = []
         if msg.tool_calls:
@@ -171,9 +171,9 @@ def to_langchain_message(msg: "MessageValue"):
                         "type": "tool_call",
                     }
                 )
-        return AIMessage(content=content, tool_calls=tool_calls, id=msg.tool_call_id)
+        return AIMessage(content=content, tool_calls=tool_calls, id=msg.tool_call_id, name=msg.name)
     elif msg.message_type == MessageType.TOOL:
-        return ToolMessage(content=content, tool_call_id=msg.tool_call_id)
+        return ToolMessage(content=content, tool_call_id=msg.tool_call_id, name=msg.name)
     else:
         raise ValueError(f"Unknown MessageType: {msg.message_type}")
 
@@ -218,11 +218,13 @@ def from_langchain_message(lc_msg) -> MessageValue:
                             )
                         )
         return parts
+    
+    name = getattr(lc_msg, "name", None)
 
     if isinstance(lc_msg, HumanMessage):
         msg_type = MessageType.USER
         content = _to_content_parts(lc_msg.content)
-        return MessageValue(message_type=msg_type, content=content)
+        return MessageValue(message_type=msg_type, content=content, name=name)
     elif isinstance(lc_msg, AIMessage):
         msg_type = MessageType.AI
         content = _to_content_parts(lc_msg.content)
@@ -243,6 +245,7 @@ def from_langchain_message(lc_msg) -> MessageValue:
             content=content,
             tool_calls=tool_calls,
             tool_call_id=getattr(lc_msg, "id", None),
+            name=name,
         )
     elif isinstance(lc_msg, ToolMessage):
         msg_type = MessageType.TOOL
@@ -251,7 +254,7 @@ def from_langchain_message(lc_msg) -> MessageValue:
             message_type=msg_type,
             content=content,
             tool_call_id=getattr(lc_msg, "tool_call_id", None),
-            tool_name=getattr(lc_msg, "name", None),
+            name=name,
         )
     else:
         raise ValueError(f"Unsupported langchain message type: {type(lc_msg)}")

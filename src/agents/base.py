@@ -337,7 +337,7 @@ ability to solve the problem and think insightfully.""",
 
 
 @knext.node(
-    "Agent Prompter 2.0",
+    "Agent Prompter",
     node_type=knext.NodeType.PREDICTOR,
     icon_path=agent_prompter_icon,
     category=agent_category,

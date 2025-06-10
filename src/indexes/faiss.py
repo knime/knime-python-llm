@@ -61,7 +61,7 @@ from .base import (
 
 from numpy import ndarray
 
-faiss_icon = "icons/generic/brain.png"
+faiss_icon = "icons/embeddings/store.png"
 faiss_category = knext.category(
     path=store_category,
     level_id="faiss",

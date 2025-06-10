@@ -81,6 +81,7 @@ agent_category = knext.category(
     description="",
     icon=agent_icon,
 )
+agent_prompter_icon = "icons/agentic/agent.png"
 
 
 @knext.parameter_group(label="Credentials")
@@ -338,7 +339,7 @@ ability to solve the problem and think insightfully.""",
 @knext.node(
     "Agent Prompter 2.0",
     node_type=knext.NodeType.PREDICTOR,
-    icon_path=agent_icon,
+    icon_path=agent_prompter_icon,
     category=agent_category,
 )
 @knext.input_port(

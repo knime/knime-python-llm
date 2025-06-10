@@ -11,13 +11,18 @@ class MessageType(Enum):
     AI = "AI"
 
 
+class MessageContentPartType(Enum):
+    TEXT = "text"
+    PNG = "png"
+    
+
 @dataclass
 class MessageContentPart:
     """
     Represents a part of the message content.
     """
 
-    type: str  # e.g., "text", "image", etc.
+    type: MessageContentPartType  # e.g., "text", "png", etc.
     data: bytes  # the data of the content part as a byte array
 
 
@@ -57,7 +62,11 @@ class MessageValueFactory(kt.PythonValueFactory):
         # storage: dict with keys "0", "1", "2", "3", "4"
         message_type = MessageType(storage["0"])
         content = [
-            MessageContentPart(type=part["0"], data=part["1"]) for part in storage["1"]
+            MessageContentPart(
+            type=MessageContentPartType(part["0"]), 
+            data=part["1"]
+            ) 
+            for part in storage["1"]
         ]
 
         tool_calls = None
@@ -91,7 +100,7 @@ class MessageValueFactory(kt.PythonValueFactory):
             "0": value.message_type.value,
             "1": [
                 {
-                    "0": part.type,
+                    "0": part.type.value,
                     "1": part.data,
                 }
                 for part in value.content
@@ -138,13 +147,13 @@ def to_langchain_message(msg: "MessageValue"):
         # Otherwise, return as list of dicts
         result = []
         for part in content_parts:
-            if part.type == "text":
+            if part.type == MessageContentPartType.TEXT:
                 result.append(
                     {"type": "text", "text": part.data.decode("utf-8")
                      if isinstance(part.data, bytes)
                      else str(part.data)}
                 )
-            elif part.type == "image":
+            elif part.type == MessageContentPartType.PNG:
                 if isinstance(part.data, bytes):
                     import base64
 
@@ -152,7 +161,7 @@ def to_langchain_message(msg: "MessageValue"):
                     image_url = f"data:image/png;base64,{base64_image}"
                     result.append({"type": "image_url", "image_url": {"url": image_url}})
             else:
-                result.append({"type": part.type, "data": part.data})
+                result.append({"type": part.type.value, "data": part.data})
         return result
 
     content = _convert_content(msg.content)
@@ -190,12 +199,12 @@ def from_langchain_message(lc_msg) -> MessageValue:
     def _to_content_parts(content):
         parts = []
         if isinstance(content, str):
-            parts.append(MessageContentPart(type="text", data=content.encode("utf-8")))
+            parts.append(MessageContentPart(type=MessageContentPartType.TEXT, data=content.encode("utf-8")))
         elif isinstance(content, list):
             for part in content:
                 if isinstance(part, str):
                     parts.append(
-                        MessageContentPart(type="text", data=part.encode("utf-8"))
+                        MessageContentPart(type=MessageContentPartType.TEXT, data=part.encode("utf-8"))
                     )
                 elif isinstance(part, dict):
                     if part.get("type") == "image_url":
@@ -203,20 +212,14 @@ def from_langchain_message(lc_msg) -> MessageValue:
                         url = part.get("image_url", {}).get("url", b"")
                         if isinstance(url, str):
                             url = url.encode("utf-8")
-                        parts.append(MessageContentPart(type="image", data=url))
+                        parts.append(MessageContentPart(type=MessageContentPartType.PNG, data=url))
                     elif part.get("type") == "text":
                         text = part.get("text", "")
                         parts.append(
-                            MessageContentPart(type="text", data=text.encode("utf-8"))
+                            MessageContentPart(type=MessageContentPartType.TEXT, data=text.encode("utf-8"))
                         )
                     else:
-                        # fallback: store as bytes
-                        parts.append(
-                            MessageContentPart(
-                                type=part.get("type", "unknown"),
-                                data=bytes(str(part), "utf-8"),
-                            )
-                        )
+                        raise ValueError(f"Unsupported message part type: {part.get('type')}")
         return parts
     
     name = getattr(lc_msg, "name", None)

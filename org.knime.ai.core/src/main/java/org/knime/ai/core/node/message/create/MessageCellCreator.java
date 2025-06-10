@@ -53,7 +53,7 @@ import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
-import org.knime.ai.core.data.message.ImageContentPart;
+import org.knime.ai.core.data.message.PngContentPart;
 import org.knime.ai.core.data.message.MessageCell;
 import org.knime.ai.core.data.message.MessageValue.MessageContentPart;
 import org.knime.ai.core.data.message.MessageValue.MessageType;
@@ -152,7 +152,7 @@ final class MessageCellCreator {
             if (cell.isMissing()) {
                 return Optional.empty();
             }
-            return Optional.of(new ImageContentPart(((PNGImageValue)cell).getImageContent().getByteArray()));
+            return Optional.of(new PngContentPart(((PNGImageValue)cell).getImageContent().getByteArray()));
         };
     }
 

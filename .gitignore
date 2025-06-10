@@ -21,7 +21,8 @@ dist/
 
 # Maven
 target/
-dist/
+# commit it for now because the build system doesn't build it, yet
+#dist/
 
 # JetBrains IDE
 .idea/

@@ -12,7 +12,6 @@ export default defineConfig({
   base: "",
   build: {
     target: "esnext",
-    outDir: "../../../",
   },
 
   // TODO: remove this when we have builds fo that libs, without them the optimizer can break things

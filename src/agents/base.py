@@ -549,7 +549,12 @@ def _extract_tools_from_table(tools_table: knext.Table, tool_column: str):
     "Data inputs",
     "The data inputs for the agent.",
 )
-@knext.output_view("KNIME Icon", "Shows the KNIME icon", static_resources="assets")
+@knext.output_view(
+    "Chat",
+    "Shows the chat interface for interacting with the agent.",
+    static_resources="src/agents/chat_app/dist/",
+    index_html_path="index.html",
+)
 class ChatAgentPrompter:
     """Enables interactive, multi-turn conversations with an AI agent that uses tools and data to fulfill user prompts.
 
@@ -602,16 +607,7 @@ class ChatAgentPrompter:
         tools_table: knext.Table,
         input_tables: list[knext.Table],
     ):
-        # Load the index.html file as a string
-        # Assume the repository root is two levels up from this file
-        # Workaround until AP-24397 is resolved
-        repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-        html_file_path = os.path.join(repo_root, "index.html")
-
-        with open(html_file_path, "r", encoding="utf-8") as html_file:
-            html_content = html_file.read()
-
-        return knext.view_html(html_content)
+        pass
 
     def get_data_service(
         self,
@@ -642,5 +638,9 @@ class ChatAgentPrompter:
         )
 
         return ChatAgentPrompterDataService(
-            agent, data_registry, self.initial_message, self.recursion_limit, self.show_tool_calls_and_results
+            agent,
+            data_registry,
+            self.initial_message,
+            self.recursion_limit,
+            self.show_tool_calls_and_results,
         )

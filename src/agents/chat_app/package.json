@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "pnpm type-check && rimraf ../../../assets && vite build",
+    "build": "pnpm type-check && vite build",
     "serve": "vite preview",
     "lint": "run-p 'lint:* --fix'",
     "lint:js": "eslint --cache .",
@@ -46,7 +46,6 @@
     "postcss-nested": "^7.0.2",
     "postcss-preset-env": "^10.2.0",
     "prettier": "^3.5.3",
-    "rimraf": "^6.0.1",
     "stylelint": "^16.20.0",
     "typescript": "^5.8.3",
     "vite": "^6.3.0",

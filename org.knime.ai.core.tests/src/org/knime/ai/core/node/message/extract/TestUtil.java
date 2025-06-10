@@ -44,41 +44,40 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   May 30, 2025 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
+ *   May 23, 2025 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
  */
 package org.knime.ai.core.node.message.extract;
 
-import org.knime.core.webui.node.impl.WebUINodeConfiguration;
-import org.knime.core.webui.node.impl.WebUINodeFactory;
+import java.util.List;
+import java.util.stream.Stream;
+
+import org.knime.ai.core.data.message.MessageCell;
+import org.knime.ai.core.data.message.MessageValue.MessageType;
+import org.knime.ai.core.data.message.MessageValue.ToolCall;
+import org.knime.ai.core.data.message.TextContentPart;
 
 /**
- * Factory for the Message Part Extractor node, which extracts parts from messages in a table.
- *
- * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
+ * Utility class for creating test data for MessageCellSplitterFactoriesTest.
  */
-@SuppressWarnings("restriction")
-public final class MessagePartExtractorNodeFactory extends WebUINodeFactory<MessagePartExtractorNodeModel> {
-
-    private static final WebUINodeConfiguration CONFIG = WebUINodeConfiguration.builder()//
-            .name("Message Part Extractor")//
-            .icon("./Message-part-extractor.png")//
-            .shortDescription("Extracts parts from messages in a table.")//
-            .fullDescription("This node extracts parts from messages in a table, allowing you to work with specific content types such as text or images.")//
-            .modelSettingsClass(MessagePartExtractorSettings.class)//
-            .addInputTable("Message table", "Table containing messages to extract parts from.")//
-            .addOutputTable("Message part table", "Table with extracted message parts.")//
-            .build();
-
-    /**
-     * Constructor for the Message Part Extractor node factory.
-     */
-    public MessagePartExtractorNodeFactory() {
-        super(CONFIG);
+final class TestUtil {
+    static MessageCell createMessageWithTextParts(final String... texts) {
+        return new MessageCell(MessageType.USER, Stream.of(texts).map(TextContentPart::new).toList(), null, null, null);
     }
 
-    @Override
-    public MessagePartExtractorNodeModel createNodeModel() {
-        return new MessagePartExtractorNodeModel();
+    static MessageCell createMessageWithToolCalls(final int count) {
+        return new MessageCell(MessageType.USER, List.of(), Stream.generate(() -> new ToolCall("tool", "id", "args"))
+            .limit(count).toList(), null, null);
     }
 
+    static MessageCell createMessageWithRole(final String role) {
+        return new MessageCell(MessageType.valueOf(role.toUpperCase()), List.of(), null, null, null);
+    }
+
+    static MessageCell createMessageWithToolCallId(final String id) {
+        return new MessageCell(MessageType.TOOL, List.of(), null, id, null);
+    }
+
+    static MessageCell createMessageWithName(final String name) {
+        return new MessageCell(MessageType.USER, List.of(), null, null, name);
+    }
 }

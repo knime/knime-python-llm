@@ -48,6 +48,8 @@
  */
 package org.knime.ai.core.node.message.extract;
 
+import java.util.Optional;
+
 import org.knime.ai.core.data.message.MessageValue;
 import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataTableSpec;
@@ -58,11 +60,7 @@ import org.knime.core.webui.node.dialog.defaultdialog.layout.Layout;
 import org.knime.core.webui.node.dialog.defaultdialog.widget.Widget;
 import org.knime.core.webui.node.dialog.defaultdialog.widget.choices.ChoicesProvider;
 import org.knime.core.webui.node.dialog.defaultdialog.widget.choices.column.CompatibleColumnsProvider;
-import org.knime.core.webui.node.dialog.defaultdialog.widget.updates.Effect;
-import org.knime.core.webui.node.dialog.defaultdialog.widget.updates.Predicate;
-import org.knime.core.webui.node.dialog.defaultdialog.widget.updates.PredicateProvider;
 import org.knime.core.webui.node.dialog.defaultdialog.widget.updates.Reference;
-import org.knime.core.webui.node.dialog.defaultdialog.widget.updates.ValueReference;
 
 /**
  * Settings for the Message Part Extractor node.
@@ -78,6 +76,11 @@ final class MessagePartExtractorSettings implements DefaultNodeSettings {
 
     @HorizontalLayout
     @After(RoleSettings.class)
+    interface NameSettings {
+    }
+
+    @HorizontalLayout
+    @After(NameSettings.class)
     interface TextPartsSettings {
     }
 
@@ -113,63 +116,39 @@ final class MessagePartExtractorSettings implements DefaultNodeSettings {
         description = "Whether to keep the original message column in the output table.")
     public boolean m_keepOriginalColumn = true;
 
-    @Widget(title = "Extract role",
-        description = "Whether to extract the role of the message (e.g., user, AI, tool). If enabled, a new column with the role will be added.")
-    @ValueReference(RoleExtractedRef.class)
+    @Widget(title = "Role column name",
+        description = "If enabled, a new column with the role will be added under the given name.")
     @Layout(RoleSettings.class)
-    public boolean m_extractRole = true;
+    public Optional<String> m_roleColumnName = Optional.of("Role");
 
-    @Widget(title = "Role column name", description = "Name of the output column for the extracted role.",
-        effect = @Effect(predicate = ShowRoleColumnName.class, type = Effect.EffectType.ENABLE))
-    @Layout(RoleSettings.class)
-    public String m_roleColumnName = "Role";
+    @Widget(title = "Name column name",
+        description = "If enabled, a new column with the name will be added under the given name.")
+    @Layout(NameSettings.class)
+    public Optional<String> m_nameColumnName = Optional.of("Name");
 
-    @Widget(title = "Extract text parts",
-        description = "Whether to extract text parts from the messages. If enabled, new columns with the text contents will be added.")
-    @ValueReference(TextPartsExtractedRef.class)
+    @Widget(title = "Text parts column prefix",
+        description = "If selected columns with the text contents are appended. Specify the prefix for the output columns here.")
     @Layout(TextPartsSettings.class)
-    public boolean m_extractTextParts = true;
+    public Optional<String> m_textPartsPrefix = Optional.of("Text Content ");
 
-    @Widget(title = "Text parts column prefix", description = "Prefix for the output columns for extracted text parts.",
-        effect = @Effect(predicate = ShowTextPartsPrefix.class, type = Effect.EffectType.ENABLE))
-    @Layout(TextPartsSettings.class)
-    public String m_textPartsPrefix = "Text Content ";
-
-    @Widget(title = "Extract image parts",
-        description = "Whether to extract image parts from the messages. If enabled, new columns with the image contents will be added.")
-    @ValueReference(ImagePartsExtractedRef.class)
+    @Widget(title = "Image parts column prefix",
+        description = "Prefix for the output columns for extracted image parts.")
     @Layout(ImagePartsSettings.class)
-    public boolean m_extractImageParts = true;
+    public Optional<String> m_imagePartsPrefix = Optional.of("Image Content ");
 
-    @Widget(title = "Image parts column prefix", description = "Prefix for the output columns for extracted image parts.",
-        effect = @Effect(predicate = ShowImagePartsPrefix.class, type = Effect.EffectType.ENABLE))
-    @Layout(ImagePartsSettings.class)
-    public String m_imagePartsPrefix = "Image Content ";
-
-    @Widget(title = "Extract tool calls",
-        description = "Whether to extract tool calls from the messages. If enabled, a new column with the tool call content will be added.")
-    @ValueReference(ToolCallsExtractedRef.class)
+    @Widget(title = "Tool calls column prefix", description = "Prefix for the output columns for extracted tool calls.")
     @Layout(ToolCallsSettings.class)
-    public boolean m_extractToolCalls = true;
+    public Optional<String> m_toolCallsPrefix = Optional.of("Tool Call ");
 
-    @Widget(title = "Tool calls column prefix", description = "Prefix for the output columns for extracted tool calls.",
-        effect = @Effect(predicate = ShowToolCallsColumnName.class, type = Effect.EffectType.ENABLE))
-    @Layout(ToolCallsSettings.class)
-    public String m_toolCallsPrefix = "Tool Call ";
-
-    @Widget(title = "Extract tool call IDs",
-        description = "Whether to extract tool call IDs from the messages. If enabled, a new column with the tool call IDs will be added.")
-    @ValueReference(ToolCallIdExtractedRef.class)
+    @Widget(title = "Tool call ID column name", description = "Name of the output column for extracted tool call IDs.")
     @Layout(ToolCallIdSettings.class)
-    public boolean m_extractToolCallIds = true;
-
-    @Widget(title = "Tool call ID column name", description = "Name of the output column for extracted tool call IDs.",
-        effect = @Effect(predicate = ShowToolCallIdColumnName.class, type = Effect.EffectType.ENABLE))
-    @Layout(ToolCallIdSettings.class)
-    public String m_toolCallIdColumnName = "Tool Call ID";
+    public Optional<String> m_toolCallIdColumnName = Optional.of("Tool Call ID");
 
     // Reference classes for effect wiring
     public static class RoleExtractedRef implements Reference<Boolean> {
+    }
+
+    public static class NameExtractedRef implements Reference<Boolean> {
     }
 
     public static class TextPartsExtractedRef implements Reference<Boolean> {
@@ -199,50 +178,5 @@ final class MessagePartExtractorSettings implements DefaultNodeSettings {
             .map(DataColumnSpec::getName)//
             .reduce((l, r) -> r)// get the last compatible column
             .orElse(null);
-    }
-
-    private abstract static class RefIsSelected implements PredicateProvider {
-        private final Class<? extends Reference<Boolean>> m_ref;
-
-        RefIsSelected(final Class<? extends Reference<Boolean>> ref) {
-            m_ref = ref;
-        }
-
-        @Override
-        public Predicate init(final PredicateProvider.PredicateInitializer i) {
-            return i.getBoolean(m_ref).isTrue();
-        }
-    }
-
-    private static final class ShowRoleColumnName extends RefIsSelected {
-
-        ShowRoleColumnName() {
-            super(RoleExtractedRef.class);
-        }
-    }
-
-    private static final class ShowTextPartsPrefix extends RefIsSelected {
-
-        ShowTextPartsPrefix() {
-            super(TextPartsExtractedRef.class);
-        }
-    }
-
-    private static final class ShowImagePartsPrefix extends RefIsSelected {
-        ShowImagePartsPrefix() {
-            super(ImagePartsExtractedRef.class);
-        }
-    }
-
-    private static final class ShowToolCallsColumnName extends RefIsSelected {
-        ShowToolCallsColumnName() {
-            super(ToolCallsExtractedRef.class);
-        }
-    }
-
-    private static final class ShowToolCallIdColumnName extends RefIsSelected {
-        ShowToolCallIdColumnName() {
-            super(ToolCallIdExtractedRef.class);
-        }
     }
 }

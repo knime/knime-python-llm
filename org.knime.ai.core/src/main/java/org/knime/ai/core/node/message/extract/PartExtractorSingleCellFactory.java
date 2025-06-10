@@ -42,43 +42,41 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
- *
+ * 
  * History
- *   May 30, 2025 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
+ *   Jun 10, 2025 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
  */
 package org.knime.ai.core.node.message.extract;
 
-import org.knime.core.webui.node.impl.WebUINodeConfiguration;
-import org.knime.core.webui.node.impl.WebUINodeFactory;
+import java.util.function.Function;
 
-/**
- * Factory for the Message Part Extractor node, which extracts parts from messages in a table.
- *
- * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
- */
-@SuppressWarnings("restriction")
-public final class MessagePartExtractorNodeFactory extends WebUINodeFactory<MessagePartExtractorNodeModel> {
+import org.knime.ai.core.data.message.MessageValue;
+import org.knime.core.data.DataCell;
+import org.knime.core.data.DataColumnSpecCreator;
+import org.knime.core.data.DataRow;
+import org.knime.core.data.DataType;
+import org.knime.core.data.container.SingleCellFactory;
 
-    private static final WebUINodeConfiguration CONFIG = WebUINodeConfiguration.builder()//
-            .name("Message Part Extractor")//
-            .icon("./Message-part-extractor.png")//
-            .shortDescription("Extracts parts from messages in a table.")//
-            .fullDescription("This node extracts parts from messages in a table, allowing you to work with specific content types such as text or images.")//
-            .modelSettingsClass(MessagePartExtractorSettings.class)//
-            .addInputTable("Message table", "Table containing messages to extract parts from.")//
-            .addOutputTable("Message part table", "Table with extracted message parts.")//
-            .build();
+final class PartExtractorSingleCellFactory extends SingleCellFactory {
 
-    /**
-     * Constructor for the Message Part Extractor node factory.
-     */
-    public MessagePartExtractorNodeFactory() {
-        super(CONFIG);
+    private final int m_messageColumnIndex;
+
+    private final Function<MessageValue, DataCell> m_extractor;
+
+    PartExtractorSingleCellFactory(final String columnName, final DataType contentType,
+        final Function<MessageValue, DataCell> extractor, final int messageColumnIndex) {
+        super(true, new DataColumnSpecCreator(columnName, contentType).createSpec());
+        m_extractor = extractor;
+        m_messageColumnIndex = messageColumnIndex;
     }
 
     @Override
-    public MessagePartExtractorNodeModel createNodeModel() {
-        return new MessagePartExtractorNodeModel();
+    public DataCell getCell(final DataRow row) {
+        var messageCell = row.getCell(m_messageColumnIndex);
+        if (messageCell.isMissing()) {
+            return DataType.getMissingCell();
+        }
+        var message = (MessageValue)messageCell;
+        return m_extractor.apply(message);
     }
-
 }

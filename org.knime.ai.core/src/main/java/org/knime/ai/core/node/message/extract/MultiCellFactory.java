@@ -42,43 +42,30 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * ---------------------------------------------------------------------
- *
+ * 
  * History
- *   May 30, 2025 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
+ *   Jun 10, 2025 (Adrian Nembach, KNIME GmbH, Konstanz, Germany): created
  */
 package org.knime.ai.core.node.message.extract;
 
-import org.knime.core.webui.node.impl.WebUINodeConfiguration;
-import org.knime.core.webui.node.impl.WebUINodeFactory;
+import java.util.function.Function;
 
-/**
- * Factory for the Message Part Extractor node, which extracts parts from messages in a table.
- *
- * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
- */
-@SuppressWarnings("restriction")
-public final class MessagePartExtractorNodeFactory extends WebUINodeFactory<MessagePartExtractorNodeModel> {
+import org.knime.core.data.DataCell;
+import org.knime.core.data.DataColumnSpec;
+import org.knime.core.data.DataRow;
+import org.knime.core.data.container.AbstractCellFactory;
 
-    private static final WebUINodeConfiguration CONFIG = WebUINodeConfiguration.builder()//
-            .name("Message Part Extractor")//
-            .icon("./Message-part-extractor.png")//
-            .shortDescription("Extracts parts from messages in a table.")//
-            .fullDescription("This node extracts parts from messages in a table, allowing you to work with specific content types such as text or images.")//
-            .modelSettingsClass(MessagePartExtractorSettings.class)//
-            .addInputTable("Message table", "Table containing messages to extract parts from.")//
-            .addOutputTable("Message part table", "Table with extracted message parts.")//
-            .build();
+final class MultiCellFactory extends AbstractCellFactory {
 
-    /**
-     * Constructor for the Message Part Extractor node factory.
-     */
-    public MessagePartExtractorNodeFactory() {
-        super(CONFIG);
+    private final Function<DataRow, DataCell[]> m_extractor;
+
+    MultiCellFactory(final DataColumnSpec[] columnSpecs, final Function<DataRow, DataCell[]> extractor) {
+        super(columnSpecs);
+        m_extractor = extractor;
     }
 
     @Override
-    public MessagePartExtractorNodeModel createNodeModel() {
-        return new MessagePartExtractorNodeModel();
+    public DataCell[] getCells(final DataRow row) {
+        return m_extractor.apply(row);
     }
-
 }

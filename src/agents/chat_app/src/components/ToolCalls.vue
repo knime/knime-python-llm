@@ -1,8 +1,14 @@
 <script setup lang="ts">
-import { type ComputedRef, computed, defineProps, reactive } from "vue";
+import {
+  type ComputedRef,
+  computed,
+  defineProps,
+  markRaw,
+  reactive,
+} from "vue";
 
+import WrenchIcon from "@knime/styles/img/icons/wrench.svg";
 import { Tree, type TreeNodeOptions } from "@knime/virtual-tree";
-import "vue-json-pretty/lib/styles.css";
 
 import type { ToolCall } from "../types";
 
@@ -15,7 +21,8 @@ const visibilityMap = reactive({});
 const treeSource: ComputedRef<TreeNodeOptions[]> = computed(() =>
   props.toolCalls.map((toolCall) => ({
     nodeKey: toolCall.id,
-    name: `Tool: ${toolCall.name}`,
+    name: toolCall.name,
+    icon: markRaw(WrenchIcon),
     hasChildren: true,
     children: [{ nodeKey: `${toolCall.id}-args`, name: toolCall.args ?? "" }],
   })),

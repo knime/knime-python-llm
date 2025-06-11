@@ -2,16 +2,13 @@
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 
 	<modelVersion>4.0.0</modelVersion>
-	<groupId>org.knime</groupId>
-	<artifactId>org.knime.ai.core</artifactId>
-	<version>${revision}</version>
+	<groupId>org.knime.ai.core</groupId>
+	<artifactId>j2html-fetch-jars</artifactId>
+	<version>1.6.0</version>
 	<packaging>pom</packaging>
 
 	<description>Running the maven goal &quot;package&quot; on this maven project will fetch all jars required for base tests and put them into the libs/ directory.</description>
 	
-	<properties>
-		<revision>4.5.0</revision>
-	</properties>
 	
 	<!-- NOTE ABOUT DEALING WITH DEPENDENCIES:
 	

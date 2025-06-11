@@ -273,7 +273,7 @@ class BaseMapper(ABC):
             text_array_trimmed = pc.utf8_trim_whitespace(pa_array)
             is_empty_string = pc.equal(pc.utf8_length(text_array_trimmed), 0)
             # A string is valid if it's not null AND not an empty string
-            return pc.and_(is_not_null_array, pc.invert(is_empty_string))
+            return pc.fill_null(pc.and_(is_not_null_array, pc.invert(is_empty_string)), False)
 
         else:
             # For any other data type, just check if it's not null.

@@ -64,7 +64,7 @@ import org.knime.core.webui.node.impl.WebUINodeModel;
 /**
  * @author Martin Horn, KNIME GmbH, Konstanz, Germany
  */
-final class ToolMessageOutputNodeModel extends WebUINodeModel<ToolMessageOutputNodeSettings> implements OutputNode {
+public final class ToolMessageOutputNodeModel extends WebUINodeModel<ToolMessageOutputNodeSettings> implements OutputNode {
 
     ToolMessageOutputNodeModel(final WebUINodeConfiguration configuration) {
         super(configuration, ToolMessageOutputNodeSettings.class);

@@ -94,9 +94,8 @@ final class MessageCreatorNodeModel extends WebUINodeModel<MessageCreatorNodeSet
         var messageTable = exec.createColumnRearrangeTable(table, createRearranger(modelSettings, table.getDataTableSpec()), exec);
         return new BufferedDataTable[]{messageTable};
     }
-
     private static ColumnRearranger createRearranger(final MessageCreatorNodeSettings modelSettings,
-        final DataTableSpec inSpec) {
+        final DataTableSpec inSpec) throws InvalidSettingsException {
         var rearranger = new ColumnRearranger(inSpec);
         var messageCellCreator = new MessageCellCreator(modelSettings, inSpec).createMessageCellCreator();
         var columnSpec = new DataColumnSpecCreator(modelSettings.m_messageColumnName, MessageCell.TYPE).createSpec();

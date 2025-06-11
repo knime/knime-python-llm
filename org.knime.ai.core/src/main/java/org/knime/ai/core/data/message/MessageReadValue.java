@@ -73,7 +73,7 @@ final class MessageReadValue implements ReadValue, MessageValue {
 
     private final Supplier<Optional<String>> m_toolCallIdReader;
 
-    private final Supplier<Optional<String>> m_toolNameReader;
+    private final Supplier<Optional<String>> m_nameReader;
 
     private final Supplier<List<MessageContentPart>> m_contentReader;
 
@@ -89,7 +89,7 @@ final class MessageReadValue implements ReadValue, MessageValue {
         StringReadAccess toolCallIdAccess = access.getAccess(3);
         m_toolCallIdReader = ValueFactoryUtils.readOptional(toolCallIdAccess, toolCallIdAccess::getStringValue);
         StringReadAccess toolNameAccess = access.getAccess(4);
-        m_toolNameReader = ValueFactoryUtils.readOptional(toolNameAccess, toolNameAccess::getStringValue);
+        m_nameReader = ValueFactoryUtils.readOptional(toolNameAccess, toolNameAccess::getStringValue);
     }
 
     @Override
@@ -104,9 +104,12 @@ final class MessageReadValue implements ReadValue, MessageValue {
 
     @Override
     public DataCell getDataCell() {
-        return new MessageCell(m_typeReader.get(), m_contentReader.get(),
-            m_toolCallsReader.get().orElse(null), m_toolCallIdReader.get().orElse(null),
-            m_toolNameReader.get().orElse(null));
+        return new MessageCell(//
+            m_typeReader.get(), //
+            m_contentReader.get(), //
+            m_toolCallsReader.get().orElse(null), //
+            m_toolCallIdReader.get().orElse(null), //
+            m_nameReader.get().orElse(null));
     }
 
     @Override
@@ -121,7 +124,7 @@ final class MessageReadValue implements ReadValue, MessageValue {
 
     @Override
     public Optional<String> getName() {
-        return m_toolNameReader.get();
+        return m_nameReader.get();
     }
 
     private static Supplier<ToolCall> createToolCallReader(final StructReadAccess access) {

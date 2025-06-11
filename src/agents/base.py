@@ -329,9 +329,9 @@ def _last_history_column(schema: knext.Schema):
     return history_columns[-1].name
 
 
-def _developer_message_parameter():
+def _system_message_parameter():
     return knext.MultilineStringParameter(
-        "Developer message",
+        "System message",
         "Message provided to the agent that instructs it how to act.",
         default_value="""## PERSISTENCE
 You are an agent - please keep going until the user's query is completely 
@@ -430,7 +430,7 @@ class AgentPrompter2:
     This node is designed for non-interactive, one-shot execution. For interactive, multi-turn conversations, use the Chat Agent Prompter node.
     """
 
-    developer_message = _developer_message_parameter()
+    developer_message = _system_message_parameter()
 
     # TODO better name + description
     # TODO or does it come from the input table?
@@ -645,7 +645,7 @@ class AgentChatView:
     To ensure effective agent behavior, provide meaningful tool names and clear descriptions — including example use cases if applicable.
     """
 
-    developer_message = _developer_message_parameter()
+    developer_message = _system_message_parameter()
 
     tool_column = _tool_column_parameter()
 

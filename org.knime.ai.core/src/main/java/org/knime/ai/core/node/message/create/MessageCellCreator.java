@@ -48,23 +48,28 @@
  */
 package org.knime.ai.core.node.message.create;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import org.knime.ai.core.data.message.PngContentPart;
 import org.knime.ai.core.data.message.MessageCell;
 import org.knime.ai.core.data.message.MessageValue.MessageContentPart;
 import org.knime.ai.core.data.message.MessageValue.MessageType;
 import org.knime.ai.core.data.message.MessageValue.ToolCall;
+import org.knime.ai.core.data.message.PngContentPart;
 import org.knime.ai.core.data.message.TextContentPart;
 import org.knime.ai.core.node.message.create.MessageCreatorNodeSettings.Contents.ContentType;
 import org.knime.core.data.DataCell;
 import org.knime.core.data.DataRow;
 import org.knime.core.data.DataTableSpec;
+import org.knime.core.data.DataValue;
 import org.knime.core.data.StringValue;
 import org.knime.core.data.image.png.PNGImageValue;
+import org.knime.core.node.InvalidSettingsException;
+import org.knime.core.node.util.CheckUtils;
 
 /**
  * Creates a {@link MessageCell} from a {@link DataRow}.
@@ -83,7 +88,8 @@ final class MessageCellCreator {
         m_inSpec = inSpec;
     }
 
-    Function<DataRow, DataCell> createMessageCellCreator() {
+
+    Function<DataRow, DataCell> createMessageCellCreator() throws InvalidSettingsException {
         var roleExtractor = createRoleExtractor();
         var contentExtractor = createContentExtractor();
         var nameExtractor = createNameExtractor();
@@ -99,103 +105,132 @@ final class MessageCellCreator {
         };
     }
 
-    Function<DataRow, List<MessageContentPart>> createContentExtractor() {
-        var extractors = Stream.of(m_modelSettings.m_content).map(c -> createContentPartExtractor(c)).toList();
-        return r -> extractors.stream().map(extractor -> extractor.apply(r)).flatMap(Optional::stream).toList();
+    Function<DataRow, List<MessageContentPart>> createContentExtractor() throws InvalidSettingsException{
+        List<Function<DataRow, Optional<MessageContentPart>>> extractors = new ArrayList<>();
+        for (int i = 0; i < m_modelSettings.m_content.length; i++) {
+            MessageCreatorNodeSettings.Contents c = m_modelSettings.m_content[i];
+            extractors.add(createContentPartExtractor(c, (i+1)));
+        }
+
+        return r -> extractors.stream()
+            .map(extractor -> extractor.apply(r))
+            .flatMap(Optional::stream)
+            .toList();
     }
 
-    Function<DataRow, Optional<String>> createNameExtractor() {
+    Function<DataRow, Optional<String>> createNameExtractor() throws InvalidSettingsException {
         if (m_modelSettings.m_nameColumn.getEnumChoice().isPresent()) {
             return r -> Optional.empty();
         } else {
             int nameColIdx = m_inSpec.findColumnIndex(m_modelSettings.m_nameColumn.getStringChoice());
-            return r -> {
-                var cell = r.getCell(nameColIdx);
-                if (cell.isMissing()) {
-                    return Optional.empty();
-                }
-                return Optional.of(((StringValue)cell).getStringValue());
-            };
+            CheckUtils.checkSetting(nameColIdx >= 0, "The selected column '%s' is not part of the input table.", m_modelSettings.m_nameColumn.getStringChoice());
+            return r -> getValue(r.getCell(nameColIdx), StringValue.class).map(StringValue::getStringValue);
         }
     }
 
     Function<DataRow, Optional<MessageContentPart>>
-        createContentPartExtractor(final MessageCreatorNodeSettings.Contents contentPartSettings) {
+        createContentPartExtractor(final MessageCreatorNodeSettings.Contents contentPartSettings, final int index) throws InvalidSettingsException {
         if (contentPartSettings.m_contentType == ContentType.TEXT) {
-            return createTextContentExtractor(contentPartSettings);
+            return createTextContentExtractor(contentPartSettings, index);
         } else if (contentPartSettings.m_contentType == ContentType.IMAGE) {
-            return createImageContentExtractor(contentPartSettings);
+            return createImageContentExtractor(contentPartSettings, index);
         }
         throw new IllegalArgumentException("Unknown content type: " + contentPartSettings.m_contentType);
     }
 
     Function<DataRow, Optional<MessageContentPart>>
-        createTextContentExtractor(final MessageCreatorNodeSettings.Contents content) {
+        createTextContentExtractor(final MessageCreatorNodeSettings.Contents content, final int index) throws InvalidSettingsException {
+
         if (content.m_inputType == MessageCreatorNodeSettings.InputType.COLUMN) {
+            CheckUtils.checkSettingNotNull(content.m_textColumn,
+                "Please select a valid column for the Text column in Content "  + index + ".");
+
             int textColIdx = m_inSpec.findColumnIndex(content.m_textColumn);
-            return r -> {
-                var cell = r.getCell(textColIdx);
-                if (cell.isMissing()) {
-                    return Optional.empty();
-                }
-                return Optional.of(new TextContentPart(((StringValue)cell).getStringValue()));
-            };
+            CheckUtils.checkSetting(textColIdx >= 0, "The selected column '%s' is not part of the input table.", content.m_textColumn);
+            return r -> getValue(r.getCell(textColIdx), StringValue.class).map(v -> new TextContentPart(v.getStringValue()));
         }
         return r -> Optional.of(new TextContentPart(content.m_textValue));
     }
 
     Function<DataRow, Optional<MessageContentPart>>
-        createImageContentExtractor(final MessageCreatorNodeSettings.Contents content) {
+        createImageContentExtractor(final MessageCreatorNodeSettings.Contents content, final int index) throws InvalidSettingsException {
+
+        if (content.m_contentType == MessageCreatorNodeSettings.Contents.ContentType.IMAGE) {
+            CheckUtils.checkSetting(content.m_imageColumn != null,
+                "Please select a valid column for the Image column in Content " + index + ".");
+        }
+
         int imageColIdx = m_inSpec.findColumnIndex(content.m_imageColumn);
-        return r -> {
-            var cell = r.getCell(imageColIdx);
-            if (cell.isMissing()) {
-                return Optional.empty();
-            }
-            return Optional.of(new PngContentPart(((PNGImageValue)cell).getImageContent().getByteArray()));
-        };
+        CheckUtils.checkSetting(imageColIdx >= 0, "The selected column '%s' is not part of the input table.", content.m_imageColumn);
+
+        return r -> getValue(r.getCell(imageColIdx), PNGImageValue.class).map(v -> new PngContentPart(v.getImageContent().getByteArray()));
     }
 
-    Function<DataRow, MessageType> createRoleExtractor() {
+    Function<DataRow, MessageType> createRoleExtractor() throws InvalidSettingsException {
+
+        if (m_modelSettings.m_roleInputType == MessageCreatorNodeSettings.InputType.COLUMN) {
+            CheckUtils.checkSettingNotNull(m_modelSettings.m_roleColumn,
+                    "Please select a valid column for the Role column.");
+        }
+
         if (m_modelSettings.m_roleInputType == MessageCreatorNodeSettings.InputType.VALUE) {
             return r -> m_modelSettings.m_roleValue;
         } else {
             int roleColIdx = m_inSpec.findColumnIndex(m_modelSettings.m_roleColumn);
+            CheckUtils.checkSetting(roleColIdx >= 0, "The selected column '%s' is not part of the input table.", m_modelSettings.m_roleColumn);
+
+            var validRoles = Stream.of(MessageType.values())
+                .map(Enum::name)
+                .map(String::toUpperCase)
+                .collect(Collectors.toSet());
             return r -> {
-                var cell = r.getCell(roleColIdx);
-                if (cell.isMissing()) {
+                String value = getValue(r.getCell(roleColIdx), StringValue.class).map(StringValue::getStringValue).map(String::toUpperCase).orElseThrow(() ->
+                    new IllegalArgumentException(
+                        "Role column '%s' contains missing or invalid values.".formatted(m_modelSettings.m_roleColumn)));
+                if (!validRoles.contains(value)) {
                     throw new IllegalArgumentException(
-                        "Role column '%s' contains missing values.".formatted(m_modelSettings.m_roleColumn));
+                        "Role column '%s' contains invalid value '%s'. Valid roles are: %s".formatted(
+                            m_modelSettings.m_roleColumn, value, validRoles));
                 }
-                return MessageType.valueOf(((StringValue)cell).getStringValue().toUpperCase());
+                return MessageType.valueOf(value);
             };
         }
     }
 
-    Function<DataRow, String> createToolCallIdExtractor() {
+    static <T extends DataValue> Optional<T> getValue(final DataCell cell, final Class<T> valueClass) {
+        if (cell.isMissing()) {
+            return Optional.empty();
+        }
+        return Optional.of(valueClass.cast(cell));
+    }
+
+    Function<DataRow, String> createToolCallIdExtractor() throws InvalidSettingsException {
         if (m_modelSettings.m_toolCallIdColumn.getEnumChoice().isPresent()) {
             return r -> null;
         }
         int colIdx = m_inSpec.findColumnIndex(m_modelSettings.m_toolCallIdColumn.getStringChoice());
-        return r -> {
-            var cell = r.getCell(colIdx);
-            if (cell.isMissing()) {
-                return null;
-            }
-            return ((StringValue)cell).getStringValue();
-        };
+        CheckUtils.checkSetting(colIdx >= 0, "The selected column '%s' is not part of the input table.", m_modelSettings.m_toolCallIdColumn.getStringChoice());
+        return r -> getValue(r.getCell(colIdx), StringValue.class).map(StringValue::getStringValue).orElse(null);
     }
 
-    Function<DataRow, List<ToolCall>> createToolCallsExtractor() {
-        var toolCallExtractors = Stream.of(m_modelSettings.m_toolCalls).map(tc -> createToolCallExtractor(tc)).toList();
+    Function<DataRow, List<ToolCall>> createToolCallsExtractor() throws InvalidSettingsException {
+        var toolCallExtractors = new ArrayList<Function<DataRow, Optional<ToolCall>>>();
+        for (int i = 0; i < m_modelSettings.m_toolCalls.length; i++) {
+            var tc = m_modelSettings.m_toolCalls[i];
+            toolCallExtractors.add(createToolCallExtractor(tc, (i + 1)));
+        }
         return r -> toolCallExtractors.stream().map(f -> f.apply(r)).flatMap(Optional::stream).toList();
     }
 
-    Function<DataRow, Optional<ToolCall>>
-        createToolCallExtractor(final MessageCreatorNodeSettings.ToolCallSettings tc) {
+    Function<DataRow, Optional<ToolCall>> createToolCallExtractor(final MessageCreatorNodeSettings.ToolCallSettings tc, final int index) throws InvalidSettingsException {
         int nameIdx = m_inSpec.findColumnIndex(tc.m_toolNameColumn);
         int idIdx = m_inSpec.findColumnIndex(tc.m_toolIdColumn);
         int argsIdx = m_inSpec.findColumnIndex(tc.m_argumentsColumn);
+
+        CheckUtils.checkSetting(nameIdx >= 0, "Please select a valid column for the Tool name column in Tool Call " + index + ".");
+        CheckUtils.checkSetting(idIdx >= 0,  "Please select a valid column for the Tool ID column in Tool Call " + index + ".");
+        CheckUtils.checkSetting(argsIdx >= 0,  "Please select a valid column for the Arguments column in Tool Call " + index + ".");
+
         return r -> {
             var nameCell = r.getCell(nameIdx);
             var idCell = r.getCell(idIdx);
@@ -207,4 +242,5 @@ final class MessageCellCreator {
                 ((StringValue)idCell).getStringValue(), ((StringValue)argsCell).getStringValue()));
         };
     }
+
 }

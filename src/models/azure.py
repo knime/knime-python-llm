@@ -461,6 +461,7 @@ class AzureOpenAIAuthenticator:
         "OpenAI",
         "Azure",
     ],
+    is_deprecated=True,
 )
 @knext.input_port(
     "Azure OpenAI Authentication",
@@ -481,7 +482,7 @@ class AzureOpenAILLMConnector:
     the model you want to use. You can find the models on the [Azure AI Studio](https://oai.azure.com) at
     'Management - Deployments'. Note that only models compatible with Azure OpenAI's Completions API will work with this node.
 
-    **Note**: See the **Azure OpenAI Chat Model Selector** node for LLMs optimized for chat-specific usecases.
+    **Note**: See the **Azure OpenAI LLM Selector** node for LLMs optimized for chat-specific usecases.
 
     **Note**: If you use the
     [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
@@ -538,7 +539,7 @@ class AzureOpenAILLMConnector:
 
 
 @knext.node(
-    "Azure OpenAI Chat Model Selector",
+    "Azure OpenAI LLM Selector",
     knext.NodeType.SOURCE,
     azure_icon,
     category=azure_openai_category,
@@ -556,9 +557,9 @@ class AzureOpenAILLMConnector:
 )
 class AzureOpenAIChatModelConnector:
     """
-    Select a chat model from Azure OpenAI.
+    Select an LLM from Azure OpenAI.
 
-    This node establishes a connection with an Azure OpenAI Chat Model.
+    This node establishes a connection with a Large Language Model (LLM) deployed on Azure OpenAI.
     After successfully authenticating using the **Azure OpenAI Authenticator** node, enter the deployment name of
     the model you want to use. You can find the models on the [Azure AI Studio](https://oai.azure.com) at
     'Management - Deployments'.

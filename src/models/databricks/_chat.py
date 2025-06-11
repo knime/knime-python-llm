@@ -187,7 +187,7 @@ class DatabricksChatModelSettings(GeneralRemoteSettings):
 
 
 @knext.node(
-    "Databricks Chat Model Selector",
+    "Databricks LLM Selector",
     node_type=knext.NodeType.SOURCE,
     icon_path="icons/databricks/Databricks-chat-model-connector.png",
     category=databricks_category,
@@ -199,14 +199,14 @@ class DatabricksChatModelSettings(GeneralRemoteSettings):
     databricks_workspace_port_type,
 )
 @knext.output_port(
-    "Databricks Chat Model",
-    "Connection to a chat model served by a Databricks workspace.",
+    "Databricks Large Language Model",
+    "Connection to a large language model served by a Databricks workspace.",
     databricks_chat_model_port_type,
 )
 class DatabricksChatModelConnector:
-    """Select a chat model served by a Databricks workspace.
+    """Select an LLM served by a Databricks workspace.
 
-    This node connects to a chat model served by the Databricks workspace that is provided as an input.
+    This node connects to a Large Language Model (LLM) served by the Databricks workspace that is provided as an input.
     See the
     [Databricks documentation](https://docs.databricks.com/en/machine-learning/model-serving/create-foundation-model-endpoints.html)
     for more information on how to serve a model in a Databricks workspace.

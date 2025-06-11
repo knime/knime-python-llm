@@ -180,7 +180,7 @@ ibm_watsonx_chat_model_port_type = knext.port_type(
 
 
 @knext.node(
-    name="IBM watsonx.ai Chat Model Selector",
+    name="IBM watsonx.ai LLM Selector",
     node_type=knext.NodeType.SOURCE,
     icon_path=ibm_watsonx_icon,
     category=ibm_watsonx_category,
@@ -192,16 +192,15 @@ ibm_watsonx_chat_model_port_type = knext.port_type(
     ibm_watsonx_auth_port_type,
 )
 @knext.output_port(
-    "IBM watsonx.ai Chat Model",
-    "The IBM watsonx.ai chat model which can be used in the LLM Prompter (Table) and LLM Prompter (Conversation) nodes.",
+    "IBM watsonx.ai Large Language Model",
+    "The IBM watsonx.ai Large Language Model which can be used in the LLM Prompter (Table) and LLM Prompter (Conversation) nodes.",
     ibm_watsonx_chat_model_port_type,
 )
 class IBMwatsonxChatModelConnector:
-    """Select a chat model provided by the IBM watsonx.ai API.
+    """Select an LLM provided by the IBM watsonx.ai API.
 
     In order to use IBM watsonx.ai models, you'll need to create an IBM watsonx.ai account and obtain an API key.
-    After successfully authenticating using the **IBM watsonx.ai Authenticator** node, you can select a chat
-    model from a predefined list.
+    After successfully authenticating using the **IBM watsonx.ai Authenticator** node, you can select a Large Language Model (LLM) from a predefined list.
 
     Refer to the [IBM watsonx.ai documentation](https://dataplatform.cloud.ibm.com/docs/content/wsj/analyze-data/fm-models-ibm.html)
     for more information on available chat models. At the moment, only the chat models from foundation models are supported.

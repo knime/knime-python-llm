@@ -1052,6 +1052,7 @@ openai_embeddings_port_type = knext.port_type(
 # == Nodes ==
 
 
+# region: Authenticator
 @knext.node(
     "OpenAI Authenticator",
     knext.NodeType.SOURCE,
@@ -1162,12 +1163,14 @@ class OpenAIAuthenticator:
 
 # TODO: Check proxy settings and add them to configuration
 # TODO: Generate prompts as configuration dialog as seen on langchain llm.generate(["Tell me a joke", "Tell me a poem"]*15)
+# region: Instruct Selector
 @knext.node(
     "OpenAI Instruct Model Selector",
     knext.NodeType.SOURCE,
     openai_icon,
     category=openai_category,
     keywords=["GenAI", "Gen AI", "Generative AI", "Large Language Model", "OpenAI"],
+    is_deprecated=True,
 )
 @knext.input_port(
     "OpenAI Authentication",
@@ -1247,8 +1250,9 @@ class OpenAILLMConnector:
         return _set_selection_parameter(parameters)
 
 
+# region: LLM Selector
 @knext.node(
-    "OpenAI Chat Model Selector",
+    "OpenAI LLM Selector",
     knext.NodeType.SOURCE,
     openai_icon,
     category=openai_category,
@@ -1260,22 +1264,19 @@ class OpenAILLMConnector:
     openai_authentication_port_type,
 )
 @knext.output_port(
-    "OpenAI Chat Model",
-    "Configured OpenAI Chat Model connection.",
+    "OpenAI Language Model",
+    "Configured OpenAI Language Model.",
     openai_chat_port_type,
 )
 class OpenAIChatModelConnector:
     """
-    Select a chat model from OpenAI or an OpenAI API-compatible provider.
+    Select an LLM from OpenAI or an OpenAI API-compatible provider.
 
-    This node establishes a connection with an OpenAI Chat Model. After successfully authenticating
-    using the **OpenAI Authenticator** node, you can select a chat model from a predefined list.
+    This node establishes a connection with an OpenAI Large Language Model (LLM). After successfully authenticating
+    using the **OpenAI Authenticator** node, you can select a model from a predefined list.
 
     If OpenAI releases a new model that is not among the listed models, you can also select from a list
-    of all available OpenAI models, but you have to ensure that selected model is compatible with the OpenAI Chat API.
-
-    **Note**: Chat models are LLMs that have been fine-tuned for chat-based usecases. As such, these models can also be
-     used in other applications as well. Find documentation about the latest models at [OpenAI](https://platform.openai.com/docs/models/models).
+    of all available OpenAI models.
 
     **Note**: If you use the
     [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
@@ -1335,6 +1336,7 @@ class OpenAIChatModelConnector:
         return _set_selection_parameter(parameters)
 
 
+# region: Embedding Selector
 @knext.node(
     "OpenAI Embedding Model Selector",
     knext.NodeType.SOURCE,
@@ -1435,6 +1437,7 @@ class ImageModels(knext.EnumParameterOptions):
     )
 
 
+# region: Image Generator
 @knext.node(
     "OpenAI Image Generator",
     node_type=knext.NodeType.VISUALIZER,
@@ -1708,6 +1711,7 @@ class OpenAIDALLEView:
         return [col.name for col in column_filter_config.apply(schema)]
 
 
+# region: Model Deleter
 @knext.node(
     "OpenAI Fine-Tuned Model Deleter",
     knext.NodeType.SINK,
@@ -1723,7 +1727,7 @@ class OpenAIFineTuneDeleter:
 
     This node allows you to delete a fine-tuned model from your OpenAI account.
 
-    The fine-tuned model must be selected via either the **OpenAI Instruct Model Selector**, or the **OpenAI Chat Model Selector** node.
+    The fine-tuned model must be selected via the **OpenAI LLM Selector** node.
 
     If the provided API key possesses the necessary permissions, the model will then be irreversibly removed from the
     authenticated OpenAI account.
@@ -1771,6 +1775,7 @@ class OpenAIFineTuneDeleter:
         LOGGER.info(f"{response.id} was successfully deleted.")
 
 
+# region: Fine-tuner
 @knext.node(
     "OpenAI Chat Model Fine-Tuner",
     node_type=knext.NodeType.LEARNER,
@@ -1815,7 +1820,7 @@ class OpenAIFineTuner:
     Each row in the input table represents a message in a conversation. The table must contain at least 10 distinct conversations, and each must include at least one `system` message to define the assistant’s behavior.
     The fine-tuning process learns from examples: it does not memorize answers, but generalizes from the patterns in the assistant replies. You define *how* the assistant should respond to user inputs by providing example dialogues with the desired outputs.
 
-    Fine-tuned models are stored on OpenAI's servers and can afterwards be selected in the `OpenAI Chat Model Selector`.
+    Fine-tuned models are stored on OpenAI's servers and can afterwards be selected in the `OpenAI LLM Selector`.
     To delete a fine-tuned model, use the `OpenAI Fine-Tuned Model Deleter` node.
 
     For pricing, see the [OpenAI documentation](https://platform.openai.com/docs/pricing#fine-tuning).

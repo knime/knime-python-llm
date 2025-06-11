@@ -85,8 +85,8 @@ from ._base import (
     ],
 )
 @knext.input_port(
-    "LLM or Chat Model",
-    "The large language model or chat model used to analyze the workflow.",
+    "LLM",
+    "The large language model used to analyze the workflow.",
     llm_port_type,
 )
 @knext.input_port(

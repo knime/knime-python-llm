@@ -146,7 +146,7 @@ def _list_models(ctx: knext.ConfigurationContext):
 
 
 @knext.node(
-    name="Anthropic Chat Model Selector",
+    name="Anthropic LLM Selector",
     node_type=knext.NodeType.SOURCE,
     icon_path=anthropic_icon,
     category=anthropic_category,
@@ -158,15 +158,15 @@ def _list_models(ctx: knext.ConfigurationContext):
     anthropic_auth_port_type,
 )
 @knext.output_port(
-    "Anthropic Chat Model",
-    "The Anthropic chat model which can be used in the LLM Prompter (Table) and LLM Prompter (Conversation) nodes.",
+    "Anthropic Large Language Model",
+    "The Anthropic large language model which can be used in the LLM Prompter (Table) and LLM Prompter (Conversation) nodes.",
     anthropic_chat_model_port_type,
 )
 class AnthropicChatModelConnector:
-    """Select a chat model provided by the Anthropic API.
+    """Select an LLM provided by the Anthropic API.
 
-    This node establishes a connection with an Anthropic Chat Model. After successfully authenticating
-    using the **Anthropic Authenticator** node, you can select a chat model from a predefined list.
+    This node establishes a connection with a Large Language Model (LLM) from Anthropic. After successfully authenticating
+    using the **Anthropic Authenticator** node, you can select a model from a predefined list.
 
     **Note**: Data sent to the Anthropic API is not used for the training of models by default,
     but can be if the prompts are flagged for Trust & Safety violations. For more information, check the

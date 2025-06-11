@@ -44,7 +44,7 @@
 
 
 # Nodes:
-# - Gemini Chat Model Selector
+# - Gemini LLM Selector
 
 import knime.extension as knext
 
@@ -79,7 +79,7 @@ def _list_gemini_chat_models(
 
 
 @knext.node(
-    "Gemini Chat Model Selector",
+    "Gemini LLM Selector",
     node_type=knext.NodeType.SOURCE,
     icon_path=gemini_icon,
     category=google_category,
@@ -91,23 +91,23 @@ def _list_gemini_chat_models(
     port_type=generic_gemini_connection_port_type,
 )
 @knext.output_port(
-    "Gemini Chat Model",
-    "A Gemini chat model.",
+    "Gemini Large Language Model",
+    "A Gemini large language model.",
     port_type=gemini_chat_model_port_type,
 )
 class GeminiChatModelConnector:
-    """Select a Gemini chat model available through either Vertex AI or Google AI Studio.
+    """Select a Gemini language model available through either Vertex AI or Google AI Studio.
 
-    This node allows selecting a Gemini chat model using an authenticated connection obtained
+    This node allows selecting a Gemini language model using an authenticated connection obtained
     either from the **Vertex AI Connector** node, or from the **Google AI Studio Authenticator** node.
     """
 
     model_name = knext.StringParameter(
         "Model",
-        """Select the Gemini chat model to use.
+        """Select the Gemini language model to use.
         The list of available models is fetched using the provided Gemini connection.
 
-        If connection with the API cannot be established, the list is populated with known Gemini chat models
+        If connection with the API cannot be established, the list is populated with known Gemini models
         appropriate for the connection type.
         """,
         choices=_list_gemini_chat_models,

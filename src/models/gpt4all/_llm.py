@@ -202,6 +202,7 @@ gpt4all_llm_port_type = knext.port_type(
         "Generative AI",
         "Local Large Language Model",
     ],
+    is_deprecated=True,
 )
 @knext.output_port(
     "GPT4All LLM",

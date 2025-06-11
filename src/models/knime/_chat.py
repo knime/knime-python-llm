@@ -199,7 +199,7 @@ class ModelSettings(GeneralSettings):
 
 
 @knext.node(
-    name="KNIME Hub Chat Model Selector",
+    name="KNIME Hub LLM Selector",
     node_type=knext.NodeType.SOURCE,
     icon_path=hub_connector_icon,
     category=knime_category,
@@ -211,15 +211,15 @@ class ModelSettings(GeneralSettings):
     port_type=knext.PortType.HUB_AUTHENTICATION,
 )
 @knext.output_port(
-    name="KNIME Hub Chat Model",
-    description="A chat model that connects to the KNIME Hub to make requests.",
+    name="KNIME Hub Large Language Model",
+    description="A Large Language Model that connects to the KNIME Hub to make requests.",
     port_type=knime_chat_model_port_type,
 )
 class KnimeHubChatModelConnector:
     """
-    Select a Chat Model configured in the GenAI Gateway of the connected KNIME Hub.
+    Select an LLM configured in the GenAI Gateway of the connected KNIME Hub.
 
-    Connects to a Chat Model configured in the GenAI Gateway of the connected KNIME Hub using the authentication
+    Connects to a Large Language Model (LLM) configured in the GenAI Gateway of the connected KNIME Hub using the authentication
     provided via the input port.
 
     Use this node to generate text, answer questions, summarize content or perform other text-based tasks.

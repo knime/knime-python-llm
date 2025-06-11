@@ -448,6 +448,7 @@ hf_hub_llm_port_type = knext.port_type(
         "Hugging Face",
         "Large Language Model",
     ],
+    is_deprecated=True,
 )
 @knext.input_port(
     "HF Authentication",
@@ -532,7 +533,7 @@ hf_hub_chat_model_port_type = knext.port_type(
 
 
 @knext.node(
-    "HF Hub Chat Model Selector",
+    "HF Hub LLM Selector",
     knext.NodeType.SOURCE,
     hf_icon,
     category=hf_hub_category,
@@ -551,16 +552,16 @@ hf_hub_chat_model_port_type = knext.port_type(
     hf_authentication_port_type,
 )
 @knext.output_port(
-    "HF Hub Chat Model",
-    "Connection to a specific chat model from Hugging Face Hub.",
+    "HF Hub Large Language Model",
+    "Connection to a specific large language model from Hugging Face Hub.",
     hf_hub_chat_model_port_type,
 )
 class HFHubChatModelConnector:
     """
-    Select a chat model hosted on the Hugging Face Hub.
+    Select an LLM hosted on the Hugging Face Hub.
 
-    This node establishes a connection to a specific chat model hosted on the Hugging Face Hub.
-    The difference to the HF Hub Instruct Model Selector is that this node allows you to provide prompt templates which are crucial for
+    This node establishes a connection to a specific Large Language Model (LLM) hosted on the Hugging Face Hub.
+    The difference to the HF Hub Instruct Model Selector (deprecated) is that this node allows you to provide prompt templates which are crucial for
     obtaining the best output from many models that have been fine-tuned for chat-based usecases.
 
     To use this node, you need to successfully authenticate with the Hugging Face Hub using the **HF Hub Authenticator** node.

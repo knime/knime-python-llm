@@ -152,7 +152,7 @@ def _list_models(ctx: knext.ConfigurationContext):
 
 
 @knext.node(
-    name="DeepSeek Chat Model Selector",
+    name="DeepSeek LLM Selector",
     node_type=knext.NodeType.SOURCE,
     icon_path=deepseek_icon,
     category=deepseek_category,
@@ -164,15 +164,15 @@ def _list_models(ctx: knext.ConfigurationContext):
     deepseek_auth_port_type,
 )
 @knext.output_port(
-    "DeepSeek Chat Model",
-    "The DeepSeek chat model which can be used in the LLM Prompter (Table) and LLM Prompter (Conversation) nodes.",
+    "DeepSeek Large Language Model",
+    "The DeepSeek large language model which can be used in the LLM Prompter (Table) and LLM Prompter (Conversation) nodes.",
     deepseek_chat_model_port_type,
 )
 class DeepSeekChatModelConnector:
-    """Select a chat model provided by the DeepSeek API.
+    """Select an LLM provided by the DeepSeek API.
 
-    This node establishes a connection with a DeepSeek Chat Model. After successfully authenticating
-    using the **DeepSeek Authenticator** node, you can select a chat model from a predefined list.
+    This node establishes a connection with a Large Language Model (LLM) from DeepSeek. After successfully authenticating
+    using the **DeepSeek Authenticator** node, you can select a model from a predefined list.
 
     **Note**: Data sent to the DeepSeek API is stored and used for training future models.
     """

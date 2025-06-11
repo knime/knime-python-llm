@@ -44,6 +44,11 @@
             factory-class="org.knime.ai.core.node.message.create.MessageCreatorNodeFactory"
             hidden="false">
       </node>
+      <node
+            deprecated="false"
+            factory-class="org.knime.ai.core.node.tool.output.ToolMessageOutputNodeFactory"
+            hidden="false">
+      </node>
    </extension>
    
    <extension point="org.knime.core.DataValueRenderer">

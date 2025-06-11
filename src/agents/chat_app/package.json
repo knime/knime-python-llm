@@ -18,6 +18,9 @@
     "coverage": "vitest run --coverage"
   },
   "dependencies": {
+    "@fontsource/roboto": "4.x",
+    "@fontsource/roboto-condensed": "4.x",
+    "@fontsource/roboto-mono": "4.x",
     "@knime/components": "^1.28.6",
     "@knime/styles": "^1.4.0",
     "@knime/ui-extension-service": "^2.2.0",

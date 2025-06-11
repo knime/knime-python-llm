@@ -248,7 +248,7 @@ def to_human_message(message):
 
     if isinstance(message, MessageValue):
         return to_langchain_message(message)
-    elif isinstance(message, dict):
+    elif isinstance(message, (dict, list)):
         return lcm.HumanMessage(json.dumps(message))
     return lcm.HumanMessage(message)
 

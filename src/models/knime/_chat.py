@@ -46,6 +46,7 @@
 import knime.extension as knext
 import knime.api.schema as ks
 from knime.extension import ConfigurationContext
+from ..openai import completion_models
 from ..base import GeneralSettings, OutputFormatOptions
 from ._base import (
     hub_connector_icon,
@@ -74,13 +75,14 @@ class KnimeHubChatModelPortObjectSpec(ChatModelPortObjectSpec):
         top_p: float,
         n_requests: int,
     ) -> None:
-        super().__init__()
+        super().__init__(
+            n_requests=n_requests
+        )
         self._auth_spec = auth_spec
         self._model_name = model_name
         self._max_tokens = max_tokens
         self._temperature = temperature
         self._top_p = top_p
-        self._n_requests = n_requests
 
     @property
     def auth_spec(self) -> ks.HubAuthenticationPortObjectSpec:

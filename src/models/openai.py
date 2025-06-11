@@ -345,6 +345,10 @@ class LLMLoaderInputSettings:
 @knext.parameter_group(label="OpenAI chat model selection")
 class ChatModelLoaderInputSettings:
     class OpenAIModelCompletionsOptions(knext.EnumParameterOptions):
+        GPT35_TURBO_INSTRUCT = (
+            "gpt-3.5-turbo-instruct",
+            """Legacy instruct model. Use this for compatibility with prompts designed for instruct models.""",
+        )
         Turbo = (
             "gpt-3.5-turbo",
             """Most capable GPT-3.5 model and optimized for chat at 1/10th the cost of text-davinci-003.""",
@@ -392,7 +396,8 @@ class ChatModelLoaderInputSettings:
     model_name = _EnumToStringParameter(
         label="Model ID",
         description="Select a chat-optimized OpenAI model to be used.",
-        choices=lambda c: chat_models,
+        # combined instruct and chat models after deprecating Instruct Model Selector nodes
+        choices=lambda c: completion_models + chat_models,
         default_value=chat_default,
         options=OpenAIModelCompletionsOptions,
     ).rule(
@@ -862,7 +867,12 @@ class OpenAILLMPortObjectSpec(OpenAIModelPortObjectSpec, LLMPortObjectSpec):
         seed: int,
         n_requests: int,
     ) -> None:
-        super().__init__(credentials)
+        OpenAIModelPortObjectSpec.__init__(self, credentials)
+        LLMPortObjectSpec.__init__(
+            self,
+            n_requests=n_requests,
+            is_instruct_model=model_name in completion_models,
+        )
         self._model = model_name
         self._temperature = temperature
         self._top_p = top_p
@@ -922,6 +932,42 @@ class OpenAILLMPortObjectSpec(OpenAIModelPortObjectSpec, LLMPortObjectSpec):
         )
 
 
+def _create_instruct_model(po_instance, ctx: knext.ExecutionContext):
+    from langchain_openai import OpenAI
+
+    return OpenAI(
+        openai_api_key=ctx.get_credentials(po_instance.spec.credentials).password,
+        base_url=po_instance.spec.base_url,
+        model=po_instance.spec.model,
+        temperature=po_instance.spec.temperature,
+        top_p=po_instance.spec.top_p,
+        max_tokens=po_instance.spec.max_tokens,
+        seed=po_instance.spec.seed,
+    )
+
+
+def _create_model(
+    po_instance, ctx: knext.ExecutionContext, output_format: OutputFormatOptions
+):
+    from langchain_openai import ChatOpenAI
+
+    model_kwargs = {}
+    if output_format == OutputFormatOptions.JSON:
+        model_kwargs["response_format"] = {"type": "json_object"}
+
+    is_o_series = bool(re.match(r"^o\d", po_instance.spec.model))
+
+    return ChatOpenAI(
+        openai_api_key=ctx.get_credentials(po_instance.spec.credentials).password,
+        base_url=po_instance.spec.base_url,
+        model=po_instance.spec.model,
+        temperature=1.0 if is_o_series else po_instance.spec.temperature,
+        max_tokens=po_instance.spec.max_tokens,
+        seed=po_instance.spec.seed,
+        model_kwargs=model_kwargs,
+    )
+
+
 class OpenAILLMPortObject(LLMPortObject):
     @property
     def spec(self) -> OpenAILLMPortObjectSpec:
@@ -930,17 +976,7 @@ class OpenAILLMPortObject(LLMPortObject):
     def create_model(
         self, ctx: knext.ExecutionContext, output_format: OutputFormatOptions
     ):
-        from langchain_openai import OpenAI
-
-        return OpenAI(
-            openai_api_key=ctx.get_credentials(self.spec.credentials).password,
-            base_url=self.spec.base_url,
-            model=self.spec.model,
-            temperature=self.spec.temperature,
-            top_p=self.spec.top_p,
-            max_tokens=self.spec.max_tokens,
-            seed=self.spec.seed,
-        )
+        return _create_instruct_model(self, ctx)
 
 
 openai_llm_port_type = knext.port_type(
@@ -962,23 +998,10 @@ class OpenAIChatModelPortObject(ChatModelPortObject):
         ctx: knext.ExecutionContext,
         output_format: OutputFormatOptions = OutputFormatOptions.Text,
     ):
-        from langchain_openai import ChatOpenAI
+        if self.spec.is_instruct_model:
+            return _create_instruct_model(self, ctx)
 
-        model_kwargs = {}
-        if output_format == OutputFormatOptions.JSON:
-            model_kwargs["response_format"] = {"type": "json_object"}
-
-        is_o_series = bool(re.match(r"^o\d", self.spec.model))
-
-        return ChatOpenAI(
-            openai_api_key=ctx.get_credentials(self.spec.credentials).password,
-            base_url=self.spec.base_url,
-            model=self.spec.model,
-            temperature=1.0 if is_o_series else self.spec.temperature,
-            max_tokens=self.spec.max_tokens,
-            seed=self.spec.seed,
-            model_kwargs=model_kwargs,
-        )
+        return _create_model(self, ctx, output_format)
 
 
 openai_chat_port_type = knext.port_type(
@@ -1052,7 +1075,7 @@ openai_embeddings_port_type = knext.port_type(
 # == Nodes ==
 
 
-# region: Authenticator
+# region Authenticator
 @knext.node(
     "OpenAI Authenticator",
     knext.NodeType.SOURCE,
@@ -1163,7 +1186,7 @@ class OpenAIAuthenticator:
 
 # TODO: Check proxy settings and add them to configuration
 # TODO: Generate prompts as configuration dialog as seen on langchain llm.generate(["Tell me a joke", "Tell me a poem"]*15)
-# region: Instruct Selector
+# region Instruct Selector
 @knext.node(
     "OpenAI Instruct Model Selector",
     knext.NodeType.SOURCE,
@@ -1250,7 +1273,7 @@ class OpenAILLMConnector:
         return _set_selection_parameter(parameters)
 
 
-# region: LLM Selector
+# region LLM Selector
 @knext.node(
     "OpenAI LLM Selector",
     knext.NodeType.SOURCE,
@@ -1314,7 +1337,8 @@ class OpenAIChatModelConnector:
             self.input_settings.selection,
             self.input_settings.model_name,
             self.input_settings.specific_model_name,
-            chat_models,
+            # allow selecting instruct models here after deprecating Instruct Model Selector nodes
+            completion_models + chat_models,
             chat_default,
         )
 
@@ -1336,7 +1360,7 @@ class OpenAIChatModelConnector:
         return _set_selection_parameter(parameters)
 
 
-# region: Embedding Selector
+# region Embedding Selector
 @knext.node(
     "OpenAI Embedding Model Selector",
     knext.NodeType.SOURCE,
@@ -1437,7 +1461,7 @@ class ImageModels(knext.EnumParameterOptions):
     )
 
 
-# region: Image Generator
+# region Image Generator
 @knext.node(
     "OpenAI Image Generator",
     node_type=knext.NodeType.VISUALIZER,
@@ -1711,7 +1735,7 @@ class OpenAIDALLEView:
         return [col.name for col in column_filter_config.apply(schema)]
 
 
-# region: Model Deleter
+# region Model Deleter
 @knext.node(
     "OpenAI Fine-Tuned Model Deleter",
     knext.NodeType.SINK,
@@ -1775,7 +1799,7 @@ class OpenAIFineTuneDeleter:
         LOGGER.info(f"{response.id} was successfully deleted.")
 
 
-# region: Fine-tuner
+# region Fine-tuner
 @knext.node(
     "OpenAI Chat Model Fine-Tuner",
     node_type=knext.NodeType.LEARNER,

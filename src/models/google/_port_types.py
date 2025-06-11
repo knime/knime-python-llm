@@ -656,6 +656,7 @@ class GeminiChatModelPortObjectSpec(ChatModelPortObjectSpec):
         temperature: float,
         n_requests: int,
     ):
+        super().__init__()
         self._connection_spec = connection_spec
         self._connection_type = connection_spec._connection_type
         self._model_name = model_name

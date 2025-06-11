@@ -66,6 +66,7 @@ const handleKeyDown = (event: KeyboardEvent) => {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
+  max-height: 200px;
   min-height: 50px;
   background-color: white;
   border: 1px solid var(--knime-stone-gray);

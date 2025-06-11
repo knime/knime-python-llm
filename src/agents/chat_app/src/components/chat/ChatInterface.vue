@@ -11,18 +11,21 @@ import MessageInput from "./MessageInput.vue";
 defineProps<{ isLoading: boolean }>();
 const emit = defineEmits<{ sendMessage: [message: string] }>();
 
-const messagesContainer = ref<HTMLElement | null>(null);
+const scrollableContainer = ref<HTMLElement | null>(null);
+const messagesList = ref<HTMLElement | null>(null);
 
-const { handleScroll } = useScrollToBottom(messagesContainer);
+useScrollToBottom(scrollableContainer, messagesList);
 </script>
 
 <template>
   <main class="chat-interface">
-    <div ref="messagesContainer" class="message-list" @scroll="handleScroll">
-      <slot />
-      <MessageBox v-if="isLoading">
-        <SkeletonItem height="24px" />
-      </MessageBox>
+    <div ref="scrollableContainer" class="scrollable-container">
+      <div ref="messagesList" class="message-list">
+        <slot />
+        <MessageBox v-if="isLoading">
+          <SkeletonItem height="24px" />
+        </MessageBox>
+      </div>
     </div>
     <MessageInput
       :is-loading="isLoading"
@@ -43,10 +46,13 @@ const { handleScroll } = useScrollToBottom(messagesContainer);
   padding: var(--space-8) var(--space-4);
 }
 
-.message-list {
-  flex-grow: 1;
+.scrollable-container {
+  flex: 1;
   overflow-y: auto;
   scroll-behavior: smooth;
+}
+
+.message-list {
   display: flex;
   flex-direction: column;
   gap: var(--space-24);

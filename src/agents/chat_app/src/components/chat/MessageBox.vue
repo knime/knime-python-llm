@@ -16,7 +16,7 @@ const hasIconSlot = slots.icon;
     class="wrapper"
     :class="{ user: isUser, error: isError, 'with-name': hasNameSlot }"
   >
-    <div class="message">
+    <div class="message-box">
       <div v-if="hasIconSlot || hasNameSlot" class="header">
         <div class="icon">
           <slot name="icon" />
@@ -42,7 +42,7 @@ const hasIconSlot = slots.icon;
   }
 }
 
-.message {
+.message-box {
   min-width: 20%;
   max-width: 80%;
   position: relative;

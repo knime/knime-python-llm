@@ -8,8 +8,10 @@ import HumanMessage from "../components/HumanMessage.vue";
 import ToolMessage from "../components/ToolMessage.vue";
 import ErrorMessage from "../components/chat/ErrorMessage.vue";
 
-const sendingError = "There was an error while sending your message.";
-const processingError = "There was an error while processing your request.";
+export const initError = "Something went wrong. Try again later.";
+export const sendingError = "There was an error while sending your message.";
+export const processingError =
+  "There was an error while processing your request.";
 
 const createId = () => (Date.now() + 1).toString();
 
@@ -23,18 +25,14 @@ const messageComponents: MessageComponentMap = {
 const messages = ref<MessageResponse[]>([]);
 const isLoading = ref(false);
 
-const assignResponseId = (response: MessageResponse): MessageResponse => ({
-  ...response,
-  id: response.id ?? createId(),
-});
+let jsonDataService: JsonDataService;
 
 const displayNewMessages = (responses: MessageResponse[]) => {
-  messages.value.push(...responses.map(assignResponseId));
+  messages.value.push(...responses);
 };
 
 const pollForNewMessages = async () => {
   try {
-    const jsonDataService = await JsonDataService.getInstance();
     const response = await jsonDataService.data({
       method: "get_last_messages",
     });
@@ -53,7 +51,6 @@ const pollForNewMessages = async () => {
 
 const postMessage = async (message: string) => {
   try {
-    const jsonDataService = await JsonDataService.getInstance();
     await jsonDataService.data({
       method: "post_user_message",
       options: [message],
@@ -78,16 +75,34 @@ const sendMessage = async (message: string) => {
 };
 
 const init = async () => {
-  const jsonDataService = await JsonDataService.getInstance();
-  const initialMessage = await jsonDataService.data({
-    method: "get_initial_message",
-  });
+  try {
+    jsonDataService = await JsonDataService.getInstance();
+  } catch (error) {
+    consola.error("Chat Agent: Error initializing JsonDataService:", error);
+    displayNewMessages([{ id: createId(), content: initError, type: "error" }]);
+    return;
+  }
+
+  let initialMessage: MessageResponse | undefined;
+  try {
+    initialMessage = await jsonDataService.data({
+      method: "get_initial_message",
+    });
+  } catch (error) {
+    consola.error("Chat Agent: Error fetching initial message:", error);
+  }
+
   if (initialMessage) {
     displayNewMessages([initialMessage]);
   }
 };
 
+const resetChat = () => {
+  messages.value = [];
+  isLoading.value = false;
+};
+
 export const useChat = () => {
   onMounted(init);
-  return { messageComponents, messages, isLoading, sendMessage };
+  return { messageComponents, messages, isLoading, sendMessage, resetChat };
 };

@@ -50,6 +50,7 @@ package org.knime.ai.core.node.message.create;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -67,7 +68,9 @@ import org.knime.ai.core.data.message.MessageCell;
 import org.knime.ai.core.data.message.MessageValue.MessageContentPart;
 import org.knime.ai.core.data.message.MessageValue.MessageType;
 import org.knime.ai.core.data.message.MessageValue.ToolCall;
+import org.knime.ai.core.data.message.PngContentPart;
 import org.knime.ai.core.data.message.TextContentPart;
+import org.knime.ai.core.node.message.create.MessageCreatorNodeSettings.InputType;
 import org.knime.core.data.DataCell;
 import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataColumnSpecCreator;
@@ -76,6 +79,7 @@ import org.knime.core.data.DataType;
 import org.knime.core.data.def.DefaultRow;
 import org.knime.core.data.def.StringCell;
 import org.knime.core.data.image.png.PNGImageCellFactory;
+import org.knime.core.node.InvalidSettingsException;
 import org.knime.core.util.FileUtil;
 import org.knime.core.webui.node.dialog.defaultdialog.setting.singleselection.StringOrEnum;
 import org.osgi.framework.FrameworkUtil;
@@ -100,11 +104,11 @@ final class MessageCellCreatorTest {
     }
 
     @Test
-    void testCreateTextContentExtractor_value() {
+    void testCreateTextContentExtractor_value() throws InvalidSettingsException {
         var settings = minimalSettings();
         var spec = minimalSpec();
         var creator = new MessageCellCreator(settings, spec);
-        var extractor = creator.createTextContentExtractor(settings.m_content[0]);
+        var extractor = creator.createTextContentExtractor(settings.m_content[0], 0);
         var row = new DefaultRow("row0", List.of());
         Optional<MessageContentPart> part = extractor.apply(row);
         assertTrue(part.isPresent());
@@ -112,7 +116,7 @@ final class MessageCellCreatorTest {
     }
 
     @Test
-    void testCreateTextContentExtractor_column() {
+    void testCreateTextContentExtractor_column() throws InvalidSettingsException {
         var settings = minimalSettings();
         settings.m_content = new MessageCreatorNodeSettings.Contents[] {
             new MessageCreatorNodeSettings.Contents()
@@ -124,7 +128,7 @@ final class MessageCellCreatorTest {
             new DataColumnSpecCreator("textCol", StringCell.TYPE).createSpec()
         );
         var creator = new MessageCellCreator(settings, spec);
-        var extractor = creator.createTextContentExtractor(settings.m_content[0]);
+        var extractor = creator.createTextContentExtractor(settings.m_content[0], 0);
         var row = new DefaultRow("row0", new StringCell("column value"));
         var part = extractor.apply(row);
         assertTrue(part.isPresent());
@@ -132,7 +136,7 @@ final class MessageCellCreatorTest {
     }
 
     @Test
-    void testCreateTextContentExtractor_column_missingValue() {
+    void testCreateTextContentExtractor_column_missingValue() throws InvalidSettingsException {
         var settings = minimalSettings();
         settings.m_content = new MessageCreatorNodeSettings.Contents[] {
             new MessageCreatorNodeSettings.Contents()
@@ -144,14 +148,14 @@ final class MessageCellCreatorTest {
             new DataColumnSpecCreator("textCol", StringCell.TYPE).createSpec()
         );
         var creator = new MessageCellCreator(settings, spec);
-        var extractor = creator.createTextContentExtractor(settings.m_content[0]);
+        var extractor = creator.createTextContentExtractor(settings.m_content[0], 0);
         var row = new DefaultRow("row0", DataType.getMissingCell());
         var part = extractor.apply(row);
         assertTrue(part.isEmpty());
     }
 
     @Test
-    void testCreateContentExtractor_value() {
+    void testCreateContentExtractor_value() throws InvalidSettingsException {
         var settings = minimalSettings();
         var spec = minimalSpec();
         var creator = new MessageCellCreator(settings, spec);
@@ -163,7 +167,7 @@ final class MessageCellCreatorTest {
     }
 
     @Test
-    void testCreateRoleExtractor_value() {
+    void testCreateRoleExtractor_value() throws InvalidSettingsException {
         var settings = minimalSettings();
         var spec = minimalSpec();
         var creator = new MessageCellCreator(settings, spec);
@@ -173,7 +177,7 @@ final class MessageCellCreatorTest {
     }
 
     @Test
-    void testCreateRoleExtractor_column() {
+    void testCreateRoleExtractor_column() throws InvalidSettingsException {
         var settings = minimalSettings();
         settings.m_roleInputType = MessageCreatorNodeSettings.InputType.COLUMN;
         settings.m_roleColumn = "role";
@@ -187,7 +191,7 @@ final class MessageCellCreatorTest {
     }
 
     @Test
-    void testCreateRoleExtractor_column_missing() {
+    void testCreateRoleExtractor_column_missing() throws InvalidSettingsException {
         var settings = minimalSettings();
         settings.m_roleInputType = MessageCreatorNodeSettings.InputType.COLUMN;
         settings.m_roleColumn = "role";
@@ -206,7 +210,27 @@ final class MessageCellCreatorTest {
     }
 
     @Test
-    void testCreateMessageCellCreator_value() {
+    void testCreateRoleExtractor_column_invalidValue() throws InvalidSettingsException{
+        var settings = minimalSettings();
+        settings.m_roleInputType = MessageCreatorNodeSettings.InputType.COLUMN;
+        settings.m_roleColumn = "role";
+        var spec = new DataTableSpec(
+            new DataColumnSpecCreator("role", StringCell.TYPE).createSpec()
+        );
+        var creator = new MessageCellCreator(settings, spec);
+        var extractor = creator.createRoleExtractor();
+        var row = new DefaultRow("row0", new StringCell("notarole"));
+        try {
+            extractor.apply(row);
+            fail("Expected IllegalArgumentException for invalid role value");
+        } catch (IllegalArgumentException e) {
+            assertTrue(e.getMessage().contains("invalid value"));
+            assertTrue(e.getMessage().contains("Valid roles"));
+        }
+    }
+
+    @Test
+    void testCreateMessageCellCreator_value() throws InvalidSettingsException {
         var settings = minimalSettings();
         var spec = minimalSpec();
         var creator = new MessageCellCreator(settings, spec);
@@ -227,7 +251,7 @@ final class MessageCellCreatorTest {
     }
 
     @Test
-    void testCreateToolCallExtractor_missingCells() {
+    void testCreateToolCallExtractor_missingCells() throws InvalidSettingsException {
         var settings = minimalSettings();
         var tc = new MessageCreatorNodeSettings.ToolCallSettings();
         tc.m_toolNameColumn = "toolName";
@@ -240,14 +264,14 @@ final class MessageCellCreatorTest {
             createColumnSpec("args", StringCell.TYPE)
         );
         var creator = new MessageCellCreator(settings, spec);
-        var extractor = creator.createToolCallExtractor(tc);
+        var extractor = creator.createToolCallExtractor(tc, 0);
         // All cells missing
         var row = new DefaultRow("row0", DataType.getMissingCell(), DataType.getMissingCell(), DataType.getMissingCell());
         assertTrue(extractor.apply(row).isEmpty());
     }
 
     @Test
-    void testCreateToolCallExtractor_present() {
+    void testCreateToolCallExtractor_present() throws InvalidSettingsException {
         var settings = minimalSettings();
         var tc = new MessageCreatorNodeSettings.ToolCallSettings();
         tc.m_toolNameColumn = "toolName";
@@ -260,7 +284,7 @@ final class MessageCellCreatorTest {
             createColumnSpec("args", StringCell.TYPE)
         );
         var creator = new MessageCellCreator(settings, spec);
-        var extractor = creator.createToolCallExtractor(tc);
+        var extractor = creator.createToolCallExtractor(tc, 0);
         var row = new DefaultRow("row0", new StringCell("tool"), new StringCell("id"), new StringCell("{}"));
         Optional<ToolCall> call = extractor.apply(row);
         assertTrue(call.isPresent());
@@ -270,7 +294,53 @@ final class MessageCellCreatorTest {
     }
 
     @Test
-    void testCreateToolCallIdExtractor_column() {
+    void testCreateToolCallsExtractor() throws InvalidSettingsException {
+        var settings = minimalSettings();
+
+        var tc1 = new MessageCreatorNodeSettings.ToolCallSettings();
+        tc1.m_toolNameColumn = "toolName1";
+        tc1.m_toolIdColumn = "toolId1";
+        tc1.m_argumentsColumn = "args1";
+
+        var tc2 = new MessageCreatorNodeSettings.ToolCallSettings();
+        tc2.m_toolNameColumn = "toolName2";
+        tc2.m_toolIdColumn = "toolId2";
+        tc2.m_argumentsColumn = "args2";
+
+        settings.m_toolCalls = new MessageCreatorNodeSettings.ToolCallSettings[]{tc1, tc2};
+
+        var spec = new DataTableSpec(
+            createColumnSpec("toolName1", StringCell.TYPE),
+            createColumnSpec("toolId1", StringCell.TYPE),
+            createColumnSpec("args1", StringCell.TYPE),
+            createColumnSpec("toolName2", StringCell.TYPE),
+            createColumnSpec("toolId2", StringCell.TYPE),
+            createColumnSpec("args2", StringCell.TYPE)
+        );
+
+        var creator = new MessageCellCreator(settings, spec);
+        var extractor = creator.createToolCallsExtractor();
+
+        var row = new DefaultRow("row0",
+            new StringCell("tool1"), new StringCell("id1"), new StringCell("{}"),
+            new StringCell("tool2"), new StringCell("id2"), new StringCell("[]")
+        );
+
+        List<ToolCall> toolCalls = extractor.apply(row);
+
+        assertEquals(2, toolCalls.size());
+
+        assertEquals("tool1", toolCalls.get(0).toolName());
+        assertEquals("id1", toolCalls.get(0).id());
+        assertEquals("{}", toolCalls.get(0).arguments());
+
+        assertEquals("tool2", toolCalls.get(1).toolName());
+        assertEquals("id2", toolCalls.get(1).id());
+        assertEquals("[]", toolCalls.get(1).arguments());
+    }
+
+    @Test
+    void testCreateToolCallIdExtractor_column() throws InvalidSettingsException {
         var settings = minimalSettings();
         settings.m_toolCallIdColumn = new StringOrEnum<>("toolCallId");
         var spec = new DataTableSpec(
@@ -283,7 +353,7 @@ final class MessageCellCreatorTest {
     }
 
     @Test
-    void testCreateToolCallIdExtractor_column_missing() {
+    void testCreateToolCallIdExtractor_column_missing() throws InvalidSettingsException {
         var settings = minimalSettings();
         settings.m_toolCallIdColumn = new StringOrEnum<>("toolCallId");
         var spec = new DataTableSpec(
@@ -296,7 +366,7 @@ final class MessageCellCreatorTest {
     }
 
     @Test
-    void testCreateImageContentExtractor_column() throws IOException {
+    void testCreateImageContentExtractor_column() throws IOException, InvalidSettingsException {
         var settings = minimalSettings();
         settings.m_content = new MessageCreatorNodeSettings.Contents[] {
             new MessageCreatorNodeSettings.Contents()
@@ -307,7 +377,7 @@ final class MessageCellCreatorTest {
             new DataColumnSpecCreator("imgCol", PNGImageCellFactory.TYPE).createSpec()
         );
         var creator = new MessageCellCreator(settings, spec);
-        var extractor = creator.createImageContentExtractor(settings.m_content[0]);
+        var extractor = creator.createImageContentExtractor(settings.m_content[0], 0);
 
         var imgFile = getFileResource("Message-creator.png");
         var imgBytes = Files.readAllBytes(imgFile);
@@ -319,7 +389,7 @@ final class MessageCellCreatorTest {
     }
 
     @Test
-    void testCreateImageContentExtractor_missing() {
+    void testCreateImageContentExtractor_missing() throws InvalidSettingsException {
         var settings = minimalSettings();
         settings.m_content = new MessageCreatorNodeSettings.Contents[] {
             new MessageCreatorNodeSettings.Contents()
@@ -330,14 +400,14 @@ final class MessageCellCreatorTest {
             new DataColumnSpecCreator("imgCol", PNGImageCellFactory.TYPE).createSpec()
         );
         var creator = new MessageCellCreator(settings, spec);
-        var extractor = creator.createImageContentExtractor(settings.m_content[0]);
+        var extractor = creator.createImageContentExtractor(settings.m_content[0], 0);
         var row = new DefaultRow("row0", DataType.getMissingCell());
         var part = extractor.apply(row);
         assertTrue(part.isEmpty());
     }
 
     @Test
-    void testCreateNameExtractor_noColumnSelected() {
+    void testCreateNameExtractor_noColumnSelected() throws InvalidSettingsException {
         var settings = minimalSettings();
         // m_nameColumn is left as default (NoneChoice)
         var spec = minimalSpec();
@@ -348,7 +418,7 @@ final class MessageCellCreatorTest {
     }
 
     @Test
-    void testCreateNameExtractor_missingValue() {
+    void testCreateNameExtractor_missingValue() throws InvalidSettingsException {
         var settings = minimalSettings();
         settings.m_nameColumn = new StringOrEnum<>("name");
         var spec = new DataTableSpec(
@@ -361,7 +431,7 @@ final class MessageCellCreatorTest {
     }
 
     @Test
-    void testCreateNameExtractor_presentValue() {
+    void testCreateNameExtractor_presentValue() throws InvalidSettingsException {
         var settings = minimalSettings();
         settings.m_nameColumn = new StringOrEnum<>("name");
         var spec = new DataTableSpec(
@@ -394,4 +464,234 @@ final class MessageCellCreatorTest {
         }
         return url;
     }
+
+    @Test
+    void testCreateRoleExtractor_column_noColumnSelected() {
+        var settings = minimalSettings();
+        settings.m_roleInputType = MessageCreatorNodeSettings.InputType.COLUMN;
+        settings.m_roleColumn = null;
+
+        var spec = new DataTableSpec();
+
+        var exception = assertThrows(InvalidSettingsException.class, () -> {
+            new MessageCellCreator(settings, spec).createRoleExtractor();
+        });
+
+        assertEquals("Please select a valid column for the Role column.", exception.getMessage());
+    }
+
+    @Test
+    void testCreateRoleExtractor_column_nonExistentColumn() {
+        var settings = minimalSettings();
+        settings.m_roleInputType = MessageCreatorNodeSettings.InputType.COLUMN;
+        settings.m_roleColumn = "ColumnThatDoesNotExist";
+
+        var spec = new DataTableSpec();
+
+        var exception = assertThrows(InvalidSettingsException.class, () -> {
+            new MessageCellCreator(settings, spec).createRoleExtractor();
+        });
+
+        assertEquals("The selected column 'ColumnThatDoesNotExist' is not part of the input table.", exception.getMessage());
+    }
+
+
+    @Test
+    void testCreateTextContentExtractor_column_nullColumnSelected() {
+        var settings = minimalSettings();
+        settings.m_content = new MessageCreatorNodeSettings.Contents[] {
+            new MessageCreatorNodeSettings.Contents()
+        };
+        settings.m_content[0].m_contentType = MessageCreatorNodeSettings.Contents.ContentType.TEXT;
+        settings.m_content[0].m_inputType = InputType.COLUMN;
+        settings.m_content[0].m_textColumn = null;
+
+        var spec = new DataTableSpec();
+
+        var exception = assertThrows(InvalidSettingsException.class, () -> {
+            new MessageCellCreator(settings, spec).createTextContentExtractor(settings.m_content[0], 0);
+        });
+
+        assertEquals("Please select a valid column for the Text column in Content 0.", exception.getMessage());
+    }
+
+    @Test
+    void testCreateTextContentExtractor_column_nonExistentColumn() {
+        var settings = minimalSettings();
+        settings.m_content = new MessageCreatorNodeSettings.Contents[] {
+            new MessageCreatorNodeSettings.Contents()
+        };
+        settings.m_content[0].m_contentType = MessageCreatorNodeSettings.Contents.ContentType.TEXT;
+        settings.m_content[0].m_inputType = InputType.COLUMN;
+        settings.m_content[0].m_textColumn = "NonExistentTextColumn";
+
+        var spec = new DataTableSpec();
+
+        var exception = assertThrows(InvalidSettingsException.class, () -> {
+            new MessageCellCreator(settings, spec).createTextContentExtractor(settings.m_content[0], 0);
+        });
+
+        assertEquals("The selected column 'NonExistentTextColumn' is not part of the input table.", exception.getMessage());
+    }
+
+
+    @Test
+    void testCreateImageContentExtractor_column_nullColumnSelected() {
+        var settings = minimalSettings();
+        settings.m_content = new MessageCreatorNodeSettings.Contents[] {
+            new MessageCreatorNodeSettings.Contents()
+        };
+        settings.m_content[0].m_contentType = MessageCreatorNodeSettings.Contents.ContentType.IMAGE;
+        settings.m_content[0].m_imageColumn = null;
+
+        var spec = new DataTableSpec();
+
+        var exception = assertThrows(InvalidSettingsException.class, () -> {
+            new MessageCellCreator(settings, spec).createImageContentExtractor(settings.m_content[0], 0);
+        });
+
+        assertEquals("Please select a valid column for the Image column in Content 0.", exception.getMessage());
+    }
+
+    @Test
+    void testCreateImageContentExtractor_column_nonExistentColumn() {
+        var settings = minimalSettings();
+        settings.m_content = new MessageCreatorNodeSettings.Contents[] {
+            new MessageCreatorNodeSettings.Contents()
+        };
+        settings.m_content[0].m_contentType = MessageCreatorNodeSettings.Contents.ContentType.IMAGE;
+        settings.m_content[0].m_imageColumn = "NonExistentImageColumn";
+
+        var spec = new DataTableSpec();
+
+        var exception = assertThrows(InvalidSettingsException.class, () -> {
+            new MessageCellCreator(settings, spec).createImageContentExtractor(settings.m_content[0], 0);
+        });
+
+        assertEquals("The selected column 'NonExistentImageColumn' is not part of the input table.", exception.getMessage());
+    }
+
+    @Test
+    void testCreateToolCallExtractor_toolNameColumnNotSelected() {
+        var settings = minimalSettings();
+
+        settings.m_toolCalls = new MessageCreatorNodeSettings.ToolCallSettings[] {
+            new MessageCreatorNodeSettings.ToolCallSettings()
+        };
+        settings.m_toolCalls[0].m_toolNameColumn = null;
+        settings.m_toolCalls[0].m_toolIdColumn = "toolId";
+
+        var spec = new DataTableSpec(
+            new DataColumnSpecCreator("toolId", StringCell.TYPE).createSpec()
+        );
+
+        var exception = assertThrows(InvalidSettingsException.class, () -> {
+            new MessageCellCreator(settings, spec).createToolCallExtractor(settings.m_toolCalls[0], 0);
+        });
+
+        assertEquals("Please select a valid column for the Tool name column in Tool Call 0.", exception.getMessage());
+    }
+
+    @Test
+    void testCreateToolCallExtractor_toolIdColumnNotSelected(){
+        var settings = minimalSettings();
+
+        settings.m_toolCalls = new MessageCreatorNodeSettings.ToolCallSettings[] {
+            new MessageCreatorNodeSettings.ToolCallSettings()
+        };
+        settings.m_toolCalls[0].m_toolNameColumn = "toolName";
+        settings.m_toolCalls[0].m_toolIdColumn = null;
+
+        var spec = new DataTableSpec(
+            new DataColumnSpecCreator("toolName", StringCell.TYPE).createSpec()
+        );
+        var exception = assertThrows(InvalidSettingsException.class, () -> {
+            new MessageCellCreator(settings, spec).createToolCallExtractor(settings.m_toolCalls[0], 0);
+        });
+
+        assertEquals("Please select a valid column for the Tool ID column in Tool Call 0.", exception.getMessage());
+    }
+
+    @Test
+    void testCreateToolCallExtractor_argsColumnNotSelected() {
+        var settings = minimalSettings();
+
+        settings.m_toolCalls = new MessageCreatorNodeSettings.ToolCallSettings[] {
+            new MessageCreatorNodeSettings.ToolCallSettings()
+        };
+        settings.m_toolCalls[0].m_toolNameColumn = "toolName";
+        settings.m_toolCalls[0].m_toolIdColumn = "toolID";
+        settings.m_toolCalls[0].m_argumentsColumn = null;
+
+        var spec = new DataTableSpec(
+            new DataColumnSpecCreator("toolName", StringCell.TYPE).createSpec(),
+            new DataColumnSpecCreator("toolID", StringCell.TYPE).createSpec()
+        );
+
+        var exception = assertThrows(InvalidSettingsException.class, () -> {
+            new MessageCellCreator(settings, spec).createToolCallExtractor(settings.m_toolCalls[0], 0);
+        });
+
+        assertEquals("Please select a valid column for the Arguments column in Tool Call 0.", exception.getMessage());
+    }
+
+    @Test
+    void testCreateContentPartExtractor_mixedContent() throws InvalidSettingsException, IOException {
+        var settings = minimalSettings();
+
+        var textContent = new MessageCreatorNodeSettings.Contents();
+        textContent.m_contentType = MessageCreatorNodeSettings.Contents.ContentType.TEXT;
+        textContent.m_inputType = MessageCreatorNodeSettings.InputType.COLUMN;
+        textContent.m_textColumn = "textCol";
+
+        var imageContent = new MessageCreatorNodeSettings.Contents();
+        imageContent.m_contentType = MessageCreatorNodeSettings.Contents.ContentType.IMAGE;
+        imageContent.m_imageColumn = "imageCol";
+
+        settings.m_content = new MessageCreatorNodeSettings.Contents[]{textContent, imageContent};
+
+        var spec = new DataTableSpec(
+            createColumnSpec("textCol", StringCell.TYPE),
+            createColumnSpec("imageCol", PNGImageCellFactory.TYPE)
+        );
+
+        var creator = new MessageCellCreator(settings, spec);
+        var contentExtractor = creator.createContentExtractor();
+
+        var imgFile = getFileResource("Message-creator.png");
+        var imgBytes = Files.readAllBytes(imgFile);
+        var imgCell = PNGImageCellFactory.create(imgBytes);
+
+        var row = new DefaultRow("row0", new StringCell("Sample Text"), imgCell);
+
+        var parts = contentExtractor.apply(row);
+
+        assertEquals(2, parts.size());
+
+        assertTrue(parts.get(0) instanceof TextContentPart);
+        assertEquals("Sample Text", ((TextContentPart)parts.get(0)).getContent());
+
+        assertTrue(parts.get(1) instanceof PngContentPart);
+        assertArrayEquals(imgBytes, ((PngContentPart)parts.get(1)).getData());
+    }
+
+    @Test
+    void testCreateContentPartExtractor_unknownContentType() {
+        var settings = minimalSettings();
+
+        var unknownContent = new MessageCreatorNodeSettings.Contents();
+        unknownContent.m_contentType = null;
+
+        settings.m_content = new MessageCreatorNodeSettings.Contents[]{unknownContent};
+
+        var spec = minimalSpec();
+        var creator = new MessageCellCreator(settings, spec);
+
+        var exception = assertThrows(IllegalArgumentException.class, () -> {
+            creator.createContentPartExtractor(unknownContent, 1);
+        });
+
+        assertEquals("Unknown content type: null", exception.getMessage());
+    }
+
 }

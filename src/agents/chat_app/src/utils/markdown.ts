@@ -1,7 +1,7 @@
 import DOMPurify from "dompurify";
-import MarkdownIt from "markdown-it";
+import markdownit from "markdown-it";
 
-const md = new MarkdownIt();
+const md = markdownit({ html: true });
 
 const sanitizationConfig = {
   ALLOWED_TAGS: [
@@ -26,6 +26,5 @@ const sanitizationConfig = {
   ALLOWED_ATTR: ["style"],
 };
 
-export const renderMarkdown = (src: string) => {
-  return DOMPurify.sanitize(md.render(src), sanitizationConfig);
-};
+export const renderMarkdown = (src: string) =>
+  DOMPurify.sanitize(md.render(src), sanitizationConfig);

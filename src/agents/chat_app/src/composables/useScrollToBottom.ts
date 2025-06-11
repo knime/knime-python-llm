@@ -1,43 +1,23 @@
-import { type Ref, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
+import { type Ref, onBeforeUnmount, onMounted } from "vue";
 
 export const useScrollToBottom = (container: Ref) => {
-  const isAtBottom = ref(true);
-  const showScrollToBottom = ref(false);
-
-  const scrollToBottom = async () => {
+  const scrollToBottom = () => {
     if (container.value) {
-      await nextTick();
       container.value.scrollTop = container.value.scrollHeight;
     }
-  };
-
-  const handleScroll = (event: Event) => {
-    const target = event.target as HTMLElement;
-    const { scrollTop, scrollHeight, clientHeight } = target;
-
-    const bottomThreshold = 100;
-    isAtBottom.value =
-      scrollHeight - scrollTop - clientHeight < bottomThreshold;
-
-    showScrollToBottom.value = !isAtBottom.value;
   };
 
   let observer: MutationObserver;
 
   onMounted(() => {
-    const config = { childList: true };
     observer = new MutationObserver(scrollToBottom);
 
     if (container.value) {
-      observer.observe(container.value, config);
+      observer.observe(container.value, { childList: true });
     }
   });
 
   onBeforeUnmount(() => {
-    if (observer) {
-      observer.disconnect();
-    }
+    observer?.disconnect();
   });
-
-  return { handleScroll };
 };

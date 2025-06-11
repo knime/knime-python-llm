@@ -13,12 +13,12 @@ const emit = defineEmits<{ sendMessage: [message: string] }>();
 
 const messagesContainer = ref<HTMLElement | null>(null);
 
-const { handleScroll } = useScrollToBottom(messagesContainer);
+useScrollToBottom(messagesContainer);
 </script>
 
 <template>
   <main class="chat-interface">
-    <div ref="messagesContainer" class="message-list" @scroll="handleScroll">
+    <div ref="messagesContainer" class="message-list">
       <slot />
       <MessageBox v-if="isLoading">
         <SkeletonItem height="24px" />

@@ -379,17 +379,17 @@ def _message_type() -> knext.LogicalType:
     return knext.logical(MessageValue)
 
 
-def has_history_table(ctx: knext.DialogCreationContext):
+def has_conversation_table(ctx: knext.DialogCreationContext):
     return ctx.get_input_specs()[2] is not None
 
 
-def _history_column_parameter() -> knext.ColumnParameter:
+def _conversation_column_parameter() -> knext.ColumnParameter:
     return knext.ColumnParameter(
         "History column",
         "The column containing the conversation history.",
         port_index=2,
         column_filter=util.create_type_filter(_message_type()),
-    ).rule(knext.DialogContextCondition(has_history_table), knext.Effect.SHOW)
+    ).rule(knext.DialogContextCondition(has_conversation_table), knext.Effect.SHOW)
 
 
 @knext.node(
@@ -402,7 +402,7 @@ def _history_column_parameter() -> knext.ColumnParameter:
     "Chat model", "The chat model to use.", port_type=chat_model_port_type
 )
 @knext.input_table("Tools", "The tools the agent can use.")
-@knext.input_table("Conversation", "The conversation history table.", optional=True)
+@knext.input_table("Conversation", "The table containing the conversation held so far.", optional=True)
 @knext.input_table_group(
     "Data inputs",
     "The data inputs for the agent.",
@@ -439,14 +439,14 @@ class AgentPrompter2:
         "Message provided to the agent that instructs it how to act.",
     )
 
-    history_column = _history_column_parameter()
+    conversation_column = _conversation_column_parameter()
 
     # New parameter for column name if no history table is connected
-    history_column_name = knext.StringParameter(
+    conversation_column_name = knext.StringParameter(
         "Conversation column name",
-        "Name of the conversation column if no history table is connected.",
+        "Name of the conversation column if no conversation table is connected.",
         default_value="Conversation",
-    ).rule(knext.DialogContextCondition(has_history_table), knext.Effect.HIDE)
+    ).rule(knext.DialogContextCondition(has_conversation_table), knext.Effect.HIDE)
 
     tool_column = _tool_column_parameter()
 
@@ -481,20 +481,20 @@ class AgentPrompter2:
         self, history_schema: Optional[knext.Schema]
     ) -> knext.Schema:
         if history_schema is not None:
-            if self.history_column is None:
-                self.history_column = _last_history_column(history_schema)
-            if self.history_column not in history_schema.column_names:
+            if self.conversation_column is None:
+                self.conversation_column = _last_history_column(history_schema)
+            if self.conversation_column not in history_schema.column_names:
                 raise knext.InvalidParametersError(
-                    f"Column {self.history_column} not found in the conversation history table."
+                    f"Column {self.conversation_column} not found in the conversation history table."
                 )
             return knext.Schema.from_columns(
                 [
-                    knext.Column(_message_type(), self.history_column),
+                    knext.Column(_message_type(), self.conversation_column),
                 ]
             )
         # Use user-provided column name if no history table is given
         return knext.Schema.from_columns(
-            [knext.Column(_message_type(), self.history_column_name)]
+            [knext.Column(_message_type(), self.conversation_column_name)]
         )
 
     def execute(
@@ -537,13 +537,13 @@ class AgentPrompter2:
         messages = []
 
         if history_table is not None:
-            if self.history_column not in history_table.column_names:
+            if self.conversation_column not in history_table.column_names:
                 raise knext.InvalidParametersError(
-                    f"Column {self.history_column} not found in the conversation history table."
+                    f"Column {self.conversation_column} not found in the conversation history table."
                 )
-            history_df = history_table[self.history_column].to_pandas()
+            history_df = history_table[self.conversation_column].to_pandas()
             messages = [
-                to_langchain_message(msg) for msg in history_df[self.history_column]
+                to_langchain_message(msg) for msg in history_df[self.conversation_column]
             ]
 
         initial_message = render_message_as_json(
@@ -583,9 +583,9 @@ class AgentPrompter2:
         
 
         output_column_name = (
-            self.history_column_name
+            self.conversation_column_name
             if history_table is None
-            else self.history_column_name
+            else self.conversation_column_name
         )
 
         result_df = pd.DataFrame(

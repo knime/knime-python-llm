@@ -53,6 +53,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.knime.ai.core.data.message.MessageValue.MessageContentPart;
+import org.knime.ai.core.data.message.MessageValue.MessageContentPart.MessageContentPartType;
 import org.knime.ai.core.data.message.MessageValue.MessageType;
 import org.knime.ai.core.data.message.MessageValue.ToolCall;
 import org.knime.core.data.DataCellDataInput;
@@ -92,7 +93,7 @@ public final class MessageCellSerializer implements DataCellSerializer<MessageCe
         for (MessageContentPart part : content) {
             output.writeUTF(part.getType().getId());
             byte[] data = part.getData();
-            output.write(data.length);
+            output.writeInt(data.length);
             output.write(data);
         }
     }
@@ -109,12 +110,12 @@ public final class MessageCellSerializer implements DataCellSerializer<MessageCe
         return content;
     }
 
-    // TODO unify content part creation
     private static MessageContentPart createContentPart(final String type, final byte[] value) {
-        switch (type) {
-            case "text":
+        var contentType = MessageContentPartType.fromId(type);
+        switch (contentType) {
+            case TEXT:
                 return new TextContentPart(new String(value));
-            case "image":
+            case PNG:
                 return new PngContentPart(value);
             default:
                 throw new IllegalArgumentException("Unknown content type: " + type);

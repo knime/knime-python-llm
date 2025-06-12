@@ -510,7 +510,7 @@ class AgentPrompter2:
         from ._agent_impl import (
             DataRegistry,
             LangchainToolConverter,
-            render_message_as_json,
+            render_structured_message,
         )
         from langgraph.prebuilt import create_react_agent
         from knime.types.message import to_langchain_message, from_langchain_message
@@ -523,7 +523,7 @@ class AgentPrompter2:
 
         data_registry = DataRegistry(input_tables)
         tool_converter = LangchainToolConverter(
-            data_registry, ctx, render_message_as_json, self.debug
+            data_registry, ctx, render_structured_message, self.debug
         )
 
         chat_model: BaseChatModel = chat_model.create_model(
@@ -696,7 +696,7 @@ class AgentChatView:
             DataRegistry,
             LangchainToolConverter,
             AgentChatViewDataService,
-            render_message_as_json,
+            render_structured_message,
         )
 
         chat_model = chat_model.create_model(
@@ -704,7 +704,7 @@ class AgentChatView:
         )
         data_registry = DataRegistry(input_tables)
         tool_converter = LangchainToolConverter(
-            data_registry, ctx, render_message_as_json, self.debug
+            data_registry, ctx, render_structured_message, self.debug
         )
         tool_cells = _extract_tools_from_table(tools_table, self.tool_column)
         tools = [tool_converter.to_langchain_tool(tool) for tool in tool_cells]

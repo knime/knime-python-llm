@@ -143,11 +143,12 @@ class DataRegistry:
     def create_summary_message(self) -> Optional[HumanMessage]:
         if not self._data:
             return None
-        content = yaml.dump({id: _port_to_dict(data.meta_data) for id, data in enumerate(self._data)}, sort_keys=False)
+        content = render_structured(**{str(id): _port_to_dict(data.meta_data) for id, data in enumerate(self._data)})
         msg = """# Data Summary
-This message summarizes the data available in the registry.
+This message summarizes the data available for tool calls.
 Each entry corresponds to a data item with its metadata.
 Use the keys to refer to the respective data item for use in tool calls.
+Tools that produce data will also include similar information in their output.
 Data:
 """
         
@@ -337,8 +338,8 @@ class LangchainToolConverter:
         }
 
 
-def render_structured_message(**kwargs) -> str:
-    return yaml.dump(kwargs)
+def render_structured(**kwargs) -> str:
+    return yaml.dump(kwargs, sort_keys=False)
 
 
 class AgentChatViewDataService:

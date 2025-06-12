@@ -435,7 +435,7 @@ hf_hub_llm_port_type = knext.port_type(
 
 
 @knext.node(
-    "HF Hub LLM Selector",
+    "HF Hub LLM Connector",
     knext.NodeType.SOURCE,
     hf_icon,
     category=hf_hub_category,

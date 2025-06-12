@@ -449,7 +449,7 @@ class AzureOpenAIAuthenticator:
 
 
 @knext.node(
-    "Azure OpenAI LLM Selector",
+    "Azure OpenAI LLM Connector",
     knext.NodeType.SOURCE,
     azure_icon,
     category=azure_openai_category,

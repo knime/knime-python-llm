@@ -315,7 +315,7 @@ huggingface_textGenInference_chat_port_type = knext.port_type(
 
 
 @knext.node(
-    "HF TGI LLM Selector",
+    "HF TGI LLM Connector",
     knext.NodeType.SOURCE,
     hf_icon,
     category=hf_tgi_category,

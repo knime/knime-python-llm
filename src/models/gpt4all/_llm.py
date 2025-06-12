@@ -192,7 +192,7 @@ gpt4all_llm_port_type = knext.port_type(
 
 
 @knext.node(
-    "Local GPT4All LLM Selector",
+    "Local GPT4All LLM Connector",
     knext.NodeType.SOURCE,
     gpt4all_icon,
     category=gpt4all_category,

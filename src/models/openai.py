@@ -1163,9 +1163,9 @@ class OpenAIAuthenticator:
 
 # TODO: Check proxy settings and add them to configuration
 # TODO: Generate prompts as configuration dialog as seen on langchain llm.generate(["Tell me a joke", "Tell me a poem"]*15)
-# region LLM Selector (Deprecated)
+# region LLM Connector (Deprecated)
 @knext.node(
-    "OpenAI LLM Selector",
+    "OpenAI LLM Connector",
     knext.NodeType.SOURCE,
     openai_icon,
     category=openai_category,

@@ -143,8 +143,15 @@ class DataRegistry:
     def create_summary_message(self) -> Optional[HumanMessage]:
         if not self._data:
             return None
+        content = yaml.dump({id: _port_to_dict(data.meta_data) for id, data in enumerate(self._data)}, sort_keys=False)
+        msg = """# Data Summary
+This message summarizes the data available in the registry.
+Each entry corresponds to a data item with its metadata.
+Use the keys to refer to the respective data item for use in tool calls.
+Data:
+"""
         
-        return HumanMessage(yaml.dump({id: _port_to_dict(data.meta_data) for id, data in enumerate(self._data)}, sort_keys=False),)
+        return HumanMessage(msg + content)
 
 def _spec_representation(table: knext.Table) -> dict:
     return {column.name: str(column.ktype) for column in table.schema}

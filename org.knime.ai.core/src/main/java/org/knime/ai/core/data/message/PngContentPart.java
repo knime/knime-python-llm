@@ -48,6 +48,8 @@
  */
 package org.knime.ai.core.data.message;
 
+import java.util.Arrays;
+
 import org.knime.ai.core.data.message.MessageValue.MessageContentPart;
 
 /**
@@ -76,5 +78,22 @@ public final class PngContentPart implements MessageContentPart {
     @Override
     public byte[] getData() {
         return m_imageData;
+    }
+
+    @Override
+    public boolean equals(final Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null || getClass() != obj.getClass()) {
+            return false;
+        }
+        PngContentPart other = (PngContentPart)obj;
+        return Arrays.equals(m_imageData, other.m_imageData);
+    }
+
+    @Override
+    public int hashCode() {
+        return Arrays.hashCode(m_imageData);
     }
 }

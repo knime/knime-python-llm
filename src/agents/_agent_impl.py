@@ -43,7 +43,7 @@
 # ------------------------------------------------------------------------
 
 from dataclasses import dataclass
-from typing import Callable, Optional, Sequence
+from typing import Optional, Sequence
 import knime.extension as knext
 
 from langgraph.graph import StateGraph, END
@@ -143,7 +143,7 @@ class DataRegistry:
     def create_summary_message(self) -> Optional[HumanMessage]:
         if not self._data:
             return None
-        content = render_structured(**{str(id): _port_to_dict(data.meta_data) for id, data in enumerate(self._data)})
+        content = _render_structured(**{str(id): _port_to_dict(data.meta_data) for id, data in enumerate(self._data)})
         msg = """# Data Summary
 This message summarizes the data available for tool calls.
 Each entry corresponds to a data item with its metadata.
@@ -167,11 +167,10 @@ def _port_to_dict(port: Port) -> dict:
 
 class LangchainToolConverter:
     def __init__(
-        self, data_registry: DataRegistry, ctx, message_renderer: Callable, debug: bool
+        self, data_registry: DataRegistry, ctx, debug: bool
     ):
         self._data_registry = data_registry
         self._ctx = ctx
-        self._message_renderer = message_renderer
         self._debug = debug
         self.sanitized_to_original = {}
 
@@ -270,7 +269,7 @@ class LangchainToolConverter:
         input_ports = tool.input_ports if tool.input_ports else []
         output_ports = tool.output_ports if tool.output_ports else []
 
-        description_with_data_info = self._message_renderer(
+        description_with_data_info = _render_structured(
             description=tool.description,
             input_ports=list(
                 map(_port_to_dict, input_ports)
@@ -305,7 +304,7 @@ class LangchainToolConverter:
                     output_reference = self._data_registry.add_table(output, port)
                     output_references.update(output_reference)
 
-                return self._message_renderer(
+                return _render_structured(
                     message=message, outputs=output_references
                 )
             except Exception as e:
@@ -338,7 +337,7 @@ class LangchainToolConverter:
         }
 
 
-def render_structured(**kwargs) -> str:
+def _render_structured(**kwargs) -> str:
     return yaml.dump(kwargs, sort_keys=False)
 
 

@@ -56,7 +56,6 @@ import pandas as pd
 import yaml
 
 
-import json
 from langchain.tools import StructuredTool
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 
@@ -323,8 +322,8 @@ class LangchainToolConverter:
         }
 
 
-def render_message_as_json(**kwargs) -> str:
-    return json.dumps(kwargs)
+def render_structured_message(**kwargs) -> str:
+    return yaml.dump(kwargs)
 
 
 class AgentChatViewDataService:

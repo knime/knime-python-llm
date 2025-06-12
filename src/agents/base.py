@@ -510,6 +510,7 @@ class AgentPrompter2:
         from ._agent_impl import (
             DataRegistry,
             LangchainToolConverter,
+            ExecutionMode,
             render_message_as_json,
         )
         from langgraph.prebuilt import create_react_agent
@@ -523,7 +524,10 @@ class AgentPrompter2:
 
         data_registry = DataRegistry(input_tables)
         tool_converter = LangchainToolConverter(
-            data_registry, ctx, render_message_as_json, self.debug
+            data_registry,
+            ctx,
+            render_message_as_json,
+            ExecutionMode.DEBUG if self.debug else ExecutionMode.DEFAULT
         )
 
         chat_model: BaseChatModel = chat_model.create_model(
@@ -696,6 +700,7 @@ class AgentChatView:
         from ._agent_impl import (
             DataRegistry,
             LangchainToolConverter,
+            ExecutionMode,
             AgentChatViewDataService,
             render_message_as_json,
         )
@@ -705,7 +710,10 @@ class AgentChatView:
         )
         data_registry = DataRegistry(input_tables)
         tool_converter = LangchainToolConverter(
-            data_registry, ctx, render_message_as_json, self.debug
+            data_registry,
+            ctx,
+            render_message_as_json,
+            ExecutionMode.DEBUG if self.debug else ExecutionMode.DETACHED
         )
         tool_cells = _extract_tools_from_table(tools_table, self.tool_column)
         tools = [tool_converter.to_langchain_tool(tool) for tool in tool_cells]

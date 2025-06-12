@@ -62,6 +62,8 @@ from langchain_core.messages import AIMessage, BaseMessage
 import logging
 import re
 
+from enum import Enum, auto
+
 _logger = logging.getLogger(__name__)
 
 
@@ -142,14 +144,24 @@ class DataRegistry:
         return f"[{', '.join(map(self._column_representation, table.schema))}]"
 
 
+class ExecutionMode(Enum):
+    DEBUG = auto()
+    DEFAULT = auto()
+    DETACHED = auto()
+
+
 class LangchainToolConverter:
     def __init__(
-        self, data_registry: DataRegistry, ctx, message_renderer: Callable, debug: bool
+        self,
+        data_registry: DataRegistry,
+        ctx,
+        message_renderer: Callable,
+        execution_mode: ExecutionMode,
     ):
         self._data_registry = data_registry
         self._ctx = ctx
         self._message_renderer = message_renderer
-        self._debug = debug
+        self._execution_mode_hint = "execution-mode:" + execution_mode.name
         self.sanitized_to_original = {}
 
     def _sanitize_tool_name(self, name: str) -> str:
@@ -213,7 +225,7 @@ class LangchainToolConverter:
                 self._validate_required_fields(
                     tool.parameter_schema.keys(), params, "configuration parameters"
                 )
-                return self._ctx._execute_tool(tool, params, [], self._debug)[0]
+                return self._ctx._execute_tool(tool, params, [], [self._execution_mode_hint])[0]
             except Exception as e:
                 _logger.exception(e)
                 raise
@@ -275,7 +287,10 @@ class LangchainToolConverter:
             try:
                 inputs = [self._data_registry.get_data(i) for i in data_inputs.values()]
                 message, outputs = self._ctx._execute_tool(
-                    tool, configuration, inputs, self._debug
+                    tool,
+                    configuration,
+                    inputs,
+                    [self._execution_mode_hint],
                 )
                 output_references = {}
                 for output in outputs:
@@ -423,7 +438,9 @@ class AgentChatViewDataService:
                 {
                     "id": tool_call["id"],
                     "name": tool_call["name"],
-                    "args": json.dumps(tool_call["args"], indent=2) if "args" in tool_call else None,
+                    "args": json.dumps(tool_call["args"], indent=2)
+                    if "args" in tool_call
+                    else None,
                 }
                 for tool_call in message.tool_calls
             ]

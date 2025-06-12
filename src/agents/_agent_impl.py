@@ -53,11 +53,12 @@ from typing import Annotated, TypedDict
 from langchain.chat_models.base import BaseChatModel
 from langchain_core.tools import BaseTool
 import pandas as pd
+import yaml
 
 
 import json
 from langchain.tools import StructuredTool
-from langchain_core.messages import AIMessage, BaseMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 
 import logging
 import re
@@ -67,7 +68,7 @@ _logger = logging.getLogger(__name__)
 
 @dataclass
 class DataItem:
-    llm_representation: str
+    llm_representation: dict
     data: knext.Table
 
 
@@ -131,15 +132,22 @@ class DataRegistry:
             "type": port.type,
             "spec": port.spec,
         }
+    
+    @property
+    def has_data(self) -> bool:
+        """Returns True if there is data in the registry, False otherwise."""
+        return len(self._data) > 0
+
+    def create_summary_message(self) -> Optional[HumanMessage]:
+        if not self._data:
+            return None
+        return HumanMessage(yaml.dump(self.llm_representation()))
 
     def llm_representation(self) -> dict:
         return {id: data.llm_representation for id, data in enumerate(self._data)}
 
-    def _column_representation(self, column: knext.Column) -> str:
-        return f"({column.name}, {str(column.ktype)})"
-
-    def _table_representation(self, table: knext.Table) -> str:
-        return f"[{', '.join(map(self._column_representation, table.schema))}]"
+    def _table_representation(self, table: knext.Table) -> dict:
+        return {column.name: str(column.ktype) for column in table.schema}
 
 
 class LangchainToolConverter:
@@ -330,14 +338,7 @@ class AgentChatViewDataService:
     ):
         self._agent_graph = agent_graph
         self._data_registry = data_registry
-        self._messages = [
-            {
-                "role": "user",
-                "content": render_message_as_json(
-                    data=data_registry.llm_representation()
-                ),
-            }
-        ]
+        self._messages = [data_registry.create_summary_message()] if data_registry.has_data else []
         self._initial_message = initial_message
         self._recursion_limit = recursion_limit
         self._show_tool_calls_and_results = show_tool_calls_and_results

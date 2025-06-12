@@ -580,23 +580,21 @@ def _isinstance_of_port_object(
         "Large Language Model",
     ],
 )
-@knext.input_port(
-    "Instruct Model or Chat Model", "Instruct Model or Chat Model.", llm_port_type
-)
+@knext.input_port("LLM", "A Large Language Model.", llm_port_type)
 @knext.input_table("Prompt Table", "A table containing a string column with prompts.")
 @knext.output_table(
     "Result Table", "A table containing prompts and their respective answer."
 )
 class LLMPrompter:
     """
-    Interact with an instruct or chat model using each row of the input table as an independent prompt.
+    Interact with an LLM using each row of the input table as an independent prompt.
 
     For each row in the input table, this node sends one prompt to the LLM and receives a corresponding response.
     Rows and the corresponding prompts are treated in isolation, i.e. the LLM cannot remember the contents of the previous rows or how it responded to them.
 
     **Note**: If you use the
     [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
-    and do not select the "Save password in configuration (weakly encrypted)" option for passing the API key for the Instruct Model Selector node,
+    and do not select the "Save password in configuration (weakly encrypted)" option for passing the API key for the LLM Selector node,
     the Credentials Configuration node will need to be reconfigured upon reopening the workflow, as the credentials flow variable
     was not saved and will therefore not be available to downstream nodes.
     """
@@ -885,7 +883,6 @@ class LLMPrompter:
 
         return isinstance(llm, BaseChatModel)
 
-    
     def _extract_messages(self, table, is_chat_model: bool):
         system_messages = self._extract_system_messages(table, is_chat_model)
         user_messages = self._extract_user_messages(table)
@@ -893,16 +890,19 @@ class LLMPrompter:
         if system_messages is None:
             return [[user_message] for user_message in user_messages]
         else:
-            return [[system_message, user_message] for system_message, user_message in zip(system_messages, user_messages)]
-
+            return [
+                [system_message, user_message]
+                for system_message, user_message in zip(system_messages, user_messages)
+            ]
 
     def _extract_user_messages(self, table):
         prompt_column = table.column(self.prompt_column)
         # TODO make sure this is always a human message
         return [util.to_human_message(prompt.as_py()) for prompt in prompt_column]
-    
+
     def _extract_system_messages(self, table, is_chat_model: bool):
         import langchain_core.messages as lcm
+
         if (
             not is_chat_model
             or self.system_message_handling == SystemMessageHandling.NONE.name

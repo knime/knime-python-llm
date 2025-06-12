@@ -192,7 +192,7 @@ gpt4all_llm_port_type = knext.port_type(
 
 
 @knext.node(
-    "Local GPT4All Instruct Model Selector",
+    "Local GPT4All LLM Selector",
     knext.NodeType.SOURCE,
     gpt4all_icon,
     category=gpt4all_category,
@@ -211,7 +211,7 @@ gpt4all_llm_port_type = knext.port_type(
 )
 class GPT4AllLLMConnector:
     """
-    Select a local instruct LLM available via GPT4All.
+    Select a local LLM available via GPT4All.
 
     This node allows you to connect to a local GPT4All LLM. To get started,
     you need to download a specific model either through the [GPT4All client](https://gpt4all.io)

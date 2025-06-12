@@ -1052,7 +1052,7 @@ openai_embeddings_port_type = knext.port_type(
 # == Nodes ==
 
 
-# region: Authenticator
+# region Authenticator
 @knext.node(
     "OpenAI Authenticator",
     knext.NodeType.SOURCE,
@@ -1163,9 +1163,9 @@ class OpenAIAuthenticator:
 
 # TODO: Check proxy settings and add them to configuration
 # TODO: Generate prompts as configuration dialog as seen on langchain llm.generate(["Tell me a joke", "Tell me a poem"]*15)
-# region: Instruct Selector
+# region LLM Selector (Deprecated)
 @knext.node(
-    "OpenAI Instruct Model Selector",
+    "OpenAI LLM Selector",
     knext.NodeType.SOURCE,
     openai_icon,
     category=openai_category,
@@ -1184,7 +1184,7 @@ class OpenAIAuthenticator:
 )
 class OpenAILLMConnector:
     """
-    Select an instruct LLM from OpenAI.
+    Select an LLM from OpenAI.
 
     This node establishes a connection with an OpenAI LLM.
 
@@ -1250,7 +1250,7 @@ class OpenAILLMConnector:
         return _set_selection_parameter(parameters)
 
 
-# region: LLM Selector
+# region LLM Selector
 @knext.node(
     "OpenAI LLM Selector",
     knext.NodeType.SOURCE,
@@ -1336,7 +1336,7 @@ class OpenAIChatModelConnector:
         return _set_selection_parameter(parameters)
 
 
-# region: Embedding Selector
+# region Embedding Selector
 @knext.node(
     "OpenAI Embedding Model Selector",
     knext.NodeType.SOURCE,
@@ -1437,7 +1437,7 @@ class ImageModels(knext.EnumParameterOptions):
     )
 
 
-# region: Image Generator
+# region Image Generator
 @knext.node(
     "OpenAI Image Generator",
     node_type=knext.NodeType.VISUALIZER,
@@ -1711,7 +1711,7 @@ class OpenAIDALLEView:
         return [col.name for col in column_filter_config.apply(schema)]
 
 
-# region: Model Deleter
+# region Model Deleter
 @knext.node(
     "OpenAI Fine-Tuned Model Deleter",
     knext.NodeType.SINK,
@@ -1775,7 +1775,7 @@ class OpenAIFineTuneDeleter:
         LOGGER.info(f"{response.id} was successfully deleted.")
 
 
-# region: Fine-tuner
+# region Fine-tuner
 @knext.node(
     "OpenAI Chat Model Fine-Tuner",
     node_type=knext.NodeType.LEARNER,

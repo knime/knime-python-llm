@@ -569,7 +569,7 @@ def _isinstance_of_port_object(
 
 
 @knext.node(
-    "LLM Prompter (Table)",
+    "LLM Prompter",
     knext.NodeType.PREDICTOR,
     "icons/generic/brain.png",
     model_category,
@@ -921,7 +921,7 @@ class LLMPrompter:
 
 
 @knext.node(
-    "LLM Prompter (Conversation)",
+    "Chat Model Prompter",
     knext.NodeType.PREDICTOR,
     "icons/generic/brain.png",
     model_category,
@@ -931,6 +931,7 @@ class LLMPrompter:
         "Generative AI",
         "Large Language Model",
     ],
+    is_deprecated=True,
 )
 @knext.input_port("Chat Model", "A chat model.", chat_model_port_type)
 @knext.input_table(

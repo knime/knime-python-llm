@@ -89,13 +89,15 @@ final class MessageCellSplitterFactories {
         settings.m_nameColumnName.map(c -> new PartExtractorSingleCellFactory(c, StringCell.TYPE,
             MessageCellSplitterFactories::extractName, messageColumnIndex))
             .ifPresent(factory -> list.add(createStatelessCellSplitterFactory(() -> factory)));
+        var textTypeFilter = ofType(MessageContentPartType.TEXT);
         settings.m_textPartsPrefix.map(prefix -> createMultiCellSplitterFactory(
-            createContentCounter(MessageContentPartType.TEXT), createColumnSpecCreator(prefix, StringCell.TYPE), messageColumnIndex,
-            createContentPartExtractor(MessageContentPartType.TEXT, data -> new StringCell(new String(data)))))
+                createContentCounter(textTypeFilter), createColumnSpecCreator(prefix, StringCell.TYPE), messageColumnIndex,
+                createContentPartExtractor(textTypeFilter, data -> new StringCell(new String(data)))))
             .ifPresent(list::add);
+        var imageTypeFilter = ofType(MessageContentPartType.PNG);
         settings.m_imagePartsPrefix.map(prefix -> createMultiCellSplitterFactory(
-            createContentCounter(MessageContentPartType.PNG), createColumnSpecCreator(prefix, PNGImageCellFactory.TYPE), messageColumnIndex,
-            createContentPartExtractor(MessageContentPartType.PNG, PNGImageCellFactory::create)))
+            createContentCounter(imageTypeFilter), createColumnSpecCreator(prefix, PNGImageCellFactory.TYPE), messageColumnIndex,
+            createContentPartExtractor(imageTypeFilter, PNGImageCellFactory::create)))
             .ifPresent(list::add);
         settings.m_toolCallsPrefix.map(prefix -> createMultiCellSplitterFactory(
             MessageCellSplitterFactories::countToolCalls,
@@ -130,26 +132,38 @@ final class MessageCellSplitterFactories {
             false);
     }
 
-    static Function<DataCell, Integer> createContentCounter(final MessageContentPartType contentType) {
-        return cell -> {
-            if (cell.isMissing()) {
-                return 0;
-            }
-            var message = (MessageValue)cell;
-            return (int)message.getContent().stream()//
-                .filter(part -> contentType.equals(part.getType()))//
-                .count();
-        };
+    static Function<DataCell, Integer> createContentCounter(final Predicate<MessageContentPart> filter) {
+        return cell -> (int) toMessageValue(cell)//
+            .stream()//
+            .map(MessageValue::getContent)//
+            .flatMap(List::stream)//
+            .filter(filter)//
+            .count();
+    }
+
+    private static Predicate<MessageContentPart> ofType(final MessageContentPartType type) {
+        return part -> part.getType().equals(type);
     }
 
 
     static Integer countToolCalls(final DataCell cell) {
-        if (cell.isMissing()) {
-            return 0;
-        }
-        var message = (MessageValue)cell;
-        return message.getToolCalls().map(List::size).orElse(0);
+        return toMessageValue(cell)
+            .map(MessageValue::getToolCalls)//
+            .filter(Optional::isPresent)//
+            .map(l -> l.get().size())//
+            .orElse(0);
     }
+
+    private static Optional<MessageValue> toMessageValue(final DataCell cell) {
+        if (cell.isMissing()) {
+            return Optional.empty();
+        }
+        if (cell instanceof MessageValue message) {
+            return Optional.of(message);
+        }
+        throw new IllegalArgumentException("Expected MessageValue, but got: " + cell.getClass().getName());
+    }
+
 
     static DataCell[] extractToolCalls(final MessageValue message) {
         return message.getToolCalls()
@@ -208,10 +222,10 @@ final class MessageCellSplitterFactories {
         }
     }
 
-    static Function<MessageValue, DataCell[]> createContentPartExtractor(final MessageContentPartType contentType,
+    static Function<MessageValue, DataCell[]> createContentPartExtractor(final Predicate<MessageContentPart> contentFilter,
         final Function<byte[], DataCell> contentToCellFn) {
         return message -> message.getContent().stream()//
-            .filter(part -> contentType.equals(part.getType()))//
+            .filter(contentFilter)//
             .map(MessageContentPart::getData)//
             .map(contentToCellFn)//
             .toArray(DataCell[]::new);

@@ -60,6 +60,9 @@ import org.knime.ai.core.data.message.MessageValue.MessageContentPart.MessageCon
 import org.knime.ai.core.data.message.MessageValue.ToolCall;
 import org.knime.core.data.DataCell;
 import org.knime.core.data.DataColumnSpec;
+import org.knime.core.data.DataRow;
+import org.knime.core.data.RowKey;
+import org.knime.core.data.def.DefaultRow;
 import org.knime.core.data.def.StringCell;
 import org.knime.core.data.json.JSONCellFactory;
 
@@ -93,7 +96,7 @@ final class MessageCellSplitterFactoriesTest {
     void testCreateContentCounter() {
         var msg = TestUtil.createMessageWithTextParts("foo", "bar");
         DataCell cell = msg;
-        var counter = MessageCellSplitterFactories.createContentCounter(MessageContentPartType.TEXT);
+        var counter = MessageCellSplitterFactories.createContentCounter(part -> part.getType() == MessageContentPartType.TEXT);
         assertEquals(2, counter.apply(cell));
     }
 
@@ -150,5 +153,180 @@ final class MessageCellSplitterFactoriesTest {
         var toolCall = new ToolCall("tool", "id", "{}\n");
         DataCell cell = MessageCellSplitterFactories.toJsonCell(toolCall);
         assertEquals(JSONCellFactory.TYPE, cell.getType());
+    }
+
+    @Test
+    void testTextPartsSplitterFactory_execution_withDataRow() {
+        MessagePartExtractorSettings settings = new MessagePartExtractorSettings();
+        settings.m_textPartsPrefix = Optional.of("text_");
+        settings.m_imagePartsPrefix = Optional.empty();
+        settings.m_toolCallsPrefix = Optional.empty();
+        settings.m_roleColumnName = Optional.empty();
+        settings.m_toolCallIdColumnName = Optional.empty();
+        settings.m_nameColumnName = Optional.empty();
+        var factories = MessageCellSplitterFactories.createCellSplitterFactories(settings, 0);
+        var factory = factories.get(0);
+        factory.accept(TestUtil.createMessageWithTextParts("foo", "bar"));
+        var cellFactory = factory.get();
+        DataRow row = new DefaultRow(new RowKey("row1"), TestUtil.createMessageWithTextParts("foo", "bar"));
+        var cells = cellFactory.getCells(row);
+        assertEquals(2, cells.length);
+        assertEquals("foo", ((StringCell)cells[0]).getStringValue());
+        assertEquals("bar", ((StringCell)cells[1]).getStringValue());
+    }
+
+    @Test
+    void testImagePartsSplitterFactory_execution_withDataRow() {
+        MessagePartExtractorSettings settings = new MessagePartExtractorSettings();
+        settings.m_textPartsPrefix = Optional.empty();
+        settings.m_imagePartsPrefix = Optional.of("img_");
+        settings.m_toolCallsPrefix = Optional.empty();
+        settings.m_roleColumnName = Optional.empty();
+        settings.m_toolCallIdColumnName = Optional.empty();
+        settings.m_nameColumnName = Optional.empty();
+        var factories = MessageCellSplitterFactories.createCellSplitterFactories(settings, 0);
+        var factory = factories.get(0);
+        factory.accept(TestUtil.createMessageWithTextParts("foo"));
+        var cellFactory = factory.get();
+        DataRow row = new DefaultRow(new RowKey("row2"), TestUtil.createMessageWithTextParts("foo"));
+        var cells = cellFactory.getCells(row);
+        assertEquals(0, cells.length); // No PNG parts
+    }
+
+    @Test
+    void testToolCallsSplitterFactory_execution_withDataRow() {
+        MessagePartExtractorSettings settings = new MessagePartExtractorSettings();
+        settings.m_textPartsPrefix = Optional.empty();
+        settings.m_imagePartsPrefix = Optional.empty();
+        settings.m_toolCallsPrefix = Optional.of("tool_");
+        settings.m_roleColumnName = Optional.empty();
+        settings.m_toolCallIdColumnName = Optional.empty();
+        settings.m_nameColumnName = Optional.empty();
+        var factories = MessageCellSplitterFactories.createCellSplitterFactories(settings, 0);
+        var factory = factories.get(0);
+        factory.accept(TestUtil.createMessageWithToolCalls(2));
+        var cellFactory = factory.get();
+        DataRow row = new DefaultRow(new RowKey("row3"), TestUtil.createMessageWithToolCalls(2));
+        var cells = cellFactory.getCells(row);
+        assertEquals(2, cells.length);
+        for (DataCell cell : cells) {
+            assertEquals(JSONCellFactory.TYPE, cell.getType());
+        }
+    }
+
+    @Test
+    void testRoleSplitterFactory_execution_withDataRow() {
+        MessagePartExtractorSettings settings = new MessagePartExtractorSettings();
+        settings.m_textPartsPrefix = Optional.empty();
+        settings.m_imagePartsPrefix = Optional.empty();
+        settings.m_toolCallsPrefix = Optional.empty();
+        settings.m_roleColumnName = Optional.of("role");
+        settings.m_toolCallIdColumnName = Optional.empty();
+        settings.m_nameColumnName = Optional.empty();
+        var factories = MessageCellSplitterFactories.createCellSplitterFactories(settings, 0);
+        var factory = factories.get(0);
+        var cellFactory = factory.get();
+        DataRow row = new DefaultRow(new RowKey("row4"), TestUtil.createMessageWithRole("USER"));
+        var cells = cellFactory.getCells(row, 0);
+        assertEquals(1, cells.length);
+        assertEquals("USER", ((StringCell)cells[0]).getStringValue());
+    }
+
+    @Test
+    void testToolCallIdSplitterFactory_execution_withDataRow() {
+        MessagePartExtractorSettings settings = new MessagePartExtractorSettings();
+        settings.m_textPartsPrefix = Optional.empty();
+        settings.m_imagePartsPrefix = Optional.empty();
+        settings.m_toolCallsPrefix = Optional.empty();
+        settings.m_roleColumnName = Optional.empty();
+        settings.m_toolCallIdColumnName = Optional.of("toolCallId");
+        settings.m_nameColumnName = Optional.empty();
+        var factories = MessageCellSplitterFactories.createCellSplitterFactories(settings, 0);
+        var factory = factories.get(0);
+        var cellFactory = factory.get();
+        DataRow row = new DefaultRow(new RowKey("row5"), TestUtil.createMessageWithToolCallId("id123"));
+        var cells = cellFactory.getCells(row, 0);
+        assertEquals(1, cells.length);
+        assertEquals("id123", ((StringCell)cells[0]).getStringValue());
+    }
+
+    @Test
+    void testNameSplitterFactory_execution_withDataRow() {
+        MessagePartExtractorSettings settings = new MessagePartExtractorSettings();
+        settings.m_textPartsPrefix = Optional.empty();
+        settings.m_imagePartsPrefix = Optional.empty();
+        settings.m_toolCallsPrefix = Optional.empty();
+        settings.m_roleColumnName = Optional.empty();
+        settings.m_toolCallIdColumnName = Optional.empty();
+        settings.m_nameColumnName = Optional.of("name");
+        var factories = MessageCellSplitterFactories.createCellSplitterFactories(settings, 0);
+        var factory = factories.get(0);
+        var cellFactory = factory.get();
+        DataRow row = new DefaultRow(new RowKey("row6"), TestUtil.createMessageWithName("foo"));
+        var cells = cellFactory.getCells(row, 0);
+        assertEquals(1, cells.length);
+        assertEquals("foo", ((StringCell)cells[0]).getStringValue());
+    }
+
+    @Test
+    void testTextPartsSplitterFactory_multiRowExtraction() {
+        MessagePartExtractorSettings settings = new MessagePartExtractorSettings();
+        settings.m_textPartsPrefix = Optional.of("text_");
+        settings.m_imagePartsPrefix = Optional.empty();
+        settings.m_toolCallsPrefix = Optional.empty();
+        settings.m_roleColumnName = Optional.empty();
+        settings.m_toolCallIdColumnName = Optional.empty();
+        settings.m_nameColumnName = Optional.empty();
+        var factories = MessageCellSplitterFactories.createCellSplitterFactories(settings, 0);
+        var factory = factories.get(0);
+        // Accept both rows to simulate state collection (max parts = 3)
+        factory.accept(TestUtil.createMessageWithTextParts("a", "b"));
+        factory.accept(TestUtil.createMessageWithTextParts("x", "y", "z"));
+        var cellFactory = factory.get();
+        DataRow row1 = new DefaultRow(new RowKey("row1"), TestUtil.createMessageWithTextParts("a", "b"));
+        DataRow row2 = new DefaultRow(new RowKey("row2"), TestUtil.createMessageWithTextParts("x", "y", "z"));
+        var cells1 = cellFactory.getCells(row1);
+        var cells2 = cellFactory.getCells(row2);
+        // Should pad row1 to 3 columns
+        assertEquals(3, cells1.length);
+        assertEquals("a", ((StringCell)cells1[0]).getStringValue());
+        assertEquals("b", ((StringCell)cells1[1]).getStringValue());
+        assertTrue(cells1[2].isMissing());
+        // Row2 should have all 3 values
+        assertEquals(3, cells2.length);
+        assertEquals("x", ((StringCell)cells2[0]).getStringValue());
+        assertEquals("y", ((StringCell)cells2[1]).getStringValue());
+        assertEquals("z", ((StringCell)cells2[2]).getStringValue());
+    }
+
+    @Test
+    void testToolCallsSplitterFactory_multiRowExtraction() {
+        MessagePartExtractorSettings settings = new MessagePartExtractorSettings();
+        settings.m_textPartsPrefix = Optional.empty();
+        settings.m_imagePartsPrefix = Optional.empty();
+        settings.m_toolCallsPrefix = Optional.of("tool_");
+        settings.m_roleColumnName = Optional.empty();
+        settings.m_toolCallIdColumnName = Optional.empty();
+        settings.m_nameColumnName = Optional.empty();
+        var factories = MessageCellSplitterFactories.createCellSplitterFactories(settings, 0);
+        var factory = factories.get(0);
+        // Accept both rows to simulate state collection (max tool calls = 3)
+        factory.accept(TestUtil.createMessageWithToolCalls(2));
+        factory.accept(TestUtil.createMessageWithToolCalls(3));
+        var cellFactory = factory.get();
+        DataRow row1 = new DefaultRow(new RowKey("row1"), TestUtil.createMessageWithToolCalls(2));
+        DataRow row2 = new DefaultRow(new RowKey("row2"), TestUtil.createMessageWithToolCalls(3));
+        var cells1 = cellFactory.getCells(row1);
+        var cells2 = cellFactory.getCells(row2);
+        // Should pad row1 to 3 columns
+        assertEquals(3, cells1.length);
+        assertEquals(JSONCellFactory.TYPE, cells1[0].getType());
+        assertEquals(JSONCellFactory.TYPE, cells1[1].getType());
+        assertTrue(cells1[2].isMissing());
+        // Row2 should have all 3 tool calls
+        assertEquals(3, cells2.length);
+        assertEquals(JSONCellFactory.TYPE, cells2[0].getType());
+        assertEquals(JSONCellFactory.TYPE, cells2[1].getType());
+        assertEquals(JSONCellFactory.TYPE, cells2[2].getType());
     }
 }

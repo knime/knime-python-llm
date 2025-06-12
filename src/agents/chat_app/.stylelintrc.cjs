@@ -8,6 +8,6 @@ module.exports = {
         ignoreAtRules: ["define-mixin", "mixin"],
       },
     ],
-    "selector-nested-pattern": "^([\\w\\-\\.]+|&)",
+    "selector-nested-pattern": "^([\\w\\-\\.]+|&)", // Allow `.with-error &` syntax
   },
 };

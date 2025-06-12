@@ -558,11 +558,10 @@ class AgentPrompter2:
                 for msg in history_df[self.conversation_column]
             ]
 
-        initial_message = render_message_as_json(
-            initial_data=data_registry.llm_representation(),
-            user_message=self.user_message,
-        )
-        messages.append({"role": "user", "content": initial_message})
+
+        if data_registry.has_data:
+            messages.append(data_registry.create_summary_message())
+        messages.append({"role": "user", "content": self.user_message})
         num_data_outputs = ctx.get_connected_output_port_numbers()[1]
 
         graph = create_react_agent(

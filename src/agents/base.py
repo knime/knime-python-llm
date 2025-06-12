@@ -554,13 +554,16 @@ class AgentPrompter2:
         from ._data_service import (
             DataRegistry,
             LangchainToolConverter,
+            ExecutionMode,
         )
         from langgraph.prebuilt import create_react_agent
         from knime.types.message import to_langchain_message, from_langchain_message
 
         data_registry = DataRegistry.create_with_input_tables(input_tables, data_message_prefix=self.data_message_prefix)
         tool_converter = LangchainToolConverter(
-            data_registry, ctx, self.debug
+            data_registry,
+            ctx,
+            ExecutionMode.DEBUG if self.debug else ExecutionMode.DEFAULT
         )
 
         chat_model: BaseChatModel = chat_model.create_model(
@@ -740,6 +743,7 @@ class AgentChatView:
         from ._data_service import (
             DataRegistry,
             LangchainToolConverter,
+            ExecutionMode,
             AgentChatViewDataService,
         )
 
@@ -748,7 +752,9 @@ class AgentChatView:
         )
         data_registry = DataRegistry.create_with_input_tables(input_tables, data_message_prefix=self.data_message_prefix)
         tool_converter = LangchainToolConverter(
-            data_registry, ctx, self.debug
+            data_registry,
+            ctx,
+            ExecutionMode.DEBUG if self.debug else ExecutionMode.DETACHED
         )
         if tools_table is not None:
             tool_cells = _extract_tools_from_table(tools_table, self.tool_column)

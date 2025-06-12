@@ -51,6 +51,8 @@ from langchain.tools import StructuredTool
 import knime.extension as knext
 import logging
 
+from enum import Enum, auto
+
 _logger = logging.getLogger(__name__)
 
 
@@ -66,11 +68,17 @@ class WorkflowTool:
     output_ports: list[Port]
 
 
+class ExecutionMode(Enum):
+    DEBUG = auto()
+    DEFAULT = auto()
+    DETACHED = auto()
+
+
 class LangchainToolConverter:
-    def __init__(self, data_registry: DataRegistry, ctx, debug: bool):
+    def __init__(self, data_registry: DataRegistry, ctx, execution_mode: ExecutionMode):
         self._data_registry = data_registry
         self._ctx = ctx
-        self._debug = debug
+        self._execution_mode_hint = {"execution-mode": execution_mode.name}
         self.sanitized_to_original = {}
         self._has_data_tools = False
 
@@ -148,7 +156,7 @@ class LangchainToolConverter:
             try:
                 configuration, inputs = params_parser(params)
                 message, outputs = self._ctx._execute_tool(
-                    tool, configuration, inputs, self._debug
+                    tool, configuration, inputs, self._execution_mode_hint
                 )
                 return outputs_processor(message, outputs)
             except Exception as e:

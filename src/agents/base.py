@@ -521,7 +521,7 @@ class AgentPrompter2:
         # print("Waiting for debugger attach")
         # debugpy.wait_for_client()
 
-        data_registry = DataRegistry(input_tables)
+        data_registry = DataRegistry.create_with_input_tables(input_tables)
         tool_converter = LangchainToolConverter(
             data_registry, ctx, render_structured_message, self.debug
         )
@@ -608,7 +608,6 @@ def _extract_tools_from_table(tools_table: knext.Table, tool_column: str):
         )
     tool_list = tools_df[tool_column].tolist()
     return tool_list
-
 
 @knext.node(
     "Agent Chat View",
@@ -702,7 +701,7 @@ class AgentChatView:
         chat_model = chat_model.create_model(
             ctx, output_format=OutputFormatOptions.Text
         )
-        data_registry = DataRegistry(input_tables)
+        data_registry = DataRegistry.create_with_input_tables(input_tables)
         tool_converter = LangchainToolConverter(
             data_registry, ctx, render_structured_message, self.debug
         )

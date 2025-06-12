@@ -65,10 +65,6 @@ import re
 _logger = logging.getLogger(__name__)
 
 
-@dataclass
-class DataItem:
-    llm_representation: dict
-    data: knext.Table
 
 
 @dataclass
@@ -76,8 +72,14 @@ class Port:
     name: str
     description: str
     type: str
-    spec: Optional[str]
+    spec: Optional[dict] = None
 
+@dataclass
+class DataItem:
+    """Represents a data item in the registry."""
+    meta_data: Port
+    data: knext.Table
+    
 
 def _empty_table():
     """Returns an empty knext.Table."""
@@ -98,16 +100,25 @@ class WorkflowTool:
 
 
 class DataRegistry:
-    def __init__(self, initial_tables: Sequence[knext.Table] = None):
+    def __init__(self):
         self._data: list[DataItem] = []
-        if initial_tables:
-            for table in initial_tables:
-                self.add_table(table)
 
-    def add_table(self, table: knext.Table) -> dict:
-        table_representation = self._table_representation(table)
-        self._data.append(DataItem(table_representation, table))
-        return {len(self._data) - 1: table_representation}
+    @classmethod
+    def create_with_input_tables(self, input_tables: Sequence[knext.Table]) -> "DataRegistry":
+        """Creates a DataRegistry with the given input tables."""
+        registry = DataRegistry()
+        for i, table in enumerate(input_tables):
+            spec = _spec_representation(table)
+            port = Port(name=f"input_table_{i+1}", description=f"Input table {i+1}", type="Table", spec=spec)
+            registry._data.append(DataItem(meta_data=port, data=table))
+        return registry
+
+    def add_table(self, table: knext.Table, port: Port) -> dict:
+        spec = _spec_representation(table)
+        meta_data = Port(
+            name=port.name, description=port.description, type=port.type, spec=spec)
+        self._data.append(DataItem(meta_data=meta_data, data=table))
+        return {len(self._data) - 1: _port_to_dict(meta_data)}
 
     def get_data(self, index: int) -> knext.Table:
         if index < 0 or index >= len(self._data):
@@ -123,14 +134,6 @@ class DataRegistry:
             empty_table = _empty_table()
             tables = tables + [empty_table] * (num_tables - len(tables))
         return tables
-
-    def create_port_description(self, port: Port) -> dict:
-        return {
-            "name": port.name,
-            "description": port.description,
-            "type": port.type,
-            "spec": port.spec,
-        }
     
     @property
     def has_data(self) -> bool:
@@ -140,14 +143,19 @@ class DataRegistry:
     def create_summary_message(self) -> Optional[HumanMessage]:
         if not self._data:
             return None
-        return HumanMessage(yaml.dump(self.llm_representation()))
+        
+        return HumanMessage(yaml.dump({id: _port_to_dict(data.meta_data) for id, data in enumerate(self._data)}, sort_keys=False),)
 
-    def llm_representation(self) -> dict:
-        return {id: data.llm_representation for id, data in enumerate(self._data)}
+def _spec_representation(table: knext.Table) -> dict:
+    return {column.name: str(column.ktype) for column in table.schema}
 
-    def _table_representation(self, table: knext.Table) -> dict:
-        return {column.name: str(column.ktype) for column in table.schema}
-
+def _port_to_dict(port: Port) -> dict:
+        return {
+            "name": port.name,
+            "description": port.description,
+            "type": port.type,
+            "spec": port.spec,
+        }
 
 class LangchainToolConverter:
     def __init__(
@@ -257,10 +265,10 @@ class LangchainToolConverter:
         description_with_data_info = self._message_renderer(
             description=tool.description,
             input_ports=list(
-                map(self._data_registry.create_port_description, input_ports)
+                map(_port_to_dict, input_ports)
             ),
             output_ports=list(
-                map(self._data_registry.create_port_description, output_ports)
+                map(_port_to_dict, output_ports)
             ),
         )
 
@@ -285,8 +293,8 @@ class LangchainToolConverter:
                     tool, configuration, inputs, self._debug
                 )
                 output_references = {}
-                for output in outputs:
-                    output_reference = self._data_registry.add_table(output)
+                for port, output in zip(output_ports, outputs):
+                    output_reference = self._data_registry.add_table(output, port)
                     output_references.update(output_reference)
 
                 return self._message_renderer(

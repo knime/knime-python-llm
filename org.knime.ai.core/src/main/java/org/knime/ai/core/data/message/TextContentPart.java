@@ -90,4 +90,21 @@ public final class TextContentPart implements MessageContentPart {
         return m_content;
     }
 
+    @Override
+    public boolean equals(final Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null || getClass() != obj.getClass()) {
+            return false;
+        }
+        TextContentPart other = (TextContentPart)obj;
+        return m_content.equals(other.m_content);
+    }
+
+    @Override
+    public int hashCode() {
+        return m_content.hashCode();
+    }
+
 }

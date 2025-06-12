@@ -105,9 +105,6 @@ importers:
       postcss-mixins:
         specifier: ^11.0.3
         version: 11.0.3(postcss@8.4.47)
-      postcss-nested:
-        specifier: ^7.0.2
-        version: 7.0.2(postcss@8.4.47)
       postcss-preset-env:
         specifier: ^10.2.0
         version: 10.2.0(postcss@8.4.47)
@@ -3006,12 +3003,6 @@ packages:
   postcss-mixins@11.0.3:
     resolution: {integrity: sha512-HZa6DHlN7uCkp7GTFNvhpyK/Gi9+vrVG7FPl2oQdj+sXUuYo4ri9OsWBseTnvnLfWxRWOq8/VwcHcixtZPrRRg==}
     engines: {node: ^18.0 || ^ 20.0 || >= 22.0}
-    peerDependencies:
-      postcss: ^8.2.14
-
-  postcss-nested@7.0.2:
-    resolution: {integrity: sha512-5osppouFc0VR9/VYzYxO03VaDa3e8F23Kfd6/9qcZTUI8P58GIYlArOET2Wq0ywSl2o2PjELhYOFI4W7l5QHKw==}
-    engines: {node: '>=18.0'}
     peerDependencies:
       postcss: ^8.2.14
 
@@ -6956,11 +6947,6 @@ snapshots:
       postcss-simple-vars: 7.0.1(postcss@8.4.47)
       sugarss: 4.0.1(postcss@8.4.47)
       tinyglobby: 0.2.14
-
-  postcss-nested@7.0.2(postcss@8.4.47):
-    dependencies:
-      postcss: 8.4.47
-      postcss-selector-parser: 7.1.0
 
   postcss-nesting@13.0.1(postcss@8.4.47):
     dependencies:

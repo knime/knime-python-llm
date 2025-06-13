@@ -338,7 +338,8 @@ class LangchainToolConverter:
 
 
 def _render_structured(**kwargs) -> str:
-    return yaml.dump(kwargs, sort_keys=False)
+    yaml_str = yaml.dump(kwargs, sort_keys=False)
+    return f"```yaml\n{yaml_str}```"
 
 
 class AgentChatViewDataService:

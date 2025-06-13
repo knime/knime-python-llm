@@ -1,7 +1,8 @@
 import DOMPurify from "dompurify";
 import markdownit from "markdown-it";
+import markdownItTable from "markdown-it-multimd-table";
 
-const md = markdownit({ html: true });
+const md = markdownit({ html: true, linkify: true, typographer: true, breaks: true }).use(markdownItTable);
 
 const sanitizationConfig = {
   ALLOWED_TAGS: [
@@ -22,6 +23,12 @@ const sanitizationConfig = {
     "li",
     "code",
     "pre",
+    "table",
+    "thead",
+    "tbody",
+    "tr",
+    "th",
+    "td",
   ],
   ALLOWED_ATTR: ["style"],
 };

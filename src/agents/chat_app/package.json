@@ -32,6 +32,7 @@
     "highlight.js": "^11.9.0",
     "lodash-es": "^4.17.21",
     "markdown-it": "^14.1.0",
+    "markdown-it-multimd-table": "^4.2.3",
     "vue": "^3.4.38"
   },
   "devDependencies": {

@@ -155,7 +155,7 @@ Data:
         return HumanMessage(msg + content)
 
 def _spec_representation(table: knext.Table) -> dict:
-    return {column.name: str(column.ktype) for column in table.schema}
+    return {"columns": {column.name: str(column.ktype) for column in table.schema}}
 
 def _port_to_dict(port: Port) -> dict:
         return {

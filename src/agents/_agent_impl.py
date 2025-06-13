@@ -299,6 +299,8 @@ class LangchainToolConverter:
                 message, outputs = self._ctx._execute_tool(
                     tool, configuration, inputs, self._debug
                 )
+                if not outputs:
+                    return message
                 output_references = {}
                 for port, output in zip(output_ports, outputs):
                     output_reference = self._data_registry.add_table(output, port)

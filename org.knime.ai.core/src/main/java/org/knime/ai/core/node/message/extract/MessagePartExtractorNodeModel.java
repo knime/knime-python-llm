@@ -82,7 +82,8 @@ final class MessagePartExtractorNodeModel extends WebUINodeModel<MessagePartExtr
                 + "' does not exist in the input table.");
         }
         int messageColumnIndex = messageTableSpec.findColumnIndex(modelSettings.m_messageColumn);
-        var splitterFactories = MessageCellSplitterFactories.createCellSplitterFactories(modelSettings, messageColumnIndex);
+
+        var splitterFactories = MessageCellSplitterFactories.createCellSplitterFactories(modelSettings, messageColumnIndex, messageTableSpec);
         // If any splitterFactory is stateful (i.e., depends on data), return null DataTableSpec
         boolean hasStateful = splitterFactories.stream().anyMatch(f -> f.isStateful());
         if (hasStateful) {
@@ -100,7 +101,8 @@ final class MessagePartExtractorNodeModel extends WebUINodeModel<MessagePartExtr
         var messageTable = inData[0];
         var messageTableSpec = messageTable.getDataTableSpec();
         int messageColumnIndex = messageTableSpec.findColumnIndex(modelSettings.m_messageColumn);
-        var splitterFactories = MessageCellSplitterFactories.createCellSplitterFactories(modelSettings, messageColumnIndex);
+
+        var splitterFactories = MessageCellSplitterFactories.createCellSplitterFactories(modelSettings, messageColumnIndex, messageTableSpec);
         // Scan the data for extractors that need it
         for (var row : messageTable) {
             var cell = row.getCell(messageColumnIndex);
@@ -126,7 +128,4 @@ final class MessagePartExtractorNodeModel extends WebUINodeModel<MessagePartExtr
         }
         return columnRearranger;
     }
-
-
-
 }

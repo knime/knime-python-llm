@@ -67,11 +67,13 @@ import org.knime.ai.core.data.message.MessageValue.ToolCall;
 import org.knime.core.data.DataCell;
 import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataColumnSpecCreator;
+import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.DataType;
 import org.knime.core.data.container.CellFactory;
 import org.knime.core.data.def.StringCell;
 import org.knime.core.data.image.png.PNGImageCellFactory;
 import org.knime.core.data.json.JSONCellFactory;
+import org.knime.core.util.UniqueNameGenerator;
 
 /**
  * Contains the logic for creating cell splitter factories for the Message Extractor node.
@@ -81,37 +83,52 @@ import org.knime.core.data.json.JSONCellFactory;
 final class MessageCellSplitterFactories {
 
     static List<CellSplitterFactory<?>> createCellSplitterFactories(final MessagePartExtractorSettings settings,
-        final int messageColumnIndex) {
+        final int messageColumnIndex, final DataTableSpec messageTableSpec) {
         var list = new ArrayList<CellSplitterFactory<?>>();
-        settings.m_roleColumnName.map(c -> new PartExtractorSingleCellFactory(c, StringCell.TYPE,
-            MessageCellSplitterFactories::extractRole, messageColumnIndex))
-            .ifPresent(factory -> list.add(createStatelessCellSplitterFactory(() -> factory)));
-        settings.m_nameColumnName.map(c -> new PartExtractorSingleCellFactory(c, StringCell.TYPE,
-            MessageCellSplitterFactories::extractName, messageColumnIndex))
-            .ifPresent(factory -> list.add(createStatelessCellSplitterFactory(() -> factory)));
+        UniqueNameGenerator uniqueNameGenerator = new UniqueNameGenerator(messageTableSpec);
+
+        settings.m_roleColumnName.map(c -> {
+            String uniqueColumnName = uniqueNameGenerator.newName(c);
+            return new PartExtractorSingleCellFactory(uniqueColumnName, StringCell.TYPE,
+                MessageCellSplitterFactories::extractRole, messageColumnIndex);
+        }).ifPresent(factory -> list.add(createStatelessCellSplitterFactory(() -> factory)));
+
+        settings.m_nameColumnName.map(c -> {
+            String uniqueColumnName = uniqueNameGenerator.newName(c);
+            return new PartExtractorSingleCellFactory(uniqueColumnName, StringCell.TYPE,
+                MessageCellSplitterFactories::extractName, messageColumnIndex);
+        }).ifPresent(factory -> list.add(createStatelessCellSplitterFactory(() -> factory)));
         var textTypeFilter = ofType(MessageContentPartType.TEXT);
         settings.m_textPartsPrefix.map(prefix -> createMultiCellSplitterFactory(
-                createContentCounter(textTypeFilter), createColumnSpecCreator(prefix, StringCell.TYPE), messageColumnIndex,
-                createContentPartExtractor(textTypeFilter, data -> new StringCell(new String(data)))))
+                createContentCounter(textTypeFilter), createColumnSpecCreator(prefix, StringCell.TYPE, messageTableSpec),
+                messageColumnIndex, createContentPartExtractor(textTypeFilter, data -> new StringCell(new String(data)))))
             .ifPresent(list::add);
         var imageTypeFilter = ofType(MessageContentPartType.PNG);
         settings.m_imagePartsPrefix.map(prefix -> createMultiCellSplitterFactory(
-            createContentCounter(imageTypeFilter), createColumnSpecCreator(prefix, PNGImageCellFactory.TYPE), messageColumnIndex,
-            createContentPartExtractor(imageTypeFilter, PNGImageCellFactory::create)))
+            createContentCounter(imageTypeFilter), createColumnSpecCreator(prefix, PNGImageCellFactory.TYPE, messageTableSpec),
+            messageColumnIndex, createContentPartExtractor(imageTypeFilter, PNGImageCellFactory::create)))
             .ifPresent(list::add);
         settings.m_toolCallsPrefix.map(prefix -> createMultiCellSplitterFactory(
             MessageCellSplitterFactories::countToolCalls,
-            createColumnSpecCreator(prefix, JSONCellFactory.TYPE), messageColumnIndex,
+            createColumnSpecCreator(prefix, JSONCellFactory.TYPE, messageTableSpec), messageColumnIndex,
             MessageCellSplitterFactories::extractToolCalls))
             .ifPresent(list::add);
-        settings.m_toolCallIdColumnName.map(c -> new PartExtractorSingleCellFactory(c, StringCell.TYPE,
-            MessageCellSplitterFactories::extractToolCallId, messageColumnIndex))
-            .ifPresent(factory -> list.add(createStatelessCellSplitterFactory(() -> factory)));
+        settings.m_toolCallIdColumnName.map(c -> {
+            String uniqueColumnName = uniqueNameGenerator.newName(c);
+            return new PartExtractorSingleCellFactory(uniqueColumnName, StringCell.TYPE,
+                MessageCellSplitterFactories::extractToolCallId, messageColumnIndex);
+        }).ifPresent(factory -> list.add(createStatelessCellSplitterFactory(() -> factory)));
         return list;
     }
 
-    static IntFunction<DataColumnSpec> createColumnSpecCreator(final String prefix, final DataType type) {
-        return j -> new DataColumnSpecCreator(prefix + (j + 1), type).createSpec();
+    static IntFunction<DataColumnSpec> createColumnSpecCreator(final String prefix, final DataType type, final DataTableSpec messageTableSpec) {
+        UniqueNameGenerator generator = new UniqueNameGenerator(messageTableSpec);
+
+        return j -> {
+            String intendedName = prefix + (j + 1);
+            String uniqueName = generator.newName(intendedName);
+            return new DataColumnSpecCreator(uniqueName, type).createSpec();
+        };
     }
 
     static CellSplitterFactory<Integer> createMultiCellSplitterFactory(

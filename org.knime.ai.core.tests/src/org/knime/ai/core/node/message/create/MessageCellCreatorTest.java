@@ -155,6 +155,26 @@ final class MessageCellCreatorTest {
     }
 
     @Test
+    void testCreateTextContentExtractor_value_withBlankText() {
+        var settings = minimalSettings();
+        settings.m_content = new MessageCreatorNodeSettings.Contents[] {
+            new MessageCreatorNodeSettings.Contents()
+        };
+        settings.m_content[0].m_contentType = MessageCreatorNodeSettings.Contents.ContentType.TEXT;
+        settings.m_content[0].m_inputType = MessageCreatorNodeSettings.InputType.VALUE;
+        settings.m_content[0].m_textValue = ""; // Blank text value
+
+        var spec = minimalSpec();
+        var creator = new MessageCellCreator(settings, spec);
+
+        var exception = assertThrows(InvalidSettingsException.class, () -> {
+            creator.createTextContentExtractor(settings.m_content[0], 0);
+        });
+
+        assertEquals("Please enter a value for the Text value in Content 0.", exception.getMessage());
+    }
+
+    @Test
     void testCreateContentExtractor_value() throws InvalidSettingsException {
         var settings = minimalSettings();
         var spec = minimalSpec();

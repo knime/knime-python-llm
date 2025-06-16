@@ -113,7 +113,7 @@ class ChatPrompter:
 
     **Conversation history**:
 
-    If the conversation history table is non-empty, it will be used as context when sending the new message to the chat model.
+    The conversation history table will be used as context when sending the new message to the chat model.
     To use only the conversation history table for prompting (without a new message), leave the new message setting empty and
     ensure that the last entry in the table is from either `User` or `Tool`.
 
@@ -130,9 +130,12 @@ class ChatPrompter:
     to route the downstream portion of the workflow appropriately.
 
     The output of the tool should then be turned into a "Tool" message, appended to the conversation, and
-    fed back into the node. Once the node is executed (without a new "User" message specified in the dialog), the model
-    will use the messages in the conversation as context, including the original "User" request, the "AI" response
-    containing the tool call, and the corresponding "Tool" message, to generate the final "AI" message.
+    fed back into the node. It is crucial to ensure that this "Tool" message has the same Tool Call ID as the
+    request it is responding to, which allows the model to link the two.
+
+    During the next node execution, the model will use the messages in the conversation as context,
+    including the original "User" request, the "AI" response containing the tool call, and the
+    corresponding "Tool" message, to generate the final "AI" message, thus completing the tool-calling loop.
 
     A **tool definition** is a JSON object describing the corresponding tool and its parameters. The more
     descriptive the definition, the more likely the LLM to call it appropriately.
@@ -165,9 +168,7 @@ class ChatPrompter:
         "System message",
         """
         Optional instructional message for the model at the start of the conversation,
-        defining rules and persona.
-
-        **Note**: Some models do not support system messages. For these, leave this field empty.
+        defining rules and persona. Also known as "developer message".
         """,
         default_value="",
     )
@@ -199,6 +200,13 @@ class ChatPrompter:
         knext.Effect.SHOW,
     )
 
+    tool_definition_column = knext.ColumnParameter(
+        "Tool definition column",
+        "Select the column from the 'Tool Definitions' table containing the tool definitions (JSON).",
+        port_index=2,
+        column_filter=util.create_type_filter(knext.logical(dict)),
+    ).rule(knext.DialogContextCondition(_is_tool_table_present), knext.Effect.SHOW)
+
     extend_existing_conversation = knext.BoolParameter(
         "Extend existing conversation",
         """If enabled, new messages will be appended to the input conversation table.
@@ -209,14 +217,12 @@ class ChatPrompter:
         knext.Effect.SHOW,
     )
 
-    _tool_visibility_rule = knext.DialogContextCondition(_is_tool_table_present)
-
-    tool_definition_column = knext.ColumnParameter(
-        "Tool definition column",
-        "Select the column from the 'Tool Definitions' table containing the tool definitions (JSON).",
-        port_index=2,
-        column_filter=util.create_type_filter(knext.logical(dict)),
-    ).rule(_tool_visibility_rule, knext.Effect.SHOW)
+    ignore_new_message_when_tool_calling = knext.BoolParameter(
+        """Ignore "New message" during tool calling.""",
+        """If the last message in the conversation history is a "Tool" message, ignore the "New message"
+        setting specified in the dialog and let the model process the tool call result instead.""",
+        default_value=True,
+    ).rule(knext.DialogContextCondition(_is_tool_table_present), knext.Effect.SHOW)
 
     def configure(
         self,
@@ -235,6 +241,7 @@ class ChatPrompter:
                     self.message_column,
                     util.message_type(),
                     "message",
+                    "Conversation History table",
                 )
             else:
                 self.message_column = util.pick_default_column(
@@ -252,6 +259,7 @@ class ChatPrompter:
                     self.tool_definition_column,
                     knext.logical(dict),
                     "tool definition",
+                    "Tool Definitions table",
                 )
             else:
                 self.tool_definition_column = util.pick_default_column(
@@ -292,11 +300,17 @@ class ChatPrompter:
         has_history = input_table is not None
         has_tools = tool_table is not None
 
+        if not has_history and not self.chat_message:
+            raise knext.InvalidParametersError(
+                "You must specify the initial message when starting a new conversation."
+            )
+
         conversation_messages = []
         if self.system_message:
             conversation_messages.append(lcm.SystemMessage(content=self.system_message))
 
         history_df = None
+        is_last_message_from_tool = False
         if has_history:
             history_df = input_table.to_pandas()
             knime_messages = history_df[self.message_column].tolist()
@@ -305,8 +319,15 @@ class ChatPrompter:
             ]
             conversation_messages.extend(langchain_history)
 
+            is_last_message_from_tool = isinstance(
+                conversation_messages[-1], lcm.ToolMessage
+            )
+
         human_message = None
-        if self.chat_message:
+        should_ignore_new_message = (
+            is_last_message_from_tool and self.ignore_new_message_when_tool_calling
+        )
+        if self.chat_message and not should_ignore_new_message:
             human_message = lcm.HumanMessage(content=self.chat_message)
             conversation_messages.append(human_message)
 

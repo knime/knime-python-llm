@@ -75,7 +75,7 @@ public final class MessageCell extends DataCell implements MessageValue {
 
     private final String m_toolCallId;
 
-    private final String m_toolName;
+    private final String m_name;
 
     /**
      * Data type for MessageCell.
@@ -98,7 +98,7 @@ public final class MessageCell extends DataCell implements MessageValue {
         m_content = immutableCopy(content);
         m_toolCalls = toolCalls != null ? immutableCopy(toolCalls) : null;
         m_toolCallId = toolCallId;
-        m_toolName = name;
+        m_name = name;
     }
 
     private static <T> List<T> immutableCopy(final List<? extends T> list) {
@@ -181,13 +181,13 @@ public final class MessageCell extends DataCell implements MessageValue {
 
     @Override
     public Optional<String> getName() {
-        return Optional.ofNullable(m_toolName);
+        return Optional.ofNullable(m_name);
     }
 
     @Override
     public String toString() {
         return "MessageCell [messageType=" + m_messageType + ", content=" + m_content + ", toolCalls=" + m_toolCalls
-            + ", toolCallId=" + m_toolCallId + ", toolName=" + m_toolName + "]";
+            + ", toolCallId=" + m_toolCallId + ", name=" + m_name + "]";
     }
 
     @Override

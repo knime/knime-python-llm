@@ -62,13 +62,32 @@ public final class MessageCreatorNodeFactory extends WebUINodeFactory<MessageCre
     private static final WebUINodeConfiguration CONFIG = WebUINodeConfiguration.builder()
             .name("Message Creator")
             .icon("./Message-creator.png")
-            .shortDescription("Creates a KNIME MessageCell from text and/or image data.")
-            .fullDescription(
-                "This node creates a MessageCell, which can contain text and/or image content "
-                + "for a specified role (USER, AI, TOOL).")
+            .shortDescription("Creates a Message containing text and/or image data for a specified role.")
+            .fullDescription("""
+                <p>
+                    This node creates Messages, which can include text and/or image content.
+                    These messages can be assigned specific roles such as User, AI, or Tool. It is possible
+                    to select columns from the input table to generate messages with mixed content, including
+                    both text and image data. Additionally, the node supports embedding tool calls within the
+                    AI messages. The input table is processed row by row, converting each row into a
+                    Message with one or multiple content parts.
+                </p>
+                <p>
+                    Message types:
+                </p>
+                <ul>
+                    <li><b>User Message</b>: Contains text and/or image content provided by the user and is assigned the User role.
+                    These messages are used to represent user input.</li>
+                    <li><b>AI Message</b>: Contains text and/or image content, assigned the AI role, and may include tool calls.
+                    Tool calls specify the tool name, ID, and arguments. These messages are used to represent AI-generated responses
+                    or actions, including invoking tools for specific tasks.</li>
+                    <li><b>Tool Message</b>: Contains text and/or image content, assigned the Tool role, and includes the tool call ID.
+                    These messages represent outputs or responses from tools invoked.</li>
+                </ul>
+                """)
             .modelSettingsClass(MessageCreatorNodeSettings.class)
-            .addInputTable("Input Table", "Table to process. A message is created for each row.")
-            .addOutputTable("Message Table", "Table with messages.")
+            .addInputTable("Input Table", "The table containing rows to process. Each row will be converted into a Message.")
+            .addOutputTable("Message Table", "The resulting table containing created messages.")
             .sinceVersion(5, 5, 0)
             .build();
 

@@ -736,4 +736,5 @@ class AgentChatView:
             self.initial_message,
             self.recursion_limit,
             self.show_tool_calls_and_results,
+            tool_converter,
         )

@@ -140,17 +140,35 @@ class DataRegistry:
         """Returns True if there is data in the registry, False otherwise."""
         return len(self._data) > 0
 
-    def create_summary_message(self) -> Optional[HumanMessage]:
-        if not self._data:
-            return None
-        content = _render_structured(**{str(id): _port_to_dict(data.meta_data) for id, data in enumerate(self._data)})
-        msg = """# Data Summary
-This message summarizes the data available for tool calls.
-Each entry corresponds to a data item with its metadata.
-Use the keys to refer to the respective data item for use in tool calls.
-Tools that produce data will also include similar information in their output.
-Data:
+    def create_data_message(self) -> Optional[HumanMessage]:
+        msg = """# Data Tools Interface
+You have access to tools that can consume and produce data.
+The interaction with these tools is mediated via a data repository that keeps track of all available data items.
+The repository is represented as a map from IDs to data items.
+
+Each data item is represented by:
+- The name of the data
+- The description of the data
+- The type of data
+- The spec of the data giving a high-level overview of the data (e.g. the columns in a table)
+
+Note: You do not have access to the actual data content, only the metadata and IDs.
+
+# Using Tools with Data
+## Consuming Data:
+To pass data to a tool, provide the ID of the relevant data item.
+Once invoked, the tool will receive the data associated with that ID.
+
+## Producing Data:
+- Tools that produce data will include an update to the data repository in their tool message.
+- This update follows the same format as the initial data repository: A map of IDs to data items.
+
+You must incorporate these updates into your working view of the data repository.
+# Data:
 """
+        if not self._data:
+            return HumanMessage(msg + "No initial data available. Use a tool to produce data.")
+        content = _render_structured(**{str(id): _port_to_dict(data.meta_data) for id, data in enumerate(self._data)})
         
         return HumanMessage(msg + content)
 
@@ -173,6 +191,12 @@ class LangchainToolConverter:
         self._ctx = ctx
         self._debug = debug
         self.sanitized_to_original = {}
+        self._has_data_tools = False
+
+    @property
+    def has_data_tools(self) -> bool:
+        """Returns True if there are tools that require data inputs or outputs."""
+        return self._has_data_tools
 
     def _sanitize_tool_name(self, name: str) -> str:
         """Replaces characters that are not alphanumeric, underscores, or hyphens because
@@ -210,6 +234,7 @@ class LangchainToolConverter:
     ) -> StructuredTool:
         sanitized_name = self._sanitize_tool_name(tool.name)
         if tool.input_ports or tool.output_ports:
+            self._has_data_tools = True
             return self._to_langchain_tool_with_data(tool, sanitized_name)
         else:
             return self._to_langchain_tool_without_data(tool, sanitized_name)
@@ -355,7 +380,7 @@ class AgentChatViewDataService:
     ):
         self._agent_graph = agent_graph
         self._data_registry = data_registry
-        self._messages = [data_registry.create_summary_message()] if data_registry.has_data else []
+        self._messages = [data_registry.create_data_message()] if data_registry.has_data else []
         self._initial_message = initial_message
         self._recursion_limit = recursion_limit
         self._show_tool_calls_and_results = show_tool_calls_and_results

@@ -558,8 +558,8 @@ class AgentPrompter2:
             ]
 
 
-        if data_registry.has_data:
-            messages.append(data_registry.create_summary_message())
+        if data_registry.has_data or tool_converter.has_data_tools:
+            messages.append(data_registry.create_data_message())
         messages.append({"role": "user", "content": self.user_message})
         num_data_outputs = ctx.get_connected_output_port_numbers()[1]
 

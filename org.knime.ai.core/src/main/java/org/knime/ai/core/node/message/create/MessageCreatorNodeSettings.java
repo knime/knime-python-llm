@@ -123,44 +123,56 @@ final class MessageCreatorNodeSettings implements DefaultNodeSettings {
 
     @Layout(RoleLayout.class)
     @Widget(title = "Input type",
-            description = "Select how the message role is provided (as a value or as a column).")
+            description = "Choose whether the message role is provided as a value or as a column.")
     @ValueSwitchWidget
     @ValueReference(RoleInputTypeRef.class)
     InputType m_roleInputType = InputType.VALUE;
 
     @Layout(RoleLayout.class)
     @Widget(title = "Role",
-            description = "Message role")
+            description = "Specify the role of the message, such as User, AI or Tool."
+            )
     @Effect(predicate = IsValueRoleInputType.class, type = EffectType.SHOW)
     MessageType m_roleValue = MessageType.USER;
 
     @Layout(RoleLayout.class)
     @Widget(title = "Role column",
-            description = "Select the input table column containing message roles.")
+            description = "Select the column from the input table that contains the message roles.")
     @Effect(predicate = IsValueRoleInputType.class, type = EffectType.HIDE)
     @ChoicesProvider(StringColumns.class)
     String m_roleColumn;
 
 
-
     @Layout(ContentLayout.class)
-    @Widget(title = "Message content", description = "Define the content parts (text, image) of the message.")
+    @Widget(title = "Message content", description = "Define the content of the message, including text and/or image parts.")
     @ArrayWidget(
-        addButtonText = "Add content",
+        addButtonText = "Add content part",
         showSortButtons = false,
-        elementTitle = "Content"
+        elementTitle = "Content part"
     )
     Contents[] m_content = new Contents[]{
         new Contents()
     };
 
     @Layout(NameLayout.class)
-    @Widget(title = "Name", description = "(Optional) Select the input table column containing the name, or leave empty.")
+    @Widget(
+        title = "Name",
+        description = "(Optional) Select the input table column containing the name, or leave as None. \n "
+                    + "<ul>"
+                    + "<li><b>Purpose:</b> This column provides a name to differentiate between participants of the same role. "
+                    + "In conversations where multiple entities share the same role (such as several users or multiple tools), "
+                    + "the name property allows you to uniquely identify each participant.</li>"
+                    + "<li><b>Usage:</b> This is especially useful when simulating structured multi-user dialogues or integrating multiple tools, "
+                    + "as it lets the model track who said what and maintain context across turns.</li>"
+                    + "<li><b>Example:</b> In a chat where two users are involved, assigning names like <code>user_A</code> and <code>user_B</code> "
+                    + "helps the model respond accurately and refer to the right person or tool, even though both technically have the same role.</li>"
+                    + "</ul>"
+    )
     @ChoicesProvider(StringColumns.class)
     StringOrEnum<NoneChoice> m_nameColumn = new StringOrEnum<>(NoneChoice.NONE);
 
     @Layout(ToolCallsLayout.class)
-    @Widget(title = "Tool calls", description = "Define tool calls for this message.")
+    @Widget(title = "Tool calls", description = "Define tool calls associated with the message, including tool names, IDs, and arguments.")
     @ArrayWidget(
         addButtonText = "Add tool call",
         showSortButtons = false,
@@ -169,17 +181,17 @@ final class MessageCreatorNodeSettings implements DefaultNodeSettings {
     ToolCallSettings[] m_toolCalls = new ToolCallSettings[]{};
 
     @Layout(ToolCallIdLayout.class)
-    @Widget(title = "Tool call ID Column",
-            description = "(Optional) Select the input table column containing the tool call id.")
+    @Widget(title = "Tool call ID column",
+            description = "(Optional) Select the column containing tool call IDs.")
     @ChoicesProvider(StringColumns.class)
     StringOrEnum<NoneChoice> m_toolCallIdColumn = new StringOrEnum<>(NoneChoice.NONE);
 
     @Layout(OutputLayout.class)
-    @Widget(title = "Message column name", description = "Name of the output message column.")
+    @Widget(title = "Message column name", description = "Name of the output column that will contain the created messages.")
     String m_messageColumnName = "Message";
 
     @Layout(OutputLayout.class)
-    @Widget(title = "Remove input columns", description = "Remove columns used as input from the output table.")
+    @Widget(title = "Remove input columns", description = "Choose whether to remove columns used as input from the output table.")
     boolean m_removeInputColumns = false;
 
     static final class ToolCallSettings implements DefaultNodeSettings {
@@ -188,7 +200,7 @@ final class MessageCreatorNodeSettings implements DefaultNodeSettings {
         String m_toolNameColumn;
 
 
-        @Widget(title = "Tool ID column", description = "Select the input table column containing the tool id.")
+        @Widget(title = "Tool call ID column", description = "Select the input table column containing the tool IDs.")
         @ChoicesProvider(StringColumns.class)
         String m_toolIdColumn;
 
@@ -213,24 +225,23 @@ final class MessageCreatorNodeSettings implements DefaultNodeSettings {
         }
 
         @Layout(ContentsLayout.class)
-        @Widget(title = "Content type", description = "Select the type of content (Text or Image).")
+        @Widget(title = "Type", description = "Select the type of the message content (Text or Image).")
         @ValueSwitchWidget
         @ValueReference(ContentTypeRef.class)
         ContentType m_contentType = ContentType.TEXT;
 
         @Layout(ContentsLayout.class)
-        @Widget(title = "Input type", description = "Select how the content is provided (as a value or as a column).")
+        @Widget(title = "Input type", description = "Specify how the content is provided: either directly as a value or from a column in the input table.")
         @ValueSwitchWidget
         @ValueReference(InputTypeRef.class)
         @Effect(predicate = HasInputTypes.class, type = EffectType.SHOW)
         InputType m_inputType = InputType.VALUE;
 
         @Layout(ContentsValueLayout.class)
-        @Widget(title = "Image column", description = "Select the input table column containing PNG images.")
+        @Widget(title = "Image column", description = "Select the column from the input table that contains PNG images.")
         @ChoicesProvider(PngColumns.class)
         @Effect(predicate = IsImageValue.class, type = EffectType.SHOW)
         String m_imageColumn;
-
 
         @Layout(ContentsValueLayout.class)
         @Widget(title = "Text value", description = "Enter the text content.")
@@ -239,7 +250,7 @@ final class MessageCreatorNodeSettings implements DefaultNodeSettings {
         String m_textValue;
 
         @Layout(ContentsValueLayout.class)
-        @Widget(title = "Text column", description = "Select the input table column containing text values.")
+        @Widget(title = "Text column", description = "Select the column from the input table that contains text values.")
         @Effect(predicate = IsTextColumn.class, type = EffectType.SHOW)
         @ChoicesProvider(StringColumns.class)
         String m_textColumn;

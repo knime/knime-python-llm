@@ -62,6 +62,7 @@ import org.knime.core.data.DataRow;
 import org.knime.core.data.DataType;
 import org.knime.core.data.MissingCell;
 import org.knime.core.data.container.SingleCellFactory;
+import org.knime.core.data.filestore.FileStoreFactory;
 import org.knime.core.node.CanceledExecutionException;
 import org.knime.core.node.ExecutionContext;
 import org.knime.core.node.InvalidSettingsException;
@@ -131,8 +132,7 @@ final class PathToWorkflowCellFactory extends SingleCellFactory implements Close
             }
             var wfTempPath = toLocalWorkflowDir(fsPath, null);
             var wfFile = wfTempPath.getTempFileOrFolder();
-            var wfm = readWorkflow(wfFile.toFile(), m_exec.createSilentSubExecutionContext(0),
-                m_messageBuilder);
+            var wfm = readWorkflow(wfFile.toFile(), m_exec.createSilentSubExecutionContext(0), m_messageBuilder);
             wfm.setName(fsPath.getFileName().toString());
             if (resetWorkflow(wfm)) {
                 m_messageBuilder.addRowIssue(m_pathColumnIndex, rowIndex,
@@ -152,7 +152,7 @@ final class PathToWorkflowCellFactory extends SingleCellFactory implements Close
                 return WorkflowToolCell.createFromAndModifyWorkflow(wfm,
                     new ToolWorkflowMetadata(
                         toolMessageOutputNode.isEmpty() ? null : toolMessageOutputNode.keySet().iterator().next()),
-                    dataAreaPath);
+                    dataAreaPath, FileStoreFactory.createFileStoreFactory(m_exec, "path_to_workflow_"));
             } catch (ToolIncompatibleWorkflowException e) {
                 var message = "Workflow can't be turned into a tool: " + e.getMessage();
                 m_messageBuilder.addRowIssue(m_pathColumnIndex, rowIndex, message);

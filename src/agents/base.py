@@ -169,6 +169,7 @@ class AgentPortObject(FilestorePortObject):
 agent_port_type = knext.port_type("Agent", AgentPortObject, AgentPortObjectSpec)
 
 
+# region Agent Prompter 1.0
 @knext.node(
     "Agent Prompter",
     knext.NodeType.PREDICTOR,
@@ -392,6 +393,7 @@ def _conversation_column_parameter() -> knext.ColumnParameter:
     ).rule(knext.DialogContextCondition(has_conversation_table), knext.Effect.SHOW)
 
 
+# region Agent Prompter 2.0
 @knext.node(
     "Agent Prompter",
     node_type=knext.NodeType.PREDICTOR,
@@ -402,7 +404,11 @@ def _conversation_column_parameter() -> knext.ColumnParameter:
     "Chat model", "The chat model to use.", port_type=chat_model_port_type
 )
 @knext.input_table("Tools", "The tools the agent can use.")
-@knext.input_table("Conversation", "The table containing the conversation held so far.", optional=True)
+@knext.input_table(
+    "Conversation History",
+    "The table containing the conversation held so far.",
+    optional=True,
+)
 @knext.input_table_group(
     "Data inputs",
     "The data inputs for the agent.",
@@ -444,7 +450,7 @@ class AgentPrompter2:
     # New parameter for column name if no history table is connected
     conversation_column_name = knext.StringParameter(
         "Conversation column name",
-        "Name of the conversation column if no conversation table is connected.",
+        "Name of the conversation column if no conversation history table is connected.",
         default_value="Conversation",
     ).rule(knext.DialogContextCondition(has_conversation_table), knext.Effect.HIDE)
 
@@ -543,7 +549,8 @@ class AgentPrompter2:
                 )
             history_df = history_table[self.conversation_column].to_pandas()
             messages = [
-                to_langchain_message(msg) for msg in history_df[self.conversation_column]
+                to_langchain_message(msg)
+                for msg in history_df[self.conversation_column]
             ]
 
         initial_message = render_message_as_json(
@@ -580,7 +587,6 @@ class AgentPrompter2:
         desanitized_messages = [
             tool_converter.desanitize_tool_calls(msg) for msg in messages
         ]
-        
 
         output_column_name = (
             self.conversation_column_name
@@ -589,7 +595,11 @@ class AgentPrompter2:
         )
 
         result_df = pd.DataFrame(
-            {output_column_name: [from_langchain_message(msg) for msg in desanitized_messages]}
+            {
+                output_column_name: [
+                    from_langchain_message(msg) for msg in desanitized_messages
+                ]
+            }
         )
 
         conversation_table = knext.Table.from_pandas(result_df)
@@ -611,6 +621,7 @@ def _extract_tools_from_table(tools_table: knext.Table, tool_column: str):
     return tool_list
 
 
+# region Agent Chat View
 @knext.node(
     "Agent Chat View",
     node_type=knext.NodeType.VISUALIZER,
@@ -649,7 +660,9 @@ class AgentChatView:
 
     tool_column = _tool_column_parameter()
 
-    initial_message = knext.MultilineStringParameter("Initial message", "An optional 'AI' initial message to be shown to the user.")
+    initial_message = knext.MultilineStringParameter(
+        "Initial message", "An optional 'AI' initial message to be shown to the user."
+    )
 
     show_tool_calls_and_results = knext.BoolParameter(
         "Show tool calls and results",

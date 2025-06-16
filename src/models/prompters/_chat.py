@@ -218,7 +218,7 @@ class ChatPrompter:
     )
 
     ignore_new_message_when_tool_calling = knext.BoolParameter(
-        """Ignore "New message" during tool calling.""",
+        """Ignore "New message" during tool calling""",
         """If the last message in the conversation history is a "Tool" message, ignore the "New message"
         setting specified in the dialog and let the model process the tool call result instead.""",
         default_value=True,

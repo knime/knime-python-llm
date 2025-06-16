@@ -100,42 +100,17 @@ final class MessageCreatorNodeModel extends WebUINodeModel<MessageCreatorNodeSet
         var messageCellCreator = new MessageCellCreator(modelSettings, inSpec).createMessageCellCreator();
         var columnSpec = new DataColumnSpecCreator(modelSettings.m_messageColumnName, MessageCell.TYPE).createSpec();
         rearranger.append(new SingleCellFactoryImpl(columnSpec, messageCellCreator));
-        rearranger.remove(columnsToRemove(modelSettings).toArray(String[]::new));
+        rearranger.remove(columnsToRemove(modelSettings, inSpec).toArray(String[]::new));
         return rearranger;
     }
 
-    private static Set<String> columnsToRemove(final MessageCreatorNodeSettings modelSettings) {
+    private static Set<String> columnsToRemove(final MessageCreatorNodeSettings modelSettings, final DataTableSpec inSpec) {
         if (!modelSettings.m_removeInputColumns) {
             return Set.of();
         }
         var columnsToRemove = new HashSet<String>();
-        // Role column
-        if (modelSettings.m_roleInputType == MessageCreatorNodeSettings.InputType.COLUMN && modelSettings.m_roleColumn != null) {
-            columnsToRemove.add(modelSettings.m_roleColumn);
-        }
-        // Tool call id column
-        if (modelSettings.m_toolCallIdColumn.getEnumChoice().isEmpty()) {
-            columnsToRemove.add(modelSettings.m_toolCallIdColumn.getStringChoice());
-        }
-
-        // Name column
-        if (modelSettings.m_nameColumn.getEnumChoice().isEmpty()) {
-            columnsToRemove.add(modelSettings.m_nameColumn.getStringChoice());
-        }
-        // Content columns
-        for (var content : modelSettings.m_content) {
-            if (content.m_contentType == MessageCreatorNodeSettings.Contents.ContentType.TEXT && content.m_inputType == MessageCreatorNodeSettings.InputType.COLUMN) {
-                columnsToRemove.add(content.m_textColumn);
-            }
-            if (content.m_contentType == MessageCreatorNodeSettings.Contents.ContentType.IMAGE) {
-                columnsToRemove.add(content.m_imageColumn);
-            }
-        }
-        // Tool call columns
-        for (var tc : modelSettings.m_toolCalls) {
-            columnsToRemove.add(tc.m_toolNameColumn);
-            columnsToRemove.add(tc.m_toolIdColumn);
-            columnsToRemove.add(tc.m_argumentsColumn);
+        for (int i = 0; i < inSpec.getNumColumns(); i++) {
+            columnsToRemove.add(inSpec.getColumnSpec(i).getName());
         }
         return columnsToRemove;
     }

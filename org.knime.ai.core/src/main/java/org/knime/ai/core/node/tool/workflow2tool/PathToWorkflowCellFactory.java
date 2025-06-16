@@ -52,6 +52,7 @@ import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.UUID;
 import java.util.zip.ZipInputStream;
 
 import org.knime.ai.core.node.tool.output.ToolMessageOutputNodeModel;
@@ -152,7 +153,7 @@ final class PathToWorkflowCellFactory extends SingleCellFactory implements Close
                 return WorkflowToolCell.createFromAndModifyWorkflow(wfm,
                     new ToolWorkflowMetadata(
                         toolMessageOutputNode.isEmpty() ? null : toolMessageOutputNode.keySet().iterator().next()),
-                    dataAreaPath);
+                    dataAreaPath, m_exec.createFileStore(UUID.randomUUID().toString()));
             } catch (ToolIncompatibleWorkflowException e) {
                 var message = "Workflow can't be turned into a tool: " + e.getMessage();
                 m_messageBuilder.addRowIssue(m_pathColumnIndex, rowIndex, message);

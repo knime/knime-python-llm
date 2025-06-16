@@ -148,6 +148,9 @@ final class MessageCellCreator {
             int textColIdx = m_inSpec.findColumnIndex(content.m_textColumn);
             CheckUtils.checkSetting(textColIdx >= 0, "The selected column '%s' is not part of the input table.", content.m_textColumn);
             return r -> getValue(r.getCell(textColIdx), StringValue.class).map(v -> new TextContentPart(v.getStringValue()));
+        } else {
+            CheckUtils.checkSetting(!content.m_textValue.isBlank(),
+                "Please enter a value for the Text value in Content "  + index + ".");
         }
         return r -> Optional.of(new TextContentPart(content.m_textValue));
     }

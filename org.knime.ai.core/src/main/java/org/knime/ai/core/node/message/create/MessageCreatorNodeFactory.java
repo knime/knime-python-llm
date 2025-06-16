@@ -62,13 +62,29 @@ public final class MessageCreatorNodeFactory extends WebUINodeFactory<MessageCre
     private static final WebUINodeConfiguration CONFIG = WebUINodeConfiguration.builder()
             .name("Message Creator")
             .icon("./Message-creator.png")
-            .shortDescription("Creates a KNIME MessageCell from text and/or image data.")
-            .fullDescription(
-                "This node creates a MessageCell, which can contain text and/or image content "
-                + "for a specified role (USER, AI, TOOL).")
+            .shortDescription("Creates a Message containing text and/or image data for a specified role.")
+            .fullDescription("""
+                <p>
+                    This node creates Messages, which can include text and/or image content.
+                    These messages can be assigned specific roles such as User, AI, or Tool. It is possible
+                    to select columns from the input table to generate messages with mixed content, including
+                    both text and image data. Additionally, the node supports embedding tool calls within the
+                    AI messages. The input table is processed row by row, converting each row into a
+                    Message with one or multiple content.
+                </p>
+                <p>
+                    Message types:
+                </p>
+                <ul>
+                    <li><b>User Message</b>: Contain text and/or image content provided by the user and are assigned the User role.</li>
+                    <li><b>AI Message</b>: Contain text and/or image content, assigned the AI role, and may include tool calls.
+                    Tool calls specify the tool name, ID, and arguments.</li>
+                    <li><b>Tool Message</b>: Contain text and/or image content, assigned the Tool role, and include the tool call ID.</li>
+                </ul>
+                """)
             .modelSettingsClass(MessageCreatorNodeSettings.class)
-            .addInputTable("Input Table", "Table to process. A message is created for each row.")
-            .addOutputTable("Message Table", "Table with messages.")
+            .addInputTable("Input Table", "The table containing rows to process. Each row will be converted into a Message.")
+            .addOutputTable("Message Table", "The resulting table containing created messages.")
             .sinceVersion(5, 5, 0)
             .build();
 

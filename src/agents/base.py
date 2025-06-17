@@ -617,13 +617,15 @@ class AgentPrompter2:
 
 
 def _extract_tools_from_table(tools_table: knext.Table, tool_column: str):
-    tools_df = tools_table[tool_column].to_pandas().dropna()
-    if tools_df.empty:
+    import pyarrow.compute as pc
+
+    tools = tools_table[tool_column].to_pyarrow().column(tool_column)
+    filtered_tools = pc.filter(tools, pc.is_valid(tools))
+    if len(filtered_tools) == 0:
         raise knext.InvalidParametersError(
             f"Tool column {tool_column} is empty. Please provide a valid tool column."
         )
-    tool_list = tools_df[tool_column].tolist()
-    return tool_list
+    return filtered_tools.to_pylist()
 
 
 # region Agent Chat View

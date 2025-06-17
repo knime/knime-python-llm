@@ -32,24 +32,39 @@
       </Module>
    </extension>
    
+    <extension
+            point="org.knime.workbench.repository.categories">
+        <category
+              icon="src/main/java/org/knime/ai/core/node/message/create/Message-creator.png"
+              level-id="message"
+              name="Message"
+              description="Nodes for working with the Message data type."
+              path="/labs/kai"/>
+    </extension>
+   
    <extension
          point="org.knime.workbench.repository.nodes">
+      
       <node
+      	category-path="/labs/kai/message" 
             deprecated="false"
             factory-class="org.knime.ai.core.node.message.extract.MessagePartExtractorNodeFactory"
             hidden="false">
       </node>
       <node
+      	category-path="/labs/kai/message" 
             deprecated="false"
             factory-class="org.knime.ai.core.node.message.create.MessageCreatorNodeFactory"
             hidden="false">
       </node>
       <node
+      	category-path="/labs/kai/agents" 
             deprecated="false"
             factory-class="org.knime.ai.core.node.tool.output.ToolMessageOutputNodeFactory"
             hidden="false">
       </node>
       <node
+      	category-path="/labs/kai/agents" 
             deprecated="false"
             factory-class="org.knime.ai.core.node.tool.workflow2tool.WorkflowToToolNodeFactory"
             hidden="false">

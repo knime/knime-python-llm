@@ -56,6 +56,7 @@ import static j2html.TagCreator.html;
 import static j2html.TagCreator.i;
 import static j2html.TagCreator.img;
 import static j2html.TagCreator.pre;
+import static j2html.TagCreator.rawHtml;
 import static j2html.TagCreator.span;
 import static j2html.TagCreator.style;
 
@@ -64,6 +65,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
+import org.commonmark.parser.Parser;
+import org.commonmark.renderer.html.HtmlRenderer;
 import org.knime.ai.core.data.message.MessageValue;
 import org.knime.ai.core.data.message.MessageValue.MessageContentPart;
 import org.knime.ai.core.data.message.MessageValue.ToolCall;
@@ -74,6 +77,8 @@ import org.knime.core.data.renderer.AbstractDataValueRendererFactory;
 import org.knime.core.data.renderer.DataValueRenderer;
 import org.knime.core.data.renderer.DefaultDataValueRenderer;
 import org.knime.core.webui.node.view.table.data.render.DataCellContentType;
+import org.owasp.html.HtmlPolicyBuilder;
+import org.owasp.html.PolicyFactory;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -129,6 +134,23 @@ public final class MessageValueRenderer extends DefaultDataValueRenderer
             return "\"" + json + "\"";
         }
     }
+
+    // MD to HTML parser
+    private static final Parser MARKDOWN_PARSER = Parser.builder().build();
+    private static final HtmlRenderer HTML_RENDERER = HtmlRenderer.builder().build();
+
+    private static final PolicyFactory HTML_SANITIZER_POLICY = new HtmlPolicyBuilder()
+            .allowCommonInlineFormattingElements()
+            .allowCommonBlockElements()
+            .allowElements("h1", "h2", "h3", "h4", "h5", "h6")
+            .allowElements("pre", "code")
+
+            // Controversial (check with Peter?): allow tables
+            .allowElements("table", "thead", "tbody", "tfoot", "tr", "th", "td")
+            .allowAttributes("colspan", "rowspan").onElements("th", "td")
+            .allowAttributes("align").onElements("table", "tr", "th", "td")
+
+            .toFactory();
 
     private MessageValueRenderer(final String description) {
         super(description);
@@ -272,8 +294,10 @@ public final class MessageValueRenderer extends DefaultDataValueRenderer
 
     private static DomContent buildContentPart(final MessageContentPart part) {
         if (part instanceof TextContentPart t) {
-            // TODO: add Markdown support.
-            return span(t.getContent());
+            String rawHtml = HTML_RENDERER.render(MARKDOWN_PARSER.parse(t.getContent()));
+            String sanitizedHtml = HTML_SANITIZER_POLICY.sanitize(rawHtml);
+
+            return rawHtml(sanitizedHtml);
         }
 
         if (part instanceof PngContentPart imgPart) {

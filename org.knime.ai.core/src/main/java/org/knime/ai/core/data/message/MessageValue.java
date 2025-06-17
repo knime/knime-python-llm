@@ -51,6 +51,8 @@ package org.knime.ai.core.data.message;
 import java.util.List;
 import java.util.Optional;
 
+import javax.swing.Icon;
+
 import org.knime.core.data.DataValue;
 import org.knime.core.data.ExtensibleUtilityFactory;
 import org.knime.core.webui.node.dialog.defaultdialog.widget.Label;
@@ -64,6 +66,20 @@ public interface MessageValue extends DataValue {
 
     @SuppressWarnings("javadoc")
     UtilityFactory UTILITY = new ExtensibleUtilityFactory(MessageValue.class) {
+
+        private static final Icon ICON = loadIcon(MessageValue.class, "./message-datatype.png");
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public Icon getIcon() {
+            if (null != ICON) {
+                return ICON;
+            } else {
+                return super.getIcon();
+            }
+        }
 
         @Override
         public String getName() {

@@ -589,7 +589,7 @@ class AgentPrompter2:
         messages = final_state["messages"]
 
         desanitized_messages = [
-            tool_converter.desanitize_tool_calls(msg) for msg in messages
+            tool_converter.desanitize_tool_names(msg) for msg in messages
         ]
 
         output_column_name = (

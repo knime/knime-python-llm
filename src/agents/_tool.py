@@ -2,7 +2,7 @@ from dataclasses import dataclass
 import re
 from ._data import Port, DataRegistry, port_to_dict
 from ._common import render_structured
-from langchain_core.messages import AIMessage, BaseMessage
+from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
 from langchain.tools import StructuredTool
 import knime.extension as knext
 import logging
@@ -55,7 +55,7 @@ class LangchainToolConverter:
     def desanitize_tool_name(self, sanitized_name: str) -> str:
         return self.sanitized_to_original.get(sanitized_name, sanitized_name)
 
-    def desanitize_tool_calls(self, msg: BaseMessage) -> BaseMessage:
+    def desanitize_tool_names(self, msg: BaseMessage) -> BaseMessage:
         """Desanitizes tool calls in a message by reverting the name back to the original user-provided name."""
         if isinstance(msg, AIMessage) and msg.tool_calls:
             # Tool calls can be either a dict or a ToolCall object, so we handle both cases
@@ -64,6 +64,8 @@ class LangchainToolConverter:
                     tool_call["name"] = self.desanitize_tool_name(tool_call["name"])
                 else:
                     tool_call.name = self.desanitize_tool_name(tool_call.name)
+        elif isinstance(msg, ToolMessage) and msg.name:
+            msg.name = self.desanitize_tool_name(msg.name)
         return msg
 
     def to_langchain_tool(

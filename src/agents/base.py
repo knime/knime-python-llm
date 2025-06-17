@@ -543,6 +543,11 @@ class AgentPrompter2:
 
         tool_cells = _extract_tools_from_table(tools_table, self.tool_column)
 
+        if len(tool_cells) == 0:
+            raise knext.InvalidParametersError(
+                f"Tool column {self.tool_column} is empty. Please provide a valid tool column."
+            )
+
         tools = [tool_converter.to_langchain_tool(tool) for tool in tool_cells]
 
         messages = []
@@ -621,11 +626,7 @@ def _extract_tools_from_table(tools_table: knext.Table, tool_column: str):
 
     tools = tools_table[tool_column].to_pyarrow().column(tool_column)
     filtered_tools = pc.filter(tools, pc.is_valid(tools))
-    if len(filtered_tools) == 0:
-        raise knext.InvalidParametersError(
-            f"Tool column {tool_column} is empty. Please provide a valid tool column."
-        )
-    return filtered_tools.to_pylist()
+    return filtered_tools.to_pylist() 
 
 
 # region Agent Chat View

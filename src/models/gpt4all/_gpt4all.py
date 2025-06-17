@@ -109,6 +109,7 @@ class GPT4All(LLM):
             model_path=model_path or None,
             device=values["device"],
             n_ctx=values["n_ctx"],
+            allow_download=False,
         )
 
         if values["n_threads"] is not None:

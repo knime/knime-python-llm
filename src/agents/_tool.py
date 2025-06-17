@@ -21,8 +21,6 @@ class WorkflowTool:
     output_ports: list[Port]
 
 
-
-
 class LangchainToolConverter:
     def __init__(
         self, data_registry: DataRegistry, ctx, debug: bool
@@ -73,132 +71,126 @@ class LangchainToolConverter:
         tool: WorkflowTool,
     ) -> StructuredTool:
         sanitized_name = self._sanitize_tool_name(tool.name)
-        if tool.input_ports or tool.output_ports:
-            self._has_data_tools = True
-            return self._to_langchain_tool_with_data(tool, sanitized_name)
-        else:
-            return self._to_langchain_tool_without_data(tool, sanitized_name)
+        configuration_schema = _create_configuration_schema(tool)
+        description_parts = {"description": tool.description}
 
-    def _validate_required_fields(self, required_fields, provided_dict, error_prefix):
+        if tool.input_ports:
+            self._has_data_tools = True
+            args_schema = _create_object_schema(
+                description="Configuration and data inputs for the tool.",
+                properties={
+                    "configuration": configuration_schema,
+                    "data_inputs": _create_input_data_schema(tool),
+                },
+            )
+            params_parser = self._create_data_input_parser(tool)
+            description_parts["input_ports"] = list(
+                map(port_to_dict, tool.input_ports)
+            )
+        else:
+            args_schema = configuration_schema
+            params_parser = self._create_no_data_input_parser(tool)
+
+        if tool.output_ports:
+            self._has_data_tools = True
+            outputs_processor = self._create_data_output_processor(tool)
+            description_parts["output_ports"] = list(
+                map(port_to_dict, tool.output_ports)
+            )
+        else:
+            outputs_processor = self._create_no_data_output_processor()
+
+        # Create the tool function
+        def tool_function(**params: dict) -> str:
+            try:
+                configuration, inputs = params_parser(params)
+                message, outputs = self._ctx._execute_tool(tool, configuration, inputs, self._debug)
+                return outputs_processor(message, outputs)
+            except Exception as e:
+                _logger.exception(e)
+                raise
+        
+        return StructuredTool.from_function(
+            func=tool_function,
+            name=sanitized_name,
+            description=render_structured(**description_parts),
+            args_schema=args_schema,
+        )
+    
+    def _create_data_output_processor(self, tool: WorkflowTool):
+        def _process_outputs_with_data(message: str, outputs: list[knext.Table]):
+            if not outputs:
+                return message
+            output_references = {}
+            for port, output in zip(tool.output_ports, outputs):
+                output_reference = self._data_registry.add_table(output, port)
+                output_references.update(output_reference)
+            return render_structured(
+                message=message, outputs=output_references
+            )
+        return _process_outputs_with_data
+
+    def _create_no_data_output_processor(self):
+        def _process_outputs_no_data(message: str, outputs: list[knext.Table]):
+            return message
+        return _process_outputs_no_data
+    
+    def _create_no_data_input_parser(self, tool: WorkflowTool):
+        def _parse_params_no_data(params: dict):
+            _validate_required_fields(tool.parameter_schema.keys(), params, "configuration parameters")
+            return params, []
+        return _parse_params_no_data
+    
+    def _create_data_input_parser(self, tool: WorkflowTool):
+        def _parse_params_with_data(params: dict):
+                configuration = params.get("configuration", {})
+                data_inputs = params.get("data_inputs", {})
+
+                _validate_required_fields(
+                    tool.parameter_schema.keys(), configuration, "configuration parameters"
+                )
+                _validate_required_fields(
+                    [port.name for port in tool.input_ports],
+                    data_inputs,
+                    "data inputs for ports",
+                )
+                inputs = [self._data_registry.get_data(i) for i in data_inputs.values()]
+                return configuration, inputs
+        return _parse_params_with_data
+    
+def _validate_required_fields(required_fields, provided_dict, error_prefix):
         missing = [field for field in required_fields if field not in provided_dict]
         if missing:
             raise knext.InvalidParametersError(
                 f"Missing {error_prefix}: {', '.join(missing)}"
             )
 
-    def _to_langchain_tool_without_data(
-        self, tool: WorkflowTool, sanitized_name: str
-    ) -> StructuredTool:
-        args_schema = {
-            "type": "object",
-            "properties": tool.parameter_schema,
-            "required": list(tool.parameter_schema.keys()),
+def _create_object_schema(description: str, properties: dict):
+    return {
+        "type": "object",
+        "description": description,
+        "properties": properties,
+        "required": list(properties.keys()),
         }
 
-        def func(**params):
-            try:
-                self._validate_required_fields(
-                    tool.parameter_schema.keys(), params, "configuration parameters"
-                )
-                return self._ctx._execute_tool(tool, params, [], self._debug)[0]
-            except Exception as e:
-                _logger.exception(e)
-                raise
+def _create_configuration_schema(tool: WorkflowTool) -> dict:
+    """Creates a parameter schema for the tool based on its input ports."""
+    return _create_object_schema(
+        description="Configures the tool to perform the task at hand.",
+        properties=tool.parameter_schema,
+    )
 
-        return StructuredTool.from_function(
-            func=func,
-            name=sanitized_name,
-            description=tool.description,
-            args_schema=args_schema,
-        )
+def _create_input_data_schema(tool: WorkflowTool) -> knext.Schema:
+    return _create_object_schema(description="Data inputs for the tool.",
+        properties=_create_input_port_properties(tool.input_ports),
+    )
 
-    def _to_langchain_tool_with_data(
-        self,
-        tool: WorkflowTool,
-        sanitized_name: str,
-    ) -> StructuredTool:
-        args_schema = {
-            "type": "object",
-            "properties": {
-                "configuration": {
-                    "type": "object",
-                    "properties": tool.parameter_schema,
-                    "description": "Configures the tool to perform the task at hand.",
-                    "required": list(tool.parameter_schema.keys()),
-                },
-                "data_inputs": self._create_input_data_schema(tool),
-            },
-            "required": ["parameters", "data_inputs"],
+def _create_input_port_properties(ports: list[Port]):
+    return {
+        port.name: {
+            "type": "integer",
+            "description": "ID of the data to feed to the port for "
+            + port.description,
         }
-
-        input_ports = tool.input_ports if tool.input_ports else []
-        output_ports = tool.output_ports if tool.output_ports else []
-
-        description_with_data_info = render_structured(
-            description=tool.description,
-            input_ports=list(
-                map(port_to_dict, input_ports)
-            ),
-            output_ports=list(
-                map(port_to_dict, output_ports)
-            ),
-        )
-
-        def func(configuration: dict = None, data_inputs: dict = None) -> str:
-            configuration = configuration or {}
-            data_inputs = data_inputs or {}
-
-            # Unified configuration validation
-            self._validate_required_fields(
-                tool.parameter_schema.keys(), configuration, "configuration parameters"
-            )
-            # Unified data input validation
-            self._validate_required_fields(
-                [port.name for port in tool.input_ports],
-                data_inputs,
-                "data inputs for ports",
-            )
-
-            try:
-                inputs = [self._data_registry.get_data(i) for i in data_inputs.values()]
-                message, outputs = self._ctx._execute_tool(
-                    tool, configuration, inputs, self._debug
-                )
-                if not outputs:
-                    return message
-                output_references = {}
-                for port, output in zip(output_ports, outputs):
-                    output_reference = self._data_registry.add_table(output, port)
-                    output_references.update(output_reference)
-
-                return render_structured(
-                    message=message, outputs=output_references
-                )
-            except Exception as e:
-                _logger.exception(e)
-                raise
-
-        return StructuredTool.from_function(
-            func=func,
-            name=sanitized_name,
-            description=description_with_data_info,
-            args_schema=args_schema,
-        )
-
-    def _create_input_data_schema(self, tool: WorkflowTool) -> knext.Schema:
-        return {
-            "type": "object",
-            "description": "The input data the tool requires for the task at hand.",
-            "properties": self._create_input_port_properties(tool.input_ports),
-            "required": [port.name for port in tool.input_ports],
-        }
-
-    def _create_input_port_properties(self, ports: list[Port]):
-        return {
-            port.name: {
-                "type": "integer",
-                "description": "ID of the data to feed to the port for "
-                + port.description,
-            }
-            for port in ports
-        }
+        for port in ports
+    }

@@ -73,6 +73,7 @@ import org.knime.core.data.container.CellFactory;
 import org.knime.core.data.def.StringCell;
 import org.knime.core.data.image.png.PNGImageCellFactory;
 import org.knime.core.data.json.JSONCellFactory;
+import org.knime.core.node.InvalidSettingsException;
 import org.knime.core.util.UniqueNameGenerator;
 
 /**
@@ -83,7 +84,10 @@ import org.knime.core.util.UniqueNameGenerator;
 final class MessageCellSplitterFactories {
 
     static List<CellSplitterFactory<?>> createCellSplitterFactories(final MessagePartExtractorSettings settings,
-        final int messageColumnIndex, final DataTableSpec messageTableSpec) {
+        final int messageColumnIndex, final DataTableSpec messageTableSpec) throws InvalidSettingsException {
+
+        validateSettings(settings);
+
         var list = new ArrayList<CellSplitterFactory<?>>();
         UniqueNameGenerator uniqueNameGenerator = new UniqueNameGenerator(messageTableSpec);
 
@@ -120,6 +124,28 @@ final class MessageCellSplitterFactories {
         }).ifPresent(factory -> list.add(createStatelessCellSplitterFactory(() -> factory)));
         return list;
     }
+
+    private static void validateSettings(final MessagePartExtractorSettings settings) throws InvalidSettingsException {
+        if (settings.m_roleColumnName.isPresent() && settings.m_roleColumnName.get().isBlank()) {
+            throw new InvalidSettingsException("Role column name cannot be empty when 'Role column name' is enabled.");
+        }
+        if (settings.m_nameColumnName.isPresent() && settings.m_nameColumnName.get().isBlank()) {
+            throw new InvalidSettingsException("Name column name cannot be empty when 'Name column name' is enabled.");
+        }
+        if (settings.m_textPartsPrefix.isPresent() && settings.m_textPartsPrefix.get().isBlank()) {
+            throw new InvalidSettingsException("Text parts column prefix cannot be empty when 'Text parts column prefix' is enabled.");
+        }
+        if (settings.m_imagePartsPrefix.isPresent() && settings.m_imagePartsPrefix.get().isBlank()) {
+            throw new InvalidSettingsException("Image parts column prefix cannot be empty when 'Image parts column prefix' is enabled.");
+        }
+        if (settings.m_toolCallsPrefix.isPresent() && settings.m_toolCallsPrefix.get().isBlank()) {
+            throw new InvalidSettingsException("Tool calls column prefix cannot be empty when 'Tool calls column prefix' is enabled.");
+        }
+        if (settings.m_toolCallIdColumnName.isPresent() && settings.m_toolCallIdColumnName.get().isBlank()) {
+            throw new InvalidSettingsException("Tool call ID column name cannot be empty when 'Tool call ID column name' is enabled.");
+        }
+    }
+
 
     static IntFunction<DataColumnSpec> createColumnSpecCreator(final String prefix, final DataType type, final DataTableSpec messageTableSpec) {
         UniqueNameGenerator generator = new UniqueNameGenerator(messageTableSpec);

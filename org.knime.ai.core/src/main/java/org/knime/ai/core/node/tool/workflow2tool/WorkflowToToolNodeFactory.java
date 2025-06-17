@@ -67,6 +67,7 @@ import org.knime.filehandling.core.port.FileSystemPortObject;
 /**
  * @author Martin Horn, KNIME GmbH, Konstanz, Germany
  */
+@SuppressWarnings("restriction")
 public final class WorkflowToToolNodeFactory extends ConfigurableNodeFactory<WorkflowToToolNodeModel>
     implements NodeDialogFactory {
 
@@ -77,22 +78,60 @@ public final class WorkflowToToolNodeFactory extends ConfigurableNodeFactory<Wor
     private static final String TOOL_TABLE_OUTPUT_PORT_GRP_NAME = "Tools";
 
     private static final String DESCRIPTION = """
-            This node reads workflows from the provided paths and turns them into the tool data type.
-            If the workflow can't be read, a missing value will be output instead. Workflows can't be read, e.g.,
-            because the path doesn't reference a workflow or the workflow doesn't comply with tool conventions.
-            Learn more about how to create a tool workflow here (TODO).
-            Please note that (partially) executed workflows will stored in a reset state.
+            <p>
+            This node reads workflows from the provided Paths and converts them into Tools.
+            While any workflow can be used as a Tool out of the box, there are a few conventions
+            that aim to maximize the Tool's usefulness:
+            </p>
+
+            <ul>
+                <li><b>Workflow description:</b> this is used to communicate the purpose of the
+                tool to the agent. The more descriptive, the better.</li>
+                <li><b>Output message:</b> using the <i>Tool Message Output</i> node, it is possible
+                to define the content of the Tool message that the agent receives after Tool execution.
+                If none was specified, the agent will simply be notified that the Tool was successfully executed.</li>
+            </ul>
+
+            <p>
+            Additionally, Tools can be parameterized using <i>Configuration</i> nodes. As with the workflow description,
+            it is crucial to ensure that every parameter has a meaningful name and description.
+            </p>
+
+            <p>
+            Tool workflows can also accept an arbitrary number of input tables and produce an arbitrary number of
+            output tables, which can be defined using the <i>Workflow Input</i> and <i>Workflow Output</i> nodes
+            respectively.
+            </p>
+
+            <p>
+            In general, a well-documented Tool workflow increases the chances that the agent will call the Tool correctly.
+            </p>
+
+            <p>
+            Tool cells provide helpful icons that indicate various characteristics of the corresponding Tool:
+            </p>
+
+            <ul>
+                <li>Whether the Tool workflow has a description.</li>
+                <li>Number of parameters.</li>
+                <li>Number of input tables.</li>
+                <li>Number of output tables.</li>
+            </ul>
+
+            <p>
+            If a workflow can't be read, a missing value will be output instead.
+            </p>
             """;
 
     private static final WebUINodeConfiguration CONFIG = WebUINodeConfiguration.builder() //
-        .name("Workflow To Tool") //
+        .name("Workflow to Tool") //
         .icon("./Path-to-string.png") //
-        .shortDescription("Turns workflow paths into tools.") //
+        .shortDescription("Turns workflow paths into Tools.") //
         .fullDescription(DESCRIPTION) //
         .modelSettingsClass(WorkflowToToolNodeSettings.class) //
-        .addInputPort(CONNECTION_INPUT_PORT_GRP_NAME, FileSystemPortObject.TYPE, "The file system connection", true)
-        .addInputTable(PATH_TABLE_INPUT_PORT_GRP_NAME, "The input table containg the paths") //
-        .addOutputPort(TOOL_TABLE_OUTPUT_PORT_GRP_NAME, BufferedDataTable.TYPE, "The output table with the tools") //
+        .addInputPort(CONNECTION_INPUT_PORT_GRP_NAME, FileSystemPortObject.TYPE, "The file system connection.", true)
+        .addInputTable(PATH_TABLE_INPUT_PORT_GRP_NAME, "Table containing Paths referencing the workflows to be converted to Tools.") //
+        .addOutputPort(TOOL_TABLE_OUTPUT_PORT_GRP_NAME, BufferedDataTable.TYPE, "Table containing Tools corresponding to the workflows referenced in the input table.") //
         .nodeType(NodeType.Manipulator) //
         .sinceVersion(5, 5, 0) //
         .build();

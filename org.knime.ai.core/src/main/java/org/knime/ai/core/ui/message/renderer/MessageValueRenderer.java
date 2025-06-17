@@ -49,7 +49,6 @@
 package org.knime.ai.core.ui.message.renderer;
 
 import static j2html.TagCreator.body;
-import static j2html.TagCreator.br;
 import static j2html.TagCreator.div;
 import static j2html.TagCreator.head;
 import static j2html.TagCreator.hr;
@@ -65,17 +64,20 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
-import org.knime.ai.core.data.message.PngContentPart;
 import org.knime.ai.core.data.message.MessageValue;
 import org.knime.ai.core.data.message.MessageValue.MessageContentPart;
-import org.knime.ai.core.data.message.MessageValue.MessageType;
 import org.knime.ai.core.data.message.MessageValue.ToolCall;
+import org.knime.ai.core.data.message.PngContentPart;
 import org.knime.ai.core.data.message.TextContentPart;
 import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.renderer.AbstractDataValueRendererFactory;
 import org.knime.core.data.renderer.DataValueRenderer;
 import org.knime.core.data.renderer.DefaultDataValueRenderer;
 import org.knime.core.webui.node.view.table.data.render.DataCellContentType;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectWriter;
 
 import j2html.tags.DomContent;
 import j2html.tags.specialized.DivTag;
@@ -103,6 +105,28 @@ public final class MessageValueRenderer extends DefaultDataValueRenderer
         @Override
         public DataValueRenderer createRenderer(final DataColumnSpec colSpec) {
             return new MessageValueRenderer(getDescription());
+        }
+    }
+
+    // JSON parsing for Tool Call Arguments. TODO: replace with YAML for better readability?
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final ObjectWriter PRETTY_PRINTER = MAPPER.writerWithDefaultPrettyPrinter();
+
+    /**
+     * Pretty-prints a JSON string.
+     * @param json the raw JSON string
+     * @return a formatted JSON string, or the original string if parsing fails.
+     */
+    private static String prettyPrintJson(final String json) {
+        if (json == null || json.isBlank()) {
+            return "{}";
+        }
+        try {
+            Object jsonObject = MAPPER.readValue(json, Object.class);
+            return PRETTY_PRINTER.writeValueAsString(jsonObject);
+        } catch (JsonProcessingException e) {
+            // If it's not valid JSON, return the original content wrapped in a string-like format
+            return "\"" + json + "\"";
         }
     }
 
@@ -149,6 +173,26 @@ public final class MessageValueRenderer extends DefaultDataValueRenderer
     }
 
     /* --------------------------------------------------------------------- */
+    /* Message type icons                                                    */
+    /* --------------------------------------------------------------------- */
+
+    // Taken directly from webapps-common
+    private static final String AI_ICON =
+        """
+            data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20viewBox=%270%200%2032%2032%27%20stroke=%27%23000%27%20fill=%27none%27%20stroke-linejoin=%27round%27%3E%3Cpath%20d=%27M19.632%2019.8495L19.5523%2020.0523L19.3495%2020.132L15.8674%2021.5L19.3495%2022.868L19.5523%2022.9477L19.632%2023.1505L21%2026.6326L22.368%2023.1505L22.4477%2022.9477L22.6505%2022.868L26.1326%2021.5L22.6505%2020.132L22.4477%2020.0523L22.368%2019.8495L21%2016.3674L19.632%2019.8495Z%27/%3E%3Cpath%20d=%27M3.5%2017V30H29.5V4H16.5%27/%3E%3Cpath%20d=%27M8.23219%208.40239L8.15424%208.65424L7.90239%208.73219L2.191%2010.5L7.90239%2012.2678L8.15424%2012.3458L8.23219%2012.5976L10%2018.309L11.7678%2012.5976L11.8458%2012.3458L12.0976%2012.2678L17.809%2010.5L12.0976%208.73219L11.8458%208.65424L11.7678%208.40239L10%202.691L8.23219%208.40239Z%27/%3E%3C/svg%3E
+            """;
+
+    private static final String USER_ICON =
+        """
+            data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20viewBox=%270%200%2032%2032%27%20stroke=%27%23000%27%20fill=%27none%27%20stroke-linejoin=%27round%27%3E%3Cpath%20d=%27M6.4%2027.1c0-3.5%204.1-6.4%209.1-6.4s9.1%202.9%209.1%206.4%27/%3E%3Ccircle%20cx=%2715.5%27%20cy=%2711.2%27%20r=%276.3%27/%3E%3C/svg%3E
+            """;
+
+    private static final String TOOL_ICON =
+        """
+            data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20viewBox=%270%200%2032%2032%27%20fill=%27none%27%20stroke=%27%23000%27%20stroke-linejoin=%27round%27%3E%3Cpath%20d=%27M4.857%2023.007c-1.142%201.141-1.142%202.995%200%204.137%201.142%201.142%202.995%201.141%204.136%200l9.318-9.754c2.302.652%205.879%20.073%207.69-1.74%201.642-1.64%202.272-3.907%201.892-6.03l-3.27%203.273-4.277-1.238-1.237-4.276%203.27-3.272v-.001c-2.122-.377-4.389.253-6.028%201.894-1.811%201.81-2.392%205.385-1.742%207.686l-9.752%209.321z%27/%3E%3C/svg%3E
+            """;
+
+    /* --------------------------------------------------------------------- */
     /* Builders                                                              */
     /* --------------------------------------------------------------------- */
 
@@ -158,12 +202,38 @@ public final class MessageValueRenderer extends DefaultDataValueRenderer
     }
 
     private static DivTag buildMessageFrame(final MessageValue message) {
-        DivTag typePill = buildTypePill(message.getMessageType());
+        DivTag messageHeader = buildMessageHeader(message);
         DivTag messageBody = buildMessageBody(message);
 
-        // frame -> content-wrapper -> (pill, body)
-        return div().withClass("message-frame")
-            .with(div().withClass("message-content-wrapper").with(typePill, messageBody));
+        return div().withClass("message-frame").with(messageHeader, messageBody);
+    }
+
+    private static DivTag buildMessageHeader(final MessageValue message) {
+        final String iconUri;
+        final String label;
+
+        switch (message.getMessageType()) {
+            case AI:
+                iconUri = AI_ICON;
+                label = "AI";
+                break;
+            case USER:
+                iconUri = USER_ICON;
+                label = "User"; // TODO: use Human instead?
+                break;
+            case TOOL:
+                iconUri = TOOL_ICON;
+                label = message.getName().orElse("Tool");
+                break;
+            default:
+                // Should not be reachable
+                return div();
+        }
+
+        DomContent icon = img().withSrc(iconUri).withClass("msg-header-icon").attr("alt", label + " message icon");
+        DomContent text = span(label).withClass("msg-header-label");
+
+        return div(icon, text).withClass("msg-header");
     }
 
     private static DivTag buildMessageBody(final MessageValue message) {
@@ -177,7 +247,6 @@ public final class MessageValueRenderer extends DefaultDataValueRenderer
                 addContentPartsToBody(body, parts);
                 break;
             case TOOL:
-                body.with(buildToolHeader(message.getName(), message.getToolCallId()));
                 addContentPartsToBody(body, parts);
                 break;
             case USER:
@@ -185,15 +254,6 @@ public final class MessageValueRenderer extends DefaultDataValueRenderer
                 break;
         }
         return body;
-    }
-
-    private static DivTag buildTypePill(final MessageType type) {
-        String typeClass = switch (type) {
-            case USER -> "msg-pill-user";
-            case AI -> "msg-pill-ai";
-            case TOOL -> "msg-pill-tool";
-        };
-        return div(type.getLabel()).withClasses("msg-pill", typeClass);
     }
 
     private static void addContentPartsToBody(final DivTag container, final List<MessageContentPart> parts) {
@@ -235,23 +295,17 @@ public final class MessageValueRenderer extends DefaultDataValueRenderer
     }
 
     private static DivTag buildToolCallsSection(final List<ToolCall> toolCalls) {
-        return div(div("Tool calls:").withClass("tool-calls-header"),
-            div().with(toolCalls.stream().map(MessageValueRenderer::buildToolCallTag)));
-    }
-
-    private static DivTag buildToolHeader(final Optional<String> toolName, final Optional<String> toolCallId) {
-        return div().with(
-            toolName.filter(name -> !name.isBlank())
-                .map(name -> div(span("Tool: ").withClass("tool-call-label"), span(name))).orElse(null), // Using map/orElse to make it more functional
-            div(span("Tool call ID: ").withClass("tool-call-label"), span(toolCallId.orElse("-"))),
-            div().withClass("tool-header-separator"));
+        return div(div().with(toolCalls.stream().map(MessageValueRenderer::buildToolCallTag)));
     }
 
     private static DivTag buildToolCallTag(final ToolCall tc) {
-        return div().withClass("tool-call").with(div(span("Tool: ").withClass("tool-call-label"), span(tc.toolName())),
-            div(span("Tool call ID: ").withClass("tool-call-label"), span(tc.id())), br(), br(),
-            div(span("Arguments:").withClass("tool-call-label")),
-            pre((tc.arguments() == null || tc.arguments().isBlank()) ? "{}" : tc.arguments()));
+        DivTag header = div().withClass("tool-call-header").with(
+            img().withSrc(TOOL_ICON).withClass("tool-call-icon"),
+            span(tc.toolName()).withClass("tool-call-name"));
+
+        DomContent args = pre(prettyPrintJson(tc.arguments())).withClass("tool-call-args");
+
+        return div().withClass("tool-call").with(header, args);
     }
 
     // Note the use of CSS variables.
@@ -263,43 +317,31 @@ public final class MessageValueRenderer extends DefaultDataValueRenderer
                 width: 100%;
                 max-width: 600px;
                 box-sizing: border-box;
-            }
-
-            .message-content-wrapper {
-                position: relative;
-                width: 100%;
                 font-size: 13px;
                 font-weight: 400;
             }
 
-            .msg-pill {
-                position: relative;
-                z-index: 2;
-                display: inline-block;
-                margin-left: 10px;
-                outline: 1px solid #ffffff;
-                border-radius: 16px;
-                padding: 0 8px;
-                min-width: 40px;
-                text-align: center;
-                font-size: .75em;
-                font-weight: bold;
-                color: #616161;
+            .msg-header {
+                display: flex;
+                align-items: center;
+                gap: 4px;
+                margin-bottom: 8px;
             }
 
-            .msg-pill-user { background: var(--knime-cornflower-semi); }
-            .msg-pill-ai { background: var(--knime-wood-light); }
-            .msg-pill-tool { background: var(--knime-porcelain); }
+            .msg-header-icon {
+                width: 16px;
+                height: 16px;
+            }
+
+            .msg-header-label {
+                color: #333;
+            }
 
             .msg-body {
-                margin-top: -6px;
-                border: 1px solid #d1d1d1;
-                border-radius: 0 4px 4px 4px;
-                background: #ffffff;
-                padding: 18px 8px 12px;
                 color: #333;
                 overflow-wrap: break-word;
                 white-space: pre-wrap;
+                font-weight: 400;
             }
 
             .content-separator {
@@ -322,25 +364,35 @@ public final class MessageValueRenderer extends DefaultDataValueRenderer
 
             .tool-calls-header {
                 font-weight: bold;
-                margin-bottom: 4px;
-            }
-
-            .tool-header-separator {
-                border-bottom: 1px dashed #ddd;
-                margin: 6px 0;
+                margin-bottom: 80px;
             }
 
             .tool-call {
-                background: #f5f5f5;
-                border: 1px solid #ddd;
-                border-radius: 4px;
-                padding: 8px;
-                margin-bottom: 6px;
-                font-size: 0.9em;
+                margin-bottom: 10px;
+                display: flex;
+                flex-direction: column;
+                gap: 5px;
             }
 
-            .tool-call-label {
-                font-weight: bold;
+            .tool-call-icon {
+                width: 16px;
+                height: 16px;
+            }
+
+            .tool-call-name {
+                font-size: 12px;
+            }
+
+            .tool-call-args {
+                background: var(--knime-porcelain);
+                border: 1px solid #e0e0e0;
+                border-radius: 4px;
+                padding: 8px;
+                font-family: 'Menlo', 'Consolas', monospace;
+                font-size: 10px;
+                white-space: pre-wrap;
+                word-break: break-all;
+                margin: 0;
             }
 
             .error-text {

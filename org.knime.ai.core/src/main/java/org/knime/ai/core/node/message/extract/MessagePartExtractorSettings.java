@@ -108,35 +108,30 @@ final class MessagePartExtractorSettings implements DefaultNodeSettings {
             .orElse(null);
     }
 
-    @Widget(title = "Message column", description = "The message column to extract parts from.")
+    @Widget(title = "Message column", description = "The column containing messages to extract parts from.")
     @ChoicesProvider(MessageColumnProvider.class)
     public String m_messageColumn;
 
-    @Widget(title = "Keep message column",
-        description = "Whether to keep the original message column in the output table.")
+    @Widget(title = "Keep message column", description = "Whether to keep the original message column in the output table.")
     public boolean m_keepOriginalColumn = true;
 
-    @Widget(title = "Role column name",
-        description = "If enabled, a new column with the role will be added under the given name.")
+    @Widget(title = "Role column name", description = "If enabled, a new column with the role will be added under the specified name.")
     @Layout(RoleSettings.class)
     public Optional<String> m_roleColumnName = Optional.of("Role");
 
-    @Widget(title = "Name column name",
-        description = "If enabled, a new column with the name will be added under the given name.")
+    @Widget(title = "Name column name", description = "If enabled, a new column with the name will be added under the specified name.")
     @Layout(NameSettings.class)
     public Optional<String> m_nameColumnName = Optional.of("Name");
 
-    @Widget(title = "Text parts column prefix",
-        description = "If selected columns with the text contents are appended. Specify the prefix for the output columns here.")
+    @Widget(title = "Text parts column prefix", description = "Prefix for the output columns for extracted text parts. There will be as many columns as there are text contents in a message, named 'prefix 1', 'prefix 2', etc.")
     @Layout(TextPartsSettings.class)
     public Optional<String> m_textPartsPrefix = Optional.of("Text Content ");
 
-    @Widget(title = "Image parts column prefix",
-        description = "Prefix for the output columns for extracted image parts.")
+    @Widget(title = "Image parts column prefix", description = "Prefix for the output columns for extracted image parts. There will be as many columns as there are image contents in a message, named 'prefix 1', 'prefix 2', etc.")
     @Layout(ImagePartsSettings.class)
     public Optional<String> m_imagePartsPrefix = Optional.of("Image Content ");
 
-    @Widget(title = "Tool calls column prefix", description = "Prefix for the output columns for extracted tool calls.")
+    @Widget(title = "Tool calls column prefix", description = "Prefix for the output columns for extracted tool calls. There will be as many columns as there are tool calls in a message, named 'prefix 1', 'prefix 2', etc.")
     @Layout(ToolCallsSettings.class)
     public Optional<String> m_toolCallsPrefix = Optional.of("Tool Call ");
 

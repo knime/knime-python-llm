@@ -519,7 +519,7 @@ class AgentPrompter2:
     ):
         from langchain.chat_models.base import BaseChatModel
         import pandas as pd
-        from ._agent_impl import (
+        from ._data_service import (
             DataRegistry,
             LangchainToolConverter,
         )
@@ -709,7 +709,7 @@ class AgentChatView:
         input_tables: list[knext.Table],
     ):
         from langgraph.prebuilt import create_react_agent
-        from ._agent_impl import (
+        from ._data_service import (
             DataRegistry,
             LangchainToolConverter,
             AgentChatViewDataService,

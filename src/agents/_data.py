@@ -21,13 +21,14 @@ class DataItem:
 
 
 class DataRegistry:
-    def __init__(self):
+    def __init__(self, data_message_prefix: str):
         self._data: list[DataItem] = []
+        self._data_message_prefix = data_message_prefix
 
     @classmethod
-    def create_with_input_tables(self, input_tables: Sequence[knext.Table]) -> "DataRegistry":
-        """Creates a DataRegistry with the given input tables."""
-        registry = DataRegistry()
+    def create_with_input_tables(cls, input_tables: Sequence[knext.Table], data_message_prefix: str = None) -> "DataRegistry":
+        """Creates a DataRegistry with the given input tables and optional prefix."""
+        registry = cls(data_message_prefix=data_message_prefix)
         for i, table in enumerate(input_tables):
             spec = _spec_representation(table)
             port = Port(name=f"input_table_{i+1}", description=f"Input table {i+1}", type="Table", spec=spec)
@@ -62,36 +63,14 @@ class DataRegistry:
         return len(self._data) > 0
 
     def create_data_message(self) -> Optional[HumanMessage]:
-        msg = """# Data Tools Interface
-You have access to tools that can consume and produce data.
-The interaction with these tools is mediated via a data repository that keeps track of all available data items.
-The repository is represented as a map from IDs to data items.
-
-Each data item is represented by:
-- The name of the data
-- The description of the data
-- The type of data
-- The spec of the data giving a high-level overview of the data (e.g. the columns in a table)
-
-Note: You do not have access to the actual data content, only the metadata and IDs.
-
-# Using Tools with Data
-## Consuming Data:
-To pass data to a tool, provide the ID of the relevant data item.
-Once invoked, the tool will receive the data associated with that ID.
-
-## Producing Data:
-- Tools that produce data will include an update to the data repository in their tool message.
-- This update follows the same format as the initial data repository: A map of IDs to data items.
-
-You must incorporate these updates into your working view of the data repository.
-# Data:
-"""
-        if not self._data:
-            return HumanMessage(msg + "No initial data available. Use a tool to produce data.")
-        content = render_structured(**{str(id): port_to_dict(data.meta_data) for id, data in enumerate(self._data)})
+        if self._data:
+            content = render_structured(
+                **{str(id): port_to_dict(data.meta_data) for id, data in enumerate(self._data)}
+            )
+        else:
+            content = "No data available. Use a tool to produce data."
         
-        return HumanMessage(msg + content)
+        return HumanMessage(self._data_message_prefix + content)
 
 def _spec_representation(table: knext.Table) -> dict:
     return {"columns": {column.name: str(column.ktype) for column in table.schema}}

@@ -51,6 +51,7 @@ package org.knime.ai.core.node.message.extract;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
@@ -68,6 +69,7 @@ import org.knime.core.data.RowKey;
 import org.knime.core.data.def.DefaultRow;
 import org.knime.core.data.def.StringCell;
 import org.knime.core.data.json.JSONCellFactory;
+import org.knime.core.node.InvalidSettingsException;
 
 @SuppressWarnings("static-method")
 final class MessageCellSplitterFactoriesTest {
@@ -78,7 +80,7 @@ final class MessageCellSplitterFactoriesTest {
             new DataColumnSpecCreator("text1", StringCell.TYPE).createSpec());
 
     @Test
-    void testCreateCellSplitterFactories_emptySettings() {
+    void testCreateCellSplitterFactories_emptySettings() throws InvalidSettingsException {
         MessagePartExtractorSettings settings = new MessagePartExtractorSettings();
         settings.m_imagePartsPrefix = Optional.empty();
         settings.m_textPartsPrefix = Optional.empty();
@@ -90,6 +92,72 @@ final class MessageCellSplitterFactoriesTest {
                 MessageCellSplitterFactories.createCellSplitterFactories(settings, 0, SPEC);
         assertNotNull(factories);
         assertTrue(factories.isEmpty());
+    }
+
+    @Test
+    void testCreateCellSplitterFactories_throwsOnRoleColumnNameBlank() {
+        MessagePartExtractorSettings settings = new MessagePartExtractorSettings();
+        settings.m_roleColumnName = Optional.of("   ");
+
+        InvalidSettingsException thrown = assertThrows(InvalidSettingsException.class, () -> {
+            MessageCellSplitterFactories.createCellSplitterFactories(settings, 0, SPEC);
+        });
+        assertEquals("Role column name cannot be empty when 'Role column name' is enabled.", thrown.getMessage());
+    }
+
+    @Test
+    void testCreateCellSplitterFactories_throwsOnNameColumnNameEmpty() {
+        MessagePartExtractorSettings settings = new MessagePartExtractorSettings();
+        settings.m_nameColumnName = Optional.of("");
+
+        InvalidSettingsException thrown = assertThrows(InvalidSettingsException.class, () -> {
+            MessageCellSplitterFactories.createCellSplitterFactories(settings, 0, SPEC);
+        });
+        assertEquals("Name column name cannot be empty when 'Name column name' is enabled.", thrown.getMessage());
+    }
+
+    @Test
+    void testCreateCellSplitterFactories_throwsOnTextPartsPrefixBlank() {
+        MessagePartExtractorSettings settings = new MessagePartExtractorSettings();
+        settings.m_textPartsPrefix = Optional.of("\t"); // Set to blank
+
+        InvalidSettingsException thrown = assertThrows(InvalidSettingsException.class, () -> {
+            MessageCellSplitterFactories.createCellSplitterFactories(settings, 0, SPEC);
+        });
+        assertEquals("Text parts column prefix cannot be empty when 'Text parts column prefix' is enabled.", thrown.getMessage());
+    }
+
+    @Test
+    void testCreateCellSplitterFactories_throwsOnImagePartsPrefixBlank() {
+        MessagePartExtractorSettings settings = new MessagePartExtractorSettings();
+        settings.m_imagePartsPrefix = Optional.of("\t"); // Set to blank
+
+        InvalidSettingsException thrown = assertThrows(InvalidSettingsException.class, () -> {
+            MessageCellSplitterFactories.createCellSplitterFactories(settings, 0, SPEC);
+        });
+        assertEquals("Image parts column prefix cannot be empty when 'Image parts column prefix' is enabled.", thrown.getMessage());
+    }
+
+    @Test
+    void testCreateCellSplitterFactories_throwsOnToolCallsPrefixBlank() {
+        MessagePartExtractorSettings settings = new MessagePartExtractorSettings();
+        settings.m_toolCallsPrefix = Optional.of("\t"); // Set to blank
+
+        InvalidSettingsException thrown = assertThrows(InvalidSettingsException.class, () -> {
+            MessageCellSplitterFactories.createCellSplitterFactories(settings, 0, SPEC);
+        });
+        assertEquals("Tool calls column prefix cannot be empty when 'Tool calls column prefix' is enabled.", thrown.getMessage());
+    }
+
+    @Test
+    void testCreateCellSplitterFactories_throwsOnToolCallIDPrefixBlank() {
+        MessagePartExtractorSettings settings = new MessagePartExtractorSettings();
+        settings.m_toolCallIdColumnName = Optional.of("\t"); // Set to blank
+
+        InvalidSettingsException thrown = assertThrows(InvalidSettingsException.class, () -> {
+            MessageCellSplitterFactories.createCellSplitterFactories(settings, 0, SPEC);
+        });
+        assertEquals("Tool call ID column name cannot be empty when 'Tool call ID column name' is enabled.", thrown.getMessage());
     }
 
     @Test
@@ -163,7 +231,7 @@ final class MessageCellSplitterFactoriesTest {
     }
 
     @Test
-    void testTextPartsSplitterFactory_execution_withDataRow() {
+    void testTextPartsSplitterFactory_execution_withDataRow() throws InvalidSettingsException {
         MessagePartExtractorSettings settings = new MessagePartExtractorSettings();
         settings.m_textPartsPrefix = Optional.of("text_");
         settings.m_imagePartsPrefix = Optional.empty();
@@ -183,7 +251,7 @@ final class MessageCellSplitterFactoriesTest {
     }
 
     @Test
-    void testImagePartsSplitterFactory_execution_withDataRow() {
+    void testImagePartsSplitterFactory_execution_withDataRow() throws InvalidSettingsException {
         MessagePartExtractorSettings settings = new MessagePartExtractorSettings();
         settings.m_textPartsPrefix = Optional.empty();
         settings.m_imagePartsPrefix = Optional.of("img_");
@@ -201,7 +269,7 @@ final class MessageCellSplitterFactoriesTest {
     }
 
     @Test
-    void testToolCallsSplitterFactory_execution_withDataRow() {
+    void testToolCallsSplitterFactory_execution_withDataRow() throws InvalidSettingsException {
         MessagePartExtractorSettings settings = new MessagePartExtractorSettings();
         settings.m_textPartsPrefix = Optional.empty();
         settings.m_imagePartsPrefix = Optional.empty();
@@ -222,7 +290,7 @@ final class MessageCellSplitterFactoriesTest {
     }
 
     @Test
-    void testRoleSplitterFactory_execution_withDataRow() {
+    void testRoleSplitterFactory_execution_withDataRow() throws InvalidSettingsException {
         MessagePartExtractorSettings settings = new MessagePartExtractorSettings();
         settings.m_textPartsPrefix = Optional.empty();
         settings.m_imagePartsPrefix = Optional.empty();
@@ -240,7 +308,7 @@ final class MessageCellSplitterFactoriesTest {
     }
 
     @Test
-    void testToolCallIdSplitterFactory_execution_withDataRow() {
+    void testToolCallIdSplitterFactory_execution_withDataRow() throws InvalidSettingsException {
         MessagePartExtractorSettings settings = new MessagePartExtractorSettings();
         settings.m_textPartsPrefix = Optional.empty();
         settings.m_imagePartsPrefix = Optional.empty();
@@ -258,7 +326,7 @@ final class MessageCellSplitterFactoriesTest {
     }
 
     @Test
-    void testNameSplitterFactory_execution_withDataRow() {
+    void testNameSplitterFactory_execution_withDataRow() throws InvalidSettingsException {
         MessagePartExtractorSettings settings = new MessagePartExtractorSettings();
         settings.m_textPartsPrefix = Optional.empty();
         settings.m_imagePartsPrefix = Optional.empty();
@@ -276,7 +344,7 @@ final class MessageCellSplitterFactoriesTest {
     }
 
     @Test
-    void testTextPartsSplitterFactory_multiRowExtraction() {
+    void testTextPartsSplitterFactory_multiRowExtraction() throws InvalidSettingsException {
         MessagePartExtractorSettings settings = new MessagePartExtractorSettings();
         settings.m_textPartsPrefix = Optional.of("text_");
         settings.m_imagePartsPrefix = Optional.empty();
@@ -307,7 +375,7 @@ final class MessageCellSplitterFactoriesTest {
     }
 
     @Test
-    void testToolCallsSplitterFactory_multiRowExtraction() {
+    void testToolCallsSplitterFactory_multiRowExtraction() throws InvalidSettingsException {
         MessagePartExtractorSettings settings = new MessagePartExtractorSettings();
         settings.m_textPartsPrefix = Optional.empty();
         settings.m_imagePartsPrefix = Optional.empty();
@@ -336,7 +404,7 @@ final class MessageCellSplitterFactoriesTest {
         assertEquals(JSONCellFactory.TYPE, cells2[1].getType());
         assertEquals(JSONCellFactory.TYPE, cells2[2].getType());
     }
-    
+
     @Test
     void testCreateColumnSpecCreator_withDuplicateColumnName() {
         var creator = MessageCellSplitterFactories.createColumnSpecCreator("text", StringCell.TYPE, SPEC);
@@ -352,7 +420,7 @@ final class MessageCellSplitterFactoriesTest {
     }
 
     @Test
-    void testRoleSplitterFactory_execution_withDuplicateRoleColumnName() {
+    void testRoleSplitterFactory_execution_withDuplicateRoleColumnName() throws InvalidSettingsException {
         MessagePartExtractorSettings settings = new MessagePartExtractorSettings();
         settings.m_textPartsPrefix = Optional.empty();
         settings.m_imagePartsPrefix = Optional.empty();

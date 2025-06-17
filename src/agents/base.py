@@ -304,7 +304,7 @@ def _tool_type() -> knext.LogicalType:
 def _tool_column_parameter():
     return knext.ColumnParameter(
         "Tool column",
-        "The column holding the tools the agent can use.",
+        "The column of the tools table holding the tools the agent can use.",
         port_index=1,
         column_filter=util.create_type_filter(_tool_type()),
     )
@@ -333,7 +333,10 @@ def _last_history_column(schema: knext.Schema):
 def _system_message_parameter():
     return knext.MultilineStringParameter(
         "System message",
-        "Message provided to the agent that instructs it how to act.",
+        "Instructions provided by the workflow builder that guide the agent's behavior. "
+        "It typically defines the agent’s role, its tone, boundaries, and behavioral rules."
+        "This message is prioritized over the user message and should not contain any information """ \
+        "that the user can inject in order to prevent prompt injection attacks.",
         default_value="""## PERSISTENCE
 You are an agent - please keep going until the user's query is completely 
 resolved, before ending your turn and yielding back to the user. Only 
@@ -386,8 +389,8 @@ def has_conversation_table(ctx: knext.DialogCreationContext):
 
 def _conversation_column_parameter() -> knext.ColumnParameter:
     return knext.ColumnParameter(
-        "History column",
-        "The column containing the conversation history.",
+        "Conversation column",
+        "The column containing the conversation history if a conversation history table is connected.",
         port_index=2,
         column_filter=util.create_type_filter(_message_type()),
     ).rule(knext.DialogContextCondition(has_conversation_table), knext.Effect.SHOW)
@@ -418,7 +421,7 @@ def _has_tools_table(ctx: knext.DialogCreationContext):
     "Data inputs",
     "The data inputs for the agent.",
 )
-@knext.output_table("Result", "The result of the agent execution.")
+@knext.output_table("Conversation", "The conversation between the LLM and the tools reflecting the agent execution.")
 @knext.output_table_group(
     "Data outputs",
     "The data outputs of the agent.",
@@ -443,11 +446,9 @@ class AgentPrompter2:
 
     developer_message = _system_message_parameter()
 
-    # TODO better name + description
-    # TODO or does it come from the input table?
     user_message = knext.MultilineStringParameter(
         "User message",
-        "Message provided to the agent that instructs it how to act.",
+        "Message from the end user, prioritized behind the developer message.",
     )
 
     conversation_column = _conversation_column_parameter()

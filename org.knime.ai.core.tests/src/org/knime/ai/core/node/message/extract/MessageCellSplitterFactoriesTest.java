@@ -49,6 +49,7 @@
 package org.knime.ai.core.node.message.extract;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -60,7 +61,9 @@ import org.knime.ai.core.data.message.MessageValue.MessageContentPart.MessageCon
 import org.knime.ai.core.data.message.MessageValue.ToolCall;
 import org.knime.core.data.DataCell;
 import org.knime.core.data.DataColumnSpec;
+import org.knime.core.data.DataColumnSpecCreator;
 import org.knime.core.data.DataRow;
+import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.RowKey;
 import org.knime.core.data.def.DefaultRow;
 import org.knime.core.data.def.StringCell;
@@ -68,6 +71,11 @@ import org.knime.core.data.json.JSONCellFactory;
 
 @SuppressWarnings("static-method")
 final class MessageCellSplitterFactoriesTest {
+
+    final static DataTableSpec SPEC =
+        new DataTableSpec(new DataColumnSpecCreator("role", StringCell.TYPE).createSpec(),
+            new DataColumnSpecCreator("name", StringCell.TYPE).createSpec(),
+            new DataColumnSpecCreator("text1", StringCell.TYPE).createSpec());
 
     @Test
     void testCreateCellSplitterFactories_emptySettings() {
@@ -79,19 +87,18 @@ final class MessageCellSplitterFactoriesTest {
         settings.m_toolCallIdColumnName = Optional.empty();
         settings.m_nameColumnName = Optional.empty();
         List<MessageCellSplitterFactories.CellSplitterFactory<?>> factories =
-                MessageCellSplitterFactories.createCellSplitterFactories(settings, 0);
+                MessageCellSplitterFactories.createCellSplitterFactories(settings, 0, SPEC);
         assertNotNull(factories);
         assertTrue(factories.isEmpty());
     }
 
     @Test
     void testCreateColumnSpecCreator() {
-        var creator = MessageCellSplitterFactories.createColumnSpecCreator("prefix", StringCell.TYPE);
+        var creator = MessageCellSplitterFactories.createColumnSpecCreator("prefix", StringCell.TYPE, SPEC);
         DataColumnSpec spec = creator.apply(0);
         assertEquals("prefix1", spec.getName());
         assertEquals(StringCell.TYPE, spec.getType());
     }
-
     @Test
     void testCreateContentCounter() {
         var msg = TestUtil.createMessageWithTextParts("foo", "bar");
@@ -164,7 +171,7 @@ final class MessageCellSplitterFactoriesTest {
         settings.m_roleColumnName = Optional.empty();
         settings.m_toolCallIdColumnName = Optional.empty();
         settings.m_nameColumnName = Optional.empty();
-        var factories = MessageCellSplitterFactories.createCellSplitterFactories(settings, 0);
+        var factories = MessageCellSplitterFactories.createCellSplitterFactories(settings, 0, SPEC);
         var factory = factories.get(0);
         factory.accept(TestUtil.createMessageWithTextParts("foo", "bar"));
         var cellFactory = factory.get();
@@ -184,7 +191,7 @@ final class MessageCellSplitterFactoriesTest {
         settings.m_roleColumnName = Optional.empty();
         settings.m_toolCallIdColumnName = Optional.empty();
         settings.m_nameColumnName = Optional.empty();
-        var factories = MessageCellSplitterFactories.createCellSplitterFactories(settings, 0);
+        var factories = MessageCellSplitterFactories.createCellSplitterFactories(settings, 0, SPEC);
         var factory = factories.get(0);
         factory.accept(TestUtil.createMessageWithTextParts("foo"));
         var cellFactory = factory.get();
@@ -202,7 +209,7 @@ final class MessageCellSplitterFactoriesTest {
         settings.m_roleColumnName = Optional.empty();
         settings.m_toolCallIdColumnName = Optional.empty();
         settings.m_nameColumnName = Optional.empty();
-        var factories = MessageCellSplitterFactories.createCellSplitterFactories(settings, 0);
+        var factories = MessageCellSplitterFactories.createCellSplitterFactories(settings, 0, SPEC);
         var factory = factories.get(0);
         factory.accept(TestUtil.createMessageWithToolCalls(2));
         var cellFactory = factory.get();
@@ -223,7 +230,7 @@ final class MessageCellSplitterFactoriesTest {
         settings.m_roleColumnName = Optional.of("role");
         settings.m_toolCallIdColumnName = Optional.empty();
         settings.m_nameColumnName = Optional.empty();
-        var factories = MessageCellSplitterFactories.createCellSplitterFactories(settings, 0);
+        var factories = MessageCellSplitterFactories.createCellSplitterFactories(settings, 0, SPEC);
         var factory = factories.get(0);
         var cellFactory = factory.get();
         DataRow row = new DefaultRow(new RowKey("row4"), TestUtil.createMessageWithRole("USER"));
@@ -241,7 +248,7 @@ final class MessageCellSplitterFactoriesTest {
         settings.m_roleColumnName = Optional.empty();
         settings.m_toolCallIdColumnName = Optional.of("toolCallId");
         settings.m_nameColumnName = Optional.empty();
-        var factories = MessageCellSplitterFactories.createCellSplitterFactories(settings, 0);
+        var factories = MessageCellSplitterFactories.createCellSplitterFactories(settings, 0, SPEC);
         var factory = factories.get(0);
         var cellFactory = factory.get();
         DataRow row = new DefaultRow(new RowKey("row5"), TestUtil.createMessageWithToolCallId("id123"));
@@ -259,7 +266,7 @@ final class MessageCellSplitterFactoriesTest {
         settings.m_roleColumnName = Optional.empty();
         settings.m_toolCallIdColumnName = Optional.empty();
         settings.m_nameColumnName = Optional.of("name");
-        var factories = MessageCellSplitterFactories.createCellSplitterFactories(settings, 0);
+        var factories = MessageCellSplitterFactories.createCellSplitterFactories(settings, 0, SPEC);
         var factory = factories.get(0);
         var cellFactory = factory.get();
         DataRow row = new DefaultRow(new RowKey("row6"), TestUtil.createMessageWithName("foo"));
@@ -277,7 +284,7 @@ final class MessageCellSplitterFactoriesTest {
         settings.m_roleColumnName = Optional.empty();
         settings.m_toolCallIdColumnName = Optional.empty();
         settings.m_nameColumnName = Optional.empty();
-        var factories = MessageCellSplitterFactories.createCellSplitterFactories(settings, 0);
+        var factories = MessageCellSplitterFactories.createCellSplitterFactories(settings, 0, SPEC);
         var factory = factories.get(0);
         // Accept both rows to simulate state collection (max parts = 3)
         factory.accept(TestUtil.createMessageWithTextParts("a", "b"));
@@ -308,7 +315,7 @@ final class MessageCellSplitterFactoriesTest {
         settings.m_roleColumnName = Optional.empty();
         settings.m_toolCallIdColumnName = Optional.empty();
         settings.m_nameColumnName = Optional.empty();
-        var factories = MessageCellSplitterFactories.createCellSplitterFactories(settings, 0);
+        var factories = MessageCellSplitterFactories.createCellSplitterFactories(settings, 0, SPEC);
         var factory = factories.get(0);
         // Accept both rows to simulate state collection (max tool calls = 3)
         factory.accept(TestUtil.createMessageWithToolCalls(2));
@@ -328,5 +335,41 @@ final class MessageCellSplitterFactoriesTest {
         assertEquals(JSONCellFactory.TYPE, cells2[0].getType());
         assertEquals(JSONCellFactory.TYPE, cells2[1].getType());
         assertEquals(JSONCellFactory.TYPE, cells2[2].getType());
+    }
+    
+    @Test
+    void testCreateColumnSpecCreator_withDuplicateColumnName() {
+        var creator = MessageCellSplitterFactories.createColumnSpecCreator("text", StringCell.TYPE, SPEC);
+
+        DataColumnSpec spec1 = creator.apply(0);
+        DataColumnSpec spec2 = creator.apply(1);
+
+        assertNotNull(spec1);
+        assertNotNull(spec2);
+        assertNotEquals(spec1.getName(), spec2.getName());
+        assertEquals("text1 (#1)", spec1.getName());
+        assertEquals("text2", spec2.getName());
+    }
+
+    @Test
+    void testRoleSplitterFactory_execution_withDuplicateRoleColumnName() {
+        MessagePartExtractorSettings settings = new MessagePartExtractorSettings();
+        settings.m_textPartsPrefix = Optional.empty();
+        settings.m_imagePartsPrefix = Optional.empty();
+        settings.m_toolCallsPrefix = Optional.empty();
+        settings.m_roleColumnName = Optional.of("role");
+        settings.m_toolCallIdColumnName = Optional.empty();
+        settings.m_nameColumnName = Optional.empty();
+
+        var factories = MessageCellSplitterFactories.createCellSplitterFactories(settings, 0, SPEC);
+        var factory = factories.get(0);
+        var cellFactory = factory.get();
+
+        DataRow row = new DefaultRow(new RowKey("row1"), TestUtil.createMessageWithRole("USER"));
+        var cells = cellFactory.getCells(row, 0);
+
+        assertEquals(1, cells.length);
+        assertEquals("USER", ((StringCell)cells[0]).getStringValue());
+        assertEquals("role (#1)", cellFactory.getColumnSpecs()[0].getName());
     }
 }

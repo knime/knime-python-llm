@@ -59,14 +59,30 @@ import org.knime.core.webui.node.impl.WebUINodeFactory;
 @SuppressWarnings("restriction")
 public final class MessagePartExtractorNodeFactory extends WebUINodeFactory<MessagePartExtractorNodeModel> {
 
-    private static final WebUINodeConfiguration CONFIG = WebUINodeConfiguration.builder()//
-            .name("Message Part Extractor")//
-            .icon("./Message-part-extractor.png")//
-            .shortDescription("Extracts parts from messages in a table.")//
-            .fullDescription("This node extracts parts from messages in a table, allowing you to work with specific content types such as text or images.")//
-            .modelSettingsClass(MessagePartExtractorSettings.class)//
-            .addInputTable("Message table", "Table containing messages to extract parts from.")//
-            .addOutputTable("Message part table", "Table with extracted message parts.")//
+    private static final WebUINodeConfiguration CONFIG = WebUINodeConfiguration.builder()
+            .name("Message Part Extractor")
+            .icon("./Message-part-extractor.png")
+            .shortDescription("Extracts specific parts from messages in a table.")
+            .fullDescription("""
+                <p>
+                    This node extracts specific parts from messages in a table, allowing you to work with content types such as text, images, roles, names, and tool calls.
+                    The input table is processed row by row, extracting the specified parts from each message.
+                </p>
+                <p>
+                    Extracted parts:
+                </p>
+                <ul>
+                    <li><b>Role</b>: Extracts the role of the message, such as User, AI, or Tool.</li>
+                    <li><b>Name</b>: Extracts the name associated with the message.</li>
+                    <li><b>Text Content</b>: Extracts text content from the message.</li>
+                    <li><b>Image Content</b>: Extracts image content from the message.</li>
+                    <li><b>Tool Calls</b>: Extracts tool calls, including tool names, IDs, and arguments.</li>
+                    <li><b>Tool Call ID</b>: Extracts the ID of the tool call associated with the message.</li>
+                </ul>
+            """)
+            .modelSettingsClass(MessagePartExtractorSettings.class)
+            .addInputTable("Message table", "Table containing messages to extract parts from.")
+            .addOutputTable("Message part table", "Table with extracted message parts.")
             .build();
 
     /**

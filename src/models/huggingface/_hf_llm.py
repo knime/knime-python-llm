@@ -97,6 +97,7 @@ class HFLLM(LLM):
             return client.text_generation(
                 prompt,
                 max_new_tokens=self.max_new_tokens,
+                temperature=self.temperature,
                 repetition_penalty=self.repetition_penalty,
                 top_k=self.top_k,
                 top_p=self.top_p,

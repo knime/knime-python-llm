@@ -393,6 +393,11 @@ def _conversation_column_parameter() -> knext.ColumnParameter:
     ).rule(knext.DialogContextCondition(has_conversation_table), knext.Effect.SHOW)
 
 
+def _has_tools_table(ctx: knext.DialogCreationContext):
+    # Port index 1 is the tools table
+    return ctx.get_input_specs()[1] is not None
+
+
 # region Agent Prompter 2.0
 @knext.node(
     "Agent Prompter",
@@ -631,7 +636,7 @@ def _extract_tools_from_table(tools_table: knext.Table, tool_column: str):
 @knext.input_port(
     "Chat model", "The chat model to use.", port_type=chat_model_port_type
 )
-@knext.input_table("Tools", "The tools the agent can use.")
+@knext.input_table("Tools", "The tools the agent can use.", optional=True)
 @knext.input_table_group(
     "Data inputs",
     "The data inputs for the agent.",
@@ -658,7 +663,7 @@ class AgentChatView:
 
     developer_message = _system_message_parameter()
 
-    tool_column = _tool_column_parameter()
+    tool_column = _tool_column_parameter().rule(knext.DialogContextCondition(_has_tools_table), knext.Effect.SHOW)
 
     initial_message = knext.MultilineStringParameter(
         "Initial message", "An optional 'AI' initial message to be shown to the user."
@@ -678,22 +683,23 @@ class AgentChatView:
         self,
         ctx: knext.ConfigurationContext,
         chat_model_spec: ChatModelPortObjectSpec,
-        tools_schema: knext.Schema,
+        tools_schema: Optional[knext.Schema],
         data_schemas: list[knext.Schema],
     ) -> knext.Schema:
         chat_model_spec.validate_context(ctx)
-        if self.tool_column is None:
-            self.tool_column = _last_tool_column(tools_schema)
-        elif self.tool_column not in tools_schema.column_names:
-            raise knext.InvalidParametersError(
-                f"Column {self.tool_column} not found in the tools table."
-            )
+        if tools_schema is not None:
+            if self.tool_column is None:
+                self.tool_column = _last_tool_column(tools_schema)
+            elif self.tool_column not in tools_schema.column_names:
+                raise knext.InvalidParametersError(
+                    f"Column {self.tool_column} not found in the tools table."
+                )
 
     def execute(
         self,
         ctx: knext.ExecutionContext,
         chat_model: ChatModelPortObject,
-        tools_table: knext.Table,
+        tools_table: Optional[knext.Table],
         input_tables: list[knext.Table],
     ):
         pass
@@ -702,7 +708,7 @@ class AgentChatView:
         self,
         ctx,
         chat_model: ChatModelPortObject,
-        tools_table: knext.Table,
+        tools_table: Optional[knext.Table],
         input_tables: list[knext.Table],
     ):
         from langgraph.prebuilt import create_react_agent
@@ -720,8 +726,11 @@ class AgentChatView:
         tool_converter = LangchainToolConverter(
             data_registry, ctx, render_message_as_json, self.debug
         )
-        tool_cells = _extract_tools_from_table(tools_table, self.tool_column)
-        tools = [tool_converter.to_langchain_tool(tool) for tool in tool_cells]
+        if tools_table is not None:
+            tool_cells = _extract_tools_from_table(tools_table, self.tool_column)
+            tools = [tool_converter.to_langchain_tool(tool) for tool in tool_cells]
+        else:
+            tools = []
         agent = create_react_agent(
             chat_model, tools=tools, prompt=self.developer_message
         )

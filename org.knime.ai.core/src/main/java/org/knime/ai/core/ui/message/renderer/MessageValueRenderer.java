@@ -83,6 +83,8 @@ import org.owasp.html.PolicyFactory;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
 
 import j2html.tags.DomContent;
 import j2html.tags.specialized.DivTag;
@@ -113,9 +115,17 @@ public final class MessageValueRenderer extends DefaultDataValueRenderer
         }
     }
 
-    // JSON parsing for Tool Call Arguments. TODO: replace with YAML for better readability?
-    private static final ObjectMapper MAPPER = new ObjectMapper();
-    private static final ObjectWriter PRETTY_PRINTER = MAPPER.writerWithDefaultPrettyPrinter();
+    // JSON parsing for Tool Call Arguments.
+    private static final ObjectMapper JSON_MAPPER = new ObjectMapper();
+
+    private static final ObjectWriter PRETTY_PRINTER =
+        new ObjectMapper(createYamlFactory()).writerWithDefaultPrettyPrinter();
+
+    private static YAMLFactory createYamlFactory() {
+        var yamlFactory = new YAMLFactory();
+        yamlFactory.disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER);
+        return yamlFactory;
+    }
 
     /**
      * Pretty-prints a JSON string.
@@ -124,14 +134,14 @@ public final class MessageValueRenderer extends DefaultDataValueRenderer
      */
     private static String prettyPrintJson(final String json) {
         if (json == null || json.isBlank()) {
-            return "{}";
+            return "";
         }
         try {
-            Object jsonObject = MAPPER.readValue(json, Object.class);
+            Object jsonObject = JSON_MAPPER.readValue(json, Object.class);
             return PRETTY_PRINTER.writeValueAsString(jsonObject);
         } catch (JsonProcessingException e) {
-            // If it's not valid JSON, return the original content wrapped in a string-like format
-            return "\"" + json + "\"";
+            // If it's not valid JSON, return the original content
+            return json;
         }
     }
 

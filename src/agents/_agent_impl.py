@@ -161,7 +161,7 @@ class LangchainToolConverter:
         self._data_registry = data_registry
         self._ctx = ctx
         self._message_renderer = message_renderer
-        self._execution_mode_hint = "execution-mode:" + execution_mode.name
+        self._execution_mode_hint = { "execution-mode" : execution_mode.name }
         self.sanitized_to_original = {}
 
     def _sanitize_tool_name(self, name: str) -> str:
@@ -225,7 +225,7 @@ class LangchainToolConverter:
                 self._validate_required_fields(
                     tool.parameter_schema.keys(), params, "configuration parameters"
                 )
-                return self._ctx._execute_tool(tool, params, [], [self._execution_mode_hint])[0]
+                return self._ctx._execute_tool(tool, params, [], self._execution_mode_hint)[0]
             except Exception as e:
                 _logger.exception(e)
                 raise
@@ -290,7 +290,7 @@ class LangchainToolConverter:
                     tool,
                     configuration,
                     inputs,
-                    [self._execution_mode_hint],
+                    self._execution_mode_hint,
                 )
                 output_references = {}
                 for output in outputs:

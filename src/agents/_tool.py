@@ -121,14 +121,12 @@ class LangchainToolConverter:
     
     def _create_data_output_processor(self, tool: WorkflowTool):
         def _process_outputs_with_data(message: str, outputs: list[knext.Table]):
-            if not outputs:
-                return message
             output_references = {}
             for port, output in zip(tool.output_ports, outputs):
                 output_reference = self._data_registry.add_table(output, port)
                 output_references.update(output_reference)
-            return render_structured(
-                message=message, outputs=output_references
+            return message + "\n\n## Data repository update\n" + render_structured(
+                **output_references
             )
         return _process_outputs_with_data
 

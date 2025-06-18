@@ -40,7 +40,7 @@ class DataRegistry:
         meta_data = Port(
             name=port.name, description=port.description, type=port.type, spec=spec)
         self._data.append(DataItem(meta_data=meta_data, data=table))
-        return {len(self._data) - 1: port_to_dict(meta_data)}
+        return {str(len(self._data) - 1): port_to_dict(meta_data)}
 
     def get_data(self, index: int) -> knext.Table:
         if index < 0 or index >= len(self._data):

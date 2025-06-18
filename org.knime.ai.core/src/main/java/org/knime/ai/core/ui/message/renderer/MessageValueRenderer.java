@@ -137,7 +137,10 @@ public final class MessageValueRenderer extends DefaultDataValueRenderer
             return "";
         }
         try {
-            Object jsonObject = JSON_MAPPER.readValue(json, Object.class);
+            var jsonObject = JSON_MAPPER.readTree(json);
+            if (jsonObject.isEmpty()) {
+                return ""; // Return empty string for empty JSON
+            }
             return PRETTY_PRINTER.writeValueAsString(jsonObject);
         } catch (JsonProcessingException e) {
             // If it's not valid JSON, return the original content
@@ -336,7 +339,10 @@ public final class MessageValueRenderer extends DefaultDataValueRenderer
         DivTag header = div().withClass("tool-call-header").with(
             img().withSrc(TOOL_ICON).withClass("tool-call-icon"),
             span(tc.toolName()).withClass("tool-call-name"));
-
+        var argsYaml = prettyPrintJson(tc.arguments());
+        if (argsYaml.isBlank()) {
+            return div().withClass("tool-call").with(header);
+        }
         DomContent args = pre(prettyPrintJson(tc.arguments())).withClass("tool-call-args");
 
         return div().withClass("tool-call").with(header, args);

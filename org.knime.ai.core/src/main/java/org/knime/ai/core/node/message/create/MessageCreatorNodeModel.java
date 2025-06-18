@@ -63,6 +63,7 @@ import org.knime.core.data.container.SingleCellFactory;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.ExecutionContext;
 import org.knime.core.node.InvalidSettingsException;
+import org.knime.core.util.UniqueNameGenerator;
 import org.knime.core.webui.node.impl.WebUINodeConfiguration;
 import org.knime.core.webui.node.impl.WebUINodeModel;
 
@@ -98,8 +99,8 @@ final class MessageCreatorNodeModel extends WebUINodeModel<MessageCreatorNodeSet
         final DataTableSpec inSpec) throws InvalidSettingsException {
         var rearranger = new ColumnRearranger(inSpec);
         var messageCellCreator = new MessageCellCreator(modelSettings, inSpec).createMessageCellCreator();
-        var columnSpec = new DataColumnSpecCreator(modelSettings.m_messageColumnName, MessageCell.TYPE).createSpec();
-        rearranger.append(new SingleCellFactoryImpl(columnSpec, messageCellCreator));
+        var outputColumnSpec = createOutputMessageColumnSpec(modelSettings, inSpec);
+        rearranger.append(new SingleCellFactoryImpl(outputColumnSpec, messageCellCreator));
         rearranger.remove(columnsToRemove(modelSettings, inSpec).toArray(String[]::new));
         return rearranger;
     }
@@ -113,6 +114,31 @@ final class MessageCreatorNodeModel extends WebUINodeModel<MessageCreatorNodeSet
             columnsToRemove.add(inSpec.getColumnSpec(i).getName());
         }
         return columnsToRemove;
+    }
+
+    /**
+     * Creates the DataColumnSpec for the output message column, ensuring a unique name.
+     * The unique name is generated based on the intended column name from settings
+     * and existing column names in the input DataTableSpec.
+     *
+     * @param modelSettings The node settings containing the output column name.
+     * @param inSpec The input DataTableSpec, used to check for existing column names.
+     * @return A DataColumnSpec for the new message column with a unique name.
+     */
+    private static DataColumnSpec createOutputMessageColumnSpec(
+            final MessageCreatorNodeSettings modelSettings,
+            final DataTableSpec inSpec) {
+
+        String finalOutputColumnName = modelSettings.m_messageColumnName;
+
+        // Only generate a unique name if input columns are not being removed
+        if (!modelSettings.m_removeInputColumns) {
+            UniqueNameGenerator uniqueNameGenerator = new UniqueNameGenerator(inSpec);
+            finalOutputColumnName = uniqueNameGenerator.newName(modelSettings.m_messageColumnName);
+        }
+
+        return new DataColumnSpecCreator(finalOutputColumnName, MessageCell.TYPE).createSpec();
+
     }
 
     private static final class SingleCellFactoryImpl extends SingleCellFactory {

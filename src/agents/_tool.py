@@ -73,24 +73,19 @@ class LangchainToolConverter:
         tool: WorkflowTool,
     ) -> StructuredTool:
         sanitized_name = self._sanitize_tool_name(tool.name)
-        configuration_schema = _create_configuration_schema(tool)
+        properties = {}
+        if tool.parameter_schema:
+            properties["configuration"] = _create_configuration_schema(tool)
         description_parts = {"description": tool.description}
 
         if tool.input_ports:
             self._has_data_tools = True
-            args_schema = _create_object_schema(
-                description="Configuration and data inputs for the tool.",
-                properties={
-                    "configuration": configuration_schema,
-                    "data_inputs": _create_input_data_schema(tool),
-                },
-            )
+            properties["data_inputs"] = _create_input_data_schema(tool)
             params_parser = self._create_data_input_parser(tool)
             description_parts["input_ports"] = list(
                 map(port_to_dict, tool.input_ports)
             )
         else:
-            args_schema = configuration_schema
             params_parser = self._create_no_data_input_parser(tool)
 
         if tool.output_ports:
@@ -101,6 +96,11 @@ class LangchainToolConverter:
             )
         else:
             outputs_processor = self._create_no_data_output_processor()
+
+        args_schema = _create_object_schema(
+            description="Parameters for the tool.",
+            properties=properties,
+        )
 
         # Create the tool function
         def tool_function(**params: dict) -> str:
@@ -137,8 +137,9 @@ class LangchainToolConverter:
     
     def _create_no_data_input_parser(self, tool: WorkflowTool):
         def _parse_params_no_data(params: dict):
-            _validate_required_fields(tool.parameter_schema.keys(), params, "configuration parameters")
-            return params, []
+            configuration = params.get("configuration", {})
+            _validate_required_fields(tool.parameter_schema.keys(), configuration, "configuration parameters")
+            return configuration, []
         return _parse_params_no_data
     
     def _create_data_input_parser(self, tool: WorkflowTool):

@@ -62,7 +62,7 @@ class DataRegistry:
         """Returns True if there is data in the registry, False otherwise."""
         return len(self._data) > 0
 
-    def create_data_message(self) -> Optional[HumanMessage]:
+    def create_data_message(self) -> HumanMessage:
         if self._data:
             content = render_structured(
                 **{str(id): port_to_dict(data.meta_data) for id, data in enumerate(self._data)}

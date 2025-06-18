@@ -1,3 +1,47 @@
+# -*- coding: utf-8 -*-
+# ------------------------------------------------------------------------
+#  Copyright by KNIME AG, Zurich, Switzerland
+#  Website: http://www.knime.com; Email: contact@knime.com
+#
+#  This program is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License, Version 3, as
+#  published by the Free Software Foundation.
+#
+#  This program is distributed in the hope that it will be useful, but
+#  WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+#  GNU General Public License for more details.
+#
+#  You should have received a copy of the GNU General Public License
+#  along with this program; if not, see <http://www.gnu.org/licenses>.
+#
+#  Additional permission under GNU GPL version 3 section 7:
+#
+#  KNIME interoperates with ECLIPSE solely via ECLIPSE's plug-in APIs.
+#  Hence, KNIME and ECLIPSE are both independent programs and are not
+#  derived from each other. Should, however, the interpretation of the
+#  GNU GPL Version 3 ("License") under any applicable laws result in
+#  KNIME and ECLIPSE being a combined program, KNIME AG herewith grants
+#  you the additional permission to use and propagate KNIME together with
+#  ECLIPSE with only the license terms in place for ECLIPSE applying to
+#  ECLIPSE and the GNU GPL Version 3 applying for KNIME, provided the
+#  license terms of ECLIPSE themselves allow for the respective use and
+#  propagation of ECLIPSE together with KNIME.
+#
+#  Additional permission relating to nodes for KNIME that extend the Node
+#  Extension (and in particular that are based on subclasses of NodeModel,
+#  NodeDialog, and NodeView) and that only interoperate with KNIME through
+#  standard APIs ("Nodes"):
+#  Nodes are deemed to be separate and independent programs and to not be
+#  covered works.  Notwithstanding anything to the contrary in the
+#  License, the License does not apply to Nodes, you are not required to
+#  license Nodes under the License, and you are granted a license to
+#  prepare and propagate Nodes, in each case even if such Nodes are
+#  propagated with or for interoperation with KNIME.  The owner of a Node
+#  may freely choose the license terms applicable to such Node, including
+#  when such Node is propagated with or for interoperation with KNIME.
+# ------------------------------------------------------------------------
+
 from dataclasses import dataclass
 from typing import Optional, Sequence
 import knime.extension as knext
@@ -13,9 +57,11 @@ class Port:
     type: str
     spec: Optional[dict] = None
 
+
 @dataclass
 class DataItem:
     """Represents a data item in the registry."""
+
     meta_data: Port
     data: knext.Table
 
@@ -26,19 +72,27 @@ class DataRegistry:
         self._data_message_prefix = data_message_prefix
 
     @classmethod
-    def create_with_input_tables(cls, input_tables: Sequence[knext.Table], data_message_prefix: str = None) -> "DataRegistry":
+    def create_with_input_tables(
+        cls, input_tables: Sequence[knext.Table], data_message_prefix: str = None
+    ) -> "DataRegistry":
         """Creates a DataRegistry with the given input tables and optional prefix."""
         registry = cls(data_message_prefix=data_message_prefix)
         for i, table in enumerate(input_tables):
             spec = _spec_representation(table)
-            port = Port(name=f"input_table_{i+1}", description=f"Input table {i+1}", type="Table", spec=spec)
+            port = Port(
+                name=f"input_table_{i + 1}",
+                description=f"Input table {i + 1}",
+                type="Table",
+                spec=spec,
+            )
             registry._data.append(DataItem(meta_data=port, data=table))
         return registry
 
     def add_table(self, table: knext.Table, port: Port) -> dict:
         spec = _spec_representation(table)
         meta_data = Port(
-            name=port.name, description=port.description, type=port.type, spec=spec)
+            name=port.name, description=port.description, type=port.type, spec=spec
+        )
         self._data.append(DataItem(meta_data=meta_data, data=table))
         return {str(len(self._data) - 1): port_to_dict(meta_data)}
 
@@ -56,7 +110,7 @@ class DataRegistry:
             empty_table = _empty_table()
             tables = tables + [empty_table] * (num_tables - len(tables))
         return tables
-    
+
     @property
     def has_data(self) -> bool:
         """Returns True if there is data in the registry, False otherwise."""
@@ -65,23 +119,29 @@ class DataRegistry:
     def create_data_message(self) -> HumanMessage:
         if self._data:
             content = render_structured(
-                **{str(id): port_to_dict(data.meta_data) for id, data in enumerate(self._data)}
+                **{
+                    str(id): port_to_dict(data.meta_data)
+                    for id, data in enumerate(self._data)
+                }
             )
         else:
             content = "No data available. Use a tool to produce data."
-        
+
         return HumanMessage(self._data_message_prefix + content)
+
 
 def _spec_representation(table: knext.Table) -> dict:
     return {"columns": {column.name: str(column.ktype) for column in table.schema}}
 
+
 def port_to_dict(port: Port) -> dict:
-        return {
-            "name": port.name,
-            "description": port.description,
-            "type": port.type,
-            "spec": port.spec,
-        }
+    return {
+        "name": port.name,
+        "description": port.description,
+        "type": port.type,
+        "spec": port.spec,
+    }
+
 
 def _empty_table():
     """Returns an empty knext.Table."""

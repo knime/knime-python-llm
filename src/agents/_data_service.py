@@ -54,12 +54,16 @@ class AgentChatViewDataService:
         initial_message: str,
         recursion_limit: int,
         show_tool_calls_and_results: bool,
-        tool_converter: LangchainToolConverter
+        tool_converter: LangchainToolConverter,
     ):
         self._agent_graph = agent_graph
         self._data_registry = data_registry
         self._tool_converter = tool_converter
-        self._messages = [data_registry.create_data_message()] if data_registry.has_data or tool_converter.has_data_tools else []
+        self._messages = (
+            [data_registry.create_data_message()]
+            if data_registry.has_data or tool_converter.has_data_tools
+            else []
+        )
         self._initial_message = initial_message
         self._recursion_limit = recursion_limit
         self._show_tool_calls_and_results = show_tool_calls_and_results
@@ -144,8 +148,12 @@ class AgentChatViewDataService:
             fe_message["toolCalls"] = [
                 {
                     "id": tool_call["id"],
-                    "name": self._tool_converter.desanitize_tool_name(tool_call["name"]),
-                    "args": json.dumps(tool_call["args"], indent=2) if "args" in tool_call else None,
+                    "name": self._tool_converter.desanitize_tool_name(
+                        tool_call["name"]
+                    ),
+                    "args": json.dumps(tool_call["args"], indent=2)
+                    if "args" in tool_call
+                    else None,
                 }
                 for tool_call in message.tool_calls
             ]
@@ -153,4 +161,3 @@ class AgentChatViewDataService:
             fe_message["toolCallId"] = message.tool_call_id
             fe_message["name"] = self._tool_converter.desanitize_tool_name(message.name)
         return fe_message
-

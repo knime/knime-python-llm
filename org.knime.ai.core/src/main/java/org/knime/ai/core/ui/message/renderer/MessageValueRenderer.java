@@ -310,7 +310,7 @@ public final class MessageValueRenderer extends DefaultDataValueRenderer
             String rawHtml = HTML_RENDERER.render(MARKDOWN_PARSER.parse(t.getContent()));
             String sanitizedHtml = HTML_SANITIZER_POLICY.sanitize(rawHtml);
 
-            return rawHtml(sanitizedHtml);
+            return div(rawHtml(sanitizedHtml)).withClass("markdown-content");
         }
 
         if (part instanceof PngContentPart imgPart) {
@@ -382,6 +382,12 @@ public final class MessageValueRenderer extends DefaultDataValueRenderer
                 overflow-wrap: break-word;
                 white-space: pre-wrap;
                 font-weight: 400;
+                margin-top: 10px;
+            }
+
+            .markdown-content > * {
+                margin-top: 0;
+                margin-bottom: 0;
             }
 
             .content-separator {

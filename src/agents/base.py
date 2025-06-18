@@ -426,7 +426,7 @@ Once invoked, the tool will receive the data associated with that ID.
 - This update follows the same format as the initial data repository: A map of IDs to data items.
 
 You must incorporate these updates into your working view of the data repository.
-## Data:
+## Data repository:
 """, is_advanced=True
     )
 

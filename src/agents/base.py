@@ -543,11 +543,6 @@ class AgentPrompter2:
 
         tool_cells = _extract_tools_from_table(tools_table, self.tool_column)
 
-        if len(tool_cells) == 0:
-            raise knext.InvalidParametersError(
-                f"Tool column {self.tool_column} is empty. Please provide a valid tool column."
-            )
-
         tools = [tool_converter.to_langchain_tool(tool) for tool in tool_cells]
 
         messages = []

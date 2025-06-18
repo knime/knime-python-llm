@@ -403,7 +403,7 @@ def _data_message_prefix_parameter():
     return knext.MultilineStringParameter(
         "Data message prefix",
         "Prefix for the data message shown to the agent. You can use this to customize the instructions about the data repository.",
-        default_value="""# Data Tools Interface
+        default_value="""## Data Tools Interface
 You have access to tools that can consume and produce data.
 The interaction with these tools is mediated via a data repository that keeps track of all available data items.
 The repository is represented as a map from IDs to data items.
@@ -416,17 +416,17 @@ Each data item is represented by:
 
 Note: You do not have access to the actual data content, only the metadata and IDs.
 
-# Using Tools with Data
-## Consuming Data:
+## Using Tools with Data
+### Consuming Data:
 To pass data to a tool, provide the ID of the relevant data item.
 Once invoked, the tool will receive the data associated with that ID.
 
-## Producing Data:
+### Producing Data:
 - Tools that produce data will include an update to the data repository in their tool message.
 - This update follows the same format as the initial data repository: A map of IDs to data items.
 
 You must incorporate these updates into your working view of the data repository.
-# Data:
+## Data:
 """, is_advanced=True
     )
 

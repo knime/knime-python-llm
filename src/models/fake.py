@@ -414,7 +414,7 @@ def to_dictionary(table, columns: list[str]):
 
 
 @knext.node(
-    "Test Instruct Model Selector",
+    "Test LLM Connector",
     knext.NodeType.SOURCE,
     fake_icon,
     category=test_category,

@@ -63,6 +63,10 @@ def generate_response(
     missing_value_strategy: str,
     node: str,
 ):
+    # LLM Prompter auto-injects this prefix during processing, causing a mismatch with the stored prompts
+    if prompt.lower().startswith("human: "):
+        prompt = prompt[len("human: ") :]
+
     response = response_dict.get(prompt)
 
     if not response:
@@ -100,7 +104,7 @@ class TestDictLLM(LLM):
             self.default_response,
             prompt,
             self.missing_value_strategy,
-            "Test Instruct Model Selector",
+            "Test LLM Connector",
         )
 
     async def _acall(
@@ -116,7 +120,7 @@ class TestDictLLM(LLM):
             self.default_response,
             prompt,
             self.missing_value_strategy,
-            "Test Instruct Model Selector",
+            "Test LLM Connector",
         )
 
     @property

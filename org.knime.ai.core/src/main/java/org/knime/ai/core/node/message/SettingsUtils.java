@@ -99,7 +99,7 @@ public final class SettingsUtils {
 
         @Override
         public Predicate init(final PredicateInitializer i) {
-            return m_predicates.stream().map(p -> p.init(i)).reduce(i.always(), m_aggregator);
+            return m_predicates.stream().map(p -> p.init(i)).reduce(m_aggregator).orElse(i.always());
         }
 
     }

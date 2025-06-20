@@ -53,6 +53,7 @@ import java.util.Optional;
 
 import org.knime.core.data.DataValue;
 import org.knime.core.data.ExtensibleUtilityFactory;
+import org.knime.core.webui.node.dialog.defaultdialog.widget.Label;
 
 /**
  * Represents a message to or from an AI model.
@@ -87,6 +88,7 @@ public interface MessageValue extends DataValue {
             /**
              * AI message, typically a response from the AI model.
              */
+            @Label("AI")
             AI("AI");
 
         private final String m_label;

@@ -99,10 +99,12 @@ final class MessageCreatorNodeSettings implements DefaultNodeSettings {
 
     @Section(title = "Tool calls")
     @After(NameLayout.class)
+    @Effect(predicate = ShouldShowToolCallsSection.class, type = EffectType.SHOW)
     interface ToolCallsLayout {}
 
     @Section(title = "Tool call ID")
     @After(ToolCallsLayout.class)
+    @Effect(predicate = ShouldShowToolCallIDSection.class, type = EffectType.SHOW)
     interface ToolCallIdLayout {}
 
 
@@ -112,13 +114,61 @@ final class MessageCreatorNodeSettings implements DefaultNodeSettings {
 
 
     static final class RoleInputTypeRef implements Reference<InputType> {}
+    static final class RoleTypeRef implements Reference<MessageType> {}
 
     private static final class IsValueRoleInputType extends CompositePredicateProvider {
-
         IsValueRoleInputType() {
             super(i -> i.getEnum(RoleInputTypeRef.class).isOneOf(InputType.VALUE));
         }
+    }
 
+    private static final class IsColumnRoleInputType extends CompositePredicateProvider {
+        IsColumnRoleInputType() {
+            super(i -> i.getEnum(RoleInputTypeRef.class).isOneOf(InputType.COLUMN));
+        }
+    }
+
+    private static final class IsToolRole extends CompositePredicateProvider {
+        IsToolRole() {
+            super(i -> i.getEnum(RoleTypeRef.class).isOneOf(MessageType.TOOL));
+        }
+    }
+
+    private static final class IsAIRole extends CompositePredicateProvider {
+        IsAIRole() {
+            super(i -> i.getEnum(RoleTypeRef.class).isOneOf(MessageType.AI));
+        }
+    }
+
+    private static final class IsToolOrAIRole extends CompositePredicateProvider {
+        IsToolOrAIRole() {
+            super(Predicate::or,
+                  new IsToolRole(),
+                  new IsAIRole());
+        }
+    }
+
+    private static final class IsValueInputAndAIRole extends CompositePredicateProvider {
+        IsValueInputAndAIRole() {
+            super(new IsValueRoleInputType(),
+                  new IsAIRole());
+        }
+    }
+
+    private static final class ShouldShowToolCallsSection extends CompositePredicateProvider {
+        ShouldShowToolCallsSection() {
+            super(Predicate::or,
+                  new IsColumnRoleInputType(),
+                  new IsValueInputAndAIRole());
+        }
+    }
+
+    private static final class ShouldShowToolCallIDSection extends CompositePredicateProvider {
+        ShouldShowToolCallIDSection() {
+            super(Predicate::or,
+                  new IsColumnRoleInputType(),
+                  new IsToolOrAIRole());
+        }
     }
 
     @Layout(RoleLayout.class)
@@ -133,6 +183,7 @@ final class MessageCreatorNodeSettings implements DefaultNodeSettings {
             description = "Specify the role of the message, such as User, AI or Tool."
             )
     @Effect(predicate = IsValueRoleInputType.class, type = EffectType.SHOW)
+    @ValueReference(RoleTypeRef.class)
     MessageType m_roleValue = MessageType.USER;
 
     @Layout(RoleLayout.class)

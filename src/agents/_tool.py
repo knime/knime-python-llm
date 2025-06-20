@@ -155,10 +155,10 @@ class LangchainToolConverter:
         def tool_function(**params: dict) -> str:
             try:
                 configuration, inputs = params_parser(params)
-                message, outputs = self._ctx._execute_tool(
+                message, outputs, view_node_ids = self._ctx._execute_tool(
                     tool, configuration, inputs, self._execution_mode_hint
                 )
-                return outputs_processor(message, outputs)
+                return outputs_processor(message, outputs, view_node_ids)
             except Exception as e:
                 _logger.exception(e)
                 raise
@@ -171,7 +171,9 @@ class LangchainToolConverter:
         )
 
     def _create_data_output_processor(self, tool: WorkflowTool):
-        def _process_outputs_with_data(message: str, outputs: list[knext.Table]):
+        def _process_outputs_with_data(
+            message: str, outputs: list[knext.Table], view_node_ids: list[str]
+        ):
             output_references = {}
             for port, output in zip(tool.output_ports, outputs):
                 output_reference = self._data_registry.add_table(output, port)
@@ -180,13 +182,21 @@ class LangchainToolConverter:
                 message
                 + "\n\n## Data repository update\n"
                 + render_structured(**output_references)
+                + "\n\n## View node IDs\n"
+                + "".join(view_node_ids)
             )
 
         return _process_outputs_with_data
 
     def _create_no_data_output_processor(self):
-        def _process_outputs_no_data(message: str, outputs: list[knext.Table]):
-            return message
+        def _process_outputs_no_data(
+            message: str, outputs: list[knext.Table], view_node_ids: list[str]
+        ):
+            return (
+                message
+                + "\n\n## View node IDs\n"
+                + "".join(view_node_ids)
+            )
 
         return _process_outputs_no_data
 

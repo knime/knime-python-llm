@@ -67,12 +67,14 @@ class WorkflowTool:
 
 
 class LangchainToolConverter:
-    def __init__(self, data_registry: DataRegistry, ctx, debug: bool):
+    def __init__(self, data_registry: DataRegistry, ctx, debug: bool, view_node_ids: list = None):
         self._data_registry = data_registry
         self._ctx = ctx
         self._debug = debug
         self.sanitized_to_original = {}
         self._has_data_tools = False
+        self.view_node_ids = [] if view_node_ids is None else view_node_ids
+    
 
     @property
     def has_data_tools(self) -> bool:
@@ -147,9 +149,10 @@ class LangchainToolConverter:
         def tool_function(**params: dict) -> str:
             try:
                 configuration, inputs = params_parser(params)
-                message, outputs = self._ctx._execute_tool(
+                message, outputs, view_node_ids = self._ctx._execute_tool(
                     tool, configuration, inputs, self._debug
                 )
+                self._view_node_ids.extend(view_node_ids)
                 return outputs_processor(message, outputs)
             except Exception as e:
                 _logger.exception(e)

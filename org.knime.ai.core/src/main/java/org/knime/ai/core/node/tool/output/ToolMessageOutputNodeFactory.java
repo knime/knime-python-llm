@@ -54,20 +54,37 @@ import org.knime.core.webui.node.impl.WebUINodeFactory;
 /**
  * @author Martin Horn, KNIME GmbH, Konstanz, Germany
  */
+@SuppressWarnings("restriction")
 public final class ToolMessageOutputNodeFactory extends WebUINodeFactory<ToolMessageOutputNodeModel> {
 
     private static final String DESCRIPTION = """
-           A workflow output that is passed to the LLM when used as an agentic tool.
-           The very first cell (first column, first row) is provided to the LLM.
+            <p>
+            This node allows specifying the output message of the Tool, which is shown
+            to the AI agent that invoked it.
+            </p>
+
+            <p>
+            Only the content of the <b>first cell</b> of the input table (first column, first row)
+            is forwarded to the agent. If the Tool workflow does not specify an output
+            message, a placeholder message notifying the agent about successful Tool execution
+            will be used instead.
+            </p>
+
+            <p>
+            This node belongs to the <i>communication layer</i> of the Tool, and is not meant to transmit
+            data. In order to pass data into or out of the Tool, add <i>Workflow Input</i>
+            and/or <i>Workflow Output</i> nodes. These facilitate the <i>data layer</i> and can be combined with this
+            node as needed.
+            </p>
             """;
 
     private static final WebUINodeConfiguration CONFIG = WebUINodeConfiguration.builder() //
         .name("Tool Message Output") //
         .icon("./Tool-message-output.png") //
-        .shortDescription("A workflow output that is passed to the LLM-model when used as an agentic tool.") //
+        .shortDescription("This node allows specifying the output message of the Tool.") //
         .fullDescription(DESCRIPTION) //
         .modelSettingsClass(ToolMessageOutputNodeSettings.class) //
-        .addInputTable("Tool message", "Table containing the tool message") //
+        .addInputTable("Tool message", "Table containing the tool message in the first cell.") //
         .nodeType(NodeType.Container) //
         .sinceVersion(5, 5, 0) //
         .build();

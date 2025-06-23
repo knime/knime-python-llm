@@ -271,20 +271,13 @@ class ChatPrompter:
         )
         chat_model_spec.validate_context(ctx)
 
-        return self._create_output_schema(has_history, input_table_spec)
-
-    def _create_output_schema(
-        self, has_history: bool, input_table_spec: Optional[knext.Schema]
-    ) -> knext.Schema:
-        if has_history and self.extend_existing_conversation:
-            return input_table_spec
-
         output_message_col_name = (
             self.message_column if has_history else self.conversation_column_name
         )
 
-        columns = [knext.Column(util.message_type(), output_message_col_name)]
-        return knext.Schema.from_columns(columns)
+        return knext.Schema.from_columns(
+            [knext.Column(util.message_type(), output_message_col_name)]
+        )
 
     def execute(
         self,
@@ -312,7 +305,7 @@ class ChatPrompter:
         history_df = None
         is_last_message_from_tool = False
         if has_history:
-            history_df = input_table.to_pandas()
+            history_df = input_table.to_pandas()[[self.message_column]].copy()
             knime_messages = history_df[self.message_column].tolist()
             langchain_history = [
                 to_langchain_message(msg) for msg in knime_messages if pd.notna(msg)
@@ -354,9 +347,10 @@ class ChatPrompter:
 
         if has_history and self.extend_existing_conversation:
             output_df = pd.concat([history_df, response_df], ignore_index=True)
-            return knext.Table.from_pandas(output_df)
         else:
-            return knext.Table.from_pandas(response_df)
+            output_df = response_df
+
+        return knext.Table.from_pandas(output_df)
 
     def _create_response_dataframe(
         self,
@@ -367,18 +361,13 @@ class ChatPrompter:
         from knime.types.message import from_langchain_message
         import pandas as pd
 
-        rows = []
-        output_message_col_name = (
-            self.message_column
-            if has_history and self.extend_existing_conversation
-            else self.conversation_column_name
+        column_name = (
+            self.message_column if has_history else self.conversation_column_name
         )
 
+        rows = []
         if human_message:
-            row = {output_message_col_name: from_langchain_message(human_message)}
-            rows.append(row)
-
-        ai_row = {output_message_col_name: from_langchain_message(ai_message)}
-        rows.append(ai_row)
+            rows.append({column_name: from_langchain_message(human_message)})
+        rows.append({column_name: from_langchain_message(ai_message)})
 
         return pd.DataFrame(rows)

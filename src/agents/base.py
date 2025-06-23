@@ -621,7 +621,7 @@ class AgentPrompter2:
         output_column_name = (
             self.conversation_column_name
             if history_table is None
-            else self.conversation_column_name
+            else self.conversation_column
         )
 
         result_df = pd.DataFrame(

@@ -59,6 +59,9 @@ class MessageValueFactory(kt.PythonValueFactory):
         super().__init__(MessageValue)
 
     def decode(self, storage):
+        if storage is None:
+            return None
+        
         # storage: dict with keys "0", "1", "2", "3", "4"
         message_type = MessageType(storage["0"])
         content = [

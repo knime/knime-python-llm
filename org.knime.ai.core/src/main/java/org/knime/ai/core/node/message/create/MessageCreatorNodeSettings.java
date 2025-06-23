@@ -140,13 +140,6 @@ final class MessageCreatorNodeSettings implements DefaultNodeSettings {
         }
     }
 
-    private static final class IsToolOrAIRole extends CompositePredicateProvider {
-        IsToolOrAIRole() {
-            super(Predicate::or,
-                  new IsToolRole(),
-                  new IsAIRole());
-        }
-    }
 
     private static final class IsValueInputAndAIRole extends CompositePredicateProvider {
         IsValueInputAndAIRole() {
@@ -167,7 +160,7 @@ final class MessageCreatorNodeSettings implements DefaultNodeSettings {
         ShouldShowToolCallIDSection() {
             super(Predicate::or,
                   new IsColumnRoleInputType(),
-                  new IsToolOrAIRole());
+                  new IsToolRole());
         }
     }
 

@@ -182,6 +182,50 @@ class AzureOpenAILLMPortObjectSpec(
         )
 
 
+def _create_instruct_model(
+    po_instance,
+    ctx: knext.ExecutionContext,
+):
+    from langchain_openai import AzureOpenAI
+
+    return AzureOpenAI(
+        openai_api_key=ctx.get_credentials(po_instance.spec.credentials).password,
+        api_version=po_instance.spec.api_version,
+        azure_endpoint=po_instance.spec.base_url,
+        openai_api_type=po_instance.spec.api_type,
+        deployment_name=po_instance.spec.model,
+        temperature=po_instance.spec.temperature,
+        top_p=po_instance.spec.top_p,
+        max_tokens=po_instance.spec.max_tokens,
+        seed=po_instance.spec.seed,
+    )
+
+
+def _create_model(
+    po_instance,
+    ctx: knext.ExecutionContext,
+    output_format: OutputFormatOptions = OutputFormatOptions.Text,
+):
+    from langchain_openai import AzureChatOpenAI
+
+    model_kwargs = {"top_p": po_instance.spec.top_p}
+
+    if output_format == OutputFormatOptions.JSON:
+        model_kwargs["response_format"] = {"type": "json_object"}
+
+    return AzureChatOpenAI(
+        openai_api_key=ctx.get_credentials(po_instance.spec.credentials).password,
+        openai_api_version=po_instance.spec.api_version,
+        azure_endpoint=po_instance.spec.base_url,
+        openai_api_type=po_instance.spec.api_type,
+        deployment_name=po_instance.spec.model,
+        temperature=po_instance.spec.temperature,
+        model_kwargs=model_kwargs,
+        max_tokens=po_instance.spec.max_tokens,
+        seed=po_instance.spec.seed,
+    )
+
+
 class AzureOpenAILLMPortObject(OpenAILLMPortObject):
     def __init__(self, spec: AzureOpenAILLMPortObjectSpec):
         super().__init__(spec)
@@ -193,19 +237,7 @@ class AzureOpenAILLMPortObject(OpenAILLMPortObject):
     def create_model(
         self, ctx: knext.ExecutionContext, output_format: OutputFormatOptions
     ):
-        from langchain_openai import AzureOpenAI
-
-        return AzureOpenAI(
-            openai_api_key=ctx.get_credentials(self.spec.credentials).password,
-            api_version=self.spec.api_version,
-            azure_endpoint=self.spec.base_url,
-            openai_api_type=self.spec.api_type,
-            deployment_name=self.spec.model,
-            temperature=self.spec.temperature,
-            top_p=self.spec.top_p,
-            max_tokens=self.spec.max_tokens,
-            seed=self.spec.seed,
-        )
+        return _create_instruct_model(self, ctx)
 
 
 azure_openai_llm_port_type = knext.port_type(
@@ -218,6 +250,10 @@ class AzureOpenAIChatModelPortObjectSpec(
 ):
     """Spec of an Azure OpenAI chat model."""
 
+    @property
+    def is_instruct_model(self):
+        return False
+
 
 class AzureOpenAIChatModelPortObject(OpenAIChatModelPortObject):
     @property
@@ -229,24 +265,10 @@ class AzureOpenAIChatModelPortObject(OpenAIChatModelPortObject):
         ctx: knext.ExecutionContext,
         output_format: OutputFormatOptions = OutputFormatOptions.Text,
     ):
-        from langchain_openai import AzureChatOpenAI
+        if self.spec.is_instruct_model:
+            return _create_instruct_model(self, ctx)
 
-        model_kwargs = {"top_p": self.spec.top_p}
-
-        if output_format == OutputFormatOptions.JSON:
-            model_kwargs["response_format"] = {"type": "json_object"}
-
-        return AzureChatOpenAI(
-            openai_api_key=ctx.get_credentials(self.spec.credentials).password,
-            openai_api_version=self.spec.api_version,
-            azure_endpoint=self.spec.base_url,
-            openai_api_type=self.spec.api_type,
-            deployment_name=self.spec.model,
-            temperature=self.spec.temperature,
-            model_kwargs=model_kwargs,
-            max_tokens=self.spec.max_tokens,
-            seed=self.spec.seed,
-        )
+        return _create_model(self, ctx, output_format)
 
 
 azure_openai_chat_port_type = knext.port_type(
@@ -335,9 +357,7 @@ class AzureDeploymentSettings:
     )
 
 
-# == Nodes ==
-
-
+# region Authenticator
 @knext.node(
     "Azure OpenAI Authenticator",
     knext.NodeType.SOURCE,
@@ -448,6 +468,7 @@ class AzureOpenAIAuthenticator:
         )
 
 
+# region Instruct Selector
 @knext.node(
     "Azure OpenAI LLM Connector",
     knext.NodeType.SOURCE,
@@ -538,6 +559,7 @@ class AzureOpenAILLMConnector:
         )
 
 
+# region LLM Selector
 @knext.node(
     "Azure OpenAI LLM Selector",
     knext.NodeType.SOURCE,
@@ -551,8 +573,8 @@ class AzureOpenAILLMConnector:
     azure_openai_authentication_port_type,
 )
 @knext.output_port(
-    "Azure OpenAI Chat Model",
-    "Configured Azure OpenAI Chat Model connection.",
+    "Azure OpenAI Large Language Model",
+    "Configured Azure OpenAI Large Language Model.",
     azure_openai_chat_port_type,
 )
 class AzureOpenAIChatModelConnector:
@@ -622,6 +644,7 @@ class AzureOpenAIChatModelConnector:
         )
 
 
+# region Embedding Selector
 @knext.node(
     "Azure OpenAI Embedding Model Selector",
     knext.NodeType.SOURCE,

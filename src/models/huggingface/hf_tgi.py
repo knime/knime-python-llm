@@ -264,6 +264,10 @@ class HFTGIChatModelPortObjectSpec(HFTGILLMPortObjectSpec, ChatModelPortObjectSp
     @property
     def system_prompt_template(self) -> str:
         return self._system_prompt_template
+    
+    @property
+    def is_instruct_model(self):
+        return False
 
     @property
     def prompt_template(self) -> str:

@@ -177,6 +177,7 @@ class HFHubLLMPortObjectSpec(LLMPortObjectSpec):
     @property
     def model_kwargs(self):
         return self._model_kwargs
+    
 
     def serialize(self) -> dict:
         return {
@@ -248,6 +249,10 @@ class HFHubChatModelPortObjectSpec(HFHubLLMPortObjectSpec, ChatModelPortObjectSp
     @property
     def prompt_template(self) -> str:
         return self._prompt_template
+    
+    @property
+    def is_instruct_model(self):
+        return False
 
     def serialize(self) -> dict:
         data = super().serialize()

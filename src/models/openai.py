@@ -345,6 +345,10 @@ class LLMLoaderInputSettings:
 @knext.parameter_group(label="OpenAI chat model selection")
 class ChatModelLoaderInputSettings:
     class OpenAIModelCompletionsOptions(knext.EnumParameterOptions):
+        GPT35_TURBO_INSTRUCT = (
+            "gpt-3.5-turbo-instruct",
+            """Legacy instruct model. Use this for compatibility with prompts designed for instruct models.""",
+        )
         Turbo = (
             "gpt-3.5-turbo",
             """Most capable GPT-3.5 model and optimized for chat at 1/10th the cost of text-davinci-003.""",
@@ -392,7 +396,8 @@ class ChatModelLoaderInputSettings:
     model_name = _EnumToStringParameter(
         label="Model ID",
         description="Select a chat-optimized OpenAI model to be used.",
-        choices=lambda c: chat_models,
+        # combined instruct and chat models after deprecating Instruct Model Selector nodes
+        choices=lambda c: completion_models + chat_models,
         default_value=chat_default,
         options=OpenAIModelCompletionsOptions,
     ).rule(
@@ -922,6 +927,42 @@ class OpenAILLMPortObjectSpec(OpenAIModelPortObjectSpec, LLMPortObjectSpec):
         )
 
 
+def _create_instruct_model(po_instance, ctx: knext.ExecutionContext):
+    from langchain_openai import OpenAI
+
+    return OpenAI(
+        openai_api_key=ctx.get_credentials(po_instance.spec.credentials).password,
+        base_url=po_instance.spec.base_url,
+        model=po_instance.spec.model,
+        temperature=po_instance.spec.temperature,
+        top_p=po_instance.spec.top_p,
+        max_tokens=po_instance.spec.max_tokens,
+        seed=po_instance.spec.seed,
+    )
+
+
+def _create_model(
+    po_instance, ctx: knext.ExecutionContext, output_format: OutputFormatOptions
+):
+    from langchain_openai import ChatOpenAI
+
+    model_kwargs = {}
+    if output_format == OutputFormatOptions.JSON:
+        model_kwargs["response_format"] = {"type": "json_object"}
+
+    is_o_series = bool(re.match(r"^o\d", po_instance.spec.model))
+
+    return ChatOpenAI(
+        openai_api_key=ctx.get_credentials(po_instance.spec.credentials).password,
+        base_url=po_instance.spec.base_url,
+        model=po_instance.spec.model,
+        temperature=1.0 if is_o_series else po_instance.spec.temperature,
+        max_tokens=po_instance.spec.max_tokens,
+        seed=po_instance.spec.seed,
+        model_kwargs=model_kwargs,
+    )
+
+
 class OpenAILLMPortObject(LLMPortObject):
     @property
     def spec(self) -> OpenAILLMPortObjectSpec:
@@ -930,17 +971,7 @@ class OpenAILLMPortObject(LLMPortObject):
     def create_model(
         self, ctx: knext.ExecutionContext, output_format: OutputFormatOptions
     ):
-        from langchain_openai import OpenAI
-
-        return OpenAI(
-            openai_api_key=ctx.get_credentials(self.spec.credentials).password,
-            base_url=self.spec.base_url,
-            model=self.spec.model,
-            temperature=self.spec.temperature,
-            top_p=self.spec.top_p,
-            max_tokens=self.spec.max_tokens,
-            seed=self.spec.seed,
-        )
+        return _create_instruct_model(self, ctx)
 
 
 openai_llm_port_type = knext.port_type(
@@ -950,6 +981,10 @@ openai_llm_port_type = knext.port_type(
 
 class OpenAIChatModelPortObjectSpec(OpenAILLMPortObjectSpec, ChatModelPortObjectSpec):
     """Spec of an OpenAI chat model."""
+
+    @property
+    def is_instruct_model(self) -> bool:
+        return self._model in completion_models
 
 
 class OpenAIChatModelPortObject(ChatModelPortObject):
@@ -962,23 +997,10 @@ class OpenAIChatModelPortObject(ChatModelPortObject):
         ctx: knext.ExecutionContext,
         output_format: OutputFormatOptions = OutputFormatOptions.Text,
     ):
-        from langchain_openai import ChatOpenAI
+        if self.spec.is_instruct_model:
+            return _create_instruct_model(self, ctx)
 
-        model_kwargs = {}
-        if output_format == OutputFormatOptions.JSON:
-            model_kwargs["response_format"] = {"type": "json_object"}
-
-        is_o_series = bool(re.match(r"^o\d", self.spec.model))
-
-        return ChatOpenAI(
-            openai_api_key=ctx.get_credentials(self.spec.credentials).password,
-            base_url=self.spec.base_url,
-            model=self.spec.model,
-            temperature=1.0 if is_o_series else self.spec.temperature,
-            max_tokens=self.spec.max_tokens,
-            seed=self.spec.seed,
-            model_kwargs=model_kwargs,
-        )
+        return _create_model(self, ctx, output_format)
 
 
 openai_chat_port_type = knext.port_type(
@@ -1314,7 +1336,8 @@ class OpenAIChatModelConnector:
             self.input_settings.selection,
             self.input_settings.model_name,
             self.input_settings.specific_model_name,
-            chat_models,
+            # allow selecting instruct models here after deprecating Instruct Model Selector nodes
+            completion_models + chat_models,
             chat_default,
         )
 

@@ -82,6 +82,10 @@ class GPT4AllChatModelPortObjectSpec(GPT4AllLLMPortObjectSpec, ChatModelPortObje
         self._prompt_template = prompt_template
 
     @property
+    def is_instruct_model(self):
+        return False
+
+    @property
     def system_prompt_template(self) -> str:
         return self._system_prompt_template
 

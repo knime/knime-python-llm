@@ -465,6 +465,10 @@ class LLMPortObjectSpec(AIPortObjectSpec):
     def supported_output_formats(self) -> list[OutputFormatOptions]:
         return [OutputFormatOptions.Text]
 
+    @property
+    def is_instruct_model(self) -> bool:
+        return True
+
 
 class LLMPortObject(knext.PortObject):
     def __init__(self, spec: LLMPortObjectSpec) -> None:
@@ -489,9 +493,21 @@ llm_port_type = knext.port_type("LLM", LLMPortObject, LLMPortObjectSpec)
 class ChatModelPortObjectSpec(LLMPortObjectSpec):
     """Most generic chat model spec. Used to define the most generic chat model PortType."""
 
+    def __init__(
+        self,
+        n_requests: int = 1,
+    ) -> None:
+        super().__init__(n_requests=n_requests)
+
     @property
     def supports_tools(self) -> bool:
         return True
+    
+    @property
+    def is_instruct_model(self) -> bool:
+        # chat models are typically not instruct models
+        # There might be exceptions in subclasses, which will need to implement the necessary logic
+        return False
 
 
 class ChatModelPortObject(LLMPortObject):
@@ -568,6 +584,7 @@ def _isinstance_of_port_object(
     return isinstance(ctx.get_input_specs()[port], spec_class)
 
 
+# region LLM Prompter (Table)
 @knext.node(
     "LLM Prompter",
     knext.NodeType.PREDICTOR,
@@ -609,7 +626,8 @@ class LLMPrompter:
         since_version="5.4.0",
     ).rule(
         knext.DialogContextCondition(
-            lambda ctx: _isinstance_of_port_object(ctx, 0, ChatModelPortObjectSpec)
+            lambda ctx: ctx.get_input_specs()[0] is not None
+            and not ctx.get_input_specs()[0].is_instruct_model
         ),
         knext.Effect.SHOW,
     )
@@ -627,7 +645,8 @@ class LLMPrompter:
     ).rule(
         knext.And(
             knext.DialogContextCondition(
-                lambda ctx: _isinstance_of_port_object(ctx, 0, ChatModelPortObjectSpec)
+                lambda ctx: ctx.get_input_specs()[0] is not None
+                and not ctx.get_input_specs()[0].is_instruct_model
             ),
             knext.OneOf(system_message_handling, [SystemMessageHandling.SINGLE.name]),
         ),
@@ -644,7 +663,8 @@ class LLMPrompter:
     ).rule(
         knext.And(
             knext.DialogContextCondition(
-                lambda ctx: _isinstance_of_port_object(ctx, 0, ChatModelPortObjectSpec)
+                lambda ctx: ctx.get_input_specs()[0] is not None
+                and not ctx.get_input_specs()[0].is_instruct_model
             ),
             knext.OneOf(system_message_handling, [SystemMessageHandling.COLUMN.name]),
         ),
@@ -729,7 +749,7 @@ class LLMPrompter:
                 input_table_spec, knext.string()
             )
 
-        if isinstance(llm_spec, ChatModelPortObjectSpec):
+        if not llm_spec.is_instruct_model:
             if (
                 self.system_message_handling == SystemMessageHandling.SINGLE.name
                 and self.system_message == ""
@@ -804,7 +824,7 @@ class LLMPrompter:
         n_requests = llm_port.spec.n_requests
         progress_tracker = util.ProgressTracker(total_rows=num_rows, ctx=ctx)
         llm = _initialize_model(llm_port, ctx, self.output_format)
-        is_chat_model = self._is_chat_model(llm)
+        is_chat_model = not llm_port.spec.is_instruct_model
 
         def _call_model(messages: list) -> list:
             def get_responses(model):
@@ -920,6 +940,7 @@ class LLMPrompter:
             )
 
 
+# region LLM Prompter (Conversation)
 @knext.node(
     "Chat Model Prompter",
     knext.NodeType.PREDICTOR,
@@ -1009,7 +1030,7 @@ class ChatModelPrompter:
 
     **Note**: If you use the
     [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
-    and do not select the "Save password in configuration (weakly encrypted)" option for passing the API key for the Chat Model Selector node,
+    and do not select the "Save password in configuration (weakly encrypted)" option for passing the API key for the LLM Selector node,
     the Credentials Configuration node will need to be reconfigured upon reopening the workflow, as the credentials flow variable
     was not saved and will therefore not be available to downstream nodes.
     """
@@ -1062,6 +1083,11 @@ class ChatModelPrompter:
         _validate_json_output_format(
             self.output_format, [self.system_message + self.chat_message]
         )
+
+        if chat_model_spec.is_instruct_model:
+            raise knext.InvalidParametersError(
+                "The selected model is not a chat model. Try selecting a different model."
+            )
 
         chat_model_spec.validate_context(ctx)
         has_tools = tool_table_spec is not None
@@ -1351,6 +1377,7 @@ def _validate_json_output_format(output_format: str, messages) -> None:
         )
 
 
+# region Text Embedder
 @knext.node(
     "Text Embedder",
     knext.NodeType.PREDICTOR,

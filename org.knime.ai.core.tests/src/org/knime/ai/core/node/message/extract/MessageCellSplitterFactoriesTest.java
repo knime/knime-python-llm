@@ -70,6 +70,7 @@ import org.knime.core.data.def.DefaultRow;
 import org.knime.core.data.def.StringCell;
 import org.knime.core.data.json.JSONCellFactory;
 import org.knime.core.node.InvalidSettingsException;
+import org.knime.core.util.UniqueNameGenerator;
 
 @SuppressWarnings("static-method")
 final class MessageCellSplitterFactoriesTest {
@@ -162,10 +163,14 @@ final class MessageCellSplitterFactoriesTest {
 
     @Test
     void testCreateColumnSpecCreator() {
-        var creator = MessageCellSplitterFactories.createColumnSpecCreator("prefix", StringCell.TYPE, SPEC);
+        var creator = MessageCellSplitterFactories.createColumnSpecCreator("prefix", StringCell.TYPE, uniqueNameGen());
         DataColumnSpec spec = creator.apply(0);
         assertEquals("prefix1", spec.getName());
         assertEquals(StringCell.TYPE, spec.getType());
+    }
+
+    private static UniqueNameGenerator uniqueNameGen() {
+        return new UniqueNameGenerator(SPEC);
     }
     @Test
     void testCreateContentCounter() {
@@ -407,7 +412,7 @@ final class MessageCellSplitterFactoriesTest {
 
     @Test
     void testCreateColumnSpecCreator_withDuplicateColumnName() {
-        var creator = MessageCellSplitterFactories.createColumnSpecCreator("text", StringCell.TYPE, SPEC);
+        var creator = MessageCellSplitterFactories.createColumnSpecCreator("text", StringCell.TYPE, uniqueNameGen());
 
         DataColumnSpec spec1 = creator.apply(0);
         DataColumnSpec spec2 = creator.apply(1);

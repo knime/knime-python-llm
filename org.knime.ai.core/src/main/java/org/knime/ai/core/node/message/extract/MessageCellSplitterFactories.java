@@ -89,39 +89,36 @@ final class MessageCellSplitterFactories {
         validateSettings(settings);
 
         var list = new ArrayList<CellSplitterFactory<?>>();
-        UniqueNameGenerator uniqueNameGenerator = new UniqueNameGenerator(messageTableSpec);
+        var uniqueNameGenerator = new UniqueNameGenerator(messageTableSpec);
 
-        settings.m_roleColumnName.map(c -> {
-            String uniqueColumnName = uniqueNameGenerator.newName(c);
-            return new PartExtractorSingleCellFactory(uniqueColumnName, StringCell.TYPE,
-                MessageCellSplitterFactories::extractRole, messageColumnIndex);
-        }).ifPresent(factory -> list.add(createStatelessCellSplitterFactory(() -> factory)));
+        settings.m_roleColumnName
+            .map(c -> new PartExtractorSingleCellFactory(uniqueNameGenerator.newName(c), StringCell.TYPE,
+                MessageCellSplitterFactories::extractRole, messageColumnIndex))
+            .ifPresent(factory -> list.add(createStatelessCellSplitterFactory(() -> factory)));
 
-        settings.m_nameColumnName.map(c -> {
-            String uniqueColumnName = uniqueNameGenerator.newName(c);
-            return new PartExtractorSingleCellFactory(uniqueColumnName, StringCell.TYPE,
-                MessageCellSplitterFactories::extractName, messageColumnIndex);
-        }).ifPresent(factory -> list.add(createStatelessCellSplitterFactory(() -> factory)));
+        settings.m_nameColumnName
+            .map(c -> new PartExtractorSingleCellFactory(uniqueNameGenerator.newName(c), StringCell.TYPE,
+                MessageCellSplitterFactories::extractName, messageColumnIndex))
+            .ifPresent(factory -> list.add(createStatelessCellSplitterFactory(() -> factory)));
         var textTypeFilter = ofType(MessageContentPartType.TEXT);
-        settings.m_textPartsPrefix.map(prefix -> createMultiCellSplitterFactory(
-                createContentCounter(textTypeFilter), createColumnSpecCreator(prefix, StringCell.TYPE, messageTableSpec),
-                messageColumnIndex, createContentPartExtractor(textTypeFilter, data -> new StringCell(new String(data)))))
+        settings.m_textPartsPrefix
+            .map(prefix -> createMultiCellSplitterFactory(createContentCounter(textTypeFilter),
+                createColumnSpecCreator(prefix, StringCell.TYPE, uniqueNameGenerator), messageColumnIndex,
+                createContentPartExtractor(textTypeFilter, data -> new StringCell(new String(data)))))
             .ifPresent(list::add);
         var imageTypeFilter = ofType(MessageContentPartType.PNG);
-        settings.m_imagePartsPrefix.map(prefix -> createMultiCellSplitterFactory(
-            createContentCounter(imageTypeFilter), createColumnSpecCreator(prefix, PNGImageCellFactory.TYPE, messageTableSpec),
-            messageColumnIndex, createContentPartExtractor(imageTypeFilter, PNGImageCellFactory::create)))
+        settings.m_imagePartsPrefix.map(prefix -> createMultiCellSplitterFactory(createContentCounter(imageTypeFilter),
+            createColumnSpecCreator(prefix, PNGImageCellFactory.TYPE, uniqueNameGenerator), messageColumnIndex,
+            createContentPartExtractor(imageTypeFilter, PNGImageCellFactory::create))).ifPresent(list::add);
+        settings.m_toolCallsPrefix
+            .map(prefix -> createMultiCellSplitterFactory(MessageCellSplitterFactories::countToolCalls,
+                createColumnSpecCreator(prefix, JSONCellFactory.TYPE, uniqueNameGenerator), messageColumnIndex,
+                MessageCellSplitterFactories::extractToolCalls))
             .ifPresent(list::add);
-        settings.m_toolCallsPrefix.map(prefix -> createMultiCellSplitterFactory(
-            MessageCellSplitterFactories::countToolCalls,
-            createColumnSpecCreator(prefix, JSONCellFactory.TYPE, messageTableSpec), messageColumnIndex,
-            MessageCellSplitterFactories::extractToolCalls))
-            .ifPresent(list::add);
-        settings.m_toolCallIdColumnName.map(c -> {
-            String uniqueColumnName = uniqueNameGenerator.newName(c);
-            return new PartExtractorSingleCellFactory(uniqueColumnName, StringCell.TYPE,
-                MessageCellSplitterFactories::extractToolCallId, messageColumnIndex);
-        }).ifPresent(factory -> list.add(createStatelessCellSplitterFactory(() -> factory)));
+        settings.m_toolCallIdColumnName
+            .map(c -> new PartExtractorSingleCellFactory(uniqueNameGenerator.newName(c), StringCell.TYPE,
+                MessageCellSplitterFactories::extractToolCallId, messageColumnIndex))
+            .ifPresent(factory -> list.add(createStatelessCellSplitterFactory(() -> factory)));
         return list;
     }
 
@@ -133,22 +130,25 @@ final class MessageCellSplitterFactories {
             throw new InvalidSettingsException("Name column name cannot be empty when 'Name column name' is enabled.");
         }
         if (settings.m_textPartsPrefix.isPresent() && settings.m_textPartsPrefix.get().isBlank()) {
-            throw new InvalidSettingsException("Text parts column prefix cannot be empty when 'Text parts column prefix' is enabled.");
+            throw new InvalidSettingsException(
+                "Text parts column prefix cannot be empty when 'Text parts column prefix' is enabled.");
         }
         if (settings.m_imagePartsPrefix.isPresent() && settings.m_imagePartsPrefix.get().isBlank()) {
-            throw new InvalidSettingsException("Image parts column prefix cannot be empty when 'Image parts column prefix' is enabled.");
+            throw new InvalidSettingsException(
+                "Image parts column prefix cannot be empty when 'Image parts column prefix' is enabled.");
         }
         if (settings.m_toolCallsPrefix.isPresent() && settings.m_toolCallsPrefix.get().isBlank()) {
-            throw new InvalidSettingsException("Tool calls column prefix cannot be empty when 'Tool calls column prefix' is enabled.");
+            throw new InvalidSettingsException(
+                "Tool calls column prefix cannot be empty when 'Tool calls column prefix' is enabled.");
         }
         if (settings.m_toolCallIdColumnName.isPresent() && settings.m_toolCallIdColumnName.get().isBlank()) {
-            throw new InvalidSettingsException("Tool call ID column name cannot be empty when 'Tool call ID column name' is enabled.");
+            throw new InvalidSettingsException(
+                "Tool call ID column name cannot be empty when 'Tool call ID column name' is enabled.");
         }
     }
 
-
-    static IntFunction<DataColumnSpec> createColumnSpecCreator(final String prefix, final DataType type, final DataTableSpec messageTableSpec) {
-        UniqueNameGenerator generator = new UniqueNameGenerator(messageTableSpec);
+    static IntFunction<DataColumnSpec> createColumnSpecCreator(final String prefix, final DataType type,
+        final UniqueNameGenerator generator) {
 
         return j -> {
             String intendedName = prefix + (j + 1);
@@ -169,14 +169,13 @@ final class MessageCellSplitterFactories {
                     .orElseGet(() -> padWithMissing(new DataCell[0], i))));
     }
 
-    static CellSplitterFactory<?>
-        createStatelessCellSplitterFactory(final Supplier<CellFactory> cellFactorySupplier) {
+    static CellSplitterFactory<?> createStatelessCellSplitterFactory(final Supplier<CellFactory> cellFactorySupplier) {
         return new CellSplitterFactory<>(null, noopExtractor(), noopAggregator(), c -> cellFactorySupplier.get(),
             false);
     }
 
     static Function<DataCell, Integer> createContentCounter(final Predicate<MessageContentPart> filter) {
-        return cell -> (int) toMessageValue(cell)//
+        return cell -> (int)toMessageValue(cell)//
             .stream()//
             .map(MessageValue::getContent)//
             .flatMap(List::stream)//
@@ -188,10 +187,8 @@ final class MessageCellSplitterFactories {
         return part -> part.getType().equals(type);
     }
 
-
     static Integer countToolCalls(final DataCell cell) {
-        return toMessageValue(cell)
-            .map(MessageValue::getToolCalls)//
+        return toMessageValue(cell).map(MessageValue::getToolCalls)//
             .filter(Optional::isPresent)//
             .map(l -> l.get().size())//
             .orElse(0);
@@ -207,12 +204,9 @@ final class MessageCellSplitterFactories {
         throw new IllegalArgumentException("Expected MessageValue, but got: " + cell.getClass().getName());
     }
 
-
     static DataCell[] extractToolCalls(final MessageValue message) {
-        return message.getToolCalls()
-            .map(list -> list.stream().map(MessageCellSplitterFactories::toJsonCell)//
-                .toArray(DataCell[]::new))
-            .orElseGet(() -> new DataCell[0]);
+        return message.getToolCalls().map(list -> list.stream().map(MessageCellSplitterFactories::toJsonCell)//
+            .toArray(DataCell[]::new)).orElseGet(() -> new DataCell[0]);
     }
 
     private static <S, T> Function<S, T> noopExtractor() {
@@ -265,8 +259,8 @@ final class MessageCellSplitterFactories {
         }
     }
 
-    static Function<MessageValue, DataCell[]> createContentPartExtractor(final Predicate<MessageContentPart> contentFilter,
-        final Function<byte[], DataCell> contentToCellFn) {
+    static Function<MessageValue, DataCell[]> createContentPartExtractor(
+        final Predicate<MessageContentPart> contentFilter, final Function<byte[], DataCell> contentToCellFn) {
         return message -> message.getContent().stream()//
             .filter(contentFilter)//
             .map(MessageContentPart::getData)//
@@ -295,7 +289,7 @@ final class MessageCellSplitterFactories {
     }
 
     static DataCell extractName(final MessageValue message) {
-        return message.getName().map(s -> (DataCell) new StringCell(s)).orElse(DataType.getMissingCell());
+        return message.getName().map(s -> (DataCell)new StringCell(s)).orElse(DataType.getMissingCell());
     }
 
     static DataCell toJsonCell(final ToolCall toolCall) {

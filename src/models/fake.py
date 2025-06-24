@@ -241,7 +241,7 @@ class TestChatModelPortObjectSpec(ChatModelPortObjectSpec):
 
     @classmethod
     def deserialize(cls, data: dict):
-        return TestLLMPortObjectSpec(data["missing_value_strategy"])
+        return TestChatModelPortObjectSpec(data["missing_value_strategy"])
 
 
 class TestChatModelPortObject(ChatModelPortObject):

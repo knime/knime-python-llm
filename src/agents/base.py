@@ -692,7 +692,7 @@ class AgentChatView:
     tool_column = _tool_column_parameter().rule(knext.DialogContextCondition(_has_tools_table), knext.Effect.SHOW)
 
     initial_message = knext.MultilineStringParameter(
-        "Initial message", "An optional 'AI' initial message to be shown to the user."
+        "Initial AI message", "An optional 'AI' initial message to be shown to the user."
     )
 
     show_tool_calls_and_results = knext.BoolParameter(

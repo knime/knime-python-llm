@@ -481,6 +481,8 @@ class AgentPrompter2:
         "Message from the end user, prioritized behind the developer message.",
     )
 
+    tool_column = _tool_column_parameter()
+
     conversation_column = _conversation_column_parameter()
 
     # New parameter for column name if no history table is connected
@@ -489,8 +491,6 @@ class AgentPrompter2:
         "Name of the conversation column if no conversation history table is connected.",
         default_value="Conversation",
     ).rule(knext.DialogContextCondition(has_conversation_table), knext.Effect.HIDE)
-
-    tool_column = _tool_column_parameter()
 
     recursion_limit = _recursion_limit_parameter()
 

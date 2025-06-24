@@ -79,42 +79,40 @@ import org.knime.core.webui.node.dialog.defaultdialog.widget.updates.ValueRefere
  */
 @SuppressWarnings("restriction")
 final class MessageCreatorNodeSettings implements DefaultNodeSettings {
+
     enum InputType {
-        @Label("Value")
-        VALUE,
-        @Label("Column")
-        COLUMN;
+            @Label("Value")
+            VALUE,
+
+            @Label("Column")
+            COLUMN;
     }
 
-    @Section(title = "Role")
-    interface RoleLayout {}
+    @Section(title = "Sender configuration")
+    interface SenderConfigurationLayout {
+    }
 
     @Section(title = "Content")
-    @After(RoleLayout.class)
-    interface ContentLayout {}
-
-    @Section(title = "Name")
-    @After(ContentLayout.class)
-    interface NameLayout {}
+    @After(SenderConfigurationLayout.class)
+    interface ContentLayout {
+    }
 
     @Section(title = "Tool calls")
-    @After(NameLayout.class)
+    @After(ContentLayout.class)
     @Effect(predicate = ShouldShowToolCallsSection.class, type = EffectType.SHOW)
-    interface ToolCallsLayout {}
-
-    @Section(title = "Tool call ID")
-    @After(ToolCallsLayout.class)
-    @Effect(predicate = ShouldShowToolCallIDSection.class, type = EffectType.SHOW)
-    interface ToolCallIdLayout {}
-
+    interface ToolCallsLayout {
+    }
 
     @Section(title = "Output")
-    @After(ToolCallIdLayout.class)
-    interface OutputLayout {}
+    @After(ToolCallsLayout.class)
+    interface OutputLayout {
+    }
 
+    static final class RoleInputTypeRef implements Reference<InputType> {
+    }
 
-    static final class RoleInputTypeRef implements Reference<InputType> {}
-    static final class RoleTypeRef implements Reference<MessageType> {}
+    static final class RoleTypeRef implements Reference<MessageType> {
+    }
 
     private static final class IsValueRoleInputType extends CompositePredicateProvider {
         IsValueRoleInputType() {
@@ -140,102 +138,89 @@ final class MessageCreatorNodeSettings implements DefaultNodeSettings {
         }
     }
 
-
     private static final class IsValueInputAndAIRole extends CompositePredicateProvider {
         IsValueInputAndAIRole() {
-            super(new IsValueRoleInputType(),
-                  new IsAIRole());
+            super(new IsValueRoleInputType(), new IsAIRole());
         }
     }
 
     private static final class ShouldShowToolCallsSection extends CompositePredicateProvider {
         ShouldShowToolCallsSection() {
-            super(Predicate::or,
-                  new IsColumnRoleInputType(),
-                  new IsValueInputAndAIRole());
+            super(Predicate::or, new IsColumnRoleInputType(), new IsValueInputAndAIRole());
         }
     }
 
-    private static final class ShouldShowToolCallIDSection extends CompositePredicateProvider {
-        ShouldShowToolCallIDSection() {
-            super(Predicate::or,
-                  new IsColumnRoleInputType(),
-                  new IsToolRole());
+    private static final class ShowWhenColumnInputOrToolRole extends CompositePredicateProvider {
+        ShowWhenColumnInputOrToolRole() {
+            super(Predicate::or, new IsToolRole(), new IsColumnRoleInputType());
         }
     }
 
-    @Layout(RoleLayout.class)
-    @Widget(title = "Input type",
-            description = "Choose whether the message role is provided as a value or as a column.")
+    @Layout(SenderConfigurationLayout.class)
+    @Widget(title = "Role input",
+        description = "Choose whether the message role is provided as a value or as a column.")
     @ValueSwitchWidget
     @ValueReference(RoleInputTypeRef.class)
     InputType m_roleInputType = InputType.VALUE;
 
-    @Layout(RoleLayout.class)
-    @Widget(title = "Role",
-            description = "Specify the role of the message, such as User, AI or Tool."
-            )
+    @Layout(SenderConfigurationLayout.class)
+    @Widget(title = "Role", description = "Specify the role of the message, such as User, AI or Tool.")
     @Effect(predicate = IsValueRoleInputType.class, type = EffectType.SHOW)
     @ValueReference(RoleTypeRef.class)
     MessageType m_roleValue = MessageType.USER;
 
-    @Layout(RoleLayout.class)
+    @Layout(SenderConfigurationLayout.class)
     @Widget(title = "Role column",
-            description = "Select the column from the input table that contains the message roles.")
+        description = "Select the column from the input table that contains the message roles.")
     @Effect(predicate = IsValueRoleInputType.class, type = EffectType.HIDE)
     @ChoicesProvider(StringColumns.class)
     String m_roleColumn;
 
-
-    @Layout(ContentLayout.class)
-    @Widget(title = "Message content", description = "Define the content of the message, including text and/or image parts.")
-    @ArrayWidget(
-        addButtonText = "Add content part",
-        showSortButtons = false,
-        elementTitle = "Content part"
-    )
-    Contents[] m_content = new Contents[]{
-        new Contents()
-    };
-
-    @Layout(NameLayout.class)
-    @Widget(
-        title = "Name",
-        description = "(Optional) Select the input table column containing the name, or leave as None. \n "
-                    + "<ul>"
-                    + "<li><b>Purpose:</b> This column provides a name to differentiate between participants of the same role. "
-                    + "In conversations where multiple entities share the same role (such as several users or multiple tools), "
-                    + "the name property allows you to uniquely identify each participant.</li>"
-                    + "<li><b>Usage:</b> This is especially useful when simulating structured multi-user dialogues or integrating multiple tools, "
-                    + "as it lets the model track who said what and maintain context across turns.</li>"
-                    + "<li><b>Example:</b> In a chat where two users are involved, assigning names like <code>user_A</code> and <code>user_B</code> "
-                    + "helps the model respond accurately and refer to the right person or tool, even though both technically have the same role.</li>"
-                    + "</ul>"
-    )
+    @Layout(SenderConfigurationLayout.class)
+    @Widget(title = "Name",
+        description = "(Optional) Select the input table column containing the name, or leave as None. "
+            + "Currently only used for the Tool role.\n"
+            + "<ul>"
+            + "<li><b>Purpose:</b> This column provides a name to differentiate between participants of the same role. "
+            + "In conversations where multiple entities share the same role (such as several users or multiple tools), "
+            + "the name property allows you to uniquely identify each participant.</li>"
+            + "<li><b>Usage:</b> This is especially useful when simulating structured multi-user dialogues or integrating multiple tools, "
+            + "as it lets the model track who said what and maintain context across turns.</li>"
+            + "<li><b>Example:</b> In a chat where two users are involved, assigning names like <code>user_A</code> and <code>user_B</code> "
+            + "helps the model respond accurately and refer to the right person or tool, even though both technically have the same role.</li>"
+            + "</ul>")
+    @Effect(predicate = ShowWhenColumnInputOrToolRole.class, type = EffectType.SHOW)
     @ChoicesProvider(StringColumns.class)
     StringOrEnum<NoneChoice> m_nameColumn = new StringOrEnum<>(NoneChoice.NONE);
 
-    @Layout(ToolCallsLayout.class)
-    @Widget(title = "Tool calls", description = "Define tool calls associated with the message, including tool names, IDs, and arguments.")
-    @ArrayWidget(
-        addButtonText = "Add tool call",
-        showSortButtons = false,
-        elementTitle = "Tool Call"
-    )
-    ToolCallSettings[] m_toolCalls = new ToolCallSettings[]{};
-
-    @Layout(ToolCallIdLayout.class)
+    @Layout(SenderConfigurationLayout.class)
     @Widget(title = "Tool call ID column",
-            description = "(Optional) Select the column containing tool call IDs.")
+        description = "(Optional) Select the column containing tool call IDs. The ID should match "
+            + "that of the tool call generated by an agent.")
+    @Effect(predicate = ShowWhenColumnInputOrToolRole.class, type = EffectType.SHOW)
     @ChoicesProvider(StringColumns.class)
     StringOrEnum<NoneChoice> m_toolCallIdColumn = new StringOrEnum<>(NoneChoice.NONE);
 
+    @Layout(ContentLayout.class)
+    @Widget(title = "Message content",
+        description = "Define the content of the message, including text and/or image parts.")
+    @ArrayWidget(addButtonText = "Add content part", showSortButtons = false, elementTitle = "Content part")
+    Contents[] m_content = {new Contents()};
+
+    @Layout(ToolCallsLayout.class)
+    @Widget(title = "Tool calls",
+        description = "Define tool calls associated with the message, including tool names, IDs, and arguments.")
+    @ArrayWidget(addButtonText = "Add tool call", showSortButtons = false, elementTitle = "Tool Call")
+    ToolCallSettings[] m_toolCalls = {};
+
     @Layout(OutputLayout.class)
-    @Widget(title = "Message column name", description = "Name of the output column that will contain the created messages.")
+    @Widget(title = "Message column name",
+        description = "Name of the output column that will contain the created messages.")
     String m_messageColumnName = "Message";
 
     @Layout(OutputLayout.class)
-    @Widget(title = "Remove input columns", description = " If selected, the columns used to create the new message will be removed from the output table.")
+    @Widget(title = "Remove input columns",
+        description = "If selected, the columns used to create the new message will be removed from the output table.")
     boolean m_removeInputColumns = false;
 
     static final class ToolCallSettings implements DefaultNodeSettings {
@@ -243,12 +228,12 @@ final class MessageCreatorNodeSettings implements DefaultNodeSettings {
         @ChoicesProvider(StringColumns.class)
         String m_toolNameColumn;
 
-
         @Widget(title = "Tool call ID column", description = "Select the input table column containing the tool IDs.")
         @ChoicesProvider(StringColumns.class)
         String m_toolIdColumn;
 
-        @Widget(title = "Arguments column", description = "Select the input table column containing the tool arguments (JSON string).")
+        @Widget(title = "Arguments column",
+            description = "Select the input table column containing the tool arguments (JSON string).")
         @ChoicesProvider(JsonColumns.class)
         String m_argumentsColumn;
     }
@@ -256,16 +241,19 @@ final class MessageCreatorNodeSettings implements DefaultNodeSettings {
     static final class Contents implements DefaultNodeSettings {
 
         enum ContentType {
-            @Label("Text")
-            TEXT,
+                @Label("Text")
+                TEXT,
 
-            @Label("Image")
-            IMAGE;
+                @Label("Image")
+                IMAGE;
         }
-
 
         @HorizontalLayout
         interface ContentsLayout {
+        }
+
+        @After(ContentsLayout.class)
+        interface ContentsValueLayout {
         }
 
         @Layout(ContentsLayout.class)
@@ -275,14 +263,16 @@ final class MessageCreatorNodeSettings implements DefaultNodeSettings {
         ContentType m_contentType = ContentType.TEXT;
 
         @Layout(ContentsLayout.class)
-        @Widget(title = "Input type", description = "Specify how the content is provided: either directly as a value or from a column in the input table.")
+        @Widget(title = "Input type",
+            description = "Specify how the content is provided: either directly as a value or from a column in the input table.")
         @ValueSwitchWidget
         @ValueReference(InputTypeRef.class)
         @Effect(predicate = HasInputTypes.class, type = EffectType.SHOW)
         InputType m_inputType = InputType.VALUE;
 
         @Layout(ContentsValueLayout.class)
-        @Widget(title = "Image column", description = "Select the column from the input table that contains PNG images.")
+        @Widget(title = "Image column",
+            description = "Select the column from the input table that contains PNG images.")
         @ChoicesProvider(PngColumns.class)
         @Effect(predicate = IsImageValue.class, type = EffectType.SHOW)
         String m_imageColumn;
@@ -294,58 +284,42 @@ final class MessageCreatorNodeSettings implements DefaultNodeSettings {
         String m_textValue;
 
         @Layout(ContentsValueLayout.class)
-        @Widget(title = "Text column", description = "Select the column from the input table that contains text values.")
-        @Effect(predicate = IsTextColumn.class, type = EffectType.SHOW)
+        @Widget(title = "Text column",
+            description = "Select the column from the input table that contains text values.")
         @ChoicesProvider(StringColumns.class)
+        @Effect(predicate = IsTextColumn.class, type = EffectType.SHOW)
         String m_textColumn;
 
-
         static final class ContentTypeRef implements Reference<ContentType> {
-
         }
 
         static final class InputTypeRef implements Reference<InputType> {
-
-        }
-
-        @After(ContentsLayout.class)
-        interface ContentsValueLayout {
         }
 
         static final class HasInputTypes extends CompositePredicateProvider {
-
             HasInputTypes() {
                 super(i -> i.getEnum(ContentTypeRef.class).isOneOf(ContentType.TEXT));
             }
-
         }
 
         static final class IsTextValue extends CompositePredicateProvider {
-
             IsTextValue() {
-                super(Predicate::and,
-                    i -> i.getEnum(ContentTypeRef.class).isOneOf(ContentType.TEXT),
+                super(Predicate::and, i -> i.getEnum(ContentTypeRef.class).isOneOf(ContentType.TEXT),
                     i -> i.getEnum(InputTypeRef.class).isOneOf(InputType.VALUE));
             }
-
         }
 
         static final class IsTextColumn extends CompositePredicateProvider {
-
             IsTextColumn() {
-                super(Predicate::and,
-                    i -> i.getEnum(ContentTypeRef.class).isOneOf(ContentType.TEXT),
+                super(Predicate::and, i -> i.getEnum(ContentTypeRef.class).isOneOf(ContentType.TEXT),
                     i -> i.getEnum(InputTypeRef.class).isOneOf(InputType.COLUMN));
             }
-
         }
 
         static final class IsImageValue extends CompositePredicateProvider {
-
             IsImageValue() {
                 super(i -> i.getEnum(ContentTypeRef.class).isOneOf(ContentType.IMAGE));
             }
-
         }
 
         Contents(final String textValue, final String imageColumn) {
@@ -356,9 +330,5 @@ final class MessageCreatorNodeSettings implements DefaultNodeSettings {
         Contents() {
             this("", "");
         }
-
-
     }
-
-
 }

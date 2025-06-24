@@ -235,7 +235,7 @@ final class MessageCreatorNodeSettings implements DefaultNodeSettings {
     String m_messageColumnName = "Message";
 
     @Layout(OutputLayout.class)
-    @Widget(title = "Remove input columns", description = "Choose whether to remove columns used as input from the output table.")
+    @Widget(title = "Remove input columns", description = " If selected, the columns used to create the new message will be removed from the output table.")
     boolean m_removeInputColumns = false;
 
     static final class ToolCallSettings implements DefaultNodeSettings {

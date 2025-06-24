@@ -48,6 +48,7 @@
  */
 package org.knime.ai.core.node.message.create;
 
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.function.Function;
@@ -97,48 +98,76 @@ final class MessageCreatorNodeModel extends WebUINodeModel<MessageCreatorNodeSet
     }
     private static ColumnRearranger createRearranger(final MessageCreatorNodeSettings modelSettings,
         final DataTableSpec inSpec) throws InvalidSettingsException {
-        var rearranger = new ColumnRearranger(inSpec);
+        Set<String> colsToRemove = columnsToRemove(modelSettings);
+        DataColumnSpec outputColumnSpec = createOutputMessageColumnSpec(modelSettings, inSpec, colsToRemove);
+        ColumnRearranger rearranger = new ColumnRearranger(inSpec);
         var messageCellCreator = new MessageCellCreator(modelSettings, inSpec).createMessageCellCreator();
-        var outputColumnSpec = createOutputMessageColumnSpec(modelSettings, inSpec);
         rearranger.append(new SingleCellFactoryImpl(outputColumnSpec, messageCellCreator));
-        rearranger.remove(columnsToRemove(modelSettings, inSpec).toArray(String[]::new));
+        rearranger.remove(colsToRemove.toArray(String[]::new));
         return rearranger;
     }
 
-    private static Set<String> columnsToRemove(final MessageCreatorNodeSettings modelSettings, final DataTableSpec inSpec) {
+    private static Set<String> columnsToRemove(final MessageCreatorNodeSettings modelSettings) {
         if (!modelSettings.m_removeInputColumns) {
             return Set.of();
         }
         var columnsToRemove = new HashSet<String>();
-        for (int i = 0; i < inSpec.getNumColumns(); i++) {
-            columnsToRemove.add(inSpec.getColumnSpec(i).getName());
+        // Role column
+        if (modelSettings.m_roleInputType == MessageCreatorNodeSettings.InputType.COLUMN && modelSettings.m_roleColumn != null) {
+            columnsToRemove.add(modelSettings.m_roleColumn);
+        }
+        // Tool call id column
+        if (modelSettings.m_toolCallIdColumn.getEnumChoice().isEmpty()) {
+            columnsToRemove.add(modelSettings.m_toolCallIdColumn.getStringChoice());
+        }
+
+        // Name column
+        if (modelSettings.m_nameColumn.getEnumChoice().isEmpty()) {
+            columnsToRemove.add(modelSettings.m_nameColumn.getStringChoice());
+        }
+        // Content columns
+        for (var content : modelSettings.m_content) {
+            if (content.m_contentType == MessageCreatorNodeSettings.Contents.ContentType.TEXT && content.m_inputType == MessageCreatorNodeSettings.InputType.COLUMN) {
+                columnsToRemove.add(content.m_textColumn);
+            }
+            if (content.m_contentType == MessageCreatorNodeSettings.Contents.ContentType.IMAGE) {
+                columnsToRemove.add(content.m_imageColumn);
+            }
+        }
+        // Tool call columns
+        for (var tc : modelSettings.m_toolCalls) {
+            columnsToRemove.add(tc.m_toolNameColumn);
+            columnsToRemove.add(tc.m_toolIdColumn);
+            columnsToRemove.add(tc.m_argumentsColumn);
         }
         return columnsToRemove;
     }
 
     /**
-     * Creates the DataColumnSpec for the output message column, ensuring a unique name.
-     * The unique name is generated based on the intended column name from settings
-     * and existing column names in the input DataTableSpec.
+     * Creates the specification for the output message column, ensuring the column name is unique.
+     * If the intended column name from the settings conflicts with existing column names in the input
+     * DataTableSpec, a unique name is generated.
      *
-     * @param modelSettings The node settings containing the output column name.
-     * @param inSpec The input DataTableSpec, used to check for existing column names.
-     * @return A DataColumnSpec for the new message column with a unique name.
+     * @param modelSettings The settings of the node containing the desired output column name.
+     * @param inSpec The input DataTableSpec, used to verify existing column names.
+     * @param colsToRemove A set of column names to be removed, excluded from the uniqueness check.
+     * @return A DataColumnSpec for the new message column with a guaranteed unique name.
      */
     private static DataColumnSpec createOutputMessageColumnSpec(
             final MessageCreatorNodeSettings modelSettings,
-            final DataTableSpec inSpec) {
+            final DataTableSpec inSpec,
+            final Set<String> colsToRemove) {
 
-        String finalOutputColumnName = modelSettings.m_messageColumnName;
+        String outputColumnName = modelSettings.m_messageColumnName;
+        boolean duplicateName = Arrays.stream(inSpec.getColumnNames())
+                                     .filter(n -> !colsToRemove.contains(n))
+                                     .anyMatch(outputColumnName::equals);
 
-        // Only generate a unique name if input columns are not being removed
-        if (!modelSettings.m_removeInputColumns) {
-            UniqueNameGenerator uniqueNameGenerator = new UniqueNameGenerator(inSpec);
-            finalOutputColumnName = uniqueNameGenerator.newName(modelSettings.m_messageColumnName);
-        }
+        String finalOutputColumnName = duplicateName
+                ? new UniqueNameGenerator(inSpec).newName(outputColumnName)
+                : outputColumnName;
 
         return new DataColumnSpecCreator(finalOutputColumnName, MessageCell.TYPE).createSpec();
-
     }
 
     private static final class SingleCellFactoryImpl extends SingleCellFactory {

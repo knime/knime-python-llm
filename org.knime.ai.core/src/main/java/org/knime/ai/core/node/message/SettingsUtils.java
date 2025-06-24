@@ -84,6 +84,9 @@ public final class SettingsUtils {
          */
         protected CompositePredicateProvider(final BinaryOperator<Predicate> accumulator,
             final PredicateProvider... predicates) {
+            if (predicates == null || predicates.length == 0) {
+                throw new IllegalArgumentException("At least one predicate must be provided.");
+            }
             m_predicates = List.of(predicates);
             m_aggregator = accumulator;
         }
@@ -99,7 +102,10 @@ public final class SettingsUtils {
 
         @Override
         public Predicate init(final PredicateInitializer i) {
-            return m_predicates.stream().map(p -> p.init(i)).reduce(m_aggregator).orElse(i.always());
+            return m_predicates.stream()
+                    .map(p -> p.init(i))
+                    .reduce(m_aggregator)
+                    .orElseThrow(() -> new IllegalStateException("No predicates were provided."));
         }
 
     }

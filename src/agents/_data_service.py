@@ -44,6 +44,7 @@
 
 from ._data import DataRegistry
 from ._tool import LangchainToolConverter
+import yaml
 
 
 class AgentChatViewDataService:
@@ -135,7 +136,6 @@ class AgentChatViewDataService:
             last_messages.append(self._to_frontend_message(self._messages[-1]))
 
     def _to_frontend_message(self, message):
-        import json
 
         fe_message = {
             "id": message.id if hasattr(message, "id") else None,
@@ -146,18 +146,17 @@ class AgentChatViewDataService:
 
         if message.type == "ai" and hasattr(message, "tool_calls"):
             fe_message["toolCalls"] = [
-                {
-                    "id": tool_call["id"],
-                    "name": self._tool_converter.desanitize_tool_name(
-                        tool_call["name"]
-                    ),
-                    "args": json.dumps(tool_call["args"], indent=2)
-                    if "args" in tool_call
-                    else None,
-                }
-                for tool_call in message.tool_calls
+                self._render_tool_call(tool_call) for tool_call in message.tool_calls
             ]
         elif message.type == "tool":
             fe_message["toolCallId"] = message.tool_call_id
             fe_message["name"] = self._tool_converter.desanitize_tool_name(message.name)
         return fe_message
+
+    def _render_tool_call(self, tool_call):
+        args = tool_call.get("args")
+        return {
+            "id": tool_call["id"],
+            "name": self._tool_converter.desanitize_tool_name(tool_call["name"]),
+            "args": yaml.dump(args, indent=2) if args else None,
+        }

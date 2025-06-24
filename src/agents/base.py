@@ -554,8 +554,8 @@ class AgentPrompter2:
         from ._data_service import (
             DataRegistry,
             LangchainToolConverter,
-            ExecutionMode,
         )
+        from ._tool import ExecutionMode
         from langgraph.prebuilt import create_react_agent
         from knime.types.message import to_langchain_message, from_langchain_message
 
@@ -743,9 +743,9 @@ class AgentChatView:
         from ._data_service import (
             DataRegistry,
             LangchainToolConverter,
-            ExecutionMode,
             AgentChatViewDataService,
         )
+        from ._tool import ExecutionMode
 
         chat_model = chat_model.create_model(
             ctx, output_format=OutputFormatOptions.Text

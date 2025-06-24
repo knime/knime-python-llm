@@ -55,6 +55,8 @@ from ..base import (
     CredentialsSettings,
     AIPortObjectSpec,
     OutputFormatOptions,
+    LLMModelType,
+    create_model_type_switch
 )
 from .hf_base import (
     hf_category,
@@ -231,6 +233,7 @@ class HFHubChatModelPortObjectSpec(HFHubLLMPortObjectSpec, ChatModelPortObjectSp
         llm_spec: HFHubLLMPortObjectSpec,
         system_prompt_template: str,
         prompt_template: str,
+        model_type: "LLMModelType"
     ) -> None:
         super().__init__(
             llm_spec._credentials,
@@ -241,6 +244,7 @@ class HFHubChatModelPortObjectSpec(HFHubLLMPortObjectSpec, ChatModelPortObjectSp
         )
         self._system_prompt_template = system_prompt_template
         self._prompt_template = prompt_template
+        self._model_type = model_type
 
     @property
     def system_prompt_template(self) -> str:
@@ -252,12 +256,13 @@ class HFHubChatModelPortObjectSpec(HFHubLLMPortObjectSpec, ChatModelPortObjectSp
     
     @property
     def is_instruct_model(self):
-        return False
+        return self._model_type is LLMModelType.INSTRUCT
 
     def serialize(self) -> dict:
         data = super().serialize()
         data["system_prompt_template"] = self.system_prompt_template
         data["prompt_template"] = self.prompt_template
+        data["model_type"] = self._model_type.name
         return data
 
     @classmethod
@@ -267,6 +272,7 @@ class HFHubChatModelPortObjectSpec(HFHubLLMPortObjectSpec, ChatModelPortObjectSp
             llm_spec,
             system_prompt_template=data["system_prompt_template"],
             prompt_template=data["prompt_template"],
+            model_type=LLMModelType[data.get("model_type", LLMModelType.CHAT.name)]
         )
 
 
@@ -281,6 +287,8 @@ class HFHubChatModelPortObject(HFHubLLMPortObject, ChatModelPortObject):
         from .._adapter import LLMChatModelAdapter
 
         llm = super().create_model(ctx, output_format)
+        if self.spec.is_instruct_model:
+            return llm
         return LLMChatModelAdapter(
             llm=llm,
             system_prompt_template=self.spec.system_prompt_template,
@@ -537,6 +545,7 @@ hf_hub_chat_model_port_type = knext.port_type(
 )
 
 
+
 @knext.node(
     "HF Hub LLM Selector",
     knext.NodeType.SOURCE,
@@ -587,7 +596,8 @@ class HFHubChatModelConnector:
     """
 
     hub_settings = HFHubSettings()
-    template_settings = HFPromptTemplateSettings()
+    model_type = create_model_type_switch()
+    template_settings = HFPromptTemplateSettings().rule(knext.OneOf(model_type, [LLMModelType.INSTRUCT.name]), knext.Effect.HIDE)
     model_settings = HFModelSettings()
 
     def configure(
@@ -624,6 +634,7 @@ class HFHubChatModelConnector:
             llm_spec,
             self.template_settings.system_prompt_template,
             self.template_settings.prompt_template,
+            model_type=LLMModelType[self.model_type]
         )
 
     def execute(

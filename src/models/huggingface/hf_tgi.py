@@ -53,6 +53,8 @@ from ..base import (
     ChatModelPortObject,
     ChatModelPortObjectSpec,
     OutputFormatOptions,
+    LLMModelType,
+    create_model_type_switch
 )
 from .hf_base import (
     hf_category,
@@ -245,6 +247,7 @@ class HFTGIChatModelPortObjectSpec(HFTGILLMPortObjectSpec, ChatModelPortObjectSp
         llm_spec: HFTGILLMPortObjectSpec,
         system_prompt_template: str,
         prompt_template: str,
+        model_type: LLMModelType
     ) -> None:
         super().__init__(
             llm_spec.inference_server_url,
@@ -260,6 +263,7 @@ class HFTGIChatModelPortObjectSpec(HFTGILLMPortObjectSpec, ChatModelPortObjectSp
         )
         self._system_prompt_template = system_prompt_template
         self._prompt_template = prompt_template
+        self._model_type = model_type
 
     @property
     def system_prompt_template(self) -> str:
@@ -267,7 +271,7 @@ class HFTGIChatModelPortObjectSpec(HFTGILLMPortObjectSpec, ChatModelPortObjectSp
     
     @property
     def is_instruct_model(self):
-        return False
+        return self._model_type is LLMModelType.INSTRUCT
 
     @property
     def prompt_template(self) -> str:
@@ -277,6 +281,7 @@ class HFTGIChatModelPortObjectSpec(HFTGILLMPortObjectSpec, ChatModelPortObjectSp
         data = super().serialize()
         data["system_prompt_template"] = self._system_prompt_template
         data["prompt_template"] = self._prompt_template
+        data["model_type"] = self._model_type.name
         return data
 
     @classmethod
@@ -286,6 +291,7 @@ class HFTGIChatModelPortObjectSpec(HFTGILLMPortObjectSpec, ChatModelPortObjectSp
             llm_spec,
             system_prompt_template=data["system_prompt_template"],
             prompt_template=data["prompt_template"],
+            model_type=LLMModelType[data.get("model_type", LLMModelType.CHAT.name)]
         )
 
 
@@ -303,6 +309,8 @@ class HFTGIChatModelPortObject(HFTGILLMPortObject, ChatModelPortObject):
         from .._adapter import LLMChatModelAdapter
 
         llm = super().create_model(ctx, output_format)
+        if self.spec.is_instruct_model:
+            return llm
         return LLMChatModelAdapter(
             llm=llm,
             system_prompt_template=self.spec.system_prompt_template,
@@ -467,7 +475,8 @@ class HFTGIChatModelConnector:
     """
 
     settings = HFTGIServerSettings()
-    templates = HFPromptTemplateSettings()
+    model_type = create_model_type_switch()
+    templates = HFPromptTemplateSettings().rule(knext.OneOf(model_type, [LLMModelType.INSTRUCT.name]), knext.Effect.HIDE)
     model_settings = HFTGIModelSettings()
 
     def configure(
@@ -512,4 +521,5 @@ class HFTGIChatModelConnector:
             llm_spec,
             self.templates.system_prompt_template,
             self.templates.prompt_template,
+            model_type=LLMModelType[self.model_type]
         )

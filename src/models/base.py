@@ -490,6 +490,29 @@ class LLMPortObject(knext.PortObject):
 llm_port_type = knext.port_type("LLM", LLMPortObject, LLMPortObjectSpec)
 
 
+class LLMModelType(knext.EnumParameterOptions):
+    CHAT = (
+        "Chat",
+        "The model is trained to follow instructions in a conversational style.",
+    )
+    INSTRUCT = (
+        "Instruct",
+        "The model is trained to follow one-shot instructions and is not well suited for conversations.",
+    )
+
+
+def create_model_type_switch() -> knext.EnumParameter:
+    return knext.EnumParameter(
+        "Model type",
+        "The type of the selected model.",
+        LLMModelType.CHAT.name,
+        LLMModelType,
+        since_version="5.5.0",
+        is_advanced=True,
+        style=knext.EnumParameter.Style.VALUE_SWITCH,
+    )
+
+
 class ChatModelPortObjectSpec(LLMPortObjectSpec):
     """Most generic chat model spec. Used to define the most generic chat model PortType."""
 
@@ -502,7 +525,7 @@ class ChatModelPortObjectSpec(LLMPortObjectSpec):
     @property
     def supports_tools(self) -> bool:
         return True
-    
+
     @property
     def is_instruct_model(self) -> bool:
         # chat models are typically not instruct models

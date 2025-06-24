@@ -265,6 +265,11 @@ class ChatPrompter:
                 self.tool_definition_column = util.pick_default_column(
                     tool_table_spec, knext.logical(dict)
                 )
+        
+        if chat_model_spec.is_instruct_model:
+            raise knext.InvalidParametersError(
+                "The selected model is not a chat model. Try selecting a different model."
+            )
 
         _validate_json_output_format(
             self.output_format, [self.system_message + self.chat_message]

@@ -71,7 +71,7 @@ import org.knime.filehandling.core.data.location.FSLocationValue;
  */
 final class WorkflowToToolNodeSettings implements DefaultNodeSettings {
 
-    @Widget(title = "Input column selection",
+    @Widget(title = "Workflow path column",
         description = "The column containing the paths to read the workflows from.")
     @ChoicesProvider(PathColumnChoice.class)
     String m_inputColumnName;

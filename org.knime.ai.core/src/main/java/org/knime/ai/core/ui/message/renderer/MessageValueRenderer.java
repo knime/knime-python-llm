@@ -60,7 +60,7 @@ import static j2html.TagCreator.rawHtml;
 import static j2html.TagCreator.span;
 import static j2html.TagCreator.style;
 
-import java.util.Base64;
+import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -314,12 +314,10 @@ public final class MessageValueRenderer extends DefaultDataValueRenderer
         }
 
         if (part instanceof PngContentPart imgPart) {
-            byte[] raw = imgPart.getData();
-            String mime = imgPart.getType().getMimeType();
-            if (raw != null && raw.length > 0 && mime != null && !mime.isBlank()) {
-                String uri = "data:%s;base64,%s".formatted(mime, Base64.getEncoder().encodeToString(raw));
+            try {
+                String uri = ImageUtil.createThumbnailForPng(imgPart.getData());
                 return img().withSrc(uri).attr("alt", "[image]").withClass("content-image");
-            } else {
+            } catch (IOException e) {
                 return i("Unable to render image.").withClass("content-unsupported");
             }
         }
@@ -397,10 +395,8 @@ public final class MessageValueRenderer extends DefaultDataValueRenderer
             }
 
             .content-image {
-                max-width: 240px;
+                max-width: 200px;
                 height: auto;
-                border-radius: 6px;
-                border: 1px solid #ccc;
             }
 
             .content-unsupported {

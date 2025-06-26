@@ -183,7 +183,7 @@ class LangchainToolConverter:
                 + "\n\n## Data repository update\n"
                 + render_structured(**output_references)
                 + "\n\n## View node IDs\n"
-                + "".join(view_node_ids)
+                + ",".join(view_node_ids)
             )
 
         return _process_outputs_with_data
@@ -195,7 +195,7 @@ class LangchainToolConverter:
             return (
                 message
                 + "\n\n## View node IDs\n"
-                + "".join(view_node_ids)
+                + ",".join(view_node_ids)
             )
 
         return _process_outputs_no_data

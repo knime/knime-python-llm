@@ -12,11 +12,11 @@ import {
   type UIExtensionService,
 } from "@knime/ui-extension-service";
 
-interface Props {
-  viewNodeIds: string[];
-}
+import type { ViewResponse } from "@/types";
 
-const props = withDefaults(defineProps<Props>(), {});
+import MessageBox from "./chat/MessageBox.vue";
+
+const props = defineProps<ViewResponse>();
 
 const dataAvailable = ref<boolean>(false);
 
@@ -36,7 +36,7 @@ const apiLayer: UIExtensionAPILayer = {
     const response = await baseService.value?.callKnimeUiApi!(
       "NodeService.callNodeDataService",
       {
-        nodeId: replaceRootIndex(props.viewNodeIds[0]),
+        nodeId: replaceRootIndex(props.content),
         extensionType: "view",
         serviceType,
         dataServiceRequest,
@@ -81,7 +81,7 @@ watchEffect(() => {
   }
 
   baseService.value.callKnimeUiApi!("NodeService.getNodeView", {
-    nodeId: replaceRootIndex(props.viewNodeIds[0]),
+    nodeId: replaceRootIndex(props.content),
   })
     .then((response) => {
       if (response.isSome) {
@@ -101,14 +101,14 @@ watchEffect(() => {
 
 onUnmounted(() => {
   baseService.value?.callKnimeUiApi!("NodeService.deactivateNodeDataServices", {
-    nodeId: replaceRootIndex(props.viewNodeIds[0]),
+    nodeId: replaceRootIndex(props.content),
   });
   dataAvailable.value = false;
 });
 </script>
 
 <template>
-  <div class="port-table">
+  <MessageBox>
     <UIExtension
       v-if="dataAvailable"
       :api-layer="apiLayer"
@@ -116,12 +116,7 @@ onUnmounted(() => {
       :resource-location="resourceLocation!"
       :shadow-app-style="{ height: '100%', width: '100%', overflowX: 'scroll' }"
     />
-  </div>
+  </MessageBox>
 </template>
 
-<style lang="postcss" scoped>
-.port-table {
-  height: 100%;
-  width: 100%;
-}
-</style>
+<style lang="postcss" scoped></style>

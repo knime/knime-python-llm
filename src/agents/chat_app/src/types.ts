@@ -1,6 +1,6 @@
 import type { DefineComponent } from "vue";
 
-type Type = "human" | "ai" | "tool" | "error";
+type Type = "human" | "ai" | "tool" | "view" | "error";
 
 export interface ToolCall {
   id: string;
@@ -27,6 +27,11 @@ export interface ToolResponse extends BaseMessageResponse {
   content: string;
 }
 
+export interface ViewResponse extends BaseMessageResponse {
+  content: string;
+  type: "view";
+}
+
 export interface ErrorResponse extends BaseMessageResponse {
   content: string;
   type: "error";
@@ -40,6 +45,7 @@ export interface HumanResponse extends BaseMessageResponse {
 export type MessageResponse =
   | AiResponse
   | ToolResponse
+  | ViewResponse
   | ErrorResponse
   | HumanResponse;
 

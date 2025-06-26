@@ -108,7 +108,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <MessageBox>
+  <MessageBox class="message">
     <UIExtension
       v-if="dataAvailable"
       :api-layer="apiLayer"
@@ -119,4 +119,11 @@ onUnmounted(() => {
   </MessageBox>
 </template>
 
-<style lang="postcss" scoped></style>
+<style lang="postcss" scoped>
+.message {
+  & :deep(.message-box) {
+    min-width: 100%;
+    min-height: 100%;
+  }
+}
+</style>

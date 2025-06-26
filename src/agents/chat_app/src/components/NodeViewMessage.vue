@@ -27,16 +27,37 @@ const baseService = ref<UIExtensionService<UIExtensionAPILayer> | null>(null);
 const noop = () => {
   /* mock unused api fields */
 };
-const replaceRootIndex = (nodeId: string): string => {
-  return nodeId.replace(/^\d+:/, "root:");
+
+const join = (
+  segments: string[],
+  startIndex: number,
+  endIndex: number,
+): string => {
+  const range = segments.slice(startIndex, endIndex);
+  return range.join(":");
+};
+
+const parseNodeID = (
+  nodeIdString: string,
+): { projectId: string; workflowId: string; nodeId: string } => {
+  const ids = nodeIdString.split(":");
+  return {
+    projectId: join(ids, 0, 2),
+    workflowId: join(ids, 1, 3),
+    nodeId: join(ids, 1, ids.length),
+  };
 };
 const apiLayer: UIExtensionAPILayer = {
   registerPushEventService: () => () => {},
   callNodeDataService: async ({ dataServiceRequest, serviceType }) => {
+    const { projectId, workflowId, nodeId } = parseNodeID(props.content);
     const response = await baseService.value?.callKnimeUiApi!(
       "NodeService.callNodeDataService",
       {
-        nodeId: replaceRootIndex(props.content),
+        projectId,
+        workflowId,
+        versionId: "current-state",
+        nodeId,
         extensionType: "view",
         serviceType,
         dataServiceRequest,
@@ -80,8 +101,12 @@ watchEffect(() => {
     return;
   }
 
+  const { projectId, workflowId, nodeId } = parseNodeID(props.content);
   baseService.value.callKnimeUiApi!("NodeService.getNodeView", {
-    nodeId: replaceRootIndex(props.content),
+    projectId,
+    workflowId,
+    versionId: "current-state",
+    nodeId,
   })
     .then((response) => {
       if (response.isSome) {
@@ -100,8 +125,12 @@ watchEffect(() => {
 });
 
 onUnmounted(() => {
+  const { projectId, workflowId, nodeId } = parseNodeID(props.content);
   baseService.value?.callKnimeUiApi!("NodeService.deactivateNodeDataServices", {
-    nodeId: replaceRootIndex(props.content),
+    projectId,
+    workflowId,
+    versionId: "current-state",
+    nodeId,
   });
   dataAvailable.value = false;
 });
@@ -123,7 +152,6 @@ onUnmounted(() => {
 .message {
   & :deep(.message-box) {
     min-width: 100%;
-    min-height: 100%;
   }
 }
 </style>

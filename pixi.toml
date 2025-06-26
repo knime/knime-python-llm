@@ -66,8 +66,12 @@ langchain-ibm = "==0.3.10.*"
 python = "3.9.*"
 knime-extension-bundling = "5.5.*"
 
+[feature.dev.dependencies]
+debugpy = "*"
+
 [feature.build.tasks]
 build = { args = [{ "arg" = "dest", "default" = "./local-update-site" }], cmd = "python ./.pixi/envs/build/bin/build_python_extension.py . {{ dest }} --render-folder ./render-dir --force --disable-strict-enforcement"}
 
 [environments]
 build = {features = ["build"], no-default-feature = true}
+dev = {features = ["dev"]}

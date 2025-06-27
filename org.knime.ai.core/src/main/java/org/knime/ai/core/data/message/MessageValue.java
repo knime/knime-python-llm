@@ -55,6 +55,7 @@ import javax.swing.Icon;
 
 import org.knime.core.data.DataValue;
 import org.knime.core.data.ExtensibleUtilityFactory;
+import org.knime.core.node.agentic.tool.ToolTextMessage;
 import org.knime.core.webui.node.dialog.defaultdialog.widget.Label;
 
 /**
@@ -62,7 +63,7 @@ import org.knime.core.webui.node.dialog.defaultdialog.widget.Label;
  *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
-public interface MessageValue extends DataValue {
+public interface MessageValue extends DataValue, ToolTextMessage {
 
     @SuppressWarnings("javadoc")
     UtilityFactory UTILITY = new ExtensibleUtilityFactory(MessageValue.class) {
@@ -139,7 +140,7 @@ public interface MessageValue extends DataValue {
          * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
          */
         enum MessageContentPartType {
-            TEXT("text/markdown"), PNG("image/png");
+                TEXT("text/markdown"), PNG("image/png");
 
             private final String m_id;
 
@@ -218,4 +219,29 @@ public interface MessageValue extends DataValue {
      */
     Optional<String> getName();
 
+    /**
+     * @return The concatenated text content of the message. If image content is encountered, an
+     *         {@link UnsupportedOperationException} is thrown.
+     */
+    @Override
+    default String getTextContent() {
+        if (getContent() == null || getContent().isEmpty()) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (MessageContentPart part : getContent()) {
+            switch (part.getType()) {
+                case TEXT:
+                    sb.append(new String(part.getData()));
+                    sb.append("\n");
+                    break;
+                case PNG:
+                    throw new UnsupportedOperationException("Image content in tool messages is not yet supported. "
+                        + "Please use only text content for the tool message output.");
+                default:
+                    throw new IllegalArgumentException("Unknown content part type: " + part.getType());
+            }
+        }
+        return sb.toString();
+    }
 }

@@ -50,11 +50,13 @@ package org.knime.ai.core.data.message;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import javax.swing.Icon;
 
 import org.knime.core.data.DataValue;
 import org.knime.core.data.ExtensibleUtilityFactory;
+import org.knime.core.node.agentic.tool.ToolMessage;
 import org.knime.core.webui.node.dialog.defaultdialog.widget.Label;
 
 /**
@@ -62,7 +64,7 @@ import org.knime.core.webui.node.dialog.defaultdialog.widget.Label;
  *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
-public interface MessageValue extends DataValue {
+public interface MessageValue extends DataValue, ToolMessage {
 
     @SuppressWarnings("javadoc")
     UtilityFactory UTILITY = new ExtensibleUtilityFactory(MessageValue.class) {
@@ -139,7 +141,7 @@ public interface MessageValue extends DataValue {
          * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
          */
         enum MessageContentPartType {
-            TEXT("text/markdown"), PNG("image/png");
+                TEXT("text/markdown"), PNG("image/png");
 
             private final String m_id;
 
@@ -218,4 +220,20 @@ public interface MessageValue extends DataValue {
      */
     Optional<String> getName();
 
+    /**
+     * @return The content of the tool message. Currently, only text parts are supported and all text parts are
+     *         concatenated.
+     * @throws UnsupportedOperationException if image content is provided.
+     */
+    @Override
+    default String getToolMessageContent() {
+        if (getContent() == null || getContent().isEmpty()) {
+            return "";
+        }
+        return getContent().stream().map(part -> switch (part.getType()) {
+            case TEXT -> new String(part.getData());
+            case PNG -> throw new UnsupportedOperationException("Image content in tool messages is not yet supported. "
+                + "Please provide only text content in tool messages.");
+        }).collect(Collectors.joining("\n"));
+    }
 }

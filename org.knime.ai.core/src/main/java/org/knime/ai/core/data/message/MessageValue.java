@@ -55,6 +55,7 @@ import javax.swing.Icon;
 
 import org.knime.core.data.DataValue;
 import org.knime.core.data.ExtensibleUtilityFactory;
+import org.knime.core.node.agentic.tool.ToolMessage;
 import org.knime.node.parameters.widget.choices.Label;
 
 /**
@@ -139,7 +140,7 @@ public interface MessageValue extends DataValue {
          * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
          */
         enum MessageContentPartType {
-            TEXT("text/markdown"), PNG("image/png");
+                TEXT("text/markdown"), PNG("image/png");
 
             private final String m_id;
 

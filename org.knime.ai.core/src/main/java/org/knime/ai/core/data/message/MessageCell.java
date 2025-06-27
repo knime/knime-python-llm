@@ -53,9 +53,11 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.knime.core.data.DataCell;
 import org.knime.core.data.DataType;
+import org.knime.core.node.agentic.tool.ToolMessage;
 import org.knime.core.node.util.CheckUtils;
 
 /**
@@ -63,7 +65,7 @@ import org.knime.core.node.util.CheckUtils;
  *
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
-public final class MessageCell extends DataCell implements MessageValue {
+public final class MessageCell extends DataCell implements MessageValue, ToolMessage {
 
     private static final long serialVersionUID = 1L;
 
@@ -202,4 +204,20 @@ public final class MessageCell extends DataCell implements MessageValue {
         return Objects.hash(m_messageType, m_content, m_toolCalls, m_toolCallId);
     }
 
+    /**
+     * @return The content of the tool message. Currently, only text parts are supported and all text parts are
+     *         concatenated.
+     * @throws UnsupportedOperationException if image content is provided.
+     */
+    @Override
+    public String getToolMessageText() {
+        if (getContent() == null || getContent().isEmpty()) {
+            return "";
+        }
+        return getContent().stream().map(part -> switch (part.getType()) {
+            case TEXT -> new String(part.getData());
+            case PNG -> throw new UnsupportedOperationException("Image content in tool messages is not yet supported. "
+                + "Please provide only text content in tool messages.");
+        }).collect(Collectors.joining("\n"));
+    }
 }

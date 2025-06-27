@@ -54,6 +54,7 @@ import org.knime.core.data.DataTableSpec;
 import org.knime.core.node.BufferedDataTable;
 import org.knime.core.node.ExecutionContext;
 import org.knime.core.node.InvalidSettingsException;
+import org.knime.core.node.agentic.tool.WorkflowToolCell;
 import org.knime.core.node.dialog.ContentType;
 import org.knime.core.node.dialog.ExternalNodeData;
 import org.knime.core.node.dialog.OutputNode;
@@ -64,7 +65,8 @@ import org.knime.core.webui.node.impl.WebUINodeModel;
 /**
  * @author Martin Horn, KNIME GmbH, Konstanz, Germany
  */
-public final class ToolMessageOutputNodeModel extends WebUINodeModel<ToolMessageOutputNodeSettings> implements OutputNode {
+public final class ToolMessageOutputNodeModel extends WebUINodeModel<ToolMessageOutputNodeSettings>
+    implements OutputNode {
 
     ToolMessageOutputNodeModel(final WebUINodeConfiguration configuration) {
         super(configuration, ToolMessageOutputNodeSettings.class);
@@ -93,6 +95,7 @@ public final class ToolMessageOutputNodeModel extends WebUINodeModel<ToolMessage
     @Override
     protected BufferedDataTable[] execute(final BufferedDataTable[] inData, final ExecutionContext exec,
         final ToolMessageOutputNodeSettings modelSettings) throws Exception {
+        WorkflowToolCell.extractToolMessageContent(inData[0]);
         return null;
     }
 

@@ -76,6 +76,11 @@ public final class ToolMessageOutputNodeFactory extends WebUINodeFactory<ToolMes
             and/or <i>Workflow Output</i> nodes. These facilitate the <i>data layer</i> and can be combined with this
             node as needed.
             </p>
+
+            <p>
+            <b>Note</b>: Tool messages currently do not support image content; only text content
+            will be forwarded as the tool message output.
+            </p>
             """;
 
     private static final WebUINodeConfiguration CONFIG = WebUINodeConfiguration.builder() //

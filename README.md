@@ -23,19 +23,28 @@ This repository contains the source code for the KNIME AI Extension. The extensi
    ```bash
    pixi install -e dev
    ```
-2. **Register the extension** in KNIME Analytics Platform:
-   - Install the [KNIME Python Extension Development](https://hub.knime.com/knime/extensions/org.knime.features.python3.nodes/latest) feature. It might be already installed if you have any Python-based extension installed.
-   - Create or update your Python `config.yaml` with:
-     ```yaml
-     org.knime.python.llm:
-       src: "<path/to/this/repository>"
-       conda_env_path: "<path/to/this/repository>/.pixi/envs/dev"
-       debug_mode: true  # Disables Python process caching for live code reloads (slower on Windows)
-     ```
-   - Point KNIME to your config by adding to `knime.ini`:
-     ```
-     -Dknime.python.extension.config=<path/to/your/config.yml>
-     ```
+2. **Ensure Java plugins are present**:  
+  The KNIME AI Extension now includes both Python and Java components. To use the extension, you must have the required Java plugins available in your KNIME Analytics Platform. You can achieve this in one of two ways:
+  - **Option 1: Install the AI Extension**  
+    Install the AI Extension directly into your KNIME Analytics Platform using the standard update sites. This will ensure all necessary Java plugins are installed.
+  - **Option 2: Develop with Eclipse**  
+    If you are developing or modifying the Java plugins, check out the relevant plugin projects in Eclipse and launch KNIME from your Eclipse workspace. This allows you to work with the latest source code for both Java and Python components.
+
+3. **Register the Python extension** in KNIME Analytics Platform:
+  - Install the [KNIME Python Extension Development](https://hub.knime.com/knime/extensions/org.knime.features.python3.nodes/latest) feature. It might already be installed if you have any Python-based extension.
+  - Create or update your Python `config.yaml` with:
+    ```yaml
+    org.knime.python.llm:
+     src: "<path/to/this/repository>"
+     conda_env_path: "<path/to/this/repository>/.pixi/envs/dev"
+     debug_mode: true  # Disables Python process caching for live code reloads (slower on Windows)
+    ```
+  - Point KNIME to your config by adding to `knime.ini`:
+    ```
+    -Dknime.python.extension.config=<path/to/your/config.yaml>
+    ```
+  - **Note for Eclipse development:**  
+    When developing from Eclipse, the plugin `org.knime.python3.nodes` from the [knime-python](https://bitbucket.org/KNIME/knime-python) repository needs to be checked out or added to the target platform, as it is not included by default.
 
 ### Configuring the dev Environment in VS Code
 To use the `dev` environment in VS Code for linting, formatting, and debugging:

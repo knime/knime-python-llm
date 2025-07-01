@@ -121,26 +121,41 @@ class AgentChatViewDataService:
                     }
                 )
                 return
-        if self._show_tool_calls_and_results:
-            last_human_index = next(
-                (
-                    i
-                    for i in reversed(range(len(self._messages)))
-                    if self._messages[i].type == "human"
-                ),
-                -1,
-            )
-            for msg in self._messages[last_human_index + 1 :]:
-                last_messages.append(self._to_frontend_message(msg))
-        else:
-            last_messages.append(self._to_frontend_message(self._messages[-1]))
+        from_index = next(
+            (
+                i
+                for i in reversed(range(len(self._messages)))
+                if self._messages[i].type == "human"
+            ),
+            -1,
+        )
+        for msg in self._messages[from_index + 1 :]:
+            frontend_messages = self._to_frontend_messages(msg)
+            if self._show_tool_calls_and_results:
+                last_messages.extend(frontend_messages)
+            else:
+                # filter out tool calls and results
+                filtered_messages = [
+                    m
+                    for m in frontend_messages
+                    if m["type"] == "view"
+                    or (m["type"] == "ai" and len(m["toolCalls"]) == 0)
+                ]
+                last_messages.extend(filtered_messages)
 
-    def _to_frontend_message(self, message):
+    def _to_frontend_messages(self, message):
+        # split the node-view-ids out into a separate message
+        content = None
+        viewNodeIds = []
+        if hasattr(message, "content"):
+            split = message.content.split("View node IDs")
+            content = split[0]
+            viewNodeIds = split[1].strip().split(",") if len(split) > 1 else []
 
         fe_message = {
             "id": message.id if hasattr(message, "id") else None,
             "type": message.type,
-            "content": message.content if hasattr(message, "content") else None,
+            "content": content,
             "name": message.name if hasattr(message, "name") else None,
         }
 
@@ -151,7 +166,17 @@ class AgentChatViewDataService:
         elif message.type == "tool":
             fe_message["toolCallId"] = message.tool_call_id
             fe_message["name"] = self._tool_converter.desanitize_tool_name(message.name)
-        return fe_message
+
+        if len(viewNodeIds) > 0:
+            return [
+                {
+                    "type": "view",
+                    "content": viewNodeId,
+                }
+                for viewNodeId in viewNodeIds
+            ] + [fe_message]
+
+        return [fe_message]
 
     def _render_tool_call(self, tool_call):
         args = tool_call.get("args")

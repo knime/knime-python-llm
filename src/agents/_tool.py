@@ -75,12 +75,22 @@ class ExecutionMode(Enum):
 
 
 class LangchainToolConverter:
-    def __init__(self, data_registry: DataRegistry, ctx, execution_mode: ExecutionMode):
+    def __init__(
+        self,
+        data_registry: DataRegistry,
+        ctx,
+        execution_mode: ExecutionMode,
+        with_view_nodes: bool = False,
+    ):
         self._data_registry = data_registry
         self._ctx = ctx
-        self._execution_mode_hint = {"execution-mode": execution_mode.name}
+        self._execution_hints = {
+            "execution-mode": execution_mode.name,
+            "with-view-nodes": str(with_view_nodes),
+        }
         self.sanitized_to_original = {}
         self._has_data_tools = False
+        self._with_view_nodes = with_view_nodes
 
     @property
     def has_data_tools(self) -> bool:
@@ -155,10 +165,10 @@ class LangchainToolConverter:
         def tool_function(**params: dict) -> str:
             try:
                 configuration, inputs = params_parser(params)
-                message, outputs = self._ctx._execute_tool(
-                    tool, configuration, inputs, self._execution_mode_hint
+                message, outputs, view_node_ids = self._ctx._execute_tool(
+                    tool, configuration, inputs, self._execution_hints
                 )
-                return outputs_processor(message, outputs)
+                return outputs_processor(message, outputs, view_node_ids)
             except Exception as e:
                 _logger.exception(e)
                 raise
@@ -171,22 +181,27 @@ class LangchainToolConverter:
         )
 
     def _create_data_output_processor(self, tool: WorkflowTool):
-        def _process_outputs_with_data(message: str, outputs: list[knext.Table]):
+        def _process_outputs_with_data(
+            message: str, outputs: list[knext.Table], view_node_ids: list[str]
+        ):
             output_references = {}
             for port, output in zip(tool.output_ports, outputs):
                 output_reference = self._data_registry.add_table(output, port)
                 output_references.update(output_reference)
-            return (
+            return self._append_view_node_ids(
                 message
                 + "\n\n## Data repository update\n"
-                + render_structured(**output_references)
+                + render_structured(**output_references),
+                view_node_ids,
             )
 
         return _process_outputs_with_data
 
     def _create_no_data_output_processor(self):
-        def _process_outputs_no_data(message: str, outputs: list[knext.Table]):
-            return message
+        def _process_outputs_no_data(
+            message: str, outputs: list[knext.Table], view_node_ids: list[str]
+        ):
+            return self._append_view_node_ids(message, view_node_ids)
 
         return _process_outputs_no_data
 
@@ -217,6 +232,11 @@ class LangchainToolConverter:
             return configuration, inputs
 
         return _parse_params_with_data
+
+    def _append_view_node_ids(self, message: str, view_node_ids: list[str]) -> str:
+        if view_node_ids:
+            return message + "\n\n## View node IDs\n" + ",".join(view_node_ids)
+        return message
 
 
 def _validate_required_fields(required_fields, provided_dict, error_prefix):

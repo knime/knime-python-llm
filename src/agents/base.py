@@ -701,6 +701,15 @@ class AgentChatView:
         default_value=False,
     )
 
+    show_views = knext.BoolParameter(
+        "Show views",
+        "If checked, the views of nodes in the workflow-based tool  will be shown in the chat.",
+        default_value=lambda v: v
+        < knext.Version(
+            5, 6, 0
+        ),  # False for versions < 5.6.0 for backwards compatibility
+    )
+
     recursion_limit = _recursion_limit_parameter()
 
     debug = _debug_mode_parameter()
@@ -754,7 +763,8 @@ class AgentChatView:
         tool_converter = LangchainToolConverter(
             data_registry,
             ctx,
-            ExecutionMode.DEBUG if self.debug else ExecutionMode.DETACHED
+            ExecutionMode.DEBUG if self.debug else ExecutionMode.DETACHED,
+            self.show_views,
         )
         if tools_table is not None:
             tool_cells = _extract_tools_from_table(tools_table, self.tool_column)

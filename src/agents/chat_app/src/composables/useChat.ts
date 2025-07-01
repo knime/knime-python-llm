@@ -2,6 +2,7 @@ import { onMounted, ref } from "vue";
 
 import { JsonDataService } from "@knime/ui-extension-service";
 
+import NodeViewMessage from "@/components/NodeViewMessage.vue";
 import type { MessageComponentMap, MessageResponse } from "@/types";
 import AiMessage from "../components/AiMessage.vue";
 import HumanMessage from "../components/HumanMessage.vue";
@@ -18,6 +19,7 @@ const createId = () => (Date.now() + 1).toString();
 const messageComponents: MessageComponentMap = {
   ai: AiMessage,
   tool: ToolMessage,
+  view: NodeViewMessage,
   human: HumanMessage,
   error: ErrorMessage,
 };

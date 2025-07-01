@@ -90,6 +90,7 @@ const hasIconSlot = slots.icon;
   border-radius: 0 var(--space-4) var(--space-4);
   background-color: var(--knime-white);
   padding: var(--space-12) var(--space-8);
+  height: 100%;
 
   .user & {
     border-radius: var(--space-4) var(--space-4) 0 var(--space-4);

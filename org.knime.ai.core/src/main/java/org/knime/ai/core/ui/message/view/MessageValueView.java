@@ -72,7 +72,8 @@ public class MessageValueView implements DataValueView {
 
     @Override
     public Page getPage() {
-        return Page.builder(() -> MessageValueRenderer.renderMessageForView(m_value), "index.html").build();
+        return Page.create().fromString(() -> MessageValueRenderer.renderMessageForView(m_value))
+            .relativePath("index.html");
     }
 
     @Override

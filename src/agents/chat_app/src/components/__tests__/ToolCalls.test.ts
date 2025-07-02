@@ -11,7 +11,7 @@ const sampleToolCalls = [
   { id: "3", name: "Calculator" },
 ];
 
-describe("ToolCalls.vue", () => {
+describe("ToolCalls", () => {
   const doMount = async (toolCalls: ToolCall[]) => {
     const wrapper = mount(ToolCalls, { props: { toolCalls } });
     await nextTick();

@@ -84,7 +84,7 @@ const apiLayer: UIExtensionAPILayer = {
   publishData: noop,
   sendAlert(alert) {
     AlertingService.getInstance().then((service) =>
-      // @ts-expect-error
+      // @ts-expect-error please provide a comment
       service.baseService.sendAlert(alert),
     );
   },
@@ -125,7 +125,7 @@ watchEffect(() => {
         resourceLocation.value =
           // TODO AP-24611: baseUrl is not provided in case of browser editing
           // and data-apps
-          // @ts-ignore
+          // @ts-expect-error please provide a comment
           extensionConfig.value?.resourceInfo?.baseUrl +
           extensionConfig.value?.resourceInfo?.path;
       }

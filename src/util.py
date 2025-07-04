@@ -294,7 +294,8 @@ class FailOnMissingMapper(BaseMapper):
         for column in self._columns:
             text_array = table.column(column)
             is_valid = self._is_valid(text_array)
-            all_valid = pc.all(is_valid)
+            # min_count = 0 allows for empty tables
+            all_valid = pc.all(is_valid, min_count=0)
             if not all_valid.as_py():
                 raise ValueError(
                     f"There are missing or empty values in column {column}. "

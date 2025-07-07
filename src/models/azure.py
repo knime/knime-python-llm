@@ -337,7 +337,7 @@ class AzureOpenAIEmbeddingsPortObject(OpenAIEmbeddingsPortObject):
         from langchain_openai import AzureOpenAIEmbeddings
 
         return AzureOpenAIEmbeddings(
-            openai_api_key=ctx.get_credentials(self.spec.credentials).password,
+            openai_api_key=self.spec.auth_spec.get_api_key(ctx),
             azure_endpoint=self.spec.base_url,
             api_version=self.spec.api_version,
             openai_api_type=self.spec.api_type,

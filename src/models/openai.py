@@ -756,15 +756,21 @@ class OpenAIAuthenticationPortObjectSpec(AIPortObjectSpec):
         credentials: str,
         base_url: str,
         credential_spec: Optional[knext.CredentialPortObjectSpec] = None,
+        custom_headers: dict[str, str] = None,
     ) -> None:
         super().__init__()
         self._credentials = credentials
         self._base_url = base_url
         self._credential_spec = credential_spec
+        self._custom_headers = {} if custom_headers is None else custom_headers
 
     @property
     def credentials(self) -> str:
         return self._credentials
+
+    @property
+    def custom_headers(self) -> str:
+        return self._custom_headers
 
     @property
     def base_url(self) -> str:
@@ -814,6 +820,7 @@ class OpenAIAuthenticationPortObjectSpec(AIPortObjectSpec):
         return OpenAIClient(
             api_key=key,
             base_url=self.base_url,
+            default_headers=self.custom_headers,
         )
 
     def get_model_list(self, ctx: knext.ConfigurationContext) -> list[str]:
@@ -836,6 +843,7 @@ class OpenAIAuthenticationPortObjectSpec(AIPortObjectSpec):
             "credential_spec": None
             if self._credential_spec is None
             else self._credential_spec.serialize(),
+            "custom_headers": self.custom_headers,
         }
 
     @classmethod
@@ -850,6 +858,7 @@ class OpenAIAuthenticationPortObjectSpec(AIPortObjectSpec):
             data["credentials"],
             data.get("base_url", _default_openai_api_base),
             credential_spec,
+            data.get("custom_headers", {}),
         )
 
 
@@ -990,6 +999,7 @@ def _create_instruct_model(
         top_p=po_instance.spec.top_p,
         max_tokens=po_instance.spec.max_tokens,
         seed=po_instance.spec.seed,
+        default_headers=po_instance.spec.auth_spec.custom_headers,
     )
 
 
@@ -1015,6 +1025,7 @@ def _create_model(
         max_tokens=po_instance.spec.max_tokens,
         seed=po_instance.spec.seed,
         model_kwargs=model_kwargs,
+        default_headers=po_instance.spec.auth_spec.custom_headers,
     )
 
 
@@ -1117,6 +1128,7 @@ class OpenAIEmbeddingsPortObject(EmbeddingsPortObject):
             base_url=self.spec.base_url,
             model=self.spec.model,
             dimensions=self.spec.dimensions,
+            default_headers=self.spec.auth_spec.custom_headers,
         )
 
 
@@ -1131,8 +1143,15 @@ credentials_port_type = kn.get_port_type_for_id(credentials_port_type_id)
 
 # == Nodes ==
 
-
 # region Authenticator
+
+
+@knext.parameter_group("Custom header")
+class CustomHeader:
+    key = knext.StringParameter("Key", "Key of the header.")
+    value = knext.StringParameter("Value", "Value of the header.")
+
+
 def _has_auth_port(ctx: knext.DialogCreationContext) -> bool:
     specs = ctx.get_input_specs()
     return len(specs) == 1 and specs[0] is not None
@@ -1189,6 +1208,15 @@ class OpenAIAuthenticator:
         """Sets the destination of the API requests to OpenAI or an OpenAI compatible API.""",
         default_value=_default_openai_api_base,
         since_version="5.2.0",
+        is_advanced=True,
+    )
+
+    # TODO prevent overwriting common headers like authentication and accept
+    custom_headers = knext.ParameterArray(
+        parameters=CustomHeader(),
+        label="Custom headers",
+        description="Any custom headers to include in requests to the API.",
+        since_version="5.6.0",
         is_advanced=True,
     )
 
@@ -1258,6 +1286,7 @@ class OpenAIAuthenticator:
             self.credentials_settings.credentials_param,
             base_url=self.base_url,
             credential_spec=credential,
+            custom_headers={header.key: header.value for header in self.custom_headers},
         )
 
 

@@ -45,6 +45,7 @@
 
 # KNIME / own imports
 import knime.extension as knext
+import knime.extension.nodes as kn
 from .base import (
     AIPortObjectSpec,
     LLMPortObjectSpec,
@@ -748,10 +749,16 @@ class FineTunerResultSettings:
 
 
 class OpenAIAuthenticationPortObjectSpec(AIPortObjectSpec):
-    def __init__(self, credentials: str, base_url: str) -> None:
+    def __init__(
+        self,
+        credentials: str,
+        base_url: str,
+        credential_spec: Optional[knext.CredentialPortObjectSpec],
+    ) -> None:
         super().__init__()
         self._credentials = credentials
         self._base_url = base_url
+        self._credential_spec = credential_spec
 
     @property
     def credentials(self) -> str:
@@ -762,6 +769,19 @@ class OpenAIAuthenticationPortObjectSpec(AIPortObjectSpec):
         return self._base_url
 
     def validate_context(self, ctx: knext.ConfigurationContext):
+        self._validate_credentials(ctx)
+        if not self.base_url:
+            raise knext.InvalidParametersError("Please provide a base URL.")
+
+    def _validate_credentials(self, ctx: knext.ConfigurationContext):
+        if self._credential_spec is not None:
+            if self._credential_spec.auth_schema != "Bearer":
+                raise knext.InvalidParametersError(
+                    f"The credential uses unsupported schema '{self._credential_spec.auth_schema}'. Only 'Bearer' is supported."
+                )
+            # TODO check if the above already raises an error if connector isn't re-executed in loaded workflow
+            return
+
         if self.credentials not in ctx.get_credential_names():
             raise knext.InvalidParametersError(
                 f"""The selected credentials '{self.credentials}' holding the OpenAI API key do not exist. 
@@ -773,14 +793,16 @@ class OpenAIAuthenticationPortObjectSpec(AIPortObjectSpec):
                 f"""The OpenAI API key '{self.credentials}' does not exist. Make sure that the node you are using to pass the credentials 
                 (e.g. the Credentials Configuration node) is still passing the valid API key as a flow variable to the downstream nodes."""
             )
-
-        if not self.base_url:
-            raise knext.InvalidParametersError("Please provide a base URL.")
+    
+    def get_api_key(self, ctx: knext.ConfigurationContext) -> str:
+        if self._credential_spec is not None:
+            return self._credential_spec.auth_parameters
+        return ctx.get_credentials(self.credentials).password
 
     def get_model_list(self, ctx: knext.ConfigurationContext) -> list[str]:
         from openai import Client as OpenAIClient
 
-        key = ctx.get_credentials(self.credentials).password
+        key = self.get_api_key(ctx)
         base_url = self.base_url
         try:
             model_list = [
@@ -801,11 +823,25 @@ class OpenAIAuthenticationPortObjectSpec(AIPortObjectSpec):
         return {
             "credentials": self._credentials,
             "base_url": self._base_url,
+            "credential_spec": None
+            if self._credential_spec is None
+            else self._credential_spec.serialize(),
         }
 
     @classmethod
     def deserialize(cls, data: dict):
-        return cls(data["credentials"], data.get("base_url", _default_openai_api_base))
+        serialized_credential_spec = data.get("credential_spec")
+        # TODO is java_callback needed?
+        credential_spec = (
+            None
+            if serialized_credential_spec is None
+            else knext.CredentialPortObjectSpec.deserialize(serialized_credential_spec)
+        )
+        return cls(
+            data["credentials"],
+            data.get("base_url", _default_openai_api_base),
+            credential_spec,
+        )
 
 
 class OpenAIAuthenticationPortObject(knext.PortObject):
@@ -832,12 +868,16 @@ openai_authentication_port_type = knext.port_type(
 
 
 class OpenAIModelPortObjectSpec(AIPortObjectSpec):
-    def __init__(self, credentials=OpenAIAuthenticationPortObjectSpec) -> None:
+    def __init__(self, credentials: OpenAIAuthenticationPortObjectSpec) -> None:
         self._credentials = credentials
 
     @property
     def credentials(self) -> str:
         return self._credentials.credentials
+    
+    @property
+    def auth_spec(self) -> OpenAIAuthenticationPortObjectSpec:
+        return self._credentials
 
     @property
     def base_url(self) -> str:
@@ -927,11 +967,11 @@ class OpenAILLMPortObjectSpec(OpenAIModelPortObjectSpec, LLMPortObjectSpec):
         )
 
 
-def _create_instruct_model(po_instance, ctx: knext.ExecutionContext):
+def _create_instruct_model(po_instance: "OpenAILLMPortObject", ctx: knext.ExecutionContext):
     from langchain_openai import OpenAI
 
     return OpenAI(
-        openai_api_key=ctx.get_credentials(po_instance.spec.credentials).password,
+        openai_api_key=po_instance.spec.auth_spec.get_api_key(ctx),
         base_url=po_instance.spec.base_url,
         model=po_instance.spec.model,
         temperature=po_instance.spec.temperature,
@@ -942,7 +982,7 @@ def _create_instruct_model(po_instance, ctx: knext.ExecutionContext):
 
 
 def _create_model(
-    po_instance, ctx: knext.ExecutionContext, output_format: OutputFormatOptions
+    po_instance: "OpenAIChatModelPortObject", ctx: knext.ExecutionContext, output_format: OutputFormatOptions
 ):
     from langchain_openai import ChatOpenAI
 
@@ -953,7 +993,7 @@ def _create_model(
     is_o_series = bool(re.match(r"^o\d", po_instance.spec.model))
 
     return ChatOpenAI(
-        openai_api_key=ctx.get_credentials(po_instance.spec.credentials).password,
+        openai_api_key=po_instance.spec.auth_spec.get_api_key(ctx),
         base_url=po_instance.spec.base_url,
         model=po_instance.spec.model,
         temperature=1.0 if is_o_series else po_instance.spec.temperature,
@@ -1057,7 +1097,7 @@ class OpenAIEmbeddingsPortObject(EmbeddingsPortObject):
         from langchain_openai import OpenAIEmbeddings
 
         return OpenAIEmbeddings(
-            openai_api_key=ctx.get_credentials(self.spec.credentials).password,
+            openai_api_key=self.spec.auth_spec.get_api_key(ctx),
             base_url=self.spec.base_url,
             model=self.spec.model,
             dimensions=self.spec.dimensions,
@@ -1070,17 +1110,28 @@ openai_embeddings_port_type = knext.port_type(
     OpenAIEmbeddingsPortObjectSpec,
 )
 
+credentials_port_type = kn.get_port_type_for_id("TODO")
+
 
 # == Nodes ==
 
 
 # region Authenticator
+def _has_auth_port(ctx: knext.DialogCreationContext) -> bool:
+    specs = ctx.get_input_specs()
+    return len(specs) == 1 and specs[0] is not None
 @knext.node(
     "OpenAI Authenticator",
     knext.NodeType.SOURCE,
     openai_icon,
     category=openai_category,
     keywords=["GenAI", "Gen AI", "Generative AI", "OpenAI"],
+)
+@knext.input_port(
+    "Credentials",
+    "Credentials for connecting to the OpenAI API.",
+    port_type=credentials_port_type,
+    optional=True,
 )
 @knext.output_port(
     "OpenAI Authentication",
@@ -1108,8 +1159,9 @@ class OpenAIAuthenticator:
         label="OpenAI API key",
         description="""
         The credentials containing the OpenAI API key in its *password* field (the *username* is ignored).
+        Only shown if no credential is connected.
         """,
-    )
+    ).rule(knext.DialogContextCondition(_has_auth_port), knext.Effect.HIDE)
 
     base_url = knext.StringParameter(
         "OpenAI base URL",
@@ -1128,25 +1180,32 @@ class OpenAIAuthenticator:
     )
 
     def configure(
-        self, ctx: knext.ConfigurationContext
+        self,
+        ctx: knext.ConfigurationContext,
+        credential: Optional[knext.CredentialPortObjectSpec],
     ) -> OpenAIAuthenticationPortObjectSpec:
         if not ctx.get_credential_names():
             raise knext.InvalidParametersError("Credentials not provided.")
 
-        if not self.credentials_settings.credentials_param:
+        if credential is None and not self.credentials_settings.credentials_param:
             raise knext.InvalidParametersError("Credentials not selected.")
 
-        spec = self.create_spec()
+        spec = self.create_spec(credential)
         spec.validate_context(ctx)
         return spec
 
-    def execute(self, ctx: knext.ExecutionContext) -> OpenAIAuthenticationPortObject:
+    def execute(
+        self, ctx: knext.ExecutionContext, credential: Optional[knext.PortObject]
+    ) -> OpenAIAuthenticationPortObject:
+        spec = self.create_spec(None if credential is None else credential.spec)
         if self.verify_settings:
-            self._verify_settings(ctx)
+            self._verify_settings(ctx, spec)
 
-        return OpenAIAuthenticationPortObject(self.create_spec())
+        return OpenAIAuthenticationPortObject(self.create_spec(credential.spec))
 
-    def _verify_settings(self, ctx):
+    def _verify_settings(
+        self, ctx: knext.ExecutionContext, spec: OpenAIAuthenticationPortObjectSpec
+    ):
         from openai import (
             NotFoundError,
             AuthenticationError,
@@ -1155,11 +1214,11 @@ class OpenAIAuthenticator:
 
         from openai import Client as OpenAIClient
 
+        api_key = spec.get_api_key(ctx)
+
         try:
             OpenAIClient(
-                api_key=ctx.get_credentials(
-                    self.credentials_settings.credentials_param
-                ).password,
+                api_key=api_key,
                 base_url=self.base_url,
             ).models.list()
         except AuthenticationError:
@@ -1177,9 +1236,24 @@ class OpenAIAuthenticator:
                 If your base URL does not support this endpoint, consider disabling the 'Verify settings' option."""
             )
 
-    def create_spec(self) -> OpenAIAuthenticationPortObjectSpec:
+    def _get_credentials(
+        self,
+        ctx: knext.ExecutionContext,
+        credential: Optional[knext.CredentialPortObjectSpec],
+    ):
+        if credential is None:
+            return ctx.get_credentials(
+                self.credentials_settings.credentials_param
+            ).password
+        return credential.auth_parameters
+
+    def create_spec(
+        self, credential: Optional[knext.CredentialPortObjectSpec]
+    ) -> OpenAIAuthenticationPortObjectSpec:
         return OpenAIAuthenticationPortObjectSpec(
-            self.credentials_settings.credentials_param, base_url=self.base_url
+            self.credentials_settings.credentials_param,
+            base_url=self.base_url,
+            credential_spec=credential,
         )
 
 
@@ -1584,7 +1658,7 @@ class OpenAIDALLEView:
         has_image_table = image_table is not None
 
         client = OpenAIClient(
-            api_key=ctx.get_credentials(authentication.spec.credentials).password,
+            api_key=authentication.spec.get_api_key(ctx),
             base_url=authentication.spec.base_url,
         )
 
@@ -1909,7 +1983,7 @@ class OpenAIFineTuner:
         from openai import BadRequestError
 
         client = OpenAIClient(
-            api_key=ctx.get_credentials(model.spec.credentials).password,
+            api_key=model.spec.auth_spec.get_api_key(ctx),
             base_url=model.spec.base_url,
         )
 

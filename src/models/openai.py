@@ -753,16 +753,22 @@ class OpenAIAuthenticationPortObjectSpec(AIPortObjectSpec):
         self,
         credentials: str,
         base_url: str,
-        credential_spec: Optional[knext.CredentialPortObjectSpec],
+        credential_spec: Optional[knext.CredentialPortObjectSpec] = None,
+        custom_headers: dict[str, str] = None,
     ) -> None:
         super().__init__()
         self._credentials = credentials
         self._base_url = base_url
         self._credential_spec = credential_spec
+        self._custom_headers = {} if custom_headers is None else custom_headers
 
     @property
     def credentials(self) -> str:
         return self._credentials
+
+    @property
+    def custom_headers(self) -> str:
+        return self._custom_headers
 
     @property
     def base_url(self) -> str:
@@ -793,21 +799,25 @@ class OpenAIAuthenticationPortObjectSpec(AIPortObjectSpec):
                 f"""The OpenAI API key '{self.credentials}' does not exist. Make sure that the node you are using to pass the credentials 
                 (e.g. the Credentials Configuration node) is still passing the valid API key as a flow variable to the downstream nodes."""
             )
-    
+
     def get_api_key(self, ctx: knext.ConfigurationContext) -> str:
         if self._credential_spec is not None:
             return self._credential_spec.auth_parameters
         return ctx.get_credentials(self.credentials).password
+    
+    def get_openai_client(self, ctx: knext.ConfigurationContext):
+        from openai import Client as OpenAIClient
+        key = self.get_api_key(ctx)
+        return OpenAIClient(
+                    api_key=key, base_url=self.base_url, default_headers=self.custom_headers
+                )
 
     def get_model_list(self, ctx: knext.ConfigurationContext) -> list[str]:
-        from openai import Client as OpenAIClient
-
-        key = self.get_api_key(ctx)
-        base_url = self.base_url
+        client = self.get_openai_client(ctx)
         try:
             model_list = [
                 model.id
-                for model in OpenAIClient(api_key=key, base_url=base_url)
+                for model in client
                 .models.list()
                 .data
                 if model.id is not None
@@ -826,6 +836,7 @@ class OpenAIAuthenticationPortObjectSpec(AIPortObjectSpec):
             "credential_spec": None
             if self._credential_spec is None
             else self._credential_spec.serialize(),
+            "custom_headers": self.custom_headers,
         }
 
     @classmethod
@@ -841,6 +852,7 @@ class OpenAIAuthenticationPortObjectSpec(AIPortObjectSpec):
             data["credentials"],
             data.get("base_url", _default_openai_api_base),
             credential_spec,
+            data.get("custom_headers", {}),
         )
 
 
@@ -874,7 +886,7 @@ class OpenAIModelPortObjectSpec(AIPortObjectSpec):
     @property
     def credentials(self) -> str:
         return self._credentials.credentials
-    
+
     @property
     def auth_spec(self) -> OpenAIAuthenticationPortObjectSpec:
         return self._credentials
@@ -978,6 +990,7 @@ def _create_instruct_model(po_instance: "OpenAILLMPortObject", ctx: knext.Execut
         top_p=po_instance.spec.top_p,
         max_tokens=po_instance.spec.max_tokens,
         seed=po_instance.spec.seed,
+        default_headers=po_instance.spec.auth_spec.custom_headers
     )
 
 
@@ -1000,6 +1013,7 @@ def _create_model(
         max_tokens=po_instance.spec.max_tokens,
         seed=po_instance.spec.seed,
         model_kwargs=model_kwargs,
+        default_headers=po_instance.spec.auth_spec.custom_headers
     )
 
 
@@ -1101,6 +1115,7 @@ class OpenAIEmbeddingsPortObject(EmbeddingsPortObject):
             base_url=self.spec.base_url,
             model=self.spec.model,
             dimensions=self.spec.dimensions,
+            default_headers=self.spec.auth_spec.custom_headers
         )
 
 
@@ -1115,11 +1130,20 @@ credentials_port_type = kn.get_port_type_for_id("TODO")
 
 # == Nodes ==
 
-
 # region Authenticator
+
+
+@knext.parameter_group("Custom header")
+class CustomHeader:
+    key = knext.StringParameter("Key", "Key of the header.")
+    value = knext.StringParameter("Value", "Value of the header.")
+
+
 def _has_auth_port(ctx: knext.DialogCreationContext) -> bool:
     specs = ctx.get_input_specs()
     return len(specs) == 1 and specs[0] is not None
+
+
 @knext.node(
     "OpenAI Authenticator",
     knext.NodeType.SOURCE,
@@ -1171,6 +1195,15 @@ class OpenAIAuthenticator:
         is_advanced=True,
     )
 
+    # TODO prevent overwriting common headers like authentication and accept
+    custom_headers = knext.ParameterArray(
+        parameters=CustomHeader(),
+        label="Custom headers",
+        description="Any custom headers to include in requests to the API.",
+        since_version="5.6.0",
+        is_advanced=True,
+    )
+
     verify_settings = knext.BoolParameter(
         "Verify settings",
         "Whether to verify the settings by calling the list models endpoint.",
@@ -1212,15 +1245,8 @@ class OpenAIAuthenticator:
             APIConnectionError,
         )
 
-        from openai import Client as OpenAIClient
-
-        api_key = spec.get_api_key(ctx)
-
         try:
-            OpenAIClient(
-                api_key=api_key,
-                base_url=self.base_url,
-            ).models.list()
+            spec.get_openai_client(ctx).models.list()
         except AuthenticationError:
             raise knext.InvalidParametersError("Invalid API key provided.")
         except APIConnectionError:
@@ -1254,6 +1280,7 @@ class OpenAIAuthenticator:
             self.credentials_settings.credentials_param,
             base_url=self.base_url,
             credential_spec=credential,
+            custom_headers={header.key: header.value for header in self.custom_headers}
         )
 
 
@@ -1653,15 +1680,9 @@ class OpenAIDALLEView:
         authentication: OpenAIAuthenticationPortObject,
         image_table: Optional[knext.Table],
     ):
-        from openai import Client as OpenAIClient
-
         has_image_table = image_table is not None
-
-        client = OpenAIClient(
-            api_key=authentication.spec.get_api_key(ctx),
-            base_url=authentication.spec.base_url,
-        )
-
+        client = authentication.spec.get_openai_client(ctx)
+        
         if self.model == ImageModels.DALL_E_3.name:
             img_bytes = self._create_with_dalle_3(client)
         elif self.model == ImageModels.GPT_IMAGE_1.name:
@@ -1836,13 +1857,8 @@ class OpenAIFineTuneDeleter:
     flow variable was not saved and will therefore not be available to downstream nodes.
     """
 
-    def configure(self, ctx: knext.ConfigurationContext, llm_spec: LLMPortObjectSpec):
-        from openai import Client as OpenAIClient
-
-        client = OpenAIClient(
-            api_key=ctx.get_credentials(llm_spec.credentials).password,
-            base_url=llm_spec.base_url,
-        )
+    def configure(self, ctx: knext.ConfigurationContext, llm_spec: OpenAILLMPortObjectSpec):
+        client = llm_spec.auth_spec.get_openai_client(ctx)
 
         response = client.models.retrieve(llm_spec.model)
 
@@ -1853,14 +1869,10 @@ class OpenAIFineTuneDeleter:
                 f"This model is owned by OpenAI ('{response.owned_by}') and cannot be deleted."
             )
 
-    def execute(self, ctx: knext.ExecutionContext, model: LLMPortObject):
-        from openai import Client as OpenAIClient
+    def execute(self, ctx: knext.ExecutionContext, model: OpenAILLMPortObject):
         from openai import NotFoundError
 
-        client = OpenAIClient(
-            api_key=ctx.get_credentials(model.spec.credentials).password,
-            base_url=model.spec.base_url,
-        )
+        client = model.spec.auth_spec.get_openai_client()
 
         try:
             response = client.models.delete(model.spec.model)
@@ -1977,15 +1989,11 @@ class OpenAIFineTuner:
         model: OpenAIChatModelPortObject,
         table: knext.Table,
     ):
-        from openai import Client as OpenAIClient
         from openai.types import FileObject
         from openai.types.fine_tuning.fine_tuning_job import FineTuningJob
         from openai import BadRequestError
 
-        client = OpenAIClient(
-            api_key=model.spec.auth_spec.get_api_key(ctx),
-            base_url=model.spec.base_url,
-        )
+        client = model.spec.auth_spec.get_openai_client(ctx)
 
         hyperparameters = self._build_hyper_params()
 

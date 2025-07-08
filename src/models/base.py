@@ -607,7 +607,7 @@ def _isinstance_of_port_object(
     return isinstance(ctx.get_input_specs()[port], spec_class)
 
 
-# region LLM Prompter (Table)
+# region LLM Prompter
 @knext.node(
     "LLM Prompter",
     knext.NodeType.PREDICTOR,
@@ -963,7 +963,7 @@ class LLMPrompter:
             )
 
 
-# region LLM Prompter (Conversation)
+# region Chat Model Prompter (deprecated)
 @knext.node(
     "Chat Model Prompter",
     knext.NodeType.PREDICTOR,
@@ -1368,11 +1368,11 @@ def _contains_json_keyword(messages: list) -> bool:
 
     Messages can be one of:
 
-        For LLM Prompter (Table) (checked in execute):
+        For LLM Prompter (checked in execute):
             - prompts ([list of strings])
             - system_message + prompt ([SystemMessage, HumanMessage])
 
-        For LLM Prompter (Conversation) (checked in configure):
+        For LLM Chat Prompter (checked in configure):
             - system_message and/or chat_message (str)
 
     """
@@ -1381,8 +1381,19 @@ def _contains_json_keyword(messages: list) -> bool:
             if "json" not in message.lower():
                 return False
         elif isinstance(message, list):
-            combined_message = " ".join(part.content for part in message)
-            if "json" not in combined_message.lower():
+            combined_text = ""
+            for item in message:
+                if isinstance(item.content, str):
+                    combined_text += f" {item.content}"
+                elif isinstance(item.content, list):
+                    # multi-part Message content
+                    combined_text += " ".join(
+                        content_part["text"]
+                        for content_part in item.content
+                        if content_part["type"] == "text"
+                    )
+
+            if "json" not in combined_text.lower():
                 return False
     return True
 

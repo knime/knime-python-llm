@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted } from "vue";
+import { computed } from "vue";
 import { useTextareaAutosize } from "@vueuse/core";
 
 import { FunctionButton } from "@knime/components";
 import SendIcon from "@knime/styles/img/icons/paper-flier.svg";
 
-const characterLimit = 300;
+const characterLimit = 5000;
 
 const props = defineProps<{ isLoading: boolean }>();
 const emit = defineEmits<{ sendMessage: [message: string] }>();
@@ -14,10 +14,6 @@ const { textarea, input } = useTextareaAutosize();
 
 const isInputValid = computed(() => input.value?.trim().length > 0);
 const isDisabled = computed(() => !isInputValid.value || props.isLoading);
-
-onMounted(() => {
-  textarea.value?.focus();
-});
 
 const handleClick = (event: MouseEvent) => {
   if (event.target === event.currentTarget) {

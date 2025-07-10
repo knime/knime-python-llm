@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import { defineProps, useSlots } from "vue";
 
-withDefaults(defineProps<{ isUser?: boolean; isError?: boolean }>(), {
-  isUser: false,
-  isError: false,
-});
+withDefaults(
+  defineProps<{ isUser?: boolean; isError?: boolean; isNodeView?: boolean }>(),
+  {
+    isUser: false,
+    isError: false,
+    isNodeView: false,
+  },
+);
 
 const slots = useSlots();
 const hasNameSlot = slots.name;
@@ -14,7 +18,12 @@ const hasIconSlot = slots.icon;
 <template>
   <div
     class="wrapper"
-    :class="{ user: isUser, error: isError, 'with-name': hasNameSlot }"
+    :class="{
+      user: isUser,
+      error: isError,
+      'node-view': isNodeView,
+      'with-name': hasNameSlot,
+    }"
   >
     <div class="message-box">
       <div v-if="hasIconSlot || hasNameSlot" class="header">
@@ -48,6 +57,11 @@ const hasIconSlot = slots.icon;
   position: relative;
   font-size: 13px;
   font-weight: 400;
+
+  .node-view & {
+    min-width: 80%;
+    aspect-ratio: 2 / 1;
+  }
 }
 
 .header {
@@ -93,12 +107,17 @@ const hasIconSlot = slots.icon;
   height: 100%;
 
   .user & {
-    border-radius: var(--space-4) var(--space-4) 0 var(--space-4);
+    border-radius: var(--space-4) 0 var(--space-4) var(--space-4);
   }
 
   .error & {
     background-color: var(--knime-coral-light);
     border-color: var(--knime-coral-light);
+  }
+
+  .node-view & {
+    padding-bottom: 0;
+    padding-top: 0;
   }
 }
 </style>

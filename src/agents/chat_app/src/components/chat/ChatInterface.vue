@@ -42,8 +42,11 @@ useScrollToBottom(scrollableContainer, messagesList);
   flex-direction: column;
   flex-grow: 1;
   position: relative;
-  overflow: hidden;
-  padding: var(--space-8) var(--space-4);
+  overflow-y: hidden;
+  padding: 0 0 var(--space-8) 0;
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
 }
 
 .scrollable-container {
@@ -56,6 +59,6 @@ useScrollToBottom(scrollableContainer, messagesList);
   display: flex;
   flex-direction: column;
   gap: var(--space-24);
-  padding: var(--space-24) var(--space-16);
+  padding: var(--space-24) 0;
 }
 </style>

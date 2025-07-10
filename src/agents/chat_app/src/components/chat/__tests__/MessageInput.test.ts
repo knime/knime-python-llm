@@ -4,14 +4,14 @@ import { mount } from "@vue/test-utils";
 import MessageInput from "../MessageInput.vue";
 
 describe("MessageInput", () => {
-  it("focuses textarea on mount", () => {
+  it("doesn't focus textarea on mount", () => {
     const wrapper = mount(MessageInput, {
       props: { isLoading: false },
       attachTo: document.body,
     });
     const textarea = wrapper.find("textarea");
 
-    expect(textarea.element).toBe(document.activeElement);
+    expect(textarea.element).not.toBe(document.activeElement);
   });
 
   it("focuses textarea when clicking on the container but not on textarea", async () => {

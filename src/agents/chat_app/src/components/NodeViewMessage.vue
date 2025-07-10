@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watchEffect } from "vue";
 
+import ChartDotsIcon from "@knime/styles/img/icons/chart-dots.svg";
 import {
   type ExtensionConfig,
   UIExtension,
@@ -157,7 +158,11 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <MessageBox class="message">
+  <MessageBox class="message" is-node-view>
+    <template #icon>
+      <ChartDotsIcon />
+    </template>
+    <template #name> Node View </template>
     <UIExtension
       v-if="dataAvailable"
       :api-layer="apiLayer"
@@ -168,12 +173,3 @@ onUnmounted(() => {
     <div v-if="renderError">{{ renderError }}</div>
   </MessageBox>
 </template>
-
-<style lang="postcss" scoped>
-.message {
-  & :deep(.message-box) {
-    min-width: 100%;
-    aspect-ratio: 1 / 0.5;
-  }
-}
-</style>

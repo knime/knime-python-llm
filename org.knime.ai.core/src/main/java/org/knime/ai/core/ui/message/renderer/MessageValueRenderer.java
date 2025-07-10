@@ -318,7 +318,9 @@ public final class MessageValueRenderer extends DefaultDataValueRenderer
                 String uri = ImageUtil.createThumbnailForPng(imgPart.getData());
                 return img().withSrc(uri).attr("alt", "[image]").withClass("content-image");
             } catch (IOException e) {
-                return i("Unable to render image.").withClass("content-unsupported");
+                return i("Unable to render image.")//
+                        .withClass("content-unsupported")//
+                        .withTitle("Error: " + e.getMessage());
             }
         }
 

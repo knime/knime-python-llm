@@ -335,7 +335,8 @@ def _system_message_parameter():
         "System message",
         "Instructions provided by the workflow builder that guide the agent's behavior. "
         "It typically defines the agent’s role, its tone, boundaries, and behavioral rules."
-        "This message is prioritized over the user message and should not contain any information """ \
+        "This message is prioritized over the user message and should not contain any information "
+        ""
         "that the user can inject in order to prevent prompt injection attacks.",
         default_value="""## PERSISTENCE
 You are an agent - please keep going until the user's query is completely 
@@ -399,6 +400,8 @@ def _conversation_column_parameter() -> knext.ColumnParameter:
 def _has_tools_table(ctx: knext.DialogCreationContext):
     # Port index 1 is the tools table
     return ctx.get_input_specs()[1] is not None
+
+
 def _data_message_prefix_parameter():
     return knext.MultilineStringParameter(
         "Data message prefix",
@@ -427,7 +430,8 @@ Once invoked, the tool will receive the data associated with that ID.
 
 You must incorporate these updates into your working view of the data repository.
 ## Data repository:
-""", is_advanced=True
+""",
+        is_advanced=True,
     )
 
 
@@ -451,7 +455,10 @@ You must incorporate these updates into your working view of the data repository
     "Data inputs",
     "The data inputs for the agent.",
 )
-@knext.output_table("Conversation", "The conversation between the LLM and the tools reflecting the agent execution.")
+@knext.output_table(
+    "Conversation",
+    "The conversation between the LLM and the tools reflecting the agent execution.",
+)
 @knext.output_table_group(
     "Data outputs",
     "The data outputs of the agent.",
@@ -559,11 +566,13 @@ class AgentPrompter2:
         from langgraph.prebuilt import create_react_agent
         from knime.types.message import to_langchain_message, from_langchain_message
 
-        data_registry = DataRegistry.create_with_input_tables(input_tables, data_message_prefix=self.data_message_prefix)
+        data_registry = DataRegistry.create_with_input_tables(
+            input_tables, data_message_prefix=self.data_message_prefix
+        )
         tool_converter = LangchainToolConverter(
             data_registry,
             ctx,
-            ExecutionMode.DEBUG if self.debug else ExecutionMode.DEFAULT
+            ExecutionMode.DEBUG if self.debug else ExecutionMode.DEFAULT,
         )
 
         chat_model: BaseChatModel = chat_model.create_model(
@@ -587,10 +596,12 @@ class AgentPrompter2:
                 for msg in history_df[self.conversation_column]
             ]
 
-
         if data_registry.has_data or tool_converter.has_data_tools:
             messages.append(data_registry.create_data_message())
-        messages.append({"role": "user", "content": self.user_message})
+
+        if self.user_message:
+            messages.append({"role": "user", "content": self.user_message})
+
         num_data_outputs = ctx.get_connected_output_port_numbers()[1]
 
         graph = create_react_agent(
@@ -649,7 +660,7 @@ def _extract_tools_from_table(tools_table: knext.Table, tool_column: str):
 
     tools = tools_table[tool_column].to_pyarrow().column(tool_column)
     filtered_tools = pc.filter(tools, pc.is_valid(tools))
-    return filtered_tools.to_pylist() 
+    return filtered_tools.to_pylist()
 
 
 # region Agent Chat View
@@ -689,10 +700,13 @@ class AgentChatView:
 
     developer_message = _system_message_parameter()
 
-    tool_column = _tool_column_parameter().rule(knext.DialogContextCondition(_has_tools_table), knext.Effect.SHOW)
+    tool_column = _tool_column_parameter().rule(
+        knext.DialogContextCondition(_has_tools_table), knext.Effect.SHOW
+    )
 
     initial_message = knext.MultilineStringParameter(
-        "Initial AI message", "An optional 'AI' initial message to be shown to the user."
+        "Initial AI message",
+        "An optional 'AI' initial message to be shown to the user.",
     )
 
     show_tool_calls_and_results = knext.BoolParameter(
@@ -759,7 +773,9 @@ class AgentChatView:
         chat_model = chat_model.create_model(
             ctx, output_format=OutputFormatOptions.Text
         )
-        data_registry = DataRegistry.create_with_input_tables(input_tables, data_message_prefix=self.data_message_prefix)
+        data_registry = DataRegistry.create_with_input_tables(
+            input_tables, data_message_prefix=self.data_message_prefix
+        )
         tool_converter = LangchainToolConverter(
             data_registry,
             ctx,

@@ -14,7 +14,7 @@ class MessageType(Enum):
 class MessageContentPartType(Enum):
     TEXT = "text"
     PNG = "png"
-    
+
 
 @dataclass
 class MessageContentPart:
@@ -61,14 +61,11 @@ class MessageValueFactory(kt.PythonValueFactory):
     def decode(self, storage):
         if storage is None:
             return None
-        
+
         # storage: dict with keys "0", "1", "2", "3", "4"
         message_type = MessageType(storage["0"])
         content = [
-            MessageContentPart(
-            type=MessageContentPartType(part["0"]), 
-            data=part["1"]
-            ) 
+            MessageContentPart(type=MessageContentPartType(part["0"]), data=part["1"])
             for part in storage["1"]
         ]
 
@@ -137,24 +134,38 @@ def to_langchain_message(msg: "MessageValue"):
 
     # Convert content parts to string or dict as appropriate
     def _convert_content(content_parts):
+        def _decode_safely(text_bytes):
+            from charset_normalizer import from_bytes
+
+            best_match = from_bytes(text_bytes).best()
+            if best_match:
+                return str(best_match)
+
+            return text_bytes.decode("latin-1", errors="replace")
+
         # If all parts are type "text", join as string, else use list of dicts
         if not content_parts:
             return ""
+
         if all(part.type == "text" for part in content_parts):
             return "".join(
-                part.data.decode("utf-8")
+                _decode_safely(part.data)
                 if isinstance(part.data, bytes)
                 else str(part.data)
                 for part in content_parts
             )
+
         # Otherwise, return as list of dicts
         result = []
         for part in content_parts:
             if part.type == MessageContentPartType.TEXT:
                 result.append(
-                    {"type": "text", "text": part.data.decode("utf-8")
-                     if isinstance(part.data, bytes)
-                     else str(part.data)}
+                    {
+                        "type": "text",
+                        "text": _decode_safely(part.data)
+                        if isinstance(part.data, bytes)
+                        else str(part.data),
+                    }
                 )
             elif part.type == MessageContentPartType.PNG:
                 if isinstance(part.data, bytes):
@@ -162,7 +173,9 @@ def to_langchain_message(msg: "MessageValue"):
 
                     base64_image = base64.b64encode(part.data).decode("utf-8")
                     image_url = f"data:image/png;base64,{base64_image}"
-                    result.append({"type": "image_url", "image_url": {"url": image_url}})
+                    result.append(
+                        {"type": "image_url", "image_url": {"url": image_url}}
+                    )
             else:
                 result.append({"type": part.type.value, "data": part.data})
         return result
@@ -183,9 +196,13 @@ def to_langchain_message(msg: "MessageValue"):
                         "type": "tool_call",
                     }
                 )
-        return AIMessage(content=content, tool_calls=tool_calls, id=msg.tool_call_id, name=msg.name)
+        return AIMessage(
+            content=content, tool_calls=tool_calls, id=msg.tool_call_id, name=msg.name
+        )
     elif msg.message_type == MessageType.TOOL:
-        return ToolMessage(content=content, tool_call_id=msg.tool_call_id, name=msg.name)
+        return ToolMessage(
+            content=content, tool_call_id=msg.tool_call_id, name=msg.name
+        )
     else:
         raise ValueError(f"Unknown MessageType: {msg.message_type}")
 
@@ -202,12 +219,18 @@ def from_langchain_message(lc_msg) -> MessageValue:
     def _to_content_parts(content):
         parts = []
         if isinstance(content, str):
-            parts.append(MessageContentPart(type=MessageContentPartType.TEXT, data=content.encode("utf-8")))
+            parts.append(
+                MessageContentPart(
+                    type=MessageContentPartType.TEXT, data=content.encode("utf-8")
+                )
+            )
         elif isinstance(content, list):
             for part in content:
                 if isinstance(part, str):
                     parts.append(
-                        MessageContentPart(type=MessageContentPartType.TEXT, data=part.encode("utf-8"))
+                        MessageContentPart(
+                            type=MessageContentPartType.TEXT, data=part.encode("utf-8")
+                        )
                     )
                 elif isinstance(part, dict):
                     if part.get("type") == "image_url":
@@ -215,16 +238,25 @@ def from_langchain_message(lc_msg) -> MessageValue:
                         url = part.get("image_url", {}).get("url", b"")
                         if isinstance(url, str):
                             url = url.encode("utf-8")
-                        parts.append(MessageContentPart(type=MessageContentPartType.PNG, data=url))
+                        parts.append(
+                            MessageContentPart(
+                                type=MessageContentPartType.PNG, data=url
+                            )
+                        )
                     elif part.get("type") == "text":
                         text = part.get("text", "")
                         parts.append(
-                            MessageContentPart(type=MessageContentPartType.TEXT, data=text.encode("utf-8"))
+                            MessageContentPart(
+                                type=MessageContentPartType.TEXT,
+                                data=text.encode("utf-8"),
+                            )
                         )
                     else:
-                        raise ValueError(f"Unsupported message part type: {part.get('type')}")
+                        raise ValueError(
+                            f"Unsupported message part type: {part.get('type')}"
+                        )
         return parts
-    
+
     name = getattr(lc_msg, "name", None)
 
     if isinstance(lc_msg, HumanMessage):

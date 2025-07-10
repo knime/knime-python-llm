@@ -72,6 +72,10 @@ public class ImageUtil {
         var in = new ByteArrayInputStream(pngBytes);
         BufferedImage src = ImageIO.read(in);
 
+        if (src == null) {
+            throw new IOException("Image may be corrupt or not a valid PNG.");
+        }
+
         // original dimensions
         var w = src.getWidth();
         var h = src.getHeight();

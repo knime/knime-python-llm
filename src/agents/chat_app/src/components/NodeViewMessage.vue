@@ -129,8 +129,11 @@ watchEffect(() => {
           // @ts-expect-error please provide a comment
           extensionConfig.value?.resourceInfo?.baseUrl +
           extensionConfig.value?.resourceInfo?.path;
+        dataAvailable.value = true;
+      } else {
+        renderError.value = "View can't be rendered";
+        dataAvailable.value = false;
       }
-      dataAvailable.value = true;
     })
     .catch((error) => {
       consola.error("Error while fetching data", error);

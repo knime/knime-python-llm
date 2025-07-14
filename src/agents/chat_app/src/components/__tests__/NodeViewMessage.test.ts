@@ -8,7 +8,7 @@ import MessageBox from "../chat/MessageBox.vue";
 const mockCallKnimeUiApi = vi.fn(() =>
   Promise.resolve({
     isSome: true,
-    result: { resourceInfo: { baseUrl: "/base/", path: "resource" } },
+    result: { resourceInfo: { path: "resource" } },
   }),
 );
 
@@ -21,6 +21,15 @@ vi.mock("@knime/ui-extension-service", () => ({
   JsonDataService: {
     getInstance: vi.fn(() =>
       Promise.resolve({ baseService: { callKnimeUiApi: mockCallKnimeUiApi } }),
+    ),
+  },
+  ResourceService: {
+    getInstance: vi.fn(() =>
+      Promise.resolve({
+        getResourceUrl: vi.fn((path) => {
+          return Promise.resolve(`/base/${path}`);
+        }),
+      }),
     ),
   },
 }));
@@ -37,7 +46,7 @@ describe("NodeViewMessage", () => {
     mockCallKnimeUiApi.mockImplementation(() =>
       Promise.resolve({
         isSome: true,
-        result: { resourceInfo: { baseUrl: "/base/", path: "resource" } },
+        result: { resourceInfo: { path: "resource" } },
       }),
     );
 

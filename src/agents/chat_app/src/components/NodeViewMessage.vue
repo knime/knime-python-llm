@@ -55,8 +55,6 @@ const apiLayer: UIExtensionAPILayer = {
       return { result: null };
     }
     const { projectId, workflowId, nodeId } = parsedNodeID.value.result;
-    // TODO AP-24611: only works if the modern UI is the ui-extension embedder
-    // but NOT in case of the pagebuilder
     const response = await baseService.value?.callKnimeUiApi!(
       "NodeService.callNodeDataService",
       {
@@ -112,28 +110,28 @@ watchEffect(() => {
     return;
   }
   const { projectId, workflowId, nodeId } = parsedNodeID.value.result;
-  // TODO AP-24611: only works if the modern UI is the ui-extension embedder
-  // but NOT in case of the pagebuilder
   baseService.value.callKnimeUiApi!("NodeService.getNodeView", {
     projectId,
     workflowId,
     versionId: "current-state",
     nodeId,
   })
-    .then((response) => {
-      if (response.isSome) {
+    .then(async (response) => {
+      if (response.isSome && baseService.value) {
         extensionConfig.value = response.result;
-        resourceLocation.value =
-          // TODO AP-24611: baseUrl is not provided in case of browser editing
-          // and data-apps
-          // @ts-expect-error please provide a comment
-          extensionConfig.value?.resourceInfo?.baseUrl +
-          extensionConfig.value?.resourceInfo?.path;
-        dataAvailable.value = true;
-      } else {
-        renderError.value = "View can't be rendered";
-        dataAvailable.value = false;
+        const path = extensionConfig.value?.resourceInfo?.path;
+        if (path) {
+          // NOTE: we can use 'getResourceLocation' here because it's
+          // a node-view in node-view nesting
+          // (on desktop, different ui-extension types have different base-urls)
+          resourceLocation.value =
+            await baseService.value.getResourceLocation(path);
+          dataAvailable.value = true;
+          return;
+        }
       }
+      renderError.value = "View can't be rendered";
+      dataAvailable.value = false;
     })
     .catch((error) => {
       consola.error("Error while fetching data", error);
@@ -144,8 +142,6 @@ watchEffect(() => {
 onUnmounted(() => {
   if (parsedNodeID.value.result) {
     const { projectId, workflowId, nodeId } = parsedNodeID.value.result;
-    // TODO AP-24611: only works if the modern UI is the ui-extension embedder
-    // but NOT in case of the pagebuilder
     baseService.value?.callKnimeUiApi!(
       "NodeService.deactivateNodeDataServices",
       {

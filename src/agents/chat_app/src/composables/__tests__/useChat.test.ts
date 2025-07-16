@@ -37,7 +37,7 @@ describe("useChat", () => {
     };
     JsonDataService.getInstance = vi
       .fn()
-      .mockResolvedValue(jsonDataServiceMock);
+      .mockResolvedValueOnce(jsonDataServiceMock);
     const chat = await createChat();
 
     expect(chat.messages.value).toEqual([]);
@@ -51,7 +51,7 @@ describe("useChat", () => {
     };
     JsonDataService.getInstance = vi
       .fn()
-      .mockResolvedValue(jsonDataServiceMock);
+      .mockResolvedValueOnce(jsonDataServiceMock);
     const chat = await createChat();
 
     expect(chat.messages.value).toEqual([initialMessage]);
@@ -64,14 +64,14 @@ describe("useChat", () => {
     };
     JsonDataService.getInstance = vi
       .fn()
-      .mockResolvedValue(jsonDataServiceMock);
+      .mockResolvedValueOnce(jsonDataServiceMock);
     const chat = await createChat();
 
     expect(chat.messages.value).toEqual([]);
     expect(chat.isLoading.value).toBe(false);
   });
 
-  it("sends a message and update messages", async () => {
+  it("sends a message and update messages if JsonDataService is ready", async () => {
     const jsonDataServiceMock = {
       data: vi.fn().mockImplementation((request) => {
         return request.method === "get_last_messages" ? [aiMessage] : undefined;
@@ -79,11 +79,39 @@ describe("useChat", () => {
     };
     JsonDataService.getInstance = vi
       .fn()
-      .mockResolvedValue(jsonDataServiceMock);
+      .mockResolvedValueOnce(jsonDataServiceMock);
     const chat = await createChat();
 
-    await chat.sendMessage(userMessage.content);
+    chat.sendMessage(userMessage.content);
+    await flushPromises();
 
+    expect(chat.messages.value).toEqual([userMessage, aiMessage]);
+    expect(chat.isLoading.value).toBe(false);
+  });
+
+  it("uses the request queue if JsonDataService isn't ready yet", async () => {
+    const jsonDataServiceMock = {
+      data: vi.fn().mockImplementation((request) => {
+        return request.method === "get_last_messages" ? [aiMessage] : undefined;
+      }),
+    };
+    JsonDataService.getInstance = vi
+      .fn()
+      .mockResolvedValueOnce(jsonDataServiceMock);
+
+    // Reset chat, but don't flush promises, to mock JsonDataService
+    // initialization in progress
+    const [chat] = withSetup(() => useChat());
+    chat.resetChat();
+
+    // No messages visible right after sending
+    chat.sendMessage(userMessage.content);
+    expect(chat.messages.value).toEqual([]);
+    expect(chat.isLoading.value).toBe(true);
+
+    // After initializing JsonDataService, request queue is flushed,
+    // pending message has been sent, and AI message received
+    await flushPromises();
     expect(chat.messages.value).toEqual([userMessage, aiMessage]);
     expect(chat.isLoading.value).toBe(false);
   });
@@ -101,10 +129,11 @@ describe("useChat", () => {
     };
     JsonDataService.getInstance = vi
       .fn()
-      .mockResolvedValue(jsonDataServiceMock);
+      .mockResolvedValueOnce(jsonDataServiceMock);
     const chat = await createChat();
 
-    await chat.sendMessage(userMessage.content);
+    chat.sendMessage(userMessage.content);
+    await flushPromises();
 
     expect(chat.messages.value).toEqual([userMessage, aiMessage]);
     expect(chat.isLoading.value).toBe(false);
@@ -118,10 +147,10 @@ describe("useChat", () => {
     };
     JsonDataService.getInstance = vi
       .fn()
-      .mockResolvedValue(jsonDataServiceMock);
+      .mockResolvedValueOnce(jsonDataServiceMock);
     const chat = await createChat();
 
-    await chat.sendMessage("");
+    chat.sendMessage("");
 
     expect(chat.messages.value).toEqual([]);
     expect(chat.isLoading.value).toBe(false);
@@ -138,10 +167,11 @@ describe("useChat", () => {
     };
     JsonDataService.getInstance = vi
       .fn()
-      .mockResolvedValue(jsonDataServiceMock);
+      .mockResolvedValueOnce(jsonDataServiceMock);
     const chat = await createChat();
 
-    await chat.sendMessage(userMessage.content);
+    chat.sendMessage(userMessage.content);
+    await flushPromises();
 
     expect(chat.messages.value).toEqual([
       userMessage,
@@ -161,10 +191,11 @@ describe("useChat", () => {
     };
     JsonDataService.getInstance = vi
       .fn()
-      .mockResolvedValue(jsonDataServiceMock);
+      .mockResolvedValueOnce(jsonDataServiceMock);
     const chat = await createChat();
 
-    await chat.sendMessage(userMessage.content);
+    chat.sendMessage(userMessage.content);
+    await flushPromises();
 
     expect(chat.messages.value).toEqual([
       userMessage,

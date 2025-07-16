@@ -55,7 +55,7 @@ import javax.swing.Icon;
 
 import org.knime.core.data.DataValue;
 import org.knime.core.data.ExtensibleUtilityFactory;
-import org.knime.core.webui.node.dialog.defaultdialog.widget.Label;
+import org.knime.node.parameters.widget.choices.Label;
 
 /**
  * Represents a message to or from an AI model.

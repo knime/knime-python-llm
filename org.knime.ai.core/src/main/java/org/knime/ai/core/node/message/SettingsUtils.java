@@ -54,9 +54,9 @@ import java.util.function.BinaryOperator;
 import org.knime.core.data.StringValue;
 import org.knime.core.data.image.png.PNGImageValue;
 import org.knime.core.data.json.JSONValue;
-import org.knime.core.webui.node.dialog.defaultdialog.widget.choices.column.CompatibleColumnsProvider;
-import org.knime.core.webui.node.dialog.defaultdialog.widget.updates.Predicate;
-import org.knime.core.webui.node.dialog.defaultdialog.widget.updates.PredicateProvider;
+import org.knime.node.parameters.updates.Predicate;
+import org.knime.node.parameters.updates.PredicateProvider;
+import org.knime.node.parameters.widget.choices.util.CompatibleColumnsProvider;
 
 /**
  * Contains utility classes for settings.

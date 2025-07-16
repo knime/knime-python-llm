@@ -49,9 +49,9 @@
 package org.knime.ai.core.node.tool.output;
 
 import org.knime.core.webui.node.dialog.defaultdialog.DefaultNodeSettings;
-import org.knime.core.webui.node.dialog.defaultdialog.widget.TextInputWidget;
-import org.knime.core.webui.node.dialog.defaultdialog.widget.Widget;
 import org.knime.core.webui.node.dialog.defaultdialog.widget.validation.internal.WorkflowIOParameterNameValidation;
+import org.knime.node.parameters.Widget;
+import org.knime.node.parameters.widget.text.TextInputWidget;
 
 /**
  * @author Martin Horn, KNIME GmbH, Konstanz, Germany

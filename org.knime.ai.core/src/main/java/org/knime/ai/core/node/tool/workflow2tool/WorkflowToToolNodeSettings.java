@@ -52,7 +52,7 @@ import java.util.List;
 
 import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataTableSpec;
-import org.knime.core.webui.node.dialog.defaultdialog.DefaultNodeSettings;
+import org.knime.node.parameters.NodeParameters;
 import org.knime.filehandling.core.data.location.FSLocationValue;
 import org.knime.node.parameters.Widget;
 import org.knime.node.parameters.updates.Effect;
@@ -69,7 +69,7 @@ import org.knime.node.parameters.widget.choices.ValueSwitchWidget;
 /**
  * @author Martin Horn, KNIME GmbH, Konstanz, Germany
  */
-final class WorkflowToToolNodeSettings implements DefaultNodeSettings {
+final class WorkflowToToolNodeSettings implements NodeParameters {
 
     @Widget(title = "Workflow path column",
         description = "The column containing the paths to read the workflows from.")
@@ -111,7 +111,7 @@ final class WorkflowToToolNodeSettings implements DefaultNodeSettings {
     static class PathColumnChoice implements ColumnChoicesProvider {
 
         @Override
-        public List<DataColumnSpec> columnChoices(final DefaultNodeSettingsContext context) {
+        public List<DataColumnSpec> columnChoices(final NodeParametersInput context) {
             var portTypes = context.getInPortTypes();
             for (int i = 0; i < portTypes.length; i++) {
                 if (DataTableSpec.class.isAssignableFrom(portTypes[i].getPortObjectSpecClass())) {

@@ -53,7 +53,7 @@ import java.util.Optional;
 import org.knime.ai.core.data.message.MessageValue;
 import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataTableSpec;
-import org.knime.core.webui.node.dialog.defaultdialog.DefaultNodeSettings;
+import org.knime.node.parameters.NodeParameters;
 import org.knime.node.parameters.Widget;
 import org.knime.node.parameters.layout.After;
 import org.knime.node.parameters.layout.HorizontalLayout;
@@ -68,7 +68,7 @@ import org.knime.node.parameters.widget.choices.util.CompatibleColumnsProvider;
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
 @SuppressWarnings("restriction")
-final class MessagePartExtractorSettings implements DefaultNodeSettings {
+final class MessagePartExtractorSettings implements NodeParameters {
 
     @HorizontalLayout
     interface RoleSettings {
@@ -102,7 +102,7 @@ final class MessagePartExtractorSettings implements DefaultNodeSettings {
     MessagePartExtractorSettings() {
     }
 
-    MessagePartExtractorSettings(final DefaultNodeSettingsContext context) {
+    MessagePartExtractorSettings(final NodeParametersInput context) {
         m_messageColumn = context.getDataTableSpec(0)//
             .map(MessagePartExtractorSettings::autoGuessColumn)//
             .orElse(null);

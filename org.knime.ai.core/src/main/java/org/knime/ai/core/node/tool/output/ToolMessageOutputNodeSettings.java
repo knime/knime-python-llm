@@ -48,7 +48,7 @@
  */
 package org.knime.ai.core.node.tool.output;
 
-import org.knime.core.webui.node.dialog.defaultdialog.DefaultNodeSettings;
+import org.knime.node.parameters.NodeParameters;
 import org.knime.core.webui.node.dialog.defaultdialog.widget.validation.internal.WorkflowIOParameterNameValidation;
 import org.knime.node.parameters.Widget;
 import org.knime.node.parameters.widget.text.TextInputWidget;
@@ -56,7 +56,7 @@ import org.knime.node.parameters.widget.text.TextInputWidget;
 /**
  * @author Martin Horn, KNIME GmbH, Konstanz, Germany
  */
-final class ToolMessageOutputNodeSettings implements DefaultNodeSettings {
+final class ToolMessageOutputNodeSettings implements NodeParameters {
 
     static final String DEFAULT_PARAMETER_NAME = "tool-message-output";
 

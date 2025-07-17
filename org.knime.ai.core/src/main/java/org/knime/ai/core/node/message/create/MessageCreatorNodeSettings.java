@@ -53,7 +53,7 @@ import org.knime.ai.core.node.message.SettingsUtils.ColumnProviders.JsonColumns;
 import org.knime.ai.core.node.message.SettingsUtils.ColumnProviders.PngColumns;
 import org.knime.ai.core.node.message.SettingsUtils.ColumnProviders.StringColumns;
 import org.knime.ai.core.node.message.SettingsUtils.CompositePredicateProvider;
-import org.knime.core.webui.node.dialog.defaultdialog.DefaultNodeSettings;
+import org.knime.node.parameters.NodeParameters;
 import org.knime.core.webui.node.dialog.defaultdialog.setting.singleselection.NoneChoice;
 import org.knime.core.webui.node.dialog.defaultdialog.setting.singleselection.StringOrEnum;
 import org.knime.node.parameters.Widget;
@@ -78,7 +78,7 @@ import org.knime.node.parameters.widget.text.TextAreaWidget;
  * @author Seray Arslan, KNIME GmbH, Konstanz, Germany
  */
 @SuppressWarnings("restriction")
-final class MessageCreatorNodeSettings implements DefaultNodeSettings {
+final class MessageCreatorNodeSettings implements NodeParameters {
 
     enum InputType {
             @Label("Value")
@@ -223,7 +223,7 @@ final class MessageCreatorNodeSettings implements DefaultNodeSettings {
         description = "If selected, the columns used to create the new message will be removed from the output table.")
     boolean m_removeInputColumns = false;
 
-    static final class ToolCallSettings implements DefaultNodeSettings {
+    static final class ToolCallSettings implements NodeParameters {
         @Widget(title = "Tool name column", description = "Select the input table column containing the tool name.")
         @ChoicesProvider(StringColumns.class)
         String m_toolNameColumn;
@@ -238,7 +238,7 @@ final class MessageCreatorNodeSettings implements DefaultNodeSettings {
         String m_argumentsColumn;
     }
 
-    static final class Contents implements DefaultNodeSettings {
+    static final class Contents implements NodeParameters {
 
         enum ContentType {
                 @Label("Text")

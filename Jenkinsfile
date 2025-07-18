@@ -25,8 +25,10 @@ properties([
 ])
 
 try {
-    env.MVN_OPTIONS = env.MVN_OPTIONS ? "-X " + env.MVN_OPTIONS : "-X"
-    knimetools.defaultPythonExtensionBuild()
+    def mvnOpts = env.MVN_OPTIONS ? "-X " + env.MVN_OPTIONS : "-X"
+    withEnv(["MVN_OPTIONS=${mvnOpts}"]) {
+        knimetools.defaultPythonExtensionBuild()
+    }
 
     withCredentials([
         string(credentialsId: 'openai-api-key', variable: 'OPENAI_API_KEY'),

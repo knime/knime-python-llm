@@ -22,6 +22,10 @@ const messageComponents: MessageComponentMap = {
   error: ErrorMessage,
 };
 
+type InitState = "idle" | "ready" | "error";
+const initState = ref<InitState>("idle");
+const requestQueue: Array<() => void> = [];
+
 const messages = ref<MessageResponse[]>([]);
 const isLoading = ref(false);
 
@@ -64,22 +68,45 @@ const postMessage = async (message: string) => {
   }
 };
 
-const sendMessage = async (message: string) => {
+const sendMessage = (message: string) => {
   if (!message.trim()) {
     return;
   }
+
+  const send = async () => {
+    displayNewMessages([{ id: createId(), content: message, type: "human" }]);
+    await postMessage(message);
+    isLoading.value = false;
+  };
+
   isLoading.value = true;
-  displayNewMessages([{ id: createId(), content: message, type: "human" }]);
-  await postMessage(message);
-  isLoading.value = false;
+
+  if (initState.value === "ready") {
+    send();
+  } else if (initState.value === "error") {
+    consola.warn(
+      "Chat Agent: JsonDataService failed to initialize. Cannot send message.",
+    );
+  } else {
+    requestQueue.push(send);
+  }
+};
+
+const flushRequestQueue = () => {
+  while (requestQueue.length > 0) {
+    requestQueue.shift()?.();
+  }
 };
 
 const init = async () => {
   try {
     jsonDataService = await JsonDataService.getInstance();
+    initState.value = "ready";
+    flushRequestQueue();
   } catch (error) {
     consola.error("Chat Agent: Error initializing JsonDataService:", error);
     displayNewMessages([{ id: createId(), content: initError, type: "error" }]);
+    initState.value = "error";
     return;
   }
 
@@ -98,6 +125,7 @@ const init = async () => {
 };
 
 const resetChat = () => {
+  initState.value = "idle";
   messages.value = [];
   isLoading.value = false;
 };

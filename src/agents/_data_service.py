@@ -44,6 +44,7 @@
 
 from ._data import DataRegistry
 from ._tool import LangchainToolConverter
+from ._agent import check_for_invalid_tool_calls
 import yaml
 
 
@@ -103,6 +104,7 @@ class AgentChatViewDataService:
         try:
             final_state = self._agent_graph.invoke({"messages": self._messages}, config)
             self._messages = final_state["messages"]
+            check_for_invalid_tool_calls(self._messages[-1])
         except Exception as e:
             if "Recursion limit" in str(e):
                 last_messages.append(

@@ -25,6 +25,7 @@ properties([
 ])
 
 try {
+    env.MVN_OPTIONS = env.MVN_OPTIONS ? "-X " + env.MVN_OPTIONS : "-X"
     knimetools.defaultPythonExtensionBuild()
 
     withCredentials([

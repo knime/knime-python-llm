@@ -103,8 +103,6 @@ const flushRequestQueue = () => {
 const init = async () => {
   try {
     jsonDataService = await JsonDataService.getInstance();
-    initState.value = "ready";
-    flushRequestQueue();
   } catch (error) {
     consola.error("Chat Agent: Error initializing JsonDataService:", error);
     displayNewMessages([{ id: createId(), content: initError, type: "error" }]);
@@ -117,8 +115,11 @@ const init = async () => {
     initialMessage = await jsonDataService.data({
       method: "get_initial_message",
     });
+    initState.value = "ready";
+    flushRequestQueue();
   } catch (error) {
     consola.error("Chat Agent: Error fetching initial message:", error);
+    initState.value = "error";
   }
 
   if (initialMessage) {

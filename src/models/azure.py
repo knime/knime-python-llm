@@ -174,12 +174,12 @@ class AzureOpenAILLMPortObjectSpec(
     @property
     def is_reasoning_model(self) -> bool:
         return self._is_reasoning_model
-    
+
     def serialize(self) -> dict:
         data = super().serialize()
         data["is_reasoning_model"] = self._is_reasoning_model
         return data
-    
+
     @classmethod
     def deserialize(cls, data: dict):
         return cls(
@@ -190,18 +190,18 @@ class AzureOpenAILLMPortObjectSpec(
             data["max_tokens"],
             data.get("seed", 0),
             data.get("n_requests", 1),
-            data.get("is_reasoning_model", False)
+            data.get("is_reasoning_model", False),
         )
 
 
 def _create_instruct_model(
-    po_instance,
+    po_instance: "AzureOpenAILLMPortObject",
     ctx: knext.ExecutionContext,
 ):
     from langchain_openai import AzureOpenAI
 
     return AzureOpenAI(
-        openai_api_key=ctx.get_credentials(po_instance.spec.credentials).password,
+        openai_api_key=po_instance.spec.auth_spec.get_api_key(ctx),
         api_version=po_instance.spec.api_version,
         azure_endpoint=po_instance.spec.base_url,
         openai_api_type=po_instance.spec.api_type,
@@ -214,7 +214,7 @@ def _create_instruct_model(
 
 
 def _create_model(
-    po_instance,
+    po_instance: "AzureOpenAIChatModelPortObject",
     ctx: knext.ExecutionContext,
     output_format: OutputFormatOptions = OutputFormatOptions.Text,
 ):
@@ -234,15 +234,19 @@ def _create_model(
         model_kwargs["response_format"] = {"type": "json_object"}
 
     return _AzureChatOpenAI(
-        openai_api_key=ctx.get_credentials(po_instance.spec.credentials).password,
+        openai_api_key=po_instance.spec.auth_spec.get_api_key(ctx),
         openai_api_version=po_instance.spec.api_version,
         azure_endpoint=po_instance.spec.base_url,
         openai_api_type=po_instance.spec.api_type,
         deployment_name=po_instance.spec.model,
-        temperature=1.0 if po_instance.spec.is_reasoning_model else po_instance.spec.temperature,
+        temperature=1.0
+        if po_instance.spec.is_reasoning_model
+        else po_instance.spec.temperature,
         # For reasoning models, we exclude 'max_tokens' from the request by setting it to None.
         # We also avoid removing the parameter entirely, as older models still require it to be present.
-        max_tokens=None if po_instance.spec.is_reasoning_model else po_instance.spec.max_tokens,
+        max_tokens=None
+        if po_instance.spec.is_reasoning_model
+        else po_instance.spec.max_tokens,
         model_kwargs=model_kwargs,
         seed=po_instance.spec.seed,
     )

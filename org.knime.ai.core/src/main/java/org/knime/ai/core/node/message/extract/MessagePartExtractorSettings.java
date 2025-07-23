@@ -53,14 +53,15 @@ import java.util.Optional;
 import org.knime.ai.core.data.message.MessageValue;
 import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataTableSpec;
-import org.knime.core.webui.node.dialog.defaultdialog.DefaultNodeSettings;
-import org.knime.core.webui.node.dialog.defaultdialog.layout.After;
-import org.knime.core.webui.node.dialog.defaultdialog.layout.HorizontalLayout;
-import org.knime.core.webui.node.dialog.defaultdialog.layout.Layout;
-import org.knime.core.webui.node.dialog.defaultdialog.widget.Widget;
-import org.knime.core.webui.node.dialog.defaultdialog.widget.choices.ChoicesProvider;
-import org.knime.core.webui.node.dialog.defaultdialog.widget.choices.column.CompatibleColumnsProvider;
-import org.knime.core.webui.node.dialog.defaultdialog.widget.updates.Reference;
+import org.knime.node.parameters.NodeParameters;
+import org.knime.node.parameters.NodeParametersInput;
+import org.knime.node.parameters.Widget;
+import org.knime.node.parameters.layout.After;
+import org.knime.node.parameters.layout.HorizontalLayout;
+import org.knime.node.parameters.layout.Layout;
+import org.knime.node.parameters.updates.ParameterReference;
+import org.knime.node.parameters.widget.choices.ChoicesProvider;
+import org.knime.node.parameters.widget.choices.util.CompatibleColumnsProvider;
 
 /**
  * Settings for the Message Part Extractor node.
@@ -68,7 +69,7 @@ import org.knime.core.webui.node.dialog.defaultdialog.widget.updates.Reference;
  * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
  */
 @SuppressWarnings("restriction")
-final class MessagePartExtractorSettings implements DefaultNodeSettings {
+final class MessagePartExtractorSettings implements NodeParameters {
 
     @HorizontalLayout
     interface RoleSettings {
@@ -102,8 +103,8 @@ final class MessagePartExtractorSettings implements DefaultNodeSettings {
     MessagePartExtractorSettings() {
     }
 
-    MessagePartExtractorSettings(final DefaultNodeSettingsContext context) {
-        m_messageColumn = context.getDataTableSpec(0)//
+    MessagePartExtractorSettings(final NodeParametersInput context) {
+        m_messageColumn = context.getInTableSpec(0)//
             .map(MessagePartExtractorSettings::autoGuessColumn)//
             .orElse(null);
     }
@@ -140,22 +141,22 @@ final class MessagePartExtractorSettings implements DefaultNodeSettings {
     public Optional<String> m_toolCallIdColumnName = Optional.of("Tool Call ID");
 
     // Reference classes for effect wiring
-    public static class RoleExtractedRef implements Reference<Boolean> {
+    public static class RoleExtractedRef implements ParameterReference<Boolean> {
     }
 
-    public static class NameExtractedRef implements Reference<Boolean> {
+    public static class NameExtractedRef implements ParameterReference<Boolean> {
     }
 
-    public static class TextPartsExtractedRef implements Reference<Boolean> {
+    public static class TextPartsExtractedRef implements ParameterReference<Boolean> {
     }
 
-    public static class ImagePartsExtractedRef implements Reference<Boolean> {
+    public static class ImagePartsExtractedRef implements ParameterReference<Boolean> {
     }
 
-    public static class ToolCallsExtractedRef implements Reference<Boolean> {
+    public static class ToolCallsExtractedRef implements ParameterReference<Boolean> {
     }
 
-    public static class ToolCallIdExtractedRef implements Reference<Boolean> {
+    public static class ToolCallIdExtractedRef implements ParameterReference<Boolean> {
     }
 
     static final class MessageColumnProvider extends CompatibleColumnsProvider {

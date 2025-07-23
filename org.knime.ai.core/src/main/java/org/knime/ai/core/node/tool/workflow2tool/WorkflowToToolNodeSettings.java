@@ -52,24 +52,25 @@ import java.util.List;
 
 import org.knime.core.data.DataColumnSpec;
 import org.knime.core.data.DataTableSpec;
-import org.knime.core.webui.node.dialog.defaultdialog.DefaultNodeSettings;
-import org.knime.core.webui.node.dialog.defaultdialog.widget.Label;
-import org.knime.core.webui.node.dialog.defaultdialog.widget.ValueSwitchWidget;
-import org.knime.core.webui.node.dialog.defaultdialog.widget.Widget;
-import org.knime.core.webui.node.dialog.defaultdialog.widget.choices.ChoicesProvider;
-import org.knime.core.webui.node.dialog.defaultdialog.widget.choices.column.ColumnChoicesProvider;
-import org.knime.core.webui.node.dialog.defaultdialog.widget.updates.Effect;
-import org.knime.core.webui.node.dialog.defaultdialog.widget.updates.Effect.EffectType;
-import org.knime.core.webui.node.dialog.defaultdialog.widget.updates.Predicate;
-import org.knime.core.webui.node.dialog.defaultdialog.widget.updates.PredicateProvider;
-import org.knime.core.webui.node.dialog.defaultdialog.widget.updates.Reference;
-import org.knime.core.webui.node.dialog.defaultdialog.widget.updates.ValueReference;
 import org.knime.filehandling.core.data.location.FSLocationValue;
+import org.knime.node.parameters.NodeParameters;
+import org.knime.node.parameters.NodeParametersInput;
+import org.knime.node.parameters.Widget;
+import org.knime.node.parameters.updates.Effect;
+import org.knime.node.parameters.updates.Effect.EffectType;
+import org.knime.node.parameters.updates.EffectPredicate;
+import org.knime.node.parameters.updates.EffectPredicateProvider;
+import org.knime.node.parameters.updates.ParameterReference;
+import org.knime.node.parameters.updates.ValueReference;
+import org.knime.node.parameters.widget.choices.ChoicesProvider;
+import org.knime.node.parameters.widget.choices.ColumnChoicesProvider;
+import org.knime.node.parameters.widget.choices.Label;
+import org.knime.node.parameters.widget.choices.ValueSwitchWidget;
 
 /**
  * @author Martin Horn, KNIME GmbH, Konstanz, Germany
  */
-final class WorkflowToToolNodeSettings implements DefaultNodeSettings {
+final class WorkflowToToolNodeSettings implements NodeParameters {
 
     @Widget(title = "Workflow path column",
         description = "The column containing the paths to read the workflows from.")
@@ -95,13 +96,13 @@ final class WorkflowToToolNodeSettings implements DefaultNodeSettings {
             REPLACE_AND_RENAME
     }
 
-    static class OutputColumnPolicyRef implements Reference<OutputColumnPolicy> {
+    static class OutputColumnPolicyRef implements ParameterReference<OutputColumnPolicy> {
     }
 
-    static final class AppendColumn implements PredicateProvider {
+    static final class AppendColumn implements EffectPredicateProvider {
 
         @Override
-        public Predicate init(final PredicateInitializer i) {
+        public EffectPredicate init(final PredicateInitializer i) {
             return i.getEnum(OutputColumnPolicyRef.class).isOneOf(OutputColumnPolicy.APPEND,
                 OutputColumnPolicy.REPLACE_AND_RENAME);
         }
@@ -111,11 +112,11 @@ final class WorkflowToToolNodeSettings implements DefaultNodeSettings {
     static class PathColumnChoice implements ColumnChoicesProvider {
 
         @Override
-        public List<DataColumnSpec> columnChoices(final DefaultNodeSettingsContext context) {
+        public List<DataColumnSpec> columnChoices(final NodeParametersInput context) {
             var portTypes = context.getInPortTypes();
             for (int i = 0; i < portTypes.length; i++) {
                 if (DataTableSpec.class.isAssignableFrom(portTypes[i].getPortObjectSpecClass())) {
-                    return context.getDataTableSpec(i)
+                    return context.getInTableSpec(i)
                         .map(tableSpec -> tableSpec.stream()
                             .filter(colSpec -> colSpec.getType().isCompatible(FSLocationValue.class)).toList())
                         .orElse(List.of());

@@ -53,24 +53,24 @@ import org.knime.ai.core.node.message.SettingsUtils.ColumnProviders.JsonColumns;
 import org.knime.ai.core.node.message.SettingsUtils.ColumnProviders.PngColumns;
 import org.knime.ai.core.node.message.SettingsUtils.ColumnProviders.StringColumns;
 import org.knime.ai.core.node.message.SettingsUtils.CompositePredicateProvider;
-import org.knime.core.webui.node.dialog.defaultdialog.DefaultNodeSettings;
-import org.knime.core.webui.node.dialog.defaultdialog.layout.After;
-import org.knime.core.webui.node.dialog.defaultdialog.layout.HorizontalLayout;
-import org.knime.core.webui.node.dialog.defaultdialog.layout.Layout;
-import org.knime.core.webui.node.dialog.defaultdialog.layout.Section;
+import org.knime.node.parameters.NodeParameters;
 import org.knime.core.webui.node.dialog.defaultdialog.setting.singleselection.NoneChoice;
 import org.knime.core.webui.node.dialog.defaultdialog.setting.singleselection.StringOrEnum;
-import org.knime.core.webui.node.dialog.defaultdialog.widget.ArrayWidget;
-import org.knime.core.webui.node.dialog.defaultdialog.widget.Label;
-import org.knime.core.webui.node.dialog.defaultdialog.widget.TextAreaWidget;
-import org.knime.core.webui.node.dialog.defaultdialog.widget.ValueSwitchWidget;
-import org.knime.core.webui.node.dialog.defaultdialog.widget.Widget;
-import org.knime.core.webui.node.dialog.defaultdialog.widget.choices.ChoicesProvider;
-import org.knime.core.webui.node.dialog.defaultdialog.widget.updates.Effect;
-import org.knime.core.webui.node.dialog.defaultdialog.widget.updates.Effect.EffectType;
-import org.knime.core.webui.node.dialog.defaultdialog.widget.updates.Predicate;
-import org.knime.core.webui.node.dialog.defaultdialog.widget.updates.Reference;
-import org.knime.core.webui.node.dialog.defaultdialog.widget.updates.ValueReference;
+import org.knime.node.parameters.Widget;
+import org.knime.node.parameters.array.ArrayWidget;
+import org.knime.node.parameters.layout.After;
+import org.knime.node.parameters.layout.HorizontalLayout;
+import org.knime.node.parameters.layout.Layout;
+import org.knime.node.parameters.layout.Section;
+import org.knime.node.parameters.updates.Effect;
+import org.knime.node.parameters.updates.EffectPredicate;
+import org.knime.node.parameters.updates.ParameterReference;
+import org.knime.node.parameters.updates.ValueReference;
+import org.knime.node.parameters.updates.Effect.EffectType;
+import org.knime.node.parameters.widget.choices.ChoicesProvider;
+import org.knime.node.parameters.widget.choices.Label;
+import org.knime.node.parameters.widget.choices.ValueSwitchWidget;
+import org.knime.node.parameters.widget.text.TextAreaWidget;
 
 /**
  * Settings for the Message Creator node.
@@ -78,7 +78,7 @@ import org.knime.core.webui.node.dialog.defaultdialog.widget.updates.ValueRefere
  * @author Seray Arslan, KNIME GmbH, Konstanz, Germany
  */
 @SuppressWarnings("restriction")
-final class MessageCreatorNodeSettings implements DefaultNodeSettings {
+final class MessageCreatorNodeSettings implements NodeParameters {
 
     enum InputType {
             @Label("Value")
@@ -108,10 +108,10 @@ final class MessageCreatorNodeSettings implements DefaultNodeSettings {
     interface OutputLayout {
     }
 
-    static final class RoleInputTypeRef implements Reference<InputType> {
+    static final class RoleInputTypeRef implements ParameterReference<InputType> {
     }
 
-    static final class RoleTypeRef implements Reference<MessageType> {
+    static final class RoleTypeRef implements ParameterReference<MessageType> {
     }
 
     private static final class IsValueRoleInputType extends CompositePredicateProvider {
@@ -146,13 +146,13 @@ final class MessageCreatorNodeSettings implements DefaultNodeSettings {
 
     private static final class ShouldShowToolCallsSection extends CompositePredicateProvider {
         ShouldShowToolCallsSection() {
-            super(Predicate::or, new IsColumnRoleInputType(), new IsValueInputAndAIRole());
+            super(EffectPredicate::or, new IsColumnRoleInputType(), new IsValueInputAndAIRole());
         }
     }
 
     private static final class ShowWhenColumnInputOrToolRole extends CompositePredicateProvider {
         ShowWhenColumnInputOrToolRole() {
-            super(Predicate::or, new IsToolRole(), new IsColumnRoleInputType());
+            super(EffectPredicate::or, new IsToolRole(), new IsColumnRoleInputType());
         }
     }
 
@@ -223,7 +223,7 @@ final class MessageCreatorNodeSettings implements DefaultNodeSettings {
         description = "If selected, the columns used to create the new message will be removed from the output table.")
     boolean m_removeInputColumns = false;
 
-    static final class ToolCallSettings implements DefaultNodeSettings {
+    static final class ToolCallSettings implements NodeParameters {
         @Widget(title = "Tool name column", description = "Select the input table column containing the tool name.")
         @ChoicesProvider(StringColumns.class)
         String m_toolNameColumn;
@@ -238,7 +238,7 @@ final class MessageCreatorNodeSettings implements DefaultNodeSettings {
         String m_argumentsColumn;
     }
 
-    static final class Contents implements DefaultNodeSettings {
+    static final class Contents implements NodeParameters {
 
         enum ContentType {
                 @Label("Text")
@@ -290,10 +290,10 @@ final class MessageCreatorNodeSettings implements DefaultNodeSettings {
         @Effect(predicate = IsTextColumn.class, type = EffectType.SHOW)
         String m_textColumn;
 
-        static final class ContentTypeRef implements Reference<ContentType> {
+        static final class ContentTypeRef implements ParameterReference<ContentType> {
         }
 
-        static final class InputTypeRef implements Reference<InputType> {
+        static final class InputTypeRef implements ParameterReference<InputType> {
         }
 
         static final class HasInputTypes extends CompositePredicateProvider {
@@ -304,14 +304,14 @@ final class MessageCreatorNodeSettings implements DefaultNodeSettings {
 
         static final class IsTextValue extends CompositePredicateProvider {
             IsTextValue() {
-                super(Predicate::and, i -> i.getEnum(ContentTypeRef.class).isOneOf(ContentType.TEXT),
+                super(EffectPredicate::and, i -> i.getEnum(ContentTypeRef.class).isOneOf(ContentType.TEXT),
                     i -> i.getEnum(InputTypeRef.class).isOneOf(InputType.VALUE));
             }
         }
 
         static final class IsTextColumn extends CompositePredicateProvider {
             IsTextColumn() {
-                super(Predicate::and, i -> i.getEnum(ContentTypeRef.class).isOneOf(ContentType.TEXT),
+                super(EffectPredicate::and, i -> i.getEnum(ContentTypeRef.class).isOneOf(ContentType.TEXT),
                     i -> i.getEnum(InputTypeRef.class).isOneOf(InputType.COLUMN));
             }
         }

@@ -54,9 +54,9 @@ import java.util.function.BinaryOperator;
 import org.knime.core.data.StringValue;
 import org.knime.core.data.image.png.PNGImageValue;
 import org.knime.core.data.json.JSONValue;
-import org.knime.core.webui.node.dialog.defaultdialog.widget.choices.column.CompatibleColumnsProvider;
-import org.knime.core.webui.node.dialog.defaultdialog.widget.updates.Predicate;
-import org.knime.core.webui.node.dialog.defaultdialog.widget.updates.PredicateProvider;
+import org.knime.node.parameters.updates.EffectPredicate;
+import org.knime.node.parameters.updates.EffectPredicateProvider;
+import org.knime.node.parameters.widget.choices.util.CompatibleColumnsProvider;
 
 /**
  * Contains utility classes for settings.
@@ -70,11 +70,11 @@ public final class SettingsUtils {
      *
      * @author Adrian Nembach, KNIME GmbH, Konstanz, Germany
      */
-    public abstract static class CompositePredicateProvider implements PredicateProvider {
+    public abstract static class CompositePredicateProvider implements EffectPredicateProvider {
 
-        private final List<PredicateProvider> m_predicates;
+        private final List<EffectPredicateProvider> m_predicates;
 
-        private final BinaryOperator<Predicate> m_aggregator;
+        private final BinaryOperator<EffectPredicate> m_aggregator;
 
         /**
          * Creates a new composite predicate provider that combines the given predicates using the given accumulator.
@@ -82,8 +82,8 @@ public final class SettingsUtils {
          * @param accumulator used to accumulate the predicates (starting with the initializer's always predicate)
          * @param predicates the predicates to combine
          */
-        protected CompositePredicateProvider(final BinaryOperator<Predicate> accumulator,
-            final PredicateProvider... predicates) {
+        protected CompositePredicateProvider(final BinaryOperator<EffectPredicate> accumulator,
+            final EffectPredicateProvider... predicates) {
             if (predicates == null || predicates.length == 0) {
                 throw new IllegalArgumentException("At least one predicate must be provided.");
             }
@@ -96,12 +96,12 @@ public final class SettingsUtils {
          *
          * @param predicates the predicates to combine
          */
-        protected CompositePredicateProvider(final PredicateProvider... predicates) {
-            this(Predicate::and, predicates);
+        protected CompositePredicateProvider(final EffectPredicateProvider... predicates) {
+            this(EffectPredicate::and, predicates);
         }
 
         @Override
-        public Predicate init(final PredicateInitializer i) {
+        public EffectPredicate init(final PredicateInitializer i) {
             return m_predicates.stream()
                     .map(p -> p.init(i))
                     .reduce(m_aggregator)

@@ -52,8 +52,8 @@ const hasIconSlot = slots.icon;
 }
 
 .message-box {
-  min-width: 20%;
-  max-width: 80%;
+  min-width: 50px;
+  max-width: 60%;
   position: relative;
   font-size: 13px;
   font-weight: 400;

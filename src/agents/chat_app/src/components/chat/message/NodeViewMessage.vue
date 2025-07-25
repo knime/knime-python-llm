@@ -16,7 +16,7 @@ import {
 
 import type { ViewResponse } from "@/types";
 
-import MessageBox from "./chat/MessageBox.vue";
+import MessageBox from "./MessageBox.vue";
 
 const props = defineProps<ViewResponse>();
 
@@ -160,7 +160,7 @@ onUnmounted(() => {
     <template #icon>
       <ChartDotsIcon />
     </template>
-    <template #name> Node View </template>
+    <template #name>View | {{ name }}</template>
     <UIExtension
       v-if="dataAvailable"
       :api-layer="apiLayer"

@@ -1,17 +1,19 @@
 <script setup lang="ts">
-import ChatInterface from "./components/chat/ChatInterface.vue";
-import { useChat } from "./composables/useChat";
+import { onMounted } from "vue";
 
-const { messageComponents, messages, isLoading, sendMessage } = useChat();
+import ChatInterface from "./components/chat/ChatInterface.vue";
+import { useChatStore } from "./stores/chat";
+
+const chatStore = useChatStore();
+
+onMounted(async () => {
+  await chatStore.init();
+});
 </script>
 
 <template>
   <div class="app-container">
-    <ChatInterface :is-loading="isLoading" @send-message="sendMessage">
-      <template v-for="message in messages" :key="message.id">
-        <component :is="messageComponents[message.type]" v-bind="message" />
-      </template>
-    </ChatInterface>
+    <ChatInterface />
   </div>
 </template>
 

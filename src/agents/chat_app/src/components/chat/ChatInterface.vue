@@ -4,15 +4,29 @@ import { ref } from "vue";
 import { SkeletonItem } from "@knime/components";
 
 import { useScrollToBottom } from "@/composables/useScrollToBottom";
+import { useChatStore } from "@/stores/chat";
 
-import MessageBox from "./MessageBox.vue";
 import MessageInput from "./MessageInput.vue";
+import ToolUseIndicator from "./ToolUseIndicator.vue";
+import AiMessage from "./message/AiMessage.vue";
+import ErrorMessage from "./message/ErrorMessage.vue";
+import HumanMessage from "./message/HumanMessage.vue";
+import MessageBox from "./message/MessageBox.vue";
+import NodeViewMessage from "./message/NodeViewMessage.vue";
+import ExpandableTimeline from "./timeline/ExpandableTimeline.vue";
 
-defineProps<{ isLoading: boolean }>();
-const emit = defineEmits<{ sendMessage: [message: string] }>();
+const chatStore = useChatStore();
 
 const scrollableContainer = ref<HTMLElement | null>(null);
 const messagesList = ref<HTMLElement | null>(null);
+
+const chatItemComponents = {
+  ai: AiMessage,
+  view: NodeViewMessage,
+  human: HumanMessage,
+  error: ErrorMessage,
+  timeline: ExpandableTimeline,
+};
 
 useScrollToBottom(scrollableContainer, messagesList);
 </script>
@@ -21,16 +35,19 @@ useScrollToBottom(scrollableContainer, messagesList);
   <main class="chat-interface">
     <div ref="scrollableContainer" class="scrollable-container">
       <div ref="messagesList" class="message-list">
-        <slot />
-        <MessageBox v-if="isLoading">
-          <SkeletonItem height="24px" />
+        <template v-for="item in chatStore.chatItems" :key="item.id">
+          <component :is="chatItemComponents[item.type]" v-bind="item" />
+        </template>
+
+        <ToolUseIndicator v-if="chatStore.shouldShowToolUseIndicator" />
+
+        <MessageBox v-if="chatStore.shouldShowGenericLoadingIndicator">
+          <SkeletonItem height="24px" width="200px" />
         </MessageBox>
       </div>
     </div>
-    <MessageInput
-      :is-loading="isLoading"
-      @send-message="emit('sendMessage', $event)"
-    />
+
+    <MessageInput />
   </main>
 </template>
 
@@ -43,16 +60,15 @@ useScrollToBottom(scrollableContainer, messagesList);
   flex-grow: 1;
   position: relative;
   overflow-y: hidden;
-  padding: 0 0 var(--space-8) 0;
+  padding: var(--space-24);
   width: 100%;
-  max-width: 800px;
-  margin: 0 auto;
 }
 
 .scrollable-container {
   flex: 1;
   overflow-y: auto;
   scroll-behavior: smooth;
+  scrollbar-gutter: stable;
 }
 
 .message-list {

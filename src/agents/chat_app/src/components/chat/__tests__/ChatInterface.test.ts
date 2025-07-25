@@ -9,14 +9,14 @@ describe("ChatInterface", () => {
 
     const wrapper = mount(ChatInterface, {
       slots: { default: slotContent },
-      props: { isLoading: false },
+      props: { isLoading: false, showGenericLoader: false, lastUserMessage: "" },
     });
 
     expect(wrapper.find(".message-list").html()).toContain(slotContent);
   });
 
   it("renders loading skeleton inside MessageBox when isLoading is true", () => {
-    const wrapper = mount(ChatInterface, { props: { isLoading: true } });
+    const wrapper = mount(ChatInterface, { props: { isLoading: true, showGenericLoader: true, lastUserMessage: "" } });
     const messageBox = wrapper.find(".message-box");
 
     expect(messageBox.exists()).toBe(true);
@@ -24,7 +24,7 @@ describe("ChatInterface", () => {
   });
 
   it("does not render loading skeleton when isLoading is false", () => {
-    const wrapper = mount(ChatInterface, { props: { isLoading: false } });
+    const wrapper = mount(ChatInterface, { props: { isLoading: false, showGenericLoader: false, lastUserMessage: "" } });
 
     expect(wrapper.find(".skeleton-item").exists()).toBe(false);
   });
@@ -36,7 +36,7 @@ describe("ChatInterface", () => {
     };
     const wrapper = mount(ChatInterface, {
       global: { stubs: { MessageInput: MessageInputStub } },
-      props: { isLoading: false },
+      props: { isLoading: false, showGenericLoader: false, lastUserMessage: "" },
     });
 
     const input = wrapper.findComponent(MessageInputStub);

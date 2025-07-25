@@ -5,15 +5,15 @@ import { useTextareaAutosize } from "@vueuse/core";
 import { FunctionButton } from "@knime/components";
 import SendIcon from "@knime/styles/img/icons/paper-flier.svg";
 
-const characterLimit = 5000;
+import { useChatStore } from "@/stores/chat";
 
-const props = defineProps<{ isLoading: boolean }>();
-const emit = defineEmits<{ sendMessage: [message: string] }>();
-
+const chatStore = useChatStore();
 const { textarea, input } = useTextareaAutosize();
 
+const characterLimit = 5000;
+
 const isInputValid = computed(() => input.value?.trim().length > 0);
-const isDisabled = computed(() => !isInputValid.value || props.isLoading);
+const isDisabled = computed(() => !isInputValid.value || chatStore.isLoading);
 
 const handleClick = (event: MouseEvent) => {
   if (event.target === event.currentTarget) {
@@ -21,15 +21,25 @@ const handleClick = (event: MouseEvent) => {
   }
 };
 
-const handleSubmit = () => {
-  emit("sendMessage", input.value);
+const handleSubmit = async () => {
+  await chatStore.sendUserMessage(input.value);
   input.value = "";
 };
 
 const handleKeyDown = (event: KeyboardEvent) => {
+  // enter: send message
   if (event.key === "Enter" && !event.shiftKey && !isDisabled.value) {
     event.preventDefault();
     handleSubmit();
+  }
+
+  // arrow up: recall last user message
+  if (
+    event.key === "ArrowUp" &&
+    input.value === "" &&
+    chatStore.lastUserMessage
+  ) {
+    input.value = chatStore.lastUserMessage;
   }
 };
 </script>

@@ -362,7 +362,7 @@ def _recursion_limit_parameter():
         """
         The maximum number of times the agent can repeat its steps to
         avoid getting stuck in an endless loop.
-        If not provided, defaults to 25.""",
+        """,
         default_value=25,
         min_value=1,
         is_advanced=True,
@@ -620,7 +620,7 @@ class AgentPrompter2:
             if "Recursion limit" in str(e):
                 raise knext.InvalidParametersError(
                     f"""Recursion limit of {self.recursion_limit} reached. 
-                    You can increase the limit by setting the `recursion_limit` parameter."""
+                    You can increase the limit by setting the `recursion_limit` parameter to a higher value."""
                 )
             else:
                 raise knext.InvalidParametersError(
@@ -767,6 +767,7 @@ class AgentChatView:
         input_tables: list[knext.Table],
     ):
         from langgraph.prebuilt import create_react_agent
+        from langgraph.checkpoint.memory import MemorySaver
         from ._data_service import (
             DataRegistry,
             LangchainToolConverter,
@@ -791,8 +792,10 @@ class AgentChatView:
             tools = [tool_converter.to_langchain_tool(tool) for tool in tool_cells]
         else:
             tools = []
+
+        memory = MemorySaver()
         agent = create_react_agent(
-            chat_model, tools=tools, prompt=self.developer_message
+            chat_model, tools=tools, prompt=self.developer_message, checkpointer=memory
         )
 
         return AgentChatViewDataService(

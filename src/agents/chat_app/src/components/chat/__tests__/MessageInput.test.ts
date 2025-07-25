@@ -94,4 +94,6 @@ describe("MessageInput", () => {
     expect(preventDefault).not.toHaveBeenCalled();
     expect(textarea.element.value).toContain("Shift+Enter message");
   });
+
+  // setInputValue test removed as functionality was removed
 });

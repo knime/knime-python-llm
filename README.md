@@ -54,6 +54,7 @@ To use the `dev` environment in VS Code for linting, formatting, and debugging:
    - Choose the interpreter from `.pixi\envs\dev` (on Windows) or `.pixi/envs/dev/bin/python` (on Linux/macOS).
    - If you do not see the environment, click "Enter interpreter path..." and browse to the Python executable in the `dev` environment.
 
+
 ### Debugging
 - Use [`debugpy`](https://github.com/microsoft/debugpy) to enable remote debugging:
   ```python
@@ -63,13 +64,15 @@ To use the `dev` environment in VS Code for linting, formatting, and debugging:
   debugpy.wait_for_client()
   ```
   - Place this at the start of a node's `execute` method for best results (KNIME may start multiple processes; only one can attach).
-  - To set breakpoints in code:
+
+  - You can set breakpoints directly in the VS Code editor by clicking next to the line numbers (red dots), or programmatically in code with:
     ```python
     import debugpy  # if not already imported
     debugpy.breakpoint()
     ```
-- In VS Code, open the Run & Debug view (Ctrl+Shift+D), select "Remote Attach" (localhost:5678), and start debugging. Ensure a Python file is open to see Python debug options.
-- For a better experience, add this to your `.vscode/launch.json`:
+  - Both methods work when the debugger is attached.
+
+- **Important:** The "Remote Attach" option will only appear in VS Code's Run & Debug view if you have a corresponding configuration in your `.vscode/launch.json`. If you do not see "Remote Attach", add the following configuration:
   ```json
   {
     "version": "0.2.0",
@@ -84,10 +87,15 @@ To use the `dev` environment in VS Code for linting, formatting, and debugging:
     ]
   }
   ```
-  - Setting `justMyCode` to `false` allows stepping into library code
+  - Setting `justMyCode` to `false` allows stepping into library code.
+
+  - **How to attach:**
+    - Without the Debugpy Attacher extension, you must first execute the node in KNIME (so the Python process starts and waits for the debugger), and only then start the debug process in VS Code (Run & Debug > "Python: Remote Attach").
+    - This is necessary because the Python process is started by KNIME, not by VS Code.
+    - Ensure a Python file is open to see Python debug options.
 
 ### Debugging with the Debugpy Attacher Extension
-- For a streamlined debugging experience, you can use the [Debugpy Attacher](https://marketplace.visualstudio.com/items?itemName=ms-python.debugpy-adapter) VS Code extension.
+- For a streamlined debugging experience, you can use the [Debugpy Attacher](https://marketplace.visualstudio.com/items?itemName=DebugPyAttacher.debugpy-attacher) VS Code extension.
   - **Install the extension:**
     - Open the Extensions view in VS Code (Ctrl+Shift+X) and search for "Debugpy Attacher".
     - Click Install.

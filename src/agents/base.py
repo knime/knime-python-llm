@@ -722,9 +722,10 @@ class AgentChatView:
         "Show views",
         "If checked, the views of nodes in the workflow-based tool  will be shown in the chat.",
         default_value=lambda v: v
-        < knext.Version(
+        >= knext.Version(
             5, 6, 0
         ),  # False for versions < 5.6.0 for backwards compatibility
+        since_version="5.6.0",
     )
 
     recursion_limit = _recursion_limit_parameter()

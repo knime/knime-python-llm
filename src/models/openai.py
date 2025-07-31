@@ -122,6 +122,22 @@ models_w_embed_dims_api = [
     "text-embedding-3-large",
 ]
 
+_reserved_request_headers = [
+    "Accept",
+    "Accept-Encoding",
+    "Connection",
+    "Content-Length",
+    "Content-Type",
+    "Host",
+]
+_overwritable_request_headers = [
+    "Authorization",
+    "User-Agent",
+    "OpenAI-Organization",
+    "OpenAI-Project",
+    "OpenAI-Beta",
+]
+
 credentials_port_type_id = "org.knime.credentials.base.CredentialPortObject"
 
 
@@ -808,6 +824,71 @@ class OpenAIAuthenticationPortObjectSpec(AIPortObjectSpec):
                 (e.g. the Credentials Configuration node) is still passing the valid API key as a flow variable to the downstream nodes."""
             )
 
+    def validate_custom_headers(
+        self,
+        custom_headers,
+    ):
+        """Makes sure that common headers that are used by OpenAI are not overwritten.
+        For some headers where it can be useful, overwriting them is allowed."""
+
+        lowered_keys = [header.key.lower() for header in custom_headers]
+
+        if "" in lowered_keys:
+            raise knext.InvalidParametersError(
+                "Every custom header needs to specify a key. Leaving the key empty is not allowed."
+            )
+
+        if len(lowered_keys) != len(set(lowered_keys)):
+            raise knext.InvalidParametersError(
+                "The custom headers must not contain any duplicate keys. The capitalization is ignored."
+            )
+
+        header_key_re = re.compile(r"^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$")  # RFC 9110/7230
+        # printable ASCII, no leading/trailing space, no tabs/CR/LF
+        header_value_re = re.compile(r"^(?! )[ -~]*(?<! )$")
+
+        for header in custom_headers:
+            if header.key.lower() in [h.lower() for h in _reserved_request_headers]:
+                raise knext.InvalidParametersError(
+                    f"The header '{header.key}' is not allowed as it would overwrite a header used by OpenAI."
+                )
+            if not header_key_re.match(header.key):
+                raise knext.InvalidParametersError(
+                    f"The header key '{header.key}' contains invalid characters."
+                )
+            if not header_value_re.match(header.value):
+                raise knext.InvalidParametersError(
+                    f"The value for header '{header.key}' contains invalid characters. "
+                    "Valid characters are printable ASCII characters without leading/trailing whitespaces."
+                )
+
+    def warn_if_headers_overwrite(self, ctx):
+        _, overwritten = self._normalize_custom_headers()
+        if overwritten:
+            ctx.set_warning(
+                f"The following custom headers overwrite headers used by OpenAI which can lead to failures in downstream nodes: {', '.join(overwritten)}."
+            )
+
+    def _normalize_custom_headers(
+        self,
+    ) -> tuple[dict[str, str], List[str]]:
+        """OpenAI does not overwrite internal headers if the capitalization of custom headers is different.
+        This function maps custom headers to the capitalization used by OpenAI so that internal headers get overwritten."""
+
+        header_map = {h.lower(): h for h in _overwritable_request_headers}
+
+        normalized = {}
+        overwritten_headers = []
+        for key, value in self.custom_headers.items():
+            lower_header = key.lower()
+            if lower_header in header_map:
+                normalized[header_map[lower_header]] = value
+                overwritten_headers.append(key)
+            else:
+                normalized[key] = value
+
+        return normalized, overwritten_headers
+
     def get_api_key(self, ctx: knext.ConfigurationContext) -> str:
         if self._credential_spec is not None:
             return self._credential_spec.auth_parameters
@@ -820,7 +901,7 @@ class OpenAIAuthenticationPortObjectSpec(AIPortObjectSpec):
         return OpenAIClient(
             api_key=key,
             base_url=self.base_url,
-            default_headers=self.custom_headers,
+            default_headers=self._normalize_custom_headers()[0],
         )
 
     def get_model_list(self, ctx: knext.ConfigurationContext) -> list[str]:
@@ -999,7 +1080,7 @@ def _create_instruct_model(
         top_p=po_instance.spec.top_p,
         max_tokens=po_instance.spec.max_tokens,
         seed=po_instance.spec.seed,
-        default_headers=po_instance.spec.auth_spec.custom_headers,
+        default_headers=po_instance.spec.auth_spec._normalize_custom_headers()[0],
     )
 
 
@@ -1025,7 +1106,7 @@ def _create_model(
         max_tokens=po_instance.spec.max_tokens,
         seed=po_instance.spec.seed,
         model_kwargs=model_kwargs,
-        default_headers=po_instance.spec.auth_spec.custom_headers,
+        default_headers=po_instance.spec.auth_spec._normalize_custom_headers()[0],
     )
 
 
@@ -1128,7 +1209,7 @@ class OpenAIEmbeddingsPortObject(EmbeddingsPortObject):
             base_url=self.spec.base_url,
             model=self.spec.model,
             dimensions=self.spec.dimensions,
-            default_headers=self.spec.auth_spec.custom_headers,
+            default_headers=self.spec.auth_spec._normalize_custom_headers()[0],
         )
 
 
@@ -1211,9 +1292,10 @@ class OpenAIAuthenticator:
         is_advanced=True,
     )
 
-    # TODO prevent overwriting common headers like authentication and accept
     custom_headers = knext.ParameterArray(
         parameters=CustomHeader(),
+        button_text="Add header",
+        array_title="Header",
         label="Custom headers",
         description="Any custom headers to include in requests to the API.",
         since_version="5.5.2",
@@ -1242,6 +1324,9 @@ class OpenAIAuthenticator:
 
         spec = self.create_spec(credential)
         spec.validate_context(ctx)
+
+        spec.validate_custom_headers(self.custom_headers)
+        spec.warn_if_headers_overwrite(ctx)
         return spec
 
     def execute(
@@ -1250,6 +1335,7 @@ class OpenAIAuthenticator:
         spec = self.create_spec(None if credential is None else credential.spec)
         if self.verify_settings:
             self._verify_settings(ctx, spec)
+        spec.warn_if_headers_overwrite(ctx)
 
         return OpenAIAuthenticationPortObject(spec)
 
@@ -1280,7 +1366,8 @@ class OpenAIAuthenticator:
             )
 
     def create_spec(
-        self, credential: Optional[knext.CredentialPortObjectSpec]
+        self,
+        credential: Optional[knext.CredentialPortObjectSpec],
     ) -> OpenAIAuthenticationPortObjectSpec:
         return OpenAIAuthenticationPortObjectSpec(
             self.credentials_settings.credentials_param,

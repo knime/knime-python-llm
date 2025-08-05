@@ -1339,13 +1339,15 @@ def _call_model_with_output_format_fallback(
             model = _initialize_model(model_port, ctx, output_format)
         return response_func(model)
     except openai.BadRequestError as e:
-        if "Invalid parameter: 'response_format'" in str(e):
+        error_message = str(e)
+        if "Invalid parameter: 'response_format'" in error_message:
             ctx.set_warning(
                 f"""The selected model does not support the output format '{output_format}', 
                 'Text' mode is used as an output format instead."""
             )
             model = _initialize_model(model_port, ctx, OutputFormatOptions.Text.name)
             return response_func(model)
+
         raise e
 
 

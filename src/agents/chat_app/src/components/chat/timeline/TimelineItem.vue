@@ -186,10 +186,10 @@ const previewText = computed(() => {
   .details {
     display: flex;
     align-items: baseline;
-    gap: 8px;
+    gap: var(--space-8);
     flex: 1;
 
-    & :deep(.pill) {
+    & .status-pill {
       font-size: 11px;
     }
 

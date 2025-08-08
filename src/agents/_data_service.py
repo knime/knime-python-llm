@@ -47,6 +47,10 @@ from ._tool import LangchainToolConverter
 from ._agent import check_for_invalid_tool_calls
 import yaml
 import queue
+import threading
+
+from langchain_core.messages.human import HumanMessage
+from langchain_core.messages.ai import AIMessage
 
 
 class AgentChatViewDataService:
@@ -82,8 +86,6 @@ class AgentChatViewDataService:
             }
 
     def post_user_message(self, user_message: str):
-        import threading
-
         if not self._thread or not self._thread.is_alive():
             while not self._message_queue.empty():
                 try:
@@ -121,9 +123,6 @@ class AgentChatViewDataService:
         }
 
     def _post_user_message(self, user_message: str):
-        from langchain_core.messages.human import HumanMessage
-        from langchain_core.messages.ai import AIMessage
-
         self._messages.append(HumanMessage(content=user_message))
         config = {
             "recursion_limit": self._recursion_limit,

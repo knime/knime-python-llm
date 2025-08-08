@@ -107,7 +107,7 @@ const isExpanded = ref(false);
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--space-8);
 
   /* Dashed line representing the timeline */
   &::before {

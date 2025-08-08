@@ -2,11 +2,11 @@
 import { Tooltip } from "@knime/components";
 import AiIcon from "@knime/styles/img/icons/ai-general.svg";
 
-import type { ErrorResponse } from "@/types";
+import type { ErrorMessage } from "@/types";
 
 import MessageBox from "./MessageBox.vue";
 
-defineProps<ErrorResponse>();
+defineProps<ErrorMessage>();
 </script>
 
 <template>

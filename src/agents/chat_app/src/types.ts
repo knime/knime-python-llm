@@ -1,7 +1,7 @@
 // Message-related entities
 type MessageType = "human" | "ai" | "tool" | "view" | "error";
 
-interface BaseMessageResponse {
+interface BaseMessage {
   id: string;
   type: MessageType;
 }
@@ -12,41 +12,41 @@ export interface ToolCall {
   args?: string;
 }
 
-export interface AiResponse extends BaseMessageResponse {
+export interface AiMessage extends BaseMessage {
   type: "ai";
   name?: string | null;
   content: string;
   toolCalls?: ToolCall[];
 }
 
-export interface ViewResponse extends BaseMessageResponse {
+export interface ViewMessage extends BaseMessage {
   content: string;
   type: "view";
   name: string;
 }
 
-export interface ErrorResponse extends BaseMessageResponse {
+export interface ErrorMessage extends BaseMessage {
   content: string;
   type: "error";
 }
 
-export interface HumanResponse extends BaseMessageResponse {
+export interface HumanMessage extends BaseMessage {
   content: string;
   type: "human";
 }
 
-export interface ToolResponse extends BaseMessageResponse {
+export interface ToolMessage extends BaseMessage {
   content: string;
   type: "tool";
   toolCallId: string;
 }
 
-export type MessageResponse =
-  | AiResponse
-  | ViewResponse
-  | ErrorResponse
-  | HumanResponse
-  | ToolResponse;
+export type Message =
+  | AiMessage
+  | ViewMessage
+  | ErrorMessage
+  | HumanMessage
+  | ToolMessage;
 
 // Timeline-related entities
 export type TimelineItemType = "reasoning" | "tool_call";
@@ -79,7 +79,7 @@ export interface Timeline {
   type: "timeline";
 }
 
-export type ChatItem = MessageResponse | Timeline;
+export type ChatItem = Message | Timeline;
 
 // misc types
 export interface Config {

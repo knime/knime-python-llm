@@ -9,6 +9,9 @@ import WrenchIcon from "@knime/styles/img/icons/wrench.svg";
 import type { TimelineItem } from "@/types";
 import MarkdownRenderer from "../MarkdownRenderer.vue";
 
+const PREVIEW_LENGTH_FOR_OVERLAY = 80;
+const CONTENT_LENGTH_FOR_PREVIEW = 150;
+
 const props = defineProps<{
   item: TimelineItem;
 }>();
@@ -52,7 +55,7 @@ const hasArgs = computed(() => {
 const hasContent = computed(() => Boolean(props.item.content));
 const isExpandable = computed(() => hasArgs.value || hasContent.value);
 
-// determine preview
+// determine preview (we only preview content, not args or anything else)
 const hasPreview = computed(() =>
   Boolean(props.item.content && props.item.content?.trim().length > 0),
 );
@@ -61,53 +64,59 @@ const previewNeedsOverlay = computed(() => {
     return false;
   }
 
-  return props.item.content?.length > 80;
+  return props.item.content?.length > PREVIEW_LENGTH_FOR_OVERLAY;
 });
 const previewText = computed(() => {
   const contentText = props.item.content || "";
   return (
-    contentText.substring(0, 150) + (contentText.length > 150 ? "..." : "")
+    contentText.substring(0, CONTENT_LENGTH_FOR_PREVIEW) +
+    (contentText.length > CONTENT_LENGTH_FOR_PREVIEW ? "..." : "")
   );
 });
 </script>
 
 <template>
-  <div class="timeline-item-wrapper">
+  <div class="timeline-item-container">
+    <!-- clickable header -->
     <div
-      class="timeline-item"
+      class="header"
       :class="{ clickable: isExpandable }"
       @click="isExpandable && (isExpanded = !isExpanded)"
     >
-      <div class="icon-container">
+      <!-- icon -->
+      <div class="icon">
         <component :is="iconComponent" />
       </div>
 
+      <!-- label and status pill -->
       <div class="details">
-        <span class="name">{{ name }}</span>
+        <span class="label">{{ name }}</span>
         <Pill :variant="pillVariant" class="status-pill">{{ pillLabel }}</Pill>
       </div>
 
+      <!-- expansion chevron -->
       <div
         v-if="isExpandable"
-        class="chevron-container"
+        class="expansion-chevron"
         :class="{ 'is-expanded': isExpanded }"
       >
         <ArrowNextIcon />
       </div>
     </div>
 
-    <!-- Preview content when collapsed -->
+    <!-- preview -->
     <div
       v-if="!isExpanded && isExpandable && hasPreview"
-      class="preview-content"
+      class="preview-container"
       :class="{ 'with-overlay': previewNeedsOverlay }"
     >
       <div class="preview-text">{{ previewText }}</div>
       <div v-if="previewNeedsOverlay" class="preview-fade" />
     </div>
 
-    <!-- Full content when expanded -->
+    <!-- full content -->
     <div v-if="isExpanded && isExpandable" class="expandable-content">
+      <!-- tool call args -->
       <div
         v-if="item.type === 'tool_call' && item.args"
         class="content-section"
@@ -115,6 +124,7 @@ const previewText = computed(() => {
         <pre>{{ item.args }}</pre>
       </div>
 
+      <!-- text content -->
       <div v-if="hasContent" class="content-section">
         <MarkdownRenderer :markdown="item.content!" />
       </div>
@@ -122,135 +132,138 @@ const previewText = computed(() => {
   </div>
 </template>
 
-<style scoped>
-.timeline-item-wrapper {
+<style lang="postcss" scoped>
+@import url("@knime/styles/css/mixins");
+
+.timeline-item-container {
   position: relative;
-  padding-left: 24px;
+  padding-left: var(--space-24);
 }
 
-.timeline-item {
+.header {
   display: flex;
   align-items: flex-start;
   padding: 8px;
   border-radius: var(--border-radius-s);
   transition: background-color 0.15s ease;
+
+  &.clickable {
+    cursor: pointer;
+
+    &:hover {
+      background-color: var(--knime-gray-light-semi);
+    }
+  }
+
+  /* Timeline dot */
+  &::before {
+    content: "";
+    position: absolute;
+    left: 12px;
+    top: 14px;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--knime-dove-gray);
+  }
+
+  .icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    margin-top: 2px;
+    margin-right: var(--space-8);
+    color: var(--knime-steel-gray);
+    flex-shrink: 0;
+
+    & :deep(svg) {
+      @mixin svg-icon-size 16;
+    }
+  }
+
+  .details {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex: 1;
+
+    & :deep(.pill) {
+      font-size: 11px;
+    }
+
+    .label {
+      font-weight: 500;
+      color: var(--knime-masala);
+      word-break: break-all;
+    }
+  }
+
+  .expansion-chevron {
+    width: 16px;
+    height: 16px;
+    margin-right: var(--space-8);
+    color: var(--knime-silver-sand);
+    transition: transform 0.2s ease;
+    flex-shrink: 0;
+
+    &.is-expanded {
+      transform: rotate(90deg);
+    }
+
+    & :deep(svg) {
+      @mixin svg-icon-size 16;
+
+      stroke-width: 1.5;
+    }
+  }
 }
 
-.timeline-item.clickable {
-  cursor: pointer;
-}
+.preview-container {
+  position: relative;
+  padding-top: var(--space-8);
+  padding-right: var(--space-24);
+  padding-left: var(--space-8);
 
-.timeline-item.clickable:hover {
-  background-color: var(--knime-gray-light-semi);
-}
+  &.with-overlay {
+    max-height: 60px;
+    overflow: hidden;
+  }
 
-/* Timeline dot */
-.timeline-item::before {
-  content: "";
-  position: absolute;
-  left: 12px;
-  top: 14px;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--knime-dove-gray);
-}
+  .preview-text {
+    font-size: 12px;
+    color: var(--knime-steel-gray);
+  }
 
-.icon-container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 14px;
-  height: 14px;
-  margin: 1px 8px 0 0;
-  color: var(--knime-steel-gray);
-  flex-shrink: 0;
-}
-
-.icon-container :deep(svg) {
-  width: 100%;
-  height: 100%;
-}
-
-.details {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  flex: 1;
-}
-
-.details :deep(.pill) {
-  font-size: 11px;
-}
-
-.chevron-container {
-  width: 16px;
-  height: 16px;
-  margin-right: 12px;
-  color: var(--knime-silver-sand);
-  transition: transform 0.2s ease;
-  flex-shrink: 0;
-}
-
-.chevron-container.is-expanded {
-  transform: rotate(90deg);
-}
-
-.chevron-container :deep(svg) {
-  width: 100%;
-  height: 100%;
-  stroke-width: 1.5;
+  .preview-fade {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 12px;
+    background: linear-gradient(transparent, var(--knime-white));
+    pointer-events: none;
+  }
 }
 
 .expandable-content {
-  padding: 8px 22px 0 8px;
+  padding-top: var(--space-8);
+  padding-right: var(--space-24);
+  padding-left: var(--space-8);
   display: flex;
   flex-direction: column;
   gap: var(--space-8);
-}
 
-.preview-content {
-  position: relative;
-  padding: 8px 22px 0 8px;
-}
-
-/* Only limit height and hide overflow if we have a fade overlay */
-.preview-content.with-overlay {
-  max-height: 60px;
-  overflow: hidden;
-}
-
-.preview-fade {
-  position: absolute;
-  bottom: 0;
-  left: 8px;
-  right: 22px;
-  height: 20px;
-  background: linear-gradient(transparent, var(--knime-white));
-  pointer-events: none;
-}
-
-.name {
-  font-weight: 500;
-  color: var(--knime-masala);
-  word-break: break-all;
-}
-
-.preview-text {
-  font-size: 12px;
-  color: var(--knime-steel-gray);
-  white-space: pre-wrap;
-  word-break: break-all;
-}
-
-.content-section pre {
-  background: var(--knime-gray-light-semi);
-  border: 1px solid var(--knime-silver-sand);
-  border-radius: var(--border-radius-s);
-  font-family: "Roboto Mono", monospace;
-  font-size: 12px;
-  padding: var(--space-8) var(--space-12);
-  white-space: pre-wrap;
-  word-break: break-all;
+  .content-section pre {
+    background: var(--knime-gray-light-semi);
+    border: 1px solid var(--knime-silver-sand);
+    border-radius: var(--border-radius-s);
+    font-family: "Roboto Mono", monospace;
+    font-size: 12px;
+    padding: var(--space-8) var(--space-12);
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
 }
 </style>

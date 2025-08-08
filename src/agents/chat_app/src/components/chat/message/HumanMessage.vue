@@ -2,12 +2,12 @@
 import { Tooltip } from "@knime/components";
 import UserIcon from "@knime/styles/img/icons/user.svg";
 
-import type { HumanResponse } from "@/types";
+import type { HumanMessage } from "@/types";
 import MarkdownRenderer from "../MarkdownRenderer.vue";
 
 import MessageBox from "./MessageBox.vue";
 
-defineProps<HumanResponse>();
+defineProps<HumanMessage>();
 </script>
 
 <template>

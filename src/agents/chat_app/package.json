@@ -39,6 +39,7 @@
   "devDependencies": {
     "@knime/eslint-config": "^9.0.2",
     "@knime/ui-extension-renderer": "^2.0.42",
+    "@pinia/testing": "^1.0.2",
     "@tsconfig/node22": "^22.0.2",
     "@types/dompurify": "^3.0.5",
     "@types/jsdom": "^21.1.7",

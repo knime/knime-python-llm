@@ -14,11 +14,11 @@ import {
   type UIExtensionService,
 } from "@knime/ui-extension-service";
 
-import type { ViewResponse } from "@/types";
+import type { ViewMessage } from "@/types";
 
 import MessageBox from "./MessageBox.vue";
 
-const props = defineProps<ViewResponse>();
+const props = defineProps<ViewMessage>();
 
 const dataAvailable = ref<boolean>(false);
 

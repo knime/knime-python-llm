@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { onMounted } from "vue";
+import { onBeforeMount } from "vue";
 
 import ChatInterface from "./components/chat/ChatInterface.vue";
 import { useChatStore } from "./stores/chat";
 
 const chatStore = useChatStore();
 
-onMounted(async () => {
+onBeforeMount(async () => {
   await chatStore.init();
 });
 </script>

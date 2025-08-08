@@ -6,49 +6,36 @@ import AnimatedEllipsis from "./AnimatedEllipsis.vue";
 
 <template>
   <div class="tool-use-indicator-container">
-    <div class="icon-wrapper">
+    <div class="icon">
       <WrenchIcon />
     </div>
-    <span class="label">Using tools<AnimatedEllipsis /></span>
+    <span>Using tools<AnimatedEllipsis /></span>
   </div>
 </template>
 
-<style scoped>
+<style lang="postcss" scoped>
+@import url("@knime/styles/css/mixins");
+
 .tool-use-indicator-container {
   font-size: 12px;
-  width: 50%;
-  min-width: 320px;
-  margin-bottom: var(--space-12);
+  margin-bottom: var(--space-8);
   align-self: flex-start;
   display: flex;
   align-items: center;
-  padding-top: 10px;
-  padding-bottom: 10px;
 }
 
-.icon-wrapper {
+.icon {
   display: flex;
-  align-items: center;
-  justify-content: center;
   background-color: var(--knime-white);
   border: 2px solid var(--knime-porcelain);
-  border-radius: 50%;
+  border-radius: 100%;
   padding: var(--space-4);
   margin-right: var(--space-12);
-  flex-shrink: 0;
-}
 
-.icon-wrapper :deep(svg) {
-  width: 16px;
-  height: 16px;
-  color: var(--knime-steel-gray);
-  stroke-width: 1.5;
-}
+  & :deep(svg) {
+    @mixin svg-icon-size 16;
 
-.label {
-  color: var(--knime-steel-gray);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+    stroke-width: 1.5;
+  }
 }
 </style>

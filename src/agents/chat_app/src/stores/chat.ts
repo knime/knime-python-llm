@@ -3,15 +3,27 @@ import { defineStore } from "pinia";
 import { JsonDataService } from "@knime/ui-extension-service";
 
 import type {
-  AiResponse,
+  AiMessage,
   ChatItem,
   Config,
-  MessageResponse,
+  ErrorMessage,
+  Message,
   Timeline,
   ToolCallTimelineItem,
-  ToolResponse,
+  ToolMessage,
 } from "@/types";
 import { createId } from "@/utils/utils";
+
+const ERROR_MESSAGES = {
+  init: "Something went wrong. Try again later.",
+  sending: "There was an error while sending your message.",
+  processing: "There was an error while processing your request.",
+  connection: "Failed to connect to the service. Please try again.",
+  configuration:
+    "Failed to load configuration. Some features may not work properly.",
+  polling:
+    "Lost connection while waiting for response. Please try sending your message again.",
+} as const;
 
 export const useChatStore = defineStore("chat", {
   state: () => {
@@ -35,13 +47,34 @@ export const useChatStore = defineStore("chat", {
     shouldShowToolCalls: (state) => state.config?.show_tool_calls_and_results,
   },
   actions: {
-    async init() {
-      await this.ensureJsonDataService();
-      this.config = await this.getConfiguration();
+    addErrorMessage(errorType: keyof typeof ERROR_MESSAGES) {
+      const errorMessage: ErrorMessage = {
+        id: createId(),
+        type: "error",
+        content: ERROR_MESSAGES[errorType],
+      };
+      this.chatItems.push(errorMessage);
 
-      const initialAiMessage = await this.getInitialMessage();
-      if (initialAiMessage) {
-        this.addItemsToChat([initialAiMessage]);
+      this.isLoading = false;
+      this.isUsingTools = false;
+      this.completeActiveTimeline();
+    },
+    async init() {
+      try {
+        await this.ensureJsonDataService();
+
+        const [config, initialAiMessage] = await Promise.all([
+          this.getConfiguration(),
+          this.getInitialMessage(),
+        ]);
+
+        this.config = config;
+        if (initialAiMessage) {
+          this.addItemsToChat([initialAiMessage]);
+        }
+      } catch (error) {
+        consola.error("Chat Store: Error during initialization:", error);
+        this.addErrorMessage("init");
       }
     },
     ensureActiveTimeline() {
@@ -74,7 +107,7 @@ export const useChatStore = defineStore("chat", {
       this.activeTimeline.status = "completed";
       this.activeTimeline = null;
     },
-    addAiReasoningToTimeline(msg: AiResponse) {
+    addAiReasoningToTimeline(msg: AiMessage) {
       if (msg.content?.trim()) {
         this.activeTimeline?.items.push({
           id: msg.id,
@@ -83,7 +116,7 @@ export const useChatStore = defineStore("chat", {
         });
       }
     },
-    addToolCallsToTimeline(msg: AiResponse) {
+    addToolCallsToTimeline(msg: AiMessage) {
       if (msg.toolCalls) {
         for (const tc of msg.toolCalls) {
           this.activeTimeline?.items.push({
@@ -96,7 +129,7 @@ export const useChatStore = defineStore("chat", {
         }
       }
     },
-    addAiResponseWithToolCalls(msg: AiResponse) {
+    addAiMessageWithToolCalls(msg: AiMessage) {
       if (!this.shouldShowToolCalls) {
         this.isUsingTools = true;
         return;
@@ -111,7 +144,7 @@ export const useChatStore = defineStore("chat", {
       // extract and add tool calls to timeline
       this.addToolCallsToTimeline(msg);
     },
-    addToolResponse(msg: ToolResponse) {
+    addToolMessage(msg: ToolMessage) {
       if (!this.activeTimeline) {
         return;
       }
@@ -125,8 +158,8 @@ export const useChatStore = defineStore("chat", {
       );
 
       if (index === -1) {
-        consola.warn(
-          `Could not find tool call with ID ${msg.id} in the active timeline.`,
+        consola.error(
+          `Could not find tool call with ID ${msg.toolCallId} in the active timeline.`,
         );
       } else {
         const originalItem = this.activeTimeline.items[
@@ -147,31 +180,31 @@ export const useChatStore = defineStore("chat", {
         this.activeTimeline.items[index] = updatedItem;
       }
     },
-    addAiResponse(msg: AiResponse) {
+    addAiMessage(msg: AiMessage) {
       // agent either finished the agentic loop, or simply replied without tool use
       this.completeActiveTimeline();
       this.isLoading = false;
 
       this.chatItems.push(msg);
     },
-    addItemsToChat(responses: MessageResponse[]) {
-      if (!responses.length) {
+    addItemsToChat(messages: Message[]) {
+      if (!messages.length) {
         return;
       }
 
-      for (const msg of responses) {
+      for (const msg of messages) {
         if (msg.type === "ai" && msg.toolCalls?.length) {
-          this.addAiResponseWithToolCalls(msg);
+          this.addAiMessageWithToolCalls(msg);
           continue;
         }
 
         if (msg.type === "tool") {
-          this.addToolResponse(msg);
+          this.addToolMessage(msg);
           continue;
         }
 
         if (msg.type === "ai" && !msg.toolCalls?.length) {
-          this.addAiResponse(msg);
+          this.addAiMessage(msg);
           continue;
         }
 
@@ -186,66 +219,79 @@ export const useChatStore = defineStore("chat", {
         return;
       }
 
-      // TODO error message
-      this.jsonDataService = await JsonDataService.getInstance();
+      try {
+        this.jsonDataService = await JsonDataService.getInstance();
+      } catch (error) {
+        consola.error(
+          "Chat Store: Failed to get JsonDataService instance:",
+          error,
+        );
+        throw new Error("Failed to connect to the service");
+      }
     },
     async getConfiguration() {
-      await this.ensureJsonDataService();
-
-      // TODO error message
-      const response = await this.jsonDataService?.data({
-        method: "get_configuration",
-      });
-
-      return response;
+      try {
+        const response = await this.jsonDataService?.data({
+          method: "get_configuration",
+        });
+        return response;
+      } catch (error) {
+        consola.error("Chat Store: Failed to get configuration:", error);
+        return { show_tool_calls_and_results: false };
+      }
     },
     async getInitialMessage() {
-      await this.ensureJsonDataService();
-
-      // TODO error message
-      const response = await this.jsonDataService?.data({
-        method: "get_initial_message",
-      });
-
-      return response;
+      try {
+        const response = await this.jsonDataService?.data({
+          method: "get_initial_message",
+        });
+        return response;
+      } catch (error) {
+        consola.error("Chat Store: Failed to get initial message:", error);
+        return null;
+      }
     },
     async getLastMessages() {
-      await this.ensureJsonDataService();
-
-      // TODO error message
-      const response = await this.jsonDataService?.data({
-        method: "get_last_messages",
-      });
-
-      return response;
+      try {
+        const response = await this.jsonDataService?.data({
+          method: "get_last_messages",
+        });
+        return response || [];
+      } catch (error) {
+        consola.error("Chat Store: Failed to get last messages:", error);
+        throw error;
+      }
     },
     async checkIsProcessing() {
-      await this.ensureJsonDataService();
-
-      // TODO error message
-      const response = await this.jsonDataService?.data({
-        method: "is_processing",
-      });
-
-      return response;
+      try {
+        const response = await this.jsonDataService?.data({
+          method: "is_processing",
+        });
+        return response;
+      } catch (error) {
+        consola.error("Chat Store: Failed to check processing status:", error);
+        return { is_processing: false };
+      }
     },
     async postUserMessage(msg: string) {
-      await this.ensureJsonDataService();
-
-      // TODO error message
-      await this.jsonDataService?.data({
-        method: "post_user_message",
-        options: [msg],
-      });
+      try {
+        await this.jsonDataService?.data({
+          method: "post_user_message",
+          options: [msg],
+        });
+      } catch (error) {
+        consola.error("Chat Store: Failed to post user message:", error);
+        throw error;
+      }
     },
 
-    // ==== HIGHER LEVEL CHAT THINGIES ====
+    // ==== HIGHER LEVEL CHAT CONTROLS ====
     async sendUserMessage(msg: string) {
       if (!msg.trim() || this.isLoading) {
         return;
       }
 
-      this.isLoading = true; // gets set to false in addAiResponse() -> completeActiveTimeline()
+      this.isLoading = true;
 
       // 1. render user message in the chat
       this.addItemsToChat([{ id: createId(), content: msg, type: "human" }]);
@@ -253,40 +299,52 @@ export const useChatStore = defineStore("chat", {
       // 2. store for arrow up recall
       this.lastUserMessage = msg;
 
-      // 3. send to backend and start polling
-      await this.postUserMessage(msg);
-      this.pollForNewMessages();
+      try {
+        // 3. send to backend and start polling
+        await this.postUserMessage(msg);
+        this.pollForNewMessages();
+      } catch (error) {
+        consola.error("Chat Store: Error sending user message:", error);
+        this.addErrorMessage("sending");
+      }
     },
     async pollForNewMessages() {
       let consecutiveEmptyPolls = 0;
       const maxEmptyPolls = 10;
 
-      while (this.isLoading) {
-        const msgs = await this.getLastMessages();
+      try {
+        while (this.isLoading) {
+          try {
+            const msgs = await this.getLastMessages();
 
-        if (msgs.length > 0) {
-          this.addItemsToChat(msgs);
-          consecutiveEmptyPolls = 0;
+            if (msgs.length > 0) {
+              this.addItemsToChat(msgs);
+              consecutiveEmptyPolls = 0;
+            } else {
+              consecutiveEmptyPolls++;
 
-          // TODO check isLoading or isUsingTools here?
-        } else {
-          consecutiveEmptyPolls++;
+              if (consecutiveEmptyPolls >= maxEmptyPolls) {
+                const response = await this.checkIsProcessing();
 
-          if (consecutiveEmptyPolls >= maxEmptyPolls) {
-            const response = await this.checkIsProcessing();
+                if (!response?.is_processing) {
+                  this.isLoading = false;
+                  this.isUsingTools = false;
+                  break;
+                }
 
-            if (!response?.is_processing) {
-              this.isLoading = false;
-              this.isUsingTools = false;
-              break;
+                // still processing, give agent and tools more time
+                consecutiveEmptyPolls = 0;
+              }
             }
-
-            // still processing, give agent and tools more time
-            consecutiveEmptyPolls = 0;
+          } catch (error) {
+            consola.error("Chat Store: Error during message polling:", error);
+            this.addErrorMessage("polling");
+            break;
           }
         }
-
-        // TODO error message
+      } catch (error) {
+        consola.error("Chat Store: Fatal error in polling loop:", error);
+        this.addErrorMessage("processing");
       }
     },
     resetChat() {

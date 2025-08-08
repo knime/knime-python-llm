@@ -12,8 +12,7 @@ import type {
   ToolCallTimelineItem,
   ToolMessage,
 } from "@/types";
-import { createId } from "@/utils/utils";
-import { computed, ref } from "vue";
+import { computed, ref, useId } from "vue";
 
 const ERROR_MESSAGES = {
   init: "Something went wrong. Try again later.",
@@ -54,7 +53,7 @@ export const useChatStore = defineStore("chat", () => {
   // actions
   function addErrorMessage(errorType: keyof typeof ERROR_MESSAGES) {
     const errorMessage: ErrorMessage = {
-      id: createId(),
+      id: useId(),
       type: "error",
       content: ERROR_MESSAGES[errorType],
     };
@@ -90,7 +89,7 @@ export const useChatStore = defineStore("chat", () => {
     }
 
     const newTimeline: Timeline = {
-      id: `timeline-${createId()}`,
+      id: `timeline-${useId()}`,
       label: "Using tools",
       items: [],
       status: "active",
@@ -313,7 +312,7 @@ export const useChatStore = defineStore("chat", () => {
     isLoading.value = true;
 
     // 1. render user message in the chat
-    addItemsToChat([{ id: createId(), content: msg, type: "human" }]);
+    addItemsToChat([{ id: useId(), content: msg, type: "human" }]);
 
     // 2. store for arrow up recall
     lastUserMessage.value = msg;

@@ -1,4 +1,12 @@
 import { expect } from "vitest";
+import type { 
+  AiMessage, 
+  Config, 
+  ToolMessage, 
+  ViewMessage, 
+  Timeline,
+  ToolCallTimelineItem 
+} from "@/types";
 
 export const createErrorMessage = (content: string) => ({
   id: expect.any(String),
@@ -6,14 +14,63 @@ export const createErrorMessage = (content: string) => ({
   content,
 });
 
-export const createAiMessage = (content: string) => ({
+export const createAiMessage = (content: string, toolCalls?: AiMessage["toolCalls"]): AiMessage => ({
   id: expect.any(String),
   type: "ai",
   content,
+  ...(toolCalls && { toolCalls }),
 });
 
 export const createUserMessage = (content: string) => ({
   id: expect.any(String),
   type: "human",
   content,
+});
+
+export const createToolMessage = (content: string, toolCallId: string): ToolMessage => ({
+  id: expect.any(String),
+  type: "tool",
+  content,
+  toolCallId,
+});
+
+export const createViewMessage = (content: string, name: string): ViewMessage => ({
+  id: expect.any(String),
+  type: "view",
+  content,
+  name,
+});
+
+export const createConfig = (showToolCalls = true): Config => ({
+  show_tool_calls_and_results: showToolCalls,
+});
+
+export const createTimeline = (
+  label = "Using tools",
+  status: Timeline["status"] = "active",
+  items: Timeline["items"] = []
+): Timeline => ({
+  id: expect.any(String),
+  type: "timeline",
+  label,
+  status,
+  items,
+});
+
+export const createToolCall = (name = "search_tool", args = '{"query": "test"}') => ({
+  id: expect.any(String),
+  name,
+  args,
+});
+
+export const createToolCallTimelineItem = (
+  name = "search",
+  status: ToolCallTimelineItem["status"] = "running",
+  content?: string
+): ToolCallTimelineItem => ({
+  id: expect.any(String),
+  type: "tool_call",
+  name,
+  status,
+  ...(content && { content }),
 });

@@ -11,6 +11,7 @@ import type {
   Timeline,
   ToolCallTimelineItem,
   ToolMessage,
+  InitializationState,
 } from "@/types";
 import { computed, ref, useId } from "vue";
 
@@ -28,12 +29,14 @@ const ERROR_MESSAGES = {
 export const useChatStore = defineStore("chat", () => {
   // state
   const chatItems = ref<ChatItem[]>([]);
-  const config = ref<Config | null>(null);
-  const isLoading = ref(false);
+  const config = ref<Config | null>(null); // node settings that affect rendering
+  const isLoading = ref(false); // true if agent is currently responding to user message
   const isUsingTools = ref(false);
   const lastUserMessage = ref("");
   const activeTimeline = ref<Timeline | null>(null);
   const jsonDataService = ref<JsonDataService | null>(null);
+  const initState = ref<InitializationState>("idle");
+  const requestQueue: Array<() => void> = []; // populated with messages sent before data service is ready
 
   // getters
   const shouldShowToolUseIndicator = computed(() => {
@@ -65,6 +68,10 @@ export const useChatStore = defineStore("chat", () => {
   }
 
   async function init() {
+    if (initState.value !== "idle") {
+      return;
+    }
+
     try {
       await ensureJsonDataService();
 
@@ -77,9 +84,13 @@ export const useChatStore = defineStore("chat", () => {
       if (initialAiMessage) {
         addItemsToChat([initialAiMessage]);
       }
+
+      initState.value = "ready";
+      flushRequestQueue();
     } catch (error) {
       consola.error("Chat Store: Error during initialization:", error);
       addErrorMessage("init");
+      initState.value = "error";
     }
   }
 
@@ -226,6 +237,13 @@ export const useChatStore = defineStore("chat", () => {
     }
   }
 
+  function flushRequestQueue() {
+    while (requestQueue.length > 0) {
+      const request = requestQueue.shift();
+      request?.();
+    }
+  }
+
   // ==== BACKEND API ACTIONS ====
   async function ensureJsonDataService() {
     if (jsonDataService.value) {
@@ -303,27 +321,40 @@ export const useChatStore = defineStore("chat", () => {
     }
   }
 
-  // ==== HIGHER LEVEL CHAT CONTROLS ====
-  async function sendUserMessage(msg: string) {
-    if (!msg.trim() || isLoading.value) {
-      return;
-    }
+  async function sendMessageToBackend(msg: string) {
+    // store for arrow up recall
+    lastUserMessage.value = msg;
 
     isLoading.value = true;
 
-    // 1. render user message in the chat
-    addItemsToChat([{ id: useId(), content: msg, type: "human" }]);
-
-    // 2. store for arrow up recall
-    lastUserMessage.value = msg;
-
     try {
-      // 3. send to backend and start polling
       await postUserMessage(msg);
       pollForNewMessages();
     } catch (error) {
       consola.error("Chat Store: Error sending user message:", error);
       addErrorMessage("sending");
+    }
+  }
+
+  // ==== HIGHER LEVEL CHAT ACTIONS ====
+  async function sendUserMessage(msg: string) {
+    if (!msg.trim() || isLoading.value) {
+      return;
+    }
+
+    const send = async () => {
+      // 1. render user message
+      addItemsToChat([{ id: useId(), content: msg, type: "human" }]);
+      // 2. send to backend
+      await sendMessageToBackend(msg);
+    };
+
+    if (initState.value === "ready") {
+      await send();
+    } else if (initState.value === "error") {
+      consola.warn("Chat Store: Initialization failed. Cannot send message.");
+    } else {
+      requestQueue.push(send);
     }
   }
 
@@ -375,6 +406,8 @@ export const useChatStore = defineStore("chat", () => {
     lastUserMessage.value = "";
     activeTimeline.value = null;
     jsonDataService.value = null;
+    initState.value = "idle";
+    requestQueue.length = 0;
   }
 
   return {
@@ -386,6 +419,7 @@ export const useChatStore = defineStore("chat", () => {
     lastUserMessage,
     activeTimeline,
     jsonDataService,
+    initState,
 
     // getters
     shouldShowToolUseIndicator,
@@ -410,6 +444,8 @@ export const useChatStore = defineStore("chat", () => {
     checkIsProcessing,
     postUserMessage,
     sendUserMessage,
+    sendMessageToBackend,
+    flushRequestQueue,
     pollForNewMessages,
     resetChat,
   };

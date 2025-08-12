@@ -66,6 +66,7 @@ describe("chat store", () => {
         lastUserMessage: "",
         activeTimeline: null,
         jsonDataService: null,
+        initState: "idle",
       });
     });
   });
@@ -344,8 +345,9 @@ describe("chat store", () => {
       mockJsonDataService.data.mockClear();
       mockJsonDataService.data.mockRejectedValue(new Error("Network error"));
 
-      // Set up the store state directly
+      // Set up the store state directly - must be ready for backend calls to happen
       store.jsonDataService = mockJsonDataService;
+      store.initState = "ready";
 
       await store.sendUserMessage("Hello!");
 
@@ -613,6 +615,199 @@ describe("chat store", () => {
         lastUserMessage: "",
         activeTimeline: null,
         jsonDataService: null,
+        initState: "idle",
+      });
+    });
+  });
+
+  describe("initialization race condition handling", () => {
+    it("queues single message sent before initialization is complete", async () => {
+      const { store } = setupStore();
+
+      // Simulate user sending message before initialization
+      await store.sendUserMessage("Hello before init");
+
+      expect(store.initState).toBe("idle");
+      expect(store.chatItems).toHaveLength(0); // Message not rendered yet
+    });
+
+    it("processes pending message after initialization completes", async () => {
+      const { store } = setupStore();
+      const config = createConfig(true);
+      const initialMessage = createAiMessage("Hello! How can I help you?");
+
+      // Queue a single message before initialization
+      await store.sendUserMessage("Hello before init");
+
+      expect(store.initState).toBe("idle");
+      expect(store.chatItems).toHaveLength(0); // Message not rendered yet
+
+      // Mock the data service for initialization
+      store.jsonDataService = mockJsonDataService;
+      mockJsonDataService.data.mockClear();
+      mockJsonDataService.data
+        .mockResolvedValueOnce(config)
+        .mockResolvedValueOnce(initialMessage)
+        .mockResolvedValue({}); // for pending message post
+
+      // Initialize the store
+      await store.init();
+
+      expect(store.initState).toBe("ready");
+      expect(store.chatItems).toHaveLength(2); // 1 user message + 1 AI initial message
+
+      // Verify backend was called for the pending message
+      expect(mockJsonDataService.data).toHaveBeenCalledWith({
+        method: "post_user_message",
+        options: ["Hello before init"],
+      });
+    });
+
+    it("handles messages sent after initialization normally", async () => {
+      const { store } = setupStore();
+
+      // Setup initialized state
+      store.initState = "ready";
+      store.jsonDataService = mockJsonDataService;
+      mockJsonDataService.data.mockClear();
+      mockJsonDataService.data.mockResolvedValue({});
+
+      await store.sendUserMessage("Hello after init");
+
+      expect(store.initState).toBe("ready");
+      expect(store.chatItems).toHaveLength(1);
+      expect(store.chatItems[0]).toMatchObject({
+        type: "human",
+        content: "Hello after init",
+      });
+
+      // Should call backend immediately
+      expect(mockJsonDataService.data).toHaveBeenCalledWith({
+        method: "post_user_message",
+        options: ["Hello after init"],
+      });
+    });
+
+    it("handles multiple messages sent before initialization by queuing all of them", async () => {
+      const { store } = setupStore();
+      const config = createConfig(true);
+
+      // Send multiple messages before initialization
+      await store.sendUserMessage("First message");
+      await store.sendUserMessage("Second message");
+      await store.sendUserMessage("Third message");
+
+      // No messages rendered yet
+      expect(store.initState).toBe("idle");
+      expect(store.chatItems).toHaveLength(0);
+
+      // Mock the data service for initialization
+      store.jsonDataService = mockJsonDataService;
+      mockJsonDataService.data.mockClear();
+      mockJsonDataService.data
+        .mockResolvedValueOnce(config)
+        .mockResolvedValueOnce(null) // No initial AI message
+        .mockResolvedValue({}); // for message posts
+
+      // Initialize the store
+      await store.init();
+
+      // All messages should be processed in order
+      expect(store.initState).toBe("ready");
+      expect(store.chatItems).toHaveLength(3); // All 3 user messages
+
+      // Verify backend was called for all messages
+      expect(mockJsonDataService.data).toHaveBeenCalledWith({
+        method: "post_user_message",
+        options: ["First message"],
+      });
+      expect(mockJsonDataService.data).toHaveBeenCalledWith({
+        method: "post_user_message",
+        options: ["Second message"],
+      });
+      expect(mockJsonDataService.data).toHaveBeenCalledWith({
+        method: "post_user_message",
+        options: ["Third message"],
+      });
+    });
+
+    it("processes pending message when there's no initial AI message", async () => {
+      const { store } = setupStore();
+      const config = createConfig(true);
+
+      // Queue a message before initialization
+      await store.sendUserMessage("Hello without initial AI");
+
+      expect(store.initState).toBe("idle");
+      expect(store.chatItems).toHaveLength(0);
+
+      // Mock the data service for initialization (no initial AI message)
+      store.jsonDataService = mockJsonDataService;
+      mockJsonDataService.data.mockClear();
+      mockJsonDataService.data
+        .mockResolvedValueOnce(config)
+        .mockResolvedValueOnce(null) // No initial AI message
+        .mockResolvedValue({}); // for pending message post
+
+      // Initialize the store
+      await store.init();
+
+      expect(store.initState).toBe("ready");
+      expect(store.chatItems).toHaveLength(1); // Only the user message
+      expect(store.chatItems[0]).toMatchObject({
+        type: "human",
+        content: "Hello without initial AI",
+      });
+
+      // Verify backend was called for the pending message
+      expect(mockJsonDataService.data).toHaveBeenCalledWith({
+        method: "post_user_message",
+        options: ["Hello without initial AI"],
+      });
+    });
+
+    it("ignores empty pending messages", async () => {
+      const { store } = setupStore();
+
+      // Try to send empty/whitespace messages before initialization
+      await store.sendUserMessage("");
+      await store.sendUserMessage("   ");
+      await store.sendUserMessage("\n\t");
+
+      // State should remain idle and no messages queued
+      expect(store.initState).toBe("idle");
+      expect(store.chatItems).toHaveLength(0);
+    });
+
+    it("handles error during pending message processing", async () => {
+      const { store } = setupStore();
+      const config = createConfig(true);
+      const initialMessage = createAiMessage("Hello!");
+
+      // Queue a message before initialization
+      await store.sendUserMessage("Hello before init");
+
+      // Mock the data service for initialization, but fail on message send
+      store.jsonDataService = mockJsonDataService;
+      mockJsonDataService.data.mockClear();
+      mockJsonDataService.data
+        .mockResolvedValueOnce(config)
+        .mockResolvedValueOnce(initialMessage)
+        .mockRejectedValueOnce(new Error("Network error")); // Fail on pending message post
+
+      // Initialize the store
+      await store.init();
+
+      expect(store.initState).toBe("ready");
+      expect(store.chatItems).toHaveLength(3); // Initial AI + user message + error message
+      expect(store.chatItems[0]).toEqual(initialMessage);
+      expect(store.chatItems[1]).toMatchObject({
+        type: "human",
+        content: "Hello before init",
+      });
+      expect(store.chatItems[2]).toMatchObject({
+        type: "error",
+        content: "There was an error while sending your message.",
       });
     });
   });

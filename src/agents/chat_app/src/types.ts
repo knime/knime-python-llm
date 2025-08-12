@@ -85,3 +85,5 @@ export type ChatItem = Message | Timeline;
 export interface Config {
   show_tool_calls_and_results: boolean;
 }
+
+export type InitializationState = "idle" | "ready" | "error";

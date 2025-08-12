@@ -1189,7 +1189,7 @@ class OpenAIAuthenticator:
         """Sets the destination of the API requests to OpenAI or an OpenAI compatible API.""",
         default_value=_default_openai_api_base,
         since_version="5.2.0",
-        is_advanced=False,
+        is_advanced=True,
     )
 
     verify_settings = knext.BoolParameter(

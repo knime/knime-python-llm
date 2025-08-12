@@ -814,11 +814,6 @@ class OpenAIAuthenticationPortObjectSpec(AIPortObjectSpec):
         return OpenAIClient(
             api_key=key,
             base_url=self.base_url,
-            default_headers={
-                "Authorization": f"{self._credential_spec.auth_schema} {key}"
-            }
-            if self._credential_spec is not None
-            else None,
         )
 
     def get_model_list(self, ctx: knext.ConfigurationContext) -> list[str]:
@@ -995,11 +990,6 @@ def _create_instruct_model(
         top_p=po_instance.spec.top_p,
         max_tokens=po_instance.spec.max_tokens,
         seed=po_instance.spec.seed,
-        default_headers={
-            "Authorization": f"{po_instance.spec.auth_spec._credential_spec.auth_schema} {key}"
-        }
-        if po_instance.spec.auth_spec._credential_spec is not None
-        else None,
     )
 
 
@@ -1025,11 +1015,6 @@ def _create_model(
         max_tokens=po_instance.spec.max_tokens,
         seed=po_instance.spec.seed,
         model_kwargs=model_kwargs,
-        default_headers={
-            "Authorization": f"{po_instance.spec.auth_spec._credential_spec.auth_schema} {key}"
-        }
-        if po_instance.spec.auth_spec._credential_spec is not None
-        else None,
     )
 
 
@@ -1132,11 +1117,6 @@ class OpenAIEmbeddingsPortObject(EmbeddingsPortObject):
             base_url=self.spec.base_url,
             model=self.spec.model,
             dimensions=self.spec.dimensions,
-            default_headers={
-                "Authorization": f"{self.spec.auth_spec._credential_spec.auth_schema} {key}"
-            }
-            if self.spec.auth_spec._credential_spec is not None
-            else None,
         )
 
 
@@ -1200,7 +1180,7 @@ class OpenAIAuthenticator:
         label="OpenAI API key",
         description="""
         The credentials containing the OpenAI API key in its *password* field (the *username* is ignored).
-        Only shown if no credential is connected to the dynamic port.
+        Only shown if the optional credential port is not connected.
         """,
     ).rule(knext.DialogContextCondition(_has_auth_port), knext.Effect.HIDE)
 

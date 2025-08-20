@@ -785,8 +785,16 @@ class OpenAIAuthenticationPortObjectSpec(AIPortObjectSpec):
         return self._credentials
 
     @property
-    def custom_headers(self) -> str:
+    def custom_headers(self) -> dict[str, str]:
         return self._custom_headers
+
+    @property
+    def normalized_custom_headers(self) -> dict[str, str]:
+        """Custom headers that are used by OpenAI internally are mapped to OpenAI's capitalization.
+        OpenAI does not overwrite internal headers if the capitalization is different."""
+
+        headers, _ = self._normalize_custom_headers()
+        return headers
 
     @property
     def base_url(self) -> str:
@@ -872,9 +880,6 @@ class OpenAIAuthenticationPortObjectSpec(AIPortObjectSpec):
     def _normalize_custom_headers(
         self,
     ) -> tuple[dict[str, str], List[str]]:
-        """OpenAI does not overwrite internal headers if the capitalization of custom headers is different.
-        This function maps custom headers to the capitalization used by OpenAI so that internal headers get overwritten."""
-
         header_map = {h.lower(): h for h in _overwritable_request_headers}
 
         normalized = {}
@@ -901,7 +906,7 @@ class OpenAIAuthenticationPortObjectSpec(AIPortObjectSpec):
         return OpenAIClient(
             api_key=key,
             base_url=self.base_url,
-            default_headers=self._normalize_custom_headers()[0],
+            default_headers=self.normalized_custom_headers,
         )
 
     def get_model_list(self, ctx: knext.ConfigurationContext) -> list[str]:
@@ -1080,7 +1085,7 @@ def _create_instruct_model(
         top_p=po_instance.spec.top_p,
         max_tokens=po_instance.spec.max_tokens,
         seed=po_instance.spec.seed,
-        default_headers=po_instance.spec.auth_spec._normalize_custom_headers()[0],
+        default_headers=po_instance.spec.auth_spec.normalized_custom_headers,
     )
 
 
@@ -1106,7 +1111,7 @@ def _create_model(
         max_tokens=po_instance.spec.max_tokens,
         seed=po_instance.spec.seed,
         model_kwargs=model_kwargs,
-        default_headers=po_instance.spec.auth_spec._normalize_custom_headers()[0],
+        default_headers=po_instance.spec.auth_spec.normalized_custom_headers,
     )
 
 
@@ -1209,7 +1214,7 @@ class OpenAIEmbeddingsPortObject(EmbeddingsPortObject):
             base_url=self.spec.base_url,
             model=self.spec.model,
             dimensions=self.spec.dimensions,
-            default_headers=self.spec.auth_spec._normalize_custom_headers()[0],
+            default_headers=self.spec.auth_spec.normalized_custom_headers,
         )
 
 

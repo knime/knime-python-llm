@@ -181,3 +181,6 @@ class LLMChatModelAdapter(BaseChatModel):
     def _llm_type(self) -> str:
         """Return type of llm."""
         return "LLMChatModelAdapter"
+
+    def bind_tools(self, tools: Any):
+        raise RuntimeError("The model does not support tool calls.")

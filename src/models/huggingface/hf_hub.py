@@ -56,13 +56,14 @@ from ..base import (
     AIPortObjectSpec,
     OutputFormatOptions,
     LLMModelType,
-    create_model_type_switch
+    create_model_type_switch,
 )
 from .hf_base import (
     hf_category,
     hf_icon,
     HFPromptTemplateSettings,
     HFModelSettings,
+    HFChatModelSettings,
     raise_for,
 )
 
@@ -179,7 +180,6 @@ class HFHubLLMPortObjectSpec(LLMPortObjectSpec):
     @property
     def model_kwargs(self):
         return self._model_kwargs
-    
 
     def serialize(self) -> dict:
         return {
@@ -233,7 +233,7 @@ class HFHubChatModelPortObjectSpec(HFHubLLMPortObjectSpec, ChatModelPortObjectSp
         llm_spec: HFHubLLMPortObjectSpec,
         system_prompt_template: str,
         prompt_template: str,
-        model_type: "LLMModelType"
+        model_type: "LLMModelType",
     ) -> None:
         super().__init__(
             llm_spec._credentials,
@@ -253,7 +253,7 @@ class HFHubChatModelPortObjectSpec(HFHubLLMPortObjectSpec, ChatModelPortObjectSp
     @property
     def prompt_template(self) -> str:
         return self._prompt_template
-    
+
     @property
     def is_instruct_model(self):
         return self._model_type is LLMModelType.INSTRUCT
@@ -272,7 +272,7 @@ class HFHubChatModelPortObjectSpec(HFHubLLMPortObjectSpec, ChatModelPortObjectSp
             llm_spec,
             system_prompt_template=data["system_prompt_template"],
             prompt_template=data["prompt_template"],
-            model_type=LLMModelType[data.get("model_type", LLMModelType.CHAT.name)]
+            model_type=LLMModelType[data.get("model_type", LLMModelType.CHAT.name)],
         )
 
 
@@ -293,6 +293,30 @@ class HFHubChatModelPortObject(HFHubLLMPortObject, ChatModelPortObject):
             llm=llm,
             system_prompt_template=self.spec.system_prompt_template,
             prompt_template=self.spec.prompt_template,
+        )
+
+
+class HFHubChatModel2PortObjectSpec(HFHubLLMPortObjectSpec, ChatModelPortObjectSpec):
+    """Spec of a HF Hub chat model that uses task 'conversational' for chat completion."""
+
+
+class HFHubChatModel2PortObject(HFHubLLMPortObject, ChatModelPortObject):
+    @property
+    def spec(self) -> HFHubChatModel2PortObjectSpec:
+        return super().spec
+
+    def create_model(
+        self, ctx: knext.ExecutionContext, output_format: OutputFormatOptions
+    ):
+        from ._hf_llm import HFChat
+
+        return HFChat(
+            model=self.spec.repo_id,
+            provider=self.spec.provider,
+            hf_api_token=self.spec.credentials.get_token(ctx),
+            max_tokens=self.spec.model_kwargs.get("max_tokens"),
+            top_p=self.spec.model_kwargs.get("top_p"),
+            temperature=self.spec.model_kwargs.get("temperature"),
         )
 
 
@@ -363,6 +387,7 @@ hf_authentication_port_type = knext.port_type(
 )
 
 
+# region Authenticator
 @knext.node(
     "HF Hub Authenticator",
     knext.NodeType.SOURCE,
@@ -447,6 +472,7 @@ hf_hub_llm_port_type = knext.port_type(
 )
 
 
+# region LLM Connector (deprecated)
 @knext.node(
     "HF Hub LLM Connector",
     knext.NodeType.SOURCE,
@@ -545,7 +571,7 @@ hf_hub_chat_model_port_type = knext.port_type(
 )
 
 
-
+# region LLM Selector (deprecated)
 @knext.node(
     "HF Hub LLM Selector",
     knext.NodeType.SOURCE,
@@ -559,6 +585,7 @@ hf_hub_chat_model_port_type = knext.port_type(
         "HuggingFace",
         "Hugging Face",
     ],
+    is_deprecated=True,
 )
 @knext.input_port(
     "HF Authentication",
@@ -575,7 +602,7 @@ class HFHubChatModelConnector:
     Select an LLM hosted on the Hugging Face Hub.
 
     This node establishes a connection to a specific Large Language Model (LLM) hosted on the Hugging Face Hub.
-    The difference to the HF Hub LLM Selector (deprecated) is that this node allows you to provide prompt templates which are crucial for
+    The difference to the HF Hub LLM Connector (deprecated) is that this node allows you to provide prompt templates which are crucial for
     obtaining the best output from many models that have been fine-tuned for chat-based usecases.
 
     To use this node, you need to successfully authenticate with the Hugging Face Hub using the **HF Hub Authenticator** node.
@@ -597,7 +624,9 @@ class HFHubChatModelConnector:
 
     hub_settings = HFHubSettings()
     model_type = create_model_type_switch()
-    template_settings = HFPromptTemplateSettings().rule(knext.OneOf(model_type, [LLMModelType.INSTRUCT.name]), knext.Effect.HIDE)
+    template_settings = HFPromptTemplateSettings().rule(
+        knext.OneOf(model_type, [LLMModelType.INSTRUCT.name]), knext.Effect.HIDE
+    )
     model_settings = HFModelSettings()
 
     def configure(
@@ -634,7 +663,7 @@ class HFHubChatModelConnector:
             llm_spec,
             self.template_settings.system_prompt_template,
             self.template_settings.prompt_template,
-            model_type=LLMModelType[self.model_type]
+            model_type=LLMModelType[self.model_type],
         )
 
     def execute(
@@ -660,6 +689,102 @@ def _validate_repo_id(repo_id: str, token: str):
         )
 
 
+hf_hub_chat_model_2_port_type = knext.port_type(
+    "HF Hub Chat Model",
+    HFHubChatModel2PortObject,
+    HFHubChatModel2PortObjectSpec,
+    id="org.knime.python.llm.models.huggingface.HFHubChatModel2PortObject",
+)
+
+
+# region LLM Selector
+@knext.node(
+    "HF Hub LLM Selector",
+    knext.NodeType.SOURCE,
+    hf_icon,
+    category=hf_hub_category,
+    id="HFHubChatModelConnector2",
+    keywords=[
+        "GenAI",
+        "Gen AI",
+        "Generative AI",
+        "HuggingFace",
+        "Hugging Face",
+    ],
+)
+@knext.input_port(
+    "HF Authentication",
+    "Validated authentication for Hugging Face Hub.",
+    hf_authentication_port_type,
+)
+@knext.output_port(
+    "HF Hub Chat Model",
+    "Connection to a specific chat model from Hugging Face Hub.",
+    hf_hub_chat_model_2_port_type,
+)
+class HFHubChatModelConnector2:
+    """
+    Connects to a chat model hosted on the Hugging Face Hub.
+
+    This node establishes a connection to a specific chat model hosted on the Hugging Face Hub.
+
+    To use this node, you need to successfully authenticate with the Hugging Face Hub using the **HF Hub Authenticator** node.
+
+    Provide the name of the desired chat model repository available on the
+    [Hugging Face Hub](https://huggingface.co/models)
+    as an input. The model will be executed with the
+    [Inference Provider](https://huggingface.co/docs/inference-providers/en/index) "HF Inference" for the
+    chat completion task.
+
+    Please ensure that you have the necessary permissions to access the model.
+    Failures with gated models may occur due to outdated tokens.
+
+    **Note**: Tool calling is currently not supported for HF Hub models.
+
+    **Note**: If you use the
+    [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
+    and do not select the "Save password in configuration (weakly encrypted)" option for passing the API key,
+    the Credentials Configuration node will need to be reconfigured upon reopening the workflow, as the credentials
+    flow variable was not saved and will therefore not be available to downstream nodes.
+    """
+
+    hub_settings = HFHubSettings()
+    model_settings = HFChatModelSettings()
+
+    def configure(
+        self,
+        ctx: knext.ConfigurationContext,
+        auth: HFAuthenticationPortObjectSpec,
+    ) -> HFHubChatModel2PortObjectSpec:
+        auth.validate_context(ctx)
+        if not self.hub_settings.repo_id:
+            raise knext.InvalidParametersError("Please enter a repo ID.")
+        _validate_repo_id(self.hub_settings.repo_id, auth.get_token(ctx))
+        return self._create_spec(auth)
+
+    def _create_spec(
+        self, auth: HFAuthenticationPortObjectSpec
+    ) -> HFHubChatModel2PortObjectSpec:
+        model_kwargs = {
+            "temperature": self.model_settings.temperature,
+            "top_p": self.model_settings.top_p,
+            "max_tokens": self.model_settings.max_tokens,
+        }
+
+        return HFHubChatModel2PortObjectSpec(
+            auth,
+            self.hub_settings.repo_id,
+            HF_DEFAULT_INFERENCE_PROVIDER,
+            self.model_settings.n_requests,
+            model_kwargs,
+        )
+
+    def execute(
+        self, ctx, auth: HFAuthenticationPortObject
+    ) -> HFHubChatModel2PortObject:
+        return HFHubChatModel2PortObject(self._create_spec(auth.spec))
+
+
 hf_embeddings_port_type = knext.port_type(
     "HF Hub Embeddings",
     HFHubEmbeddingsPortObject,
@@ -668,6 +793,7 @@ hf_embeddings_port_type = knext.port_type(
 )
 
 
+# region Embedding Selector
 @knext.node(
     "HF Hub Embedding Model Selector",
     knext.NodeType.SOURCE,

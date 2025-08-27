@@ -102,6 +102,48 @@ class HFModelSettings(GeneralRemoteSettings):
     )
 
 
+class HFChatModelSettings(GeneralRemoteSettings):
+    max_tokens = knext.IntParameter(
+        label="Maximum response length (token)",
+        description="""
+        The maximum number of tokens to generate.
+
+        This value, plus the token count of your prompt, cannot exceed the model's context length.
+        """,
+        default_value=200,
+        min_value=1,
+    )
+
+    # Altered from GeneralSettings because huggingface-hub has temperatures going up to 2
+    temperature = knext.DoubleParameter(
+        label="Temperature",
+        description="""
+        Sampling temperature to use, between 0.0 and 2.0. 
+        Higher values will make the output more random, 
+        while lower values will make it more focused and deterministic.
+        """,
+        default_value=1.0,
+        min_value=0.0,
+        max_value=2.0,
+        is_advanced=True,
+    )
+
+    # Altered from GeneralSettings because huggingface-hub defaults to 1.0
+    top_p = knext.DoubleParameter(
+        label="Top-p sampling",
+        description="""
+        An alternative to sampling with temperature, 
+        where the model considers the results of the tokens (words) 
+        with top_p probability mass. Hence, 0.1 means only the tokens 
+        comprising the top 10% probability mass are considered.
+        """,
+        default_value=1.0,
+        min_value=0.01,
+        max_value=1.0,
+        is_advanced=True,
+    )
+
+
 @knext.parameter_group(label="Prompt Templates")
 class HFPromptTemplateSettings:
     system_prompt_template = knext.MultilineStringParameter(

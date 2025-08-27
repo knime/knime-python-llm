@@ -9,14 +9,15 @@ no-build = true
 [tasks]
 
 [dependencies]
-knime-python-base = "*"
+knime-extension = "5.7.*"
+knime-python-versions = "5.7.*"
 python = "3.11.*"
 langchain = "0.3.23.*"
 langchain-community = "0.3.21.*"
 langchain-openai = "0.3.14.*"
 langchain-chroma = "0.2.3.*"
 langchain-anthropic = "0.3.12.*"
-packaging = "<25"
+packaging = "<=25"
 pydantic = "2.10.2.*"
 shapely = "*"
 httpx = "*"
@@ -27,10 +28,10 @@ faiss-cpu = "1.7.4.*"
 docopt = "0.6.2.*"
 griffe = "0.48.0.*"
 bokeh = "3.3.4.*"
-scipy = "1.11.4.*"
+scipy = "1.11.*"
 umap-learn = "0.5.7.*"
-matplotlib = "3.10.1.*"
-ipython = "9.1.0.*"
+matplotlib = "*"
+ipython = "*"
 langdetect = "1.0.9.*"
 chardet = "5.2.0.*"
 cloudpickle = "3.1.1.*"
@@ -41,7 +42,7 @@ smmap = "5.0.2.*"
 sqlparse = "0.5.3.*"
 xxhash = "*"
 google-genai = "1.12.1.*"
-beautifulsoup4 = "4.12.3.*"
+beautifulsoup4 = "*"
 huggingface_hub = "0.31.4.*"
 openai = "1.76.2.*"
 pip = "25.0.1.*"
@@ -51,7 +52,8 @@ ibm_cos_sdk = "2.14.1.*"
 langgraph = "0.4.2.*"
 pyyaml = ">=6.0.2,<7"
 onnxruntime = "1.21.1.*"
-charset-normalizer = ">=3.4.2,<4"
+charset-normalizer = ">=3.4.2,<4.13.6"
+posthog = ">=2.4.0,<6.0.0"
 
 
 [pypi-dependencies]
@@ -65,13 +67,13 @@ langchain-ibm = "==0.3.10.*"
 
 [feature.build.dependencies]
 python = "3.9.*"
-knime-extension-bundling = "5.5.*"
+knime-extension-bundling = "5.7.*"
 
 [feature.dev.dependencies]
 debugpy = "*"
 
 [feature.build.tasks]
-build = { args = [{ "arg" = "dest", "default" = "./local-update-site" }], cmd = "python ./.pixi/envs/build/bin/build_python_extension.py . {{ dest }} --render-folder ./render-dir --force --disable-strict-enforcement"}
+build = { args = [{ "arg" = "dest", "default" = "./local-update-site" }], cmd = "build-python-extension . {{ dest }} --render-folder ./render-dir --force"}
 
 [environments]
 build = {features = ["build"], no-default-feature = true}

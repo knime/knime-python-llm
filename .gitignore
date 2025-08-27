@@ -58,3 +58,6 @@ test-results
 # Optional eslint cache
 .eslintcache
 .stylelintcache
+
+local-update-site/
+render-dir/

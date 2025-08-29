@@ -347,6 +347,7 @@ class GeminiImageGenerator:
                 config = types.GenerateImagesConfig(
                     aspect_ratio=ImagenSettings.AspectRatioOptions.to_api_value(self.imagen_settings.aspect_ratio),
                     person_generation=ImagenSettings.PersonGenerationOptions.to_api_value(self.imagen_settings.person_generation),
+                    number_of_images=1
                 )
 
                 response = client.models.generate_images(

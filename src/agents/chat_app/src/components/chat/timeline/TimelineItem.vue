@@ -110,7 +110,9 @@ const previewText = computed(() => {
       class="preview-container"
       :class="{ 'with-overlay': previewNeedsOverlay }"
     >
-      <div class="preview-text">{{ previewText }}</div>
+      <div class="preview-text">
+        <MarkdownRenderer :markdown="previewText" />
+      </div>
       <div v-if="previewNeedsOverlay" class="preview-fade" />
     </div>
 

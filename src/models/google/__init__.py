@@ -46,3 +46,4 @@
 from ._connectivity import VertexAiConnector, GoogleAiStudioAuthenticator
 from ._chat import GeminiChatModelConnector
 from ._embedding import GeminiEmbeddingModelConnector
+from ._image_generator import GeminiImageGenerator

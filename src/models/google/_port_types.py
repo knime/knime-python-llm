@@ -67,6 +67,7 @@ from ._utils import (
     GEMINI_CHAT_MODELS_FALLBACK,
     VERTEX_AI_GEMINI_EMBEDDING_MODELS_FALLBACK,
     GOOGLE_AI_STUDIO_GEMINI_EMBEDDING_MODELS_FALLBACK,
+    GOOGLE_AI_STUDIO_GEMINI_IMAGE_MODELS_FALLBACK
 )
 
 LOGGER = logging.getLogger(__name__)
@@ -93,7 +94,14 @@ class GenericGeminiConnectionPortObjectSpec(AIPortObjectSpec):
         raise NotImplementedError(
             "Subclasses of the generic Gemini connection must implement this method."
         )
-
+    
+    def get_image_model_list(
+        self, dialog_creation_context: knext.DialogCreationContext
+    ) -> List[str]:
+        raise NotImplementedError(
+            "Subclasses of the generic Gemini connection must implement this method."
+        )
+    
     def create_chat_model_name(self, model_name) -> str:
         raise NotImplementedError(
             "Subclasses of the generic Gemini connection must implement this method."
@@ -538,10 +546,22 @@ class GoogleAiStudioAuthenticationPortObjectSpec(GenericGeminiConnectionPortObje
 
         return self._clean_and_sort_models(models)
 
+    def get_image_model_list(
+        self, dialog_creation_context: knext.DialogCreationContext
+    ) -> List[str]:
+        models = self._fetch_models_from_api(dialog_creation_context, "image")
+        if not models:
+            LOGGER.info(
+                "No image models available for the authenticated Google AI Studio user. Using a predefined list of known image models."
+            )
+            return GOOGLE_AI_STUDIO_GEMINI_IMAGE_MODELS_FALLBACK
+
+        return self._clean_and_sort_models(models)
+
     def _fetch_models_from_api(
         self,
         ctx: knext.ExecutionContext | knext.DialogCreationContext,
-        model_type: Literal["chat", "embedding"],
+        model_type: Literal["chat", "embedding", "image"],
     ):
         """
         Always returns either:
@@ -567,6 +587,9 @@ class GoogleAiStudioAuthenticationPortObjectSpec(GenericGeminiConnectionPortObje
 
             if model_type == "embedding":
                 return "embedContent" in model.supported_actions
+
+            if  model_type == "image":
+                return model_type in model.name 
 
             return False
 

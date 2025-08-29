@@ -69,7 +69,7 @@ import time
 import json
 import base64
 import tempfile
-from typing import Callable, List, Optional, Tuple
+from typing import Callable, List, Optional
 import logging
 
 LOGGER = logging.getLogger(__name__)
@@ -635,23 +635,13 @@ class GPTImage1Settings:
         style=knext.EnumParameter.Style.VALUE_SWITCH,
     )
 
-    def _image_column_filter(column: knext.Column) -> bool:
-        from PIL import Image
-
-        img_type = knext.logical(Image.Image)
-        return column.ktype == img_type
-
-    def _image_table_present(ctx: knext.DialogCreationContext) -> bool:
-        specs = ctx.get_input_specs()
-        return len(specs) == 2 and specs[1] is not None
-
     image_columns = knext.ColumnFilterParameter(
         "Images to edit",
         "Columns containing images to edit.",
         port_index=1,
-        column_filter=_image_column_filter,
+        column_filter=util.image_column_filter,
     ).rule(
-        knext.DialogContextCondition(_image_table_present),
+        knext.DialogContextCondition(util.image_table_present),
         knext.Effect.SHOW,
     )
 
@@ -1785,7 +1775,7 @@ class OpenAIDALLEView:
             img_bytes = self._create_with_dalle_3(client)
         elif self.model == ImageModels.GPT_IMAGE_1.name:
             if has_image_table:
-                images = self._prepare_images(
+                images = util.prepare_images(
                     image_table, self.gpt_image_1_settings.image_columns
                 )
                 img_bytes = self._edit_with_gpt_image_1(client, images)
@@ -1874,57 +1864,6 @@ class OpenAIDALLEView:
         b_64 = response.data[0].b64_json
 
         return base64.b64decode(b_64)
-
-    def _prepare_images(
-        self,
-        image_table: knext.Table,
-        image_columns: knext.ColumnFilterConfig,
-    ) -> List[Tuple[str, io.BytesIO, str]]:
-        """
-        Extracts images from table according to selected image columns,
-        converts them to PNG in-memory file tuples, and returns a list
-        of (filename, raw_png_bytes, mimetype).
-        This format is required by the OpenAI Image API for image generation.
-        """
-        image_column_names = self._get_image_column_names(
-            image_columns,
-            schema=image_table.schema,
-        )
-
-        image_df = image_table[image_column_names].to_pandas()
-
-        files = []
-        for idx, row in enumerate(image_df.itertuples(index=False), start=1):
-            # for each image column, save the image to a bytes buffer
-            for i, col in enumerate(image_column_names):
-                # create an in-memory bytes buffer to hold the PNG data
-                buffer = io.BytesIO()
-
-                # pull out the PIL.Image object from the row
-                pil_img = row[i]
-
-                # save the image into our buffer in PNG format
-                # this encodes the PIL.Image into valid PNG bytes
-                pil_img.save(buffer, format="PNG")
-
-                # extract raw PNG bytes from the buffer
-                raw = buffer.getvalue()
-
-                filename = f"{col}_{idx}.png"
-                files.append((filename, raw, "image/png"))
-        return files
-
-    def _get_image_column_names(
-        self,
-        column_filter_config,
-        schema: knext.Schema,
-    ) -> List[str]:
-        """
-        Get the image column names from the column filter config and schema.
-        """
-        if not column_filter_config:
-            return []
-        return [col.name for col in column_filter_config.apply(schema)]
 
 
 # region Model Deleter

@@ -84,6 +84,10 @@ GOOGLE_AI_STUDIO_GEMINI_EMBEDDING_MODELS_FALLBACK = [
     "gemini-embedding-exp-03-07",
     "text-embedding-005",
 ]
+GOOGLE_AI_STUDIO_GEMINI_IMAGE_MODELS_FALLBACK = [
+    "gemini-2.5-flash-image-preview",
+    "imagen-4.0-generate-001",
+]
 
 # icons
 vertex_ai_icon = "icons/google/vertex_ai.png"

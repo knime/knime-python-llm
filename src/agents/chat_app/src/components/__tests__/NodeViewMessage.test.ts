@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 
-import type { ViewResponse } from "@/types";
-import NodeViewMessage from "../NodeViewMessage.vue";
-import MessageBox from "../chat/MessageBox.vue";
+import type { ViewMessage } from "@/types";
+import MessageBox from "../chat/message/MessageBox.vue";
+import NodeViewMessage from "../chat/message/NodeViewMessage.vue";
 
 const mockCallKnimeUiApi = vi.fn(() =>
   Promise.resolve({
@@ -35,11 +35,12 @@ vi.mock("@knime/ui-extension-service", () => ({
 }));
 
 describe("NodeViewMessage", () => {
-  const doMount = (props: Partial<ViewResponse> = {}) => {
+  const doMount = (props: Partial<ViewMessage> = {}) => {
     const defaultProps = {
       id: "1",
       content: "projectId#workflowId:nodeId",
       type: "view" as const,
+      name: "Test View",
     };
 
     mockCallKnimeUiApi.mockClear();

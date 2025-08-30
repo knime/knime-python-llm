@@ -1,6 +1,10 @@
-import type { DefineComponent } from "vue";
+// Message-related entities
+type MessageType = "human" | "ai" | "tool" | "view" | "error";
 
-type Type = "human" | "ai" | "tool" | "view" | "error";
+interface BaseMessage {
+  id: string;
+  type: MessageType;
+}
 
 export interface ToolCall {
   id: string;
@@ -8,51 +12,78 @@ export interface ToolCall {
   args?: string;
 }
 
-interface BaseMessageResponse {
-  id: string;
-  type: Type;
-}
-
-export interface AiResponse extends BaseMessageResponse {
+export interface AiMessage extends BaseMessage {
   type: "ai";
   name?: string | null;
   content: string;
   toolCalls?: ToolCall[];
 }
 
-export interface ToolResponse extends BaseMessageResponse {
-  toolCallId: string;
-  type: "tool";
-  name: string;
-  content: string;
-}
-
-export interface ViewResponse extends BaseMessageResponse {
+export interface ViewMessage extends BaseMessage {
   content: string;
   type: "view";
+  name: string;
 }
 
-export interface ErrorResponse extends BaseMessageResponse {
+export interface ErrorMessage extends BaseMessage {
   content: string;
   type: "error";
 }
 
-export interface HumanResponse extends BaseMessageResponse {
+export interface HumanMessage extends BaseMessage {
   content: string;
   type: "human";
 }
 
-export type MessageResponse =
-  | AiResponse
-  | ToolResponse
-  | ViewResponse
-  | ErrorResponse
-  | HumanResponse;
+export interface ToolMessage extends BaseMessage {
+  content: string;
+  type: "tool";
+  toolCallId: string;
+}
 
-export type MessageComponentMap = {
-  [K in MessageResponse["type"]]: DefineComponent<
-    Extract<MessageResponse, { type: K }>,
-    {},
-    any
-  >;
-};
+export type Message =
+  | AiMessage
+  | ViewMessage
+  | ErrorMessage
+  | HumanMessage
+  | ToolMessage;
+
+// Timeline-related entities
+export type TimelineItemType = "reasoning" | "tool_call";
+
+export interface BaseTimelineItem {
+  id: string;
+  type: TimelineItemType;
+}
+
+export interface ReasoningTimelineItem extends BaseTimelineItem {
+  type: "reasoning";
+  content?: string;
+}
+
+export interface ToolCallTimelineItem extends BaseTimelineItem {
+  type: "tool_call";
+  name: string;
+  status: "running" | "completed" | "failed";
+  args?: string;
+  content?: string;
+}
+
+export type TimelineItem = ReasoningTimelineItem | ToolCallTimelineItem;
+
+export interface Timeline {
+  id: string;
+  items: TimelineItem[];
+  label: string;
+  status: "active" | "completed";
+  type: "timeline";
+}
+
+export type ChatItem = Message | Timeline;
+
+// misc types
+export interface Config {
+  show_tool_calls_and_results: boolean;
+}
+
+export type InitializationState = "idle" | "ready" | "error";

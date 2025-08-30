@@ -43,7 +43,45 @@
 # ------------------------------------------------------------------------
 
 
-from ._connectivity import VertexAiConnector, GoogleAiStudioAuthenticator
-from ._chat import GeminiChatModelConnector
-from ._embedding import GeminiEmbeddingModelConnector
-from ._image_generator import GeminiImageGenerator
+from langchain_openai.chat_models.azure import AzureChatOpenAI
+
+class _AzureChatOpenAI(AzureChatOpenAI):
+    """
+    AzureChatOpenAI subclass that provides custom error handling.
+    """
+
+    async def abatch(self, messages, **kwargs):
+        try:
+            return await super().abatch(messages, **kwargs)
+        except Exception as e:
+            self._raise_if_reasoning_model_error(e)
+        
+    def invoke(self, input, config=None, **kwargs):
+        try:
+            return super().invoke(input, config=config, **kwargs)
+        except Exception as e:
+            self._raise_if_reasoning_model_error(e)
+
+
+    def _raise_if_reasoning_model_error(self, error):
+        from openai import BadRequestError
+
+        error_message = str(error)
+        has_unsupported_param = any(
+            f"Unsupported parameter: '{param}'" in error_message
+            for param in ["max_tokens", "top_p"]
+        )
+        has_unsupported_value = (
+            "Unsupported value" in error_message and "temperature" in error_message
+        )
+
+        if (
+            isinstance(error, BadRequestError)
+            and (has_unsupported_param or has_unsupported_value)
+        ):
+            raise ValueError(
+                "The selected model is a reasoning model. "
+                "Please enable the 'The model is a reasoning model' option in the Azure OpenAI LLM Selector, "
+                "or choose a different model that is not a reasoning model."
+            )
+        raise error

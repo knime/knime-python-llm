@@ -5,7 +5,7 @@
 
 # Node artifact files
 node_modules/
-dist/
+# dist/
 
 # Compiled Java class files
 *.class
@@ -58,3 +58,6 @@ test-results
 # Optional eslint cache
 .eslintcache
 .stylelintcache
+
+local-update-site/
+render-dir/

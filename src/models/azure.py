@@ -160,6 +160,7 @@ class AzureOpenAILLMPortObjectSpec(
         max_tokens: int,
         seed: int,
         n_requests: int,
+        is_reasoning_model: bool,
     ) -> None:
         super().__init__(credentials)
         self._model = model_name
@@ -168,6 +169,16 @@ class AzureOpenAILLMPortObjectSpec(
         self._max_tokens = max_tokens
         self._seed = seed
         self._n_requests = n_requests
+        self._is_reasoning_model = is_reasoning_model
+
+    @property
+    def is_reasoning_model(self) -> bool:
+        return self._is_reasoning_model
+
+    def serialize(self) -> dict:
+        data = super().serialize()
+        data["is_reasoning_model"] = self._is_reasoning_model
+        return data
 
     @classmethod
     def deserialize(cls, data: dict):
@@ -179,17 +190,18 @@ class AzureOpenAILLMPortObjectSpec(
             data["max_tokens"],
             data.get("seed", 0),
             data.get("n_requests", 1),
+            data.get("is_reasoning_model", False),
         )
 
 
 def _create_instruct_model(
-    po_instance,
+    po_instance: "AzureOpenAILLMPortObject",
     ctx: knext.ExecutionContext,
 ):
     from langchain_openai import AzureOpenAI
 
     return AzureOpenAI(
-        openai_api_key=ctx.get_credentials(po_instance.spec.credentials).password,
+        openai_api_key=po_instance.spec.auth_spec.get_api_key(ctx),
         api_version=po_instance.spec.api_version,
         azure_endpoint=po_instance.spec.base_url,
         openai_api_type=po_instance.spec.api_type,
@@ -202,26 +214,40 @@ def _create_instruct_model(
 
 
 def _create_model(
-    po_instance,
+    po_instance: "AzureOpenAIChatModelPortObject",
     ctx: knext.ExecutionContext,
     output_format: OutputFormatOptions = OutputFormatOptions.Text,
 ):
-    from langchain_openai import AzureChatOpenAI
+    from ._azure import _AzureChatOpenAI
 
-    model_kwargs = {"top_p": po_instance.spec.top_p}
+    model_kwargs = {}
+
+    # Map max_tokens to max_completion_tokens
+    if po_instance.spec.is_reasoning_model:
+        model_kwargs["max_completion_tokens"] = po_instance.spec.max_tokens
+
+    # Ignore top_p for reasoning models as it's an unsupported parameter
+    if not po_instance.spec.is_reasoning_model:
+        model_kwargs["top_p"] = po_instance.spec.top_p
 
     if output_format == OutputFormatOptions.JSON:
         model_kwargs["response_format"] = {"type": "json_object"}
 
-    return AzureChatOpenAI(
-        openai_api_key=ctx.get_credentials(po_instance.spec.credentials).password,
+    return _AzureChatOpenAI(
+        openai_api_key=po_instance.spec.auth_spec.get_api_key(ctx),
         openai_api_version=po_instance.spec.api_version,
         azure_endpoint=po_instance.spec.base_url,
         openai_api_type=po_instance.spec.api_type,
         deployment_name=po_instance.spec.model,
-        temperature=po_instance.spec.temperature,
+        temperature=1.0
+        if po_instance.spec.is_reasoning_model
+        else po_instance.spec.temperature,
+        # For reasoning models, we exclude 'max_tokens' from the request by setting it to None.
+        # We also avoid removing the parameter entirely, as older models still require it to be present.
+        max_tokens=None
+        if po_instance.spec.is_reasoning_model
+        else po_instance.spec.max_tokens,
         model_kwargs=model_kwargs,
-        max_tokens=po_instance.spec.max_tokens,
         seed=po_instance.spec.seed,
     )
 
@@ -315,7 +341,7 @@ class AzureOpenAIEmbeddingsPortObject(OpenAIEmbeddingsPortObject):
         from langchain_openai import AzureOpenAIEmbeddings
 
         return AzureOpenAIEmbeddings(
-            openai_api_key=ctx.get_credentials(self.spec.credentials).password,
+            openai_api_key=self.spec.auth_spec.get_api_key(ctx),
             azure_endpoint=self.spec.base_url,
             api_version=self.spec.api_version,
             openai_api_type=self.spec.api_type,
@@ -354,6 +380,17 @@ class AzureDeploymentSettings:
         label="Deployment name",
         description="""The name of the deployed model to use. Find the deployed models on the [Azure AI Studio](https://oai.azure.com).""",
         default_value="",
+    )
+    is_reasoning_model = knext.BoolParameter(
+        label="The model is a reasoning model",
+        description="""
+        Reasoning models use fixed settings for certain parameters: "temperature=1.0" and "top_p=1.0". These models do not support custom values for either of these parameters.
+        Additionally, reasoning models do not support the standard 'Maximum response length (tokens)' setting unless the "The model is a reasoning model" option is enabled. Once this option is selected, 
+        the model will be able to use the maximum token parameter as intended.
+        For more information and to verify whether a model is categorized as a reasoning model (e.g. o3, o4-mini and gpt-5), please refer to the [OpenAI Docs](https://platform.openai.com/docs/guides/reasoning?api-mode=responses).
+        """,
+        default_value=False,
+        since_version="5.5.2",
     )
 
 
@@ -641,6 +678,7 @@ class AzureOpenAIChatModelConnector:
             self.model_settings.max_tokens,
             self.model_settings.seed,
             self.model_settings.n_requests,
+            self.deployment.is_reasoning_model,
         )
 
 

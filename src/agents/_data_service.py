@@ -46,6 +46,11 @@ from ._data import DataRegistry
 from ._tool import LangchainToolConverter
 from ._agent import check_for_invalid_tool_calls
 import yaml
+import queue
+import threading
+
+from langchain_core.messages.human import HumanMessage
+from langchain_core.messages.ai import AIMessage
 
 
 class AgentChatViewDataService:
@@ -70,80 +75,108 @@ class AgentChatViewDataService:
         self._recursion_limit = recursion_limit
         self._show_tool_calls_and_results = show_tool_calls_and_results
 
+        self._message_queue = queue.Queue()
+        self._thread = None
+
     def get_initial_message(self):
         if self._initial_message:
             return {
                 "type": "ai",
                 "content": self._initial_message,
             }
-        else:
-            pass
 
     def post_user_message(self, user_message: str):
-        import threading
+        if not self._thread or not self._thread.is_alive():
+            while not self._message_queue.empty():
+                try:
+                    self._message_queue.get_nowait()
+                except queue.Empty:
+                    continue
 
-        if not hasattr(self, "_thread") or not self._thread.is_alive():
-            self._last_messages = []
             self._thread = threading.Thread(
-                target=self._post_user_message, args=(user_message, self._last_messages)
+                target=self._post_user_message, args=(user_message,)
             )
             self._thread.start()
 
     def get_last_messages(self):
-        if not hasattr(self, "_thread"):
-            return []
-        elif self._thread.is_alive():
-            # wait with timeout to enable long-polling
-            self._thread.join(timeout=5)
+        messages = []
 
-        return self._last_messages
-
-    def _post_user_message(self, user_message: str, last_messages: list):
-        self._messages.append({"role": "user", "content": user_message})
-        config = {"recursion_limit": self._recursion_limit}
         try:
-            final_state = self._agent_graph.invoke({"messages": self._messages}, config)
-            self._messages = final_state["messages"]
-            check_for_invalid_tool_calls(self._messages[-1])
+            msg = self._message_queue.get(timeout=2)
+            messages.append(msg)
+
+            while not self._message_queue.empty():
+                messages.append(self._message_queue.get_nowait())
+        except queue.Empty:
+            pass
+
+        return messages
+
+    def is_processing(self):
+        is_alive = self._thread and self._thread.is_alive()
+
+        return {"is_processing": is_alive or not self._message_queue.empty()}
+
+    def get_configuration(self):
+        return {
+            "show_tool_calls_and_results": self._show_tool_calls_and_results,
+        }
+
+    def _post_user_message(self, user_message: str):
+        self._messages.append(HumanMessage(content=user_message))
+        config = {
+            "recursion_limit": self._recursion_limit,
+            "configurable": {"thread_id": "1"},
+        }
+
+        try:
+            num_messages_at_last_step = len(self._messages)
+            state_stream = self._agent_graph.stream(
+                {"messages": self._messages},
+                config,
+                stream_mode="values",  # streams state by state
+            )
+
+            final_state = None
+            for state in state_stream:
+                new_messages = state["messages"][num_messages_at_last_step:]
+                num_messages_at_last_step = len(state["messages"])
+                final_state = state
+
+                for new_message in new_messages:
+                    # already added
+                    if isinstance(new_message, HumanMessage):
+                        continue
+
+                    fe_messages = self._to_frontend_messages(new_message)
+                    is_ai = isinstance(new_message, AIMessage)
+
+                    for fe_msg in fe_messages:
+                        should_send = False
+
+                        if self._show_tool_calls_and_results:
+                            # always send everything if showing tool calls
+                            should_send = True
+                        else:
+                            # otherwise only send Views and AI messages
+                            if fe_msg.get("type") == "view" or is_ai:
+                                should_send = True
+
+                        if should_send:
+                            self._message_queue.put(fe_msg)
+
+            if final_state:
+                self._messages = final_state["messages"]
+                if self._messages:
+                    check_for_invalid_tool_calls(self._messages[-1])
+
         except Exception as e:
+            error_message = {"type": "error", "content": f"An error occurred: {e}"}
             if "Recursion limit" in str(e):
-                last_messages.append(
-                    {
-                        "type": "error",
-                        "content": f"""Recursion limit of {self._recursion_limit} reached. 
-                        You can increase the limit by setting the `recursion_limit` parameter.""",
-                    }
+                error_message["content"] = (
+                    f"Recursion limit of {self._recursion_limit} reached."
                 )
-                return
-            else:
-                last_messages.append(
-                    {
-                        "type": "error",
-                        "content": f"An error occurred while executing the agent: {e}",
-                    }
-                )
-                return
-        from_index = next(
-            (
-                i
-                for i in reversed(range(len(self._messages)))
-                if self._messages[i].type == "human"
-            ),
-            -1,
-        )
-        for msg in self._messages[from_index + 1 :]:
-            frontend_messages = self._to_frontend_messages(msg)
-            if self._show_tool_calls_and_results:
-                last_messages.extend(frontend_messages)
-            else:
-                # filter out tool calls and results
-                filtered_messages = [
-                    m
-                    for m in frontend_messages
-                    if m["type"] == "view"
-                    or (m["type"] == "ai" and len(m["toolCalls"]) == 0)
-                ]
-                last_messages.extend(filtered_messages)
+            self._message_queue.put(error_message)
 
     def _to_frontend_messages(self, message):
         # split the node-view-ids out into a separate message
@@ -170,13 +203,21 @@ class AgentChatViewDataService:
             fe_message["name"] = self._tool_converter.desanitize_tool_name(message.name)
 
         if len(viewNodeIds) > 0:
-            return [
-                {
-                    "type": "view",
-                    "content": viewNodeId,
-                }
-                for viewNodeId in viewNodeIds
-            ] + [fe_message]
+            view_msgs = []
+            base_id = getattr(message, "id", "msg")
+            view_name = (
+                fe_message.get("name") if message.type == "tool" else "Node View"
+            )
+            for idx, viewNodeId in enumerate(viewNodeIds):
+                view_msgs.append(
+                    {
+                        "id": f"{base_id}-view-{idx}",
+                        "type": "view",
+                        "content": viewNodeId,
+                        "name": view_name,
+                    }
+                )
+            return [fe_message] + view_msgs
 
         return [fe_message]
 

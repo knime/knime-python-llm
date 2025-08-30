@@ -44,9 +44,10 @@
 
 
 import knime.extension as knext
-from typing import Callable, List, Union
+from typing import Callable, List, Union, Tuple
 from abc import ABC, abstractmethod
 import re
+import io
 import pyarrow as pa
 import pyarrow.compute as pc
 from dataclasses import dataclass
@@ -481,3 +482,63 @@ def create_empty_table(
             pa.array([], col.pa_type),
         )
     return knext.Table.from_pyarrow(pa_table)
+
+def image_table_present(ctx: knext.DialogCreationContext) -> bool:
+    """Check if an image table is connected."""
+    specs = ctx.get_input_specs()
+    return len(specs) == 2 and specs[1] is not None
+
+def image_column_filter(column: knext.Column) -> bool:
+    from PIL import Image
+
+    img_type = knext.logical(Image.Image)
+    return column.ktype == img_type
+
+def prepare_images(
+    image_table: knext.Table,
+    image_columns: knext.ColumnFilterConfig,
+) -> List[Tuple[str, bytes, str]]:
+    """
+    Extracts images from table according to selected image columns,
+    converts them to PNG in-memory file tuples, and returns a list
+    of (filename, raw_png_bytes, mimetype).
+    This format is required by the OpenAI Image API for image generation.
+    """
+    image_column_names = _get_image_column_names(
+        image_columns,
+        schema=image_table.schema,
+    )
+
+    image_df = image_table[image_column_names].to_pandas()
+
+    files = []
+    for idx, row in enumerate(image_df.itertuples(index=False), start=1):
+        # for each image column, save the image to a bytes buffer
+        for i, col in enumerate(image_column_names):
+            # create an in-memory bytes buffer to hold the PNG data
+            buffer = io.BytesIO()
+
+            # pull out the PIL.Image object from the row
+            pil_img = row[i]
+
+            # save the image into our buffer in PNG format
+            # this encodes the PIL.Image into valid PNG bytes
+            pil_img.save(buffer, format="PNG")
+
+            # extract raw PNG bytes from the buffer
+            raw = buffer.getvalue()
+
+            filename = f"{col}_{idx}.png"
+            files.append((filename, raw, "image/png"))
+    return files
+
+def _get_image_column_names(
+    column_filter_config,
+    schema: knext.Schema,
+) -> List[str]:
+    """
+    Get the image column names from the column filter config and schema.
+    """
+    if not column_filter_config:
+        return []
+    return [col.name for col in column_filter_config.apply(schema)]

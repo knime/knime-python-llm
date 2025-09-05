@@ -66,7 +66,8 @@ from .hf_base import (
     HFChatModelSettings,
     raise_for,
 )
-
+from huggingface_hub import model_info
+from huggingface_hub.inference._providers import PROVIDERS
 
 hf_hub_category = knext.category(
     path=hf_category,
@@ -78,6 +79,22 @@ hf_hub_category = knext.category(
 
 HF_DEFAULT_INFERENCE_PROVIDER = "hf-inference"
 HF_LEGACY_INFERENCE_PROVIDER = "hf-inference"  # for port objects created before 5.5
+
+
+def _create_provider_parameter(task: str) -> knext.StringParameter:
+    return knext.StringParameter(
+        "Inference provider",
+        description="The inference provider that runs the model. The HF Hub website shows for each model "
+        "which providers are available.",
+        default_value=HF_DEFAULT_INFERENCE_PROVIDER,
+        choices=lambda ctx: [
+            provider
+            for provider in PROVIDERS.keys()
+            if task in PROVIDERS[provider]
+            and provider != "openai"  # openai is not listed on HF Hub
+        ],
+        since_version="5.8.0",
+    )
 
 
 def _create_repo_id_parameter() -> knext.StringParameter:
@@ -731,9 +748,9 @@ class HFHubChatModelConnector2:
 
     Provide the name of the desired chat model repository available on the
     [Hugging Face Hub](https://huggingface.co/models)
-    as an input. The model will be executed with the
-    [Inference Provider](https://huggingface.co/docs/inference-providers/en/index) "HF Inference" for the
-    chat completion task.
+    as an input. The model will be executed with the selected
+    [Inference Provider](https://huggingface.co/docs/inference-providers/en/index) for the
+    conversational task.
 
     Please ensure that you have the necessary permissions to access the model.
     Failures with gated models may occur due to outdated tokens.
@@ -748,6 +765,7 @@ class HFHubChatModelConnector2:
     """
 
     hub_settings = HFHubSettings()
+    provider = _create_provider_parameter("conversational")
     model_settings = HFChatModelSettings()
 
     def configure(
@@ -759,6 +777,9 @@ class HFHubChatModelConnector2:
         if not self.hub_settings.repo_id:
             raise knext.InvalidParametersError("Please enter a repo ID.")
         _validate_repo_id(self.hub_settings.repo_id, auth.get_token(ctx))
+        _validate_provider_model_pair(
+            self.hub_settings.repo_id, self.provider, "conversational"
+        )
         return self._create_spec(auth)
 
     def _create_spec(
@@ -773,7 +794,7 @@ class HFHubChatModelConnector2:
         return HFHubChatModel2PortObjectSpec(
             auth,
             self.hub_settings.repo_id,
-            HF_DEFAULT_INFERENCE_PROVIDER,
+            self.provider,
             self.model_settings.n_requests,
             model_kwargs,
         )
@@ -782,6 +803,21 @@ class HFHubChatModelConnector2:
         self, ctx, auth: HFAuthenticationPortObject
     ) -> HFHubChatModel2PortObject:
         return HFHubChatModel2PortObject(self._create_spec(auth.spec))
+
+
+def _validate_provider_model_pair(model: str, provider: str, task: str):
+    model_info_data = model_info(model, expand="inferenceProviderMapping")
+    mapping = getattr(model_info_data, "inference_provider_mapping", [])
+    matching = [x for x in mapping if x.provider == provider]
+    if not matching or matching[0].status != "live":
+        raise knext.InvalidParametersError(
+            f"The model is not supported by provider '{provider}'. You can check which providers support the "
+            "model on the HF Hub website."
+        )
+    if matching[0].task != task:
+        raise knext.InvalidParametersError(
+            f"The model with the selected provider does not support the task '{task}'."
+        )
 
 
 hf_embeddings_port_type = knext.port_type(
@@ -837,6 +873,7 @@ class HFHubEmbeddingsConnector:
     """
 
     repo_id = _create_repo_id_parameter()
+    provider = _create_provider_parameter("feature-extraction")
 
     def configure(
         self,
@@ -847,13 +884,14 @@ class HFHubEmbeddingsConnector:
             raise knext.InvalidParametersError("Please enter a repo ID.")
         authentication_spec.validate_context(ctx)
         _validate_repo_id(self.repo_id, authentication_spec.get_token(ctx))
+        _validate_provider_model_pair(self.repo_id, self.provider, "feature-extraction")
         return self.create_spec(authentication_spec)
 
     def create_spec(
         self, authentication_spec: HFAuthenticationPortObjectSpec
     ) -> HFHubEmbeddingsPortObjectSpec:
         return HFHubEmbeddingsPortObjectSpec(
-            authentication_spec, self.repo_id, HF_DEFAULT_INFERENCE_PROVIDER
+            authentication_spec, self.repo_id, self.provider
         )
 
     def execute(

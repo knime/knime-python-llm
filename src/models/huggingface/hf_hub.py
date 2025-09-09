@@ -693,7 +693,6 @@ hf_hub_chat_model_2_port_type = knext.port_type(
     "HF Hub Chat Model",
     HFHubChatModel2PortObject,
     HFHubChatModel2PortObjectSpec,
-    id="org.knime.python.llm.models.huggingface.HFHubChatModel2PortObject",
 )
 
 

@@ -127,7 +127,6 @@ class HFChat(BaseChatModel):
     temperature: Optional[float] = 1.0
     client: Any
     async_client: Any
-    _tools: Any = None
 
     def _llm_type(self):
         return "hfchat"
@@ -164,7 +163,6 @@ class HFChat(BaseChatModel):
                 max_tokens=self.max_tokens,
                 temperature=self.temperature,
                 top_p=self.top_p,
-                tools=self._tools,
             )
         except Exception as ex:
             raise_for(ex)
@@ -185,7 +183,6 @@ class HFChat(BaseChatModel):
                 max_tokens=self.max_tokens,
                 temperature=self.temperature,
                 top_p=self.top_p,
-                tools=self._tools,
             )
         except Exception as ex:
             raise_for(ex)

@@ -104,6 +104,9 @@ chat_models = [
     "gpt-4.1-nano",
     "gpt-4o",
     "gpt-4o-mini",
+    "gpt-5",
+    "gpt-5-mini",
+    "gpt-5-nano",
     "o1",
     "o1-mini",
     "o3",
@@ -208,7 +211,7 @@ class OpenAIGeneralSettings(GeneralRemoteSettings):
         Try 0.9 for more creative applications, and 0 for ones with a well-defined answer.
         It is generally recommended altering this, or Top-p, but not both.
 
-        **Note**: this setting is ignored for o-series models.
+        **Note**: this setting is ignored for reasoning models like GPT-5 or o-series models.
         """,
         default_value=0.2,
         min_value=0.0,
@@ -364,6 +367,8 @@ class LLMLoaderInputSettings:
 @knext.parameter_group(label="OpenAI chat model selection")
 class ChatModelLoaderInputSettings:
     class OpenAIModelCompletionsOptions(knext.EnumParameterOptions):
+        """Only used for backwards compatibility."""
+
         GPT35_TURBO_INSTRUCT = (
             "gpt-3.5-turbo-instruct",
             """Legacy instruct model. Use this for compatibility with prompts designed for instruct models.""",
@@ -1090,14 +1095,19 @@ def _create_model(
     if output_format == OutputFormatOptions.JSON:
         model_kwargs["response_format"] = {"type": "json_object"}
 
-    is_o_series = bool(re.match(r"^o\d", po_instance.spec.model))
+    def is_reasoning(model: str):
+        is_o_series = bool(re.match(r"^o\d", model))
+        is_gpt_5 = bool(re.match(r"^gpt-5", model))
+        return is_o_series or is_gpt_5
 
     key = po_instance.spec.auth_spec.get_api_key(ctx)
     return ChatOpenAI(
         openai_api_key=key,
         base_url=po_instance.spec.base_url,
         model=po_instance.spec.model,
-        temperature=1.0 if is_o_series else po_instance.spec.temperature,
+        temperature=1.0
+        if is_reasoning(po_instance.spec.model)
+        else po_instance.spec.temperature,
         max_tokens=po_instance.spec.max_tokens,
         seed=po_instance.spec.seed,
         model_kwargs=model_kwargs,

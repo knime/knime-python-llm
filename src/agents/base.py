@@ -722,7 +722,7 @@ class AgentChatView:
 
     show_views = knext.BoolParameter(
         "Show views",
-        "If checked, the views of nodes in the workflow-based tool  will be shown in the chat.",
+        "If checked, the views of nodes in the workflow-based tool will be shown in the chat. The view nodes must be top-level nodes, i.e., not inside a component or metanode.",
         default_value=lambda v: v
         >= knext.Version(
             5, 6, 0

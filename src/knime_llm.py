@@ -67,6 +67,7 @@ except Exception as e:
 import models.azure
 
 import agents.base
+import agents.base_deprecated
 import agents.openai
 
 import tools.base

@@ -435,6 +435,9 @@ You must incorporate these updates into your working view of the data repository
     )
 
 
+# endregion
+
+
 # region Agent Prompter 2.0
 @knext.node(
     "Agent Prompter",
@@ -666,9 +669,14 @@ def _extract_tools_from_table(tools_table: knext.Table, tool_column: str):
     return filtered_tools.to_pylist()
 
 
-# region Agent Chat View
+# endregion
+
+
+# region Agent Chat Widget
+
+
 @knext.node(
-    "Agent Chat View",
+    "Agent Chat Widget",
     node_type=knext.NodeType.VISUALIZER,
     icon_path=chat_agent_icon,
     category=agent_category,
@@ -681,14 +689,20 @@ def _extract_tools_from_table(tools_table: knext.Table, tool_column: str):
     "Data inputs",
     "The data inputs for the agent.",
 )
+@knext.output_table(
+    "Conversation",
+    "The conversation between the LLM and the tools reflecting the agent execution.",
+)
 @knext.output_view(
     "Chat",
     "Shows the chat interface for interacting with the agent.",
     static_resources="src/agents/chat_app/dist/",
     index_html_path="index.html",
 )
-class AgentChatView:
-    """Enables interactive, multi-turn conversations with an AI agent that uses tools and data to fulfill user prompts.
+class AgentChatWidget:
+    """TODO update
+
+    Enables interactive, multi-turn conversations with an AI agent that uses tools and data to fulfill user prompts.
 
     This node enables interactive, multi-turn conversations with an AI agent, combining a chat model with a set of tools and optional input data.
 
@@ -705,6 +719,30 @@ class AgentChatView:
 
     tool_column = _tool_column_parameter().rule(
         knext.DialogContextCondition(_has_tools_table), knext.Effect.SHOW
+    )
+
+    conversation_column_name = knext.StringParameter(
+        "Conversation column name",
+        "Name of the conversation column in the output table.",
+        default_value="Conversation",
+    )
+
+    class ConversationUpdateAction(knext.EnumParameterOptions):
+        NEVER = (
+            "Never",
+            "Never update the conversation explicitly from within the chat. TODO",
+        )
+        INTERACTION = (
+            "Interaction",
+            "Update the conversation after each user interaction. TODO",
+        )
+
+    conversation_update_action = knext.EnumParameter(
+        "Output and persist conversation TODO",
+        "TODO",
+        ConversationUpdateAction.NEVER.name,
+        ConversationUpdateAction,
+        style=knext.EnumParameter.Style.VALUE_SWITCH,
     )
 
     initial_message = knext.MultilineStringParameter(
@@ -734,6 +772,8 @@ class AgentChatView:
 
     data_message_prefix = _data_message_prefix_parameter()
 
+    import knime.types.message as MessageValue
+
     def configure(
         self,
         ctx: knext.ConfigurationContext,
@@ -757,7 +797,88 @@ class AgentChatView:
         tools_table: Optional[knext.Table],
         input_tables: list[knext.Table],
     ):
-        pass
+        import pandas as pd
+        import json
+
+        messages_str = ctx.get_internal_view_data()
+
+        if messages_str is None:
+            return knext.Table.from_pandas(
+                pd.DataFrame(
+                    {
+                        self.conversation_column_name: [],
+                    }
+                )
+            )
+
+        messages = json.loads(messages_str)
+        message_values = [self._to_message_value(msg) for msg in messages]
+        # Filter out None messages (e.g., view messages that are ignored)
+        message_values = [msg for msg in message_values if msg is not None]
+        result_df = pd.DataFrame({self.conversation_column_name: message_values})
+
+        conversation_table = knext.Table.from_pandas(result_df)
+        return conversation_table
+
+    def _to_message_value(self, msg: dict) -> MessageValue:
+        from knime.types.message import MessageType
+        from knime.types.message import MessageValue
+        from knime.types.message import ToolCall
+        import yaml
+
+        def _to_content_parts(content):
+            from knime.types.message import MessageContentPart
+            from knime.types.message import MessageContentPartType
+
+            return [
+                MessageContentPart(
+                    type=MessageContentPartType.TEXT, data=content.encode("utf-8")
+                )
+            ]
+
+        name = msg.get("name", None)
+        type = msg.get("type", None)
+
+        if type == "human":
+            msg_type = MessageType.USER
+            content = _to_content_parts(msg["content"])
+            return MessageValue(message_type=msg_type, content=content, name=name)
+        elif type == "ai":
+            msg_type = MessageType.AI
+            content = _to_content_parts(msg["content"])
+            toolCalls = msg.get("toolCalls", None)
+            if toolCalls and len(toolCalls) > 0:
+                tool_calls = [
+                    ToolCall(
+                        id=tc.get("id", ""),
+                        tool_name=tc.get("name", ""),
+                        arguments=yaml.safe_load(tc.get("args", "")),
+                    )
+                    for tc in toolCalls
+                ]
+            else:
+                tool_calls = None
+            return MessageValue(
+                message_type=msg_type,
+                content=content,
+                tool_calls=tool_calls,
+                tool_call_id=getattr(msg, "id", None),
+                name=name,
+            )
+        elif type == "tool":
+            msg_type = MessageType.TOOL
+            content = _to_content_parts(msg["content"])
+            return MessageValue(
+                message_type=msg_type,
+                content=content,
+                tool_call_id=getattr(msg, "toolCallId", None),
+                name=name,
+            )
+        elif type == "view":
+            # ignore
+            return None
+        else:
+            raise ValueError(f"Unsupported frontend message type: {type(msg)}")
 
     def get_data_service(
         self,
@@ -771,9 +892,10 @@ class AgentChatView:
         from ._data_service import (
             DataRegistry,
             LangchainToolConverter,
-            AgentChatViewDataService,
+            AgentChatWidgetDataService,
         )
         from ._tool import ExecutionMode
+        import json
 
         chat_model = chat_model.create_model(
             ctx, output_format=OutputFormatOptions.Text
@@ -798,11 +920,65 @@ class AgentChatView:
             chat_model, tools=tools, prompt=self.developer_message, checkpointer=memory
         )
 
-        return AgentChatViewDataService(
+        previous_messages_str = ctx.get_internal_view_data()
+        if previous_messages_str is None:
+            previous_messages = []
+        else:
+            previous_messages = json.loads(previous_messages_str)
+            previous_messages = [
+                self._to_langchain_message(msg) for msg in previous_messages
+            ]
+            # Filter out None messages (e.g., view messages that are ignored)
+            previous_messages = [msg for msg in previous_messages if msg is not None]
+
+        return AgentChatWidgetDataService(
             agent,
             data_registry,
             self.initial_message,
+            previous_messages,
             self.recursion_limit,
             self.show_tool_calls_and_results,
             tool_converter,
         )
+
+    def _to_langchain_message(self, msg: dict):
+        from langchain_core.messages.human import HumanMessage
+        from langchain_core.messages.ai import AIMessage
+        from langchain_core.messages.tool import ToolMessage
+        from langchain_core.messages.system import SystemMessage
+        import yaml
+
+        type = msg.get("type", None)
+        name = msg.get("name", None)
+        content = msg.get("content", None)
+
+        if type == "human":
+            return HumanMessage(content=content, name=name)
+        elif type == "ai":
+            if msg.get("toolCalls"):
+                tool_calls = [
+                    {
+                        "name": tc.get("name", ""),
+                        "id": tc.get("id", ""),
+                        "args": yaml.safe_load(tc.get("args", "")),
+                        "type": "tool_call",
+                    }
+                    for tc in msg["toolCalls"]
+                ]
+                return AIMessage(content=content, name=name, tool_calls=tool_calls)
+            else:
+                return AIMessage(content=content, name=name)
+        elif type == "tool":
+            tool_call_id = msg.get("toolCallId", None)
+            return ToolMessage(content=content, name=name, tool_call_id=tool_call_id)
+        elif type == "error":
+            error_content = f"[ERROR] {content}"
+            return SystemMessage(content=error_content)
+        elif type == "view":
+            # ignore
+            return None
+        else:
+            raise ValueError(f"Unsupported message type: {type}")
+
+
+# endregion

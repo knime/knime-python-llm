@@ -53,12 +53,13 @@ from langchain_core.messages.human import HumanMessage
 from langchain_core.messages.ai import AIMessage
 
 
-class AgentChatViewDataService:
+class AgentChatWidgetDataService:
     def __init__(
         self,
         agent_graph,
         data_registry: DataRegistry,
         initial_message: str,
+        previous_messages: list,
         recursion_limit: int,
         show_tool_calls_and_results: bool,
         tool_converter: LangchainToolConverter,
@@ -71,6 +72,7 @@ class AgentChatViewDataService:
             if data_registry.has_data or tool_converter.has_data_tools
             else []
         )
+        self._messages.extend(previous_messages)
         self._initial_message = initial_message
         self._recursion_limit = recursion_limit
         self._show_tool_calls_and_results = show_tool_calls_and_results

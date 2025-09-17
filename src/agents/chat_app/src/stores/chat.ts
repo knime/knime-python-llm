@@ -142,12 +142,16 @@ function addMessagesToChatItems(
         chatItems.push(msg);
         continue;
       }
+
+      if (msg.type === "error" && activeTimeline) {
+        completeActiveTimeline(activeTimeline!);
+        chatItems.push(msg);
+        continue;
+      }
     } else if (msg.type === "ai" && msg.toolCalls?.length) {
       // ignore ai tool-call message if tool calls are not shown
       continue;
     }
-
-    // TODO error-type message
 
     // otherwise add message directly to the conversation
     chatItems.push(msg);
@@ -169,12 +173,15 @@ export const useChatStore = defineStore("chat", () => {
   watch(lastMessages, (newMessages, oldMessages) => {
     const lastMessage = newMessages.at(-1);
     if (lastMessage?.type === "ai" && !lastMessage.toolCalls?.length) {
-      loadingFinished();
+      loadingFinished(initState.value !== "idle");
     }
   });
 
   // getters
   const isUsingTools = computed(() => {
+    if (!isLoading.value) {
+      return false;
+    }
     // last message is either an 'ai' message with tool calls or a 'tool' message
     const lastMessage = lastMessages.value.at(-1);
     return (
@@ -226,13 +233,11 @@ export const useChatStore = defineStore("chat", () => {
       type: "error",
       content: ERROR_MESSAGES[errorType],
     };
-    // TODO
-    // chatItems.value.push(errorMessage);
 
-    // TODO apply?
-    isLoading.value = false;
-    // TODO
-    // completeActiveTimeline();
+    messages.push(errorMessage);
+    lastMessages.value = [errorMessage];
+
+    loadingFinished(false);
   }
 
   async function init() {
@@ -419,7 +424,7 @@ export const useChatStore = defineStore("chat", () => {
               const response = await checkIsProcessing();
 
               if (!response?.is_processing) {
-                loadingFinished();
+                loadingFinished(true);
                 break;
               }
 
@@ -440,10 +445,11 @@ export const useChatStore = defineStore("chat", () => {
   }
 
   // TODO naming
-  function loadingFinished() {
+  function loadingFinished(apply: boolean) {
     isLoading.value = false;
-    // TODO make sure 'isUsingTools' is false
-    // TODO apply conversation
+    if (apply) {
+      applyConversation();
+    }
   }
 
   function applyConversation() {

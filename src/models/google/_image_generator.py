@@ -113,10 +113,6 @@ class ImagenSettings:
         "Person Generation",
         """
         Allow the model to generate images of people.
-        
-        - "Block People": Block generation of images of people.
-        - "Adults Only": Generate images of adults, but not children (default).
-        
         """,
         enum=PersonGenerationOptions,
         default_value=PersonGenerationOptions.Adults_Only.name,

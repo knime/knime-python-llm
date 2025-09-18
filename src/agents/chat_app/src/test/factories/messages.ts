@@ -7,6 +7,7 @@ import type {
   Timeline,
   ToolCallTimelineItem,
   reexecution_trigger,
+  HumanMessage,
 } from "@/types";
 
 export const createErrorMessage = (content: string) => ({
@@ -25,7 +26,7 @@ export const createAiMessage = (
   ...(toolCalls && { toolCalls }),
 });
 
-export const createUserMessage = (content: string) => ({
+export const createUserMessage = (content: string): HumanMessage => ({
   id: expect.any(String),
   type: "human",
   content,

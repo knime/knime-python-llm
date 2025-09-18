@@ -75,7 +75,7 @@ describe("chat store", () => {
     it("shouldShowToolUseIndicator returns true when loading with tools and not showing tool calls", () => {
       const { store } = setupStore();
       store.isLoading = true;
-      store.isUsingTools = true;
+      store.lastMessage = createToolMessage("Tool response", "123");
       store.config = createConfig(false);
 
       expect(store.shouldShowToolUseIndicator).toBe(true);
@@ -84,7 +84,8 @@ describe("chat store", () => {
     it("shouldShowToolUseIndicator returns false when showing tool calls", () => {
       const { store } = setupStore();
       store.isLoading = true;
-      store.isUsingTools = true;
+      store.lastMessage = createToolMessage("Tool response", "123");
+
       store.config = createConfig(true);
 
       expect(store.shouldShowToolUseIndicator).toBe(false);
@@ -93,7 +94,7 @@ describe("chat store", () => {
     it("shouldShowGenericLoadingIndicator returns true when loading without tools", () => {
       const { store } = setupStore();
       store.isLoading = true;
-      store.isUsingTools = false;
+      store.lastMessage = createToolMessage("Tool response", "123");
 
       expect(store.shouldShowGenericLoadingIndicator).toBe(true);
     });
@@ -101,7 +102,7 @@ describe("chat store", () => {
     it("shouldShowGenericLoadingIndicator returns false when using tools", () => {
       const { store } = setupStore();
       store.isLoading = true;
-      store.isUsingTools = true;
+      store.lastMessage = createToolMessage("Tool response", "123");
 
       expect(store.shouldShowGenericLoadingIndicator).toBe(false);
     });
@@ -121,7 +122,7 @@ describe("chat store", () => {
     it("adds error message to chat items", () => {
       const { store } = setupStore();
       store.isLoading = true;
-      store.isUsingTools = true;
+      store.lastMessage = createToolMessage("Tool response", "123");
 
       store.addErrorMessage("sending");
 
@@ -408,7 +409,7 @@ describe("chat store", () => {
         createToolCallTimelineItem("search", "completed"),
       ]);
       store.activeTimeline = timeline;
-      store.isUsingTools = true;
+      store.lastMessage = createToolMessage("Tool response", "123");
 
       store.completeActiveTimeline();
 

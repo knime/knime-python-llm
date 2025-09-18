@@ -3,9 +3,20 @@ import { mount } from "@vue/test-utils";
 import { createTestingPinia } from "@pinia/testing";
 import { setActivePinia } from "pinia";
 
-import type { AiMessage, ErrorMessage, HumanMessage, Timeline } from "@/types";
+import type {
+  AiMessage,
+  ErrorMessage,
+  HumanMessage,
+  Timeline,
+  ToolMessage,
+} from "@/types";
 import { useChatStore } from "@/stores/chat";
 import ChatInterface from "../ChatInterface.vue";
+import {
+  createAiMessage,
+  createToolMessage,
+  createUserMessage,
+} from "@/test/factories/messages";
 
 vi.mock("@/composables/useScrollToBottom", () => ({
   useScrollToBottom: vi.fn(),
@@ -74,7 +85,7 @@ describe("ChatInterface", () => {
       content: "Hi there!",
     };
 
-    chatStore.chatItems = [humanMessage, aiMessage];
+    chatStore.lastMessagesToDisplay = [humanMessage, aiMessage];
     await wrapper.vm.$nextTick();
 
     expect(wrapper.find(".human-message").exists()).toBe(true);
@@ -85,25 +96,30 @@ describe("ChatInterface", () => {
     const wrapper = createWrapper();
     const chatStore = useChatStore();
 
+    const aiMessageWithToolCalls: AiMessage = {
+      id: "1",
+      type: "ai",
+      content: "",
+      toolCalls: [
+        {
+          id: "tool1",
+          name: "Tool 1",
+        },
+      ],
+    };
+
     const errorMessage: ErrorMessage = {
       id: "1",
       type: "error",
       content: "Something went wrong",
     };
 
-    const timeline: Timeline = {
-      id: "2",
-      type: "timeline",
-      label: "Using tools",
-      status: "active",
-      items: [],
-    };
+    chatStore.lastMessagesToDisplay = [aiMessageWithToolCalls, errorMessage];
 
-    chatStore.chatItems = [errorMessage, timeline];
     await wrapper.vm.$nextTick();
 
-    expect(wrapper.find(".error-message").exists()).toBe(true);
     expect(wrapper.find(".timeline").exists()).toBe(true);
+    expect(wrapper.find(".error-message").exists()).toBe(true);
   });
 
   it("shows tool use indicator when store indicates tools are being used", async () => {
@@ -112,8 +128,16 @@ describe("ChatInterface", () => {
 
     // Mock the getter to return true
     chatStore.isLoading = true;
-    chatStore.isUsingTools = true;
-    chatStore.config = { show_tool_calls_and_results: false };
+    chatStore.lastMessage = {
+      type: "tool",
+      content: "",
+      toolCallId: "123",
+      id: "tool1",
+    };
+    chatStore.config = {
+      show_tool_calls_and_results: false,
+      reexecution_trigger: "NONE",
+    };
     await wrapper.vm.$nextTick();
 
     expect(wrapper.find(".tool-indicator").exists()).toBe(true);
@@ -124,7 +148,7 @@ describe("ChatInterface", () => {
     const chatStore = useChatStore();
 
     chatStore.isLoading = false;
-    chatStore.isUsingTools = false;
+    chatStore.lastMessage = createAiMessage("AI response");
 
     expect(wrapper.find(".tool-indicator").exists()).toBe(false);
   });
@@ -134,7 +158,7 @@ describe("ChatInterface", () => {
     const chatStore = useChatStore();
 
     chatStore.isLoading = true;
-    chatStore.isUsingTools = false;
+    chatStore.lastMessage = createAiMessage("AI response");
     await wrapper.vm.$nextTick();
 
     expect(wrapper.find(".skeleton-item").exists()).toBe(true);
@@ -145,7 +169,7 @@ describe("ChatInterface", () => {
     const chatStore = useChatStore();
 
     chatStore.isLoading = false;
-    chatStore.isUsingTools = false;
+    chatStore.lastMessage = createAiMessage("AI response");
 
     expect(wrapper.find(".skeleton-item").exists()).toBe(false);
   });
@@ -154,9 +178,8 @@ describe("ChatInterface", () => {
     const wrapper = createWrapper();
     const chatStore = useChatStore();
 
-    chatStore.chatItems = [];
     chatStore.isLoading = false;
-    chatStore.isUsingTools = false;
+    chatStore.lastMessage = createAiMessage("AI response");
 
     const messageList = wrapper.find(".message-list");
     expect(messageList.exists()).toBe(true);
@@ -172,16 +195,16 @@ describe("ChatInterface", () => {
     const wrapper = createWrapper();
     const chatStore = useChatStore();
 
-    const humanMessage: HumanMessage = {
-      id: "1",
-      type: "human",
-      content: "Hello",
-    };
+    const humanMessage: HumanMessage = createUserMessage("Hello");
+    const toolMessage: ToolMessage = createToolMessage("Tool response", "123");
 
-    chatStore.chatItems = [humanMessage];
+    chatStore.lastMessagesToDisplay = [humanMessage];
+    chatStore.lastMessage = toolMessage;
     chatStore.isLoading = true;
-    chatStore.isUsingTools = true;
-    chatStore.config = { show_tool_calls_and_results: false };
+    chatStore.config = {
+      show_tool_calls_and_results: false,
+      reexecution_trigger: "NONE",
+    };
     await wrapper.vm.$nextTick();
 
     // Should show both the message and the tool indicator

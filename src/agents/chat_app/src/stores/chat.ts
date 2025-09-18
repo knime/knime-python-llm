@@ -496,6 +496,8 @@ export const useChatStore = defineStore("chat", () => {
 
   return {
     //state
+    lastMessagesToDisplay,
+    lastMessage,
     config,
     isLoading,
     lastUserMessage,
@@ -506,6 +508,7 @@ export const useChatStore = defineStore("chat", () => {
     shouldShowToolUseIndicator,
     shouldShowGenericLoadingIndicator,
     shouldShowToolCalls,
+    isUsingTools,
     chatItems,
 
     // actions

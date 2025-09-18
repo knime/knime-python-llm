@@ -727,21 +727,21 @@ class AgentChatWidget:
         default_value="Conversation",
     )
 
-    class ConversationUpdateAction(knext.EnumParameterOptions):
-        NEVER = (
+    class ReexecutionTrigger(knext.EnumParameterOptions):
+        NONE = (
             "Never",
-            "Never update the conversation explicitly from within the chat. TODO",
+            "Never re-execute the node to update the conversation output explicitly from within the chat.",
         )
         INTERACTION = (
-            "Interaction",
-            "Update the conversation after each user interaction. TODO",
+            "After every interaction",
+            "Update the conversation output after each completed chat interaction.",
         )
 
-    conversation_update_action = knext.EnumParameter(
-        "Output and persist conversation TODO",
+    reexecution_trigger = knext.EnumParameter(
+        "Re-execute node to update conversation output",
         "TODO",
-        ConversationUpdateAction.NEVER.name,
-        ConversationUpdateAction,
+        ReexecutionTrigger.NONE.name,
+        ReexecutionTrigger,
         style=knext.EnumParameter.Style.VALUE_SWITCH,
     )
 
@@ -938,6 +938,7 @@ class AgentChatWidget:
             previous_messages,
             self.recursion_limit,
             self.show_tool_calls_and_results,
+            self.reexecution_trigger,
             tool_converter,
         )
 

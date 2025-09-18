@@ -62,6 +62,7 @@ class AgentChatWidgetDataService:
         previous_messages: list,
         recursion_limit: int,
         show_tool_calls_and_results: bool,
+        reexecution_trigger: str,
         tool_converter: LangchainToolConverter,
     ):
         self._agent_graph = agent_graph
@@ -76,6 +77,7 @@ class AgentChatWidgetDataService:
         self._initial_message = initial_message
         self._recursion_limit = recursion_limit
         self._show_tool_calls_and_results = show_tool_calls_and_results
+        self._reexecution_trigger = reexecution_trigger
 
         self._message_queue = queue.Queue()
         self._thread = None
@@ -122,6 +124,7 @@ class AgentChatWidgetDataService:
     def get_configuration(self):
         return {
             "show_tool_calls_and_results": self._show_tool_calls_and_results,
+            "reexecution_trigger": self._reexecution_trigger,
         }
 
     def _post_user_message(self, user_message: str):

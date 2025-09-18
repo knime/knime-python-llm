@@ -115,42 +115,37 @@ function addToolMessageToTimeLine(msg: ToolMessage, timeline: Timeline) {
 function addMessagesToChatItems(
   messages: Message[],
   chatItems: ChatItem[],
-  shouldShowToolCalls: boolean,
-  activeTimeline?: Timeline,
+  timeline?: Timeline,
 ) {
+  let activeTimeline = timeline;
   for (const msg of messages) {
-    if (shouldShowToolCalls) {
-      if (msg.type === "ai" && msg.toolCalls?.length) {
-        const updatedTimeline = addAiMessageWithToolCallsToTimeline(
-          msg,
-          activeTimeline,
-        );
-        if (!activeTimeline) {
-          activeTimeline = updatedTimeline;
-          chatItems.push(updatedTimeline);
-        }
+    if (isAiMessageWithToolCalls(msg)) {
+      const updatedTimeline = addAiMessageWithToolCallsToTimeline(
+        msg as AiMessage,
+        activeTimeline,
+      );
+      if (!activeTimeline) {
+        activeTimeline = updatedTimeline;
+        chatItems.push(updatedTimeline);
+      }
+      continue;
+    }
+
+    if (activeTimeline) {
+      if (isToolMessage(msg)) {
+        addToolMessageToTimeLine(msg as ToolMessage, activeTimeline);
         continue;
       }
-
-      if (msg.type === "tool" && activeTimeline) {
-        addToolMessageToTimeLine(msg, activeTimeline);
-        continue;
-      }
-
-      if (msg.type === "ai" && !msg.toolCalls?.length && activeTimeline) {
+      if (isAiMessageWithoutToolCalls(msg)) {
         completeActiveTimeline(activeTimeline);
         chatItems.push(msg);
         continue;
       }
-
-      if (msg.type === "error" && activeTimeline) {
+      if (msg.type === "error") {
         completeActiveTimeline(activeTimeline!);
         chatItems.push(msg);
         continue;
       }
-    } else if (msg.type === "ai" && msg.toolCalls?.length) {
-      // ignore ai tool-call message if tool calls are not shown
-      continue;
     }
 
     // otherwise add message directly to the conversation
@@ -158,10 +153,32 @@ function addMessagesToChatItems(
   }
 }
 
+function isToolMessage(msg?: Message): boolean {
+  if (!msg) {
+    return false;
+  }
+  return msg.type === "tool";
+}
+
+function isAiMessageWithToolCalls(msg?: Message): boolean {
+  if (!msg) {
+    return false;
+  }
+  return msg.type === "ai" && (msg.toolCalls?.length ?? 0) > 0;
+}
+
+function isAiMessageWithoutToolCalls(msg?: Message): boolean {
+  if (!msg) {
+    return false;
+  }
+  return msg.type === "ai" && !msg.toolCalls?.length;
+}
+
 export const useChatStore = defineStore("chat", () => {
   // state
-  let messages: Message[] = [];
-  const lastMessages = shallowRef<Message[]>([]);
+  let messagesToPersist: Message[] = [];
+  const lastMessagesToDisplay = shallowRef<Message[]>([]);
+  const lastMessage = shallowRef<Message | undefined>();
   const config = ref<Config | null>(null); // node settings that affect rendering
   const isLoading = ref(false); // true if agent is currently responding to user message
   const lastUserMessage = ref("");
@@ -170,45 +187,37 @@ export const useChatStore = defineStore("chat", () => {
   const requestQueue: Array<() => void> = []; // populated with messages sent before data service is ready
 
   // watchers
-  watch(lastMessages, (newMessages, oldMessages) => {
-    const lastMessage = newMessages.at(-1);
-    if (lastMessage?.type === "ai" && !lastMessage.toolCalls?.length) {
+  watch(lastMessage, (newMessages, oldMessages) => {
+    if (isAiMessageWithoutToolCalls(lastMessage.value)) {
       loadingFinished(initState.value !== "idle");
     }
   });
 
   // getters
   const isUsingTools = computed(() => {
-    if (!isLoading.value) {
+    if (!isLoading.value || !lastMessage.value) {
       return false;
     }
-    // last message is either an 'ai' message with tool calls or a 'tool' message
-    const lastMessage = lastMessages.value.at(-1);
     return (
-      (lastMessage?.type === "ai" &&
-        (lastMessage.toolCalls?.length ?? 0) > 0) ||
-      lastMessage?.type === "tool"
+      isAiMessageWithToolCalls(lastMessage.value) ||
+      isToolMessage(lastMessage.value)
     );
   });
 
-  const shouldShowToolUseIndicator = computed(() => {
-    return (
-      isLoading.value &&
-      isUsingTools &&
-      !config.value?.show_tool_calls_and_results
-    );
-  });
+  const shouldShowToolUseIndicator = computed(
+    () => isLoading.value && isUsingTools.value && !shouldShowToolCalls.value,
+  );
 
   const shouldShowGenericLoadingIndicator = computed(
     () => isLoading.value && !isUsingTools.value,
   );
 
-  const shouldShowToolCalls = computed(() =>
-    config.value ? config.value.show_tool_calls_and_results : true,
+  const shouldShowToolCalls = computed(
+    () => config.value?.show_tool_calls_and_results,
   );
 
   const chatItems = computed((previous: ChatItem[] | undefined): ChatItem[] => {
-    if (lastMessages.value.length === 0) {
+    if (lastMessagesToDisplay.value.length === 0) {
       return previous || [];
     }
 
@@ -218,9 +227,8 @@ export const useChatStore = defineStore("chat", () => {
       (item) => item.type === "timeline" && item.status === "active",
     ) as Timeline | undefined;
     addMessagesToChatItems(
-      lastMessages.value,
+      lastMessagesToDisplay.value,
       chatItems,
-      shouldShowToolCalls.value,
       activeTimeline,
     );
     return chatItems;
@@ -234,9 +242,7 @@ export const useChatStore = defineStore("chat", () => {
       content: ERROR_MESSAGES[errorType],
     };
 
-    messages.push(errorMessage);
-    lastMessages.value = [errorMessage];
-
+    filterAndUpdateMessages([errorMessage]);
     loadingFinished(false);
   }
 
@@ -249,20 +255,18 @@ export const useChatStore = defineStore("chat", () => {
       await ensureJsonDataService();
 
       const initialConversation = await getInitialConversation();
-      messages = initialConversation || [];
-      lastMessages.value = initialConversation || [];
-
-      // TODO
-      const [configResponse, initialAiMessage] = await Promise.all([
-        getConfiguration(),
-        getInitialMessage(),
-      ]);
-
-      config.value = configResponse;
-      // TODO
-      if (initialAiMessage && !initialConversation) {
-        lastMessages.value = [initialAiMessage];
-        messages.push(initialAiMessage);
+      if (initialConversation) {
+        updateMessages(initialConversation);
+        config.value = await getConfiguration();
+      } else {
+        const [configResponse, initialAiMessage] = await Promise.all([
+          getConfiguration(),
+          getInitialMessage(),
+        ]);
+        config.value = configResponse;
+        if (initialAiMessage) {
+          updateMessages([initialAiMessage]);
+        }
       }
 
       initState.value = "ready";
@@ -389,8 +393,7 @@ export const useChatStore = defineStore("chat", () => {
     const send = async () => {
       // 1. render user message
       const message: Message = { id: useId(), content: msg, type: "human" };
-      messages.push(message);
-      lastMessages.value = [message];
+      filterAndUpdateMessages([message]);
       // 2. send to backend
       await sendMessageToBackend(msg);
     };
@@ -414,8 +417,7 @@ export const useChatStore = defineStore("chat", () => {
           const msgs = await getLastMessages();
 
           if (msgs.length > 0) {
-            messages.push(...msgs);
-            lastMessages.value = msgs;
+            filterAndUpdateMessages(msgs);
             consecutiveEmptyPolls = 0;
           } else {
             consecutiveEmptyPolls++;
@@ -444,21 +446,41 @@ export const useChatStore = defineStore("chat", () => {
     }
   }
 
+  function updateMessages(msgs: Message[]) {
+    messagesToPersist.push(...msgs);
+    lastMessagesToDisplay.value = msgs;
+    lastMessage.value = msgs.at(-1);
+  }
+
+  function filterAndUpdateMessages(msgs: Message[]) {
+    if (shouldShowToolCalls.value) {
+      updateMessages(msgs);
+    } else {
+      const filtered = msgs.filter(
+        (msg) => !isToolMessage(msg) && !isAiMessageWithToolCalls(msg),
+      );
+      messagesToPersist.push(...filtered);
+      lastMessagesToDisplay.value = filtered;
+      lastMessage.value = msgs.at(-1);
+    }
+  }
+
   // TODO naming
   function loadingFinished(apply: boolean) {
     isLoading.value = false;
-    if (apply) {
+    if (apply && config.value?.reexecution_trigger === "INTERACTION") {
       applyConversation();
     }
   }
 
   function applyConversation() {
-    jsonDataService.value?.applyData(messages);
+    jsonDataService.value?.applyData(messagesToPersist);
   }
 
   function resetChat() {
-    messages = [];
-    lastMessages.value = [];
+    messagesToPersist = [];
+    lastMessagesToDisplay.value = [];
+    lastMessage.value = undefined;
     config.value = null;
     isLoading.value = false;
     lastUserMessage.value = "";

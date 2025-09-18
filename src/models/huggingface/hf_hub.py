@@ -66,8 +66,6 @@ from .hf_base import (
     HFChatModelSettings,
     raise_for,
 )
-from huggingface_hub import model_info
-from huggingface_hub.inference._providers import PROVIDERS
 
 hf_hub_category = knext.category(
     path=hf_category,
@@ -82,10 +80,12 @@ HF_LEGACY_INFERENCE_PROVIDER = "hf-inference"  # for port objects created before
 
 
 def _create_provider_parameter(task: str) -> knext.StringParameter:
+    from huggingface_hub.inference._providers import PROVIDERS
+
     return knext.StringParameter(
         "Inference provider",
-        description="The inference provider that runs the model. The HF Hub website shows for each model "
-        "which providers are available.",
+        description="The [Inference Provider](https://huggingface.co/docs/inference-providers/en/index) that "
+        "runs the model. The HF Hub website shows for each model which providers are available.",
         default_value=HF_DEFAULT_INFERENCE_PROVIDER,
         choices=lambda ctx: [
             provider
@@ -806,14 +806,36 @@ class HFHubChatModelConnector2:
 
 
 def _validate_provider_model_pair(model: str, provider: str, task: str):
-    model_info_data = model_info(model, expand="inferenceProviderMapping")
-    mapping = getattr(model_info_data, "inference_provider_mapping", [])
-    matching = [x for x in mapping if x.provider == provider]
-    if not matching or matching[0].status != "live":
-        raise knext.InvalidParametersError(
-            f"The model is not supported by provider '{provider}'. You can check which providers support the "
-            "model on the HF Hub website."
-        )
+    from ._session import huggingface_hub
+
+    model_info_data = huggingface_hub.model_info(
+        repo_id=model, expand="inferenceProviderMapping"
+    )
+    provider_mapping = [
+        x
+        for x in getattr(model_info_data, "inference_provider_mapping", [])
+        if x.status == "live"
+    ]
+    matching = [x for x in provider_mapping if x.provider == provider]
+
+    if not matching:
+        if provider_mapping:
+            if len(provider_mapping) < 4:
+                raise knext.InvalidParametersError(
+                    f"The model is not supported by provider '{provider}'. Available providers are: "
+                    f"{', '.join([x.provider for x in provider_mapping])}."
+                )
+            else:
+                raise knext.InvalidParametersError(
+                    f"The model is not supported by provider '{provider}'. Available providers include: "
+                    f"{', '.join([x.provider for x in provider_mapping][:3])}. The complete list of "
+                    "providers for the model can be found on the HF Hub website."
+                )
+        else:
+            raise knext.InvalidParametersError(
+                "The model is not supported by any provider."
+            )
+
     if matching[0].task != task:
         raise knext.InvalidParametersError(
             f"The model with the selected provider does not support the task '{task}'."

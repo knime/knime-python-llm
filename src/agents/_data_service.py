@@ -50,7 +50,6 @@ import queue
 import threading
 
 from langchain_core.messages.human import HumanMessage
-from langchain_core.messages.ai import AIMessage
 
 
 class AgentChatWidgetDataService:
@@ -154,21 +153,8 @@ class AgentChatWidgetDataService:
                         continue
 
                     fe_messages = self._to_frontend_messages(new_message)
-                    is_ai = isinstance(new_message, AIMessage)
-
                     for fe_msg in fe_messages:
-                        should_send = False
-
-                        if self._show_tool_calls_and_results:
-                            # always send everything if showing tool calls
-                            should_send = True
-                        else:
-                            # otherwise only send Views and AI messages
-                            if fe_msg.get("type") == "view" or is_ai:
-                                should_send = True
-
-                        if should_send:
-                            self._message_queue.put(fe_msg)
+                        self._message_queue.put(fe_msg)
 
             if final_state:
                 self._messages = final_state["messages"]

@@ -811,7 +811,7 @@ class AgentChatWidget:
                 )
             )
 
-        messages = json.loads(messages_str)
+        messages = json.loads(messages_str)["conversation"]
         message_values = [self._to_message_value(msg) for msg in messages]
         # Filter out None messages (e.g., view messages that are ignored)
         message_values = [msg for msg in message_values if msg is not None]
@@ -924,7 +924,7 @@ class AgentChatWidget:
         if previous_messages_str is None:
             previous_messages = []
         else:
-            previous_messages = json.loads(previous_messages_str)
+            previous_messages = json.loads(previous_messages_str)["conversation"]
             previous_messages = [
                 self._to_langchain_message(msg) for msg in previous_messages
             ]

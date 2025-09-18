@@ -12,6 +12,7 @@ import type {
   ToolCallTimelineItem,
   ToolMessage,
   InitializationState,
+  ViewData,
 } from "@/types";
 import { computed, ref, shallowRef, useId, watch } from "vue";
 
@@ -188,7 +189,7 @@ export const useChatStore = defineStore("chat", () => {
 
   // watchers
   watch(lastMessage, (newMessages, oldMessages) => {
-    if (isAiMessageWithoutToolCalls(lastMessage.value)) {
+    if (isLoading.value && isAiMessageWithoutToolCalls(lastMessage.value)) {
       loadingFinished(initState.value !== "idle");
     }
   });
@@ -242,7 +243,7 @@ export const useChatStore = defineStore("chat", () => {
       content: ERROR_MESSAGES[errorType],
     };
 
-    filterAndUpdateMessages([errorMessage]);
+    filterAndUpdateMessages([errorMessage], true);
     loadingFinished(false);
   }
 
@@ -254,10 +255,13 @@ export const useChatStore = defineStore("chat", () => {
     try {
       await ensureJsonDataService();
 
-      const initialConversation = await getInitialConversation();
-      if (initialConversation) {
-        updateMessages(initialConversation);
-        config.value = await getConfiguration();
+      const viewData = await getInitialViewData();
+      if (viewData) {
+        filterAndUpdateMessages(
+          viewData.conversation,
+          viewData.config.show_tool_calls_and_results,
+        );
+        config.value = viewData.config;
       } else {
         const [configResponse, initialAiMessage] = await Promise.all([
           getConfiguration(),
@@ -265,7 +269,7 @@ export const useChatStore = defineStore("chat", () => {
         ]);
         config.value = configResponse;
         if (initialAiMessage) {
-          updateMessages([initialAiMessage]);
+          filterAndUpdateMessages([initialAiMessage], true);
         }
       }
 
@@ -326,7 +330,7 @@ export const useChatStore = defineStore("chat", () => {
     }
   }
 
-  async function getInitialConversation() {
+  async function getInitialViewData(): Promise<ViewData | undefined> {
     var initialData = await jsonDataService.value?.initialData();
     if (initialData) {
       return initialData;
@@ -393,7 +397,7 @@ export const useChatStore = defineStore("chat", () => {
     const send = async () => {
       // 1. render user message
       const message: Message = { id: useId(), content: msg, type: "human" };
-      filterAndUpdateMessages([message]);
+      filterAndUpdateMessages([message], shouldShowToolCalls.value || false);
       // 2. send to backend
       await sendMessageToBackend(msg);
     };
@@ -417,7 +421,7 @@ export const useChatStore = defineStore("chat", () => {
           const msgs = await getLastMessages();
 
           if (msgs.length > 0) {
-            filterAndUpdateMessages(msgs);
+            filterAndUpdateMessages(msgs, shouldShowToolCalls.value || false);
             consecutiveEmptyPolls = 0;
           } else {
             consecutiveEmptyPolls++;
@@ -446,35 +450,36 @@ export const useChatStore = defineStore("chat", () => {
     }
   }
 
-  function updateMessages(msgs: Message[]) {
-    messagesToPersist.push(...msgs);
-    lastMessagesToDisplay.value = msgs;
-    lastMessage.value = msgs.at(-1);
-  }
-
-  function filterAndUpdateMessages(msgs: Message[]) {
-    if (shouldShowToolCalls.value) {
-      updateMessages(msgs);
+  function filterAndUpdateMessages(
+    msgs: Message[],
+    showToolCallsResults: boolean,
+  ) {
+    if (showToolCallsResults) {
+      lastMessagesToDisplay.value = msgs;
     } else {
       const filtered = msgs.filter(
         (msg) => !isToolMessage(msg) && !isAiMessageWithToolCalls(msg),
       );
-      messagesToPersist.push(...filtered);
       lastMessagesToDisplay.value = filtered;
-      lastMessage.value = msgs.at(-1);
     }
+    messagesToPersist.push(...msgs);
+    lastMessage.value = msgs.at(-1);
   }
 
   // TODO naming
   function loadingFinished(apply: boolean) {
     isLoading.value = false;
     if (apply && config.value?.reexecution_trigger === "INTERACTION") {
-      applyConversation();
+      applyViewData();
     }
   }
 
-  function applyConversation() {
-    jsonDataService.value?.applyData(messagesToPersist);
+  function applyViewData() {
+    const viewData: ViewData = {
+      conversation: messagesToPersist,
+      config: config.value!,
+    };
+    jsonDataService.value?.applyData(viewData);
   }
 
   function resetChat() {
@@ -509,7 +514,6 @@ export const useChatStore = defineStore("chat", () => {
     ensureJsonDataService,
     getConfiguration,
     getInitialMessage,
-    getInitialConversation,
     getLastMessages,
     checkIsProcessing,
     postUserMessage,
@@ -517,7 +521,6 @@ export const useChatStore = defineStore("chat", () => {
     sendMessageToBackend,
     flushRequestQueue,
     pollForNewMessages,
-    applyConversation,
     resetChat,
   };
 });

@@ -90,3 +90,8 @@ export interface Config {
 export type reexecution_trigger = "NONE" | "INTERACTION";
 
 export type InitializationState = "idle" | "ready" | "error";
+
+export interface ViewData {
+  conversation: Message[];
+  config: Config;
+}

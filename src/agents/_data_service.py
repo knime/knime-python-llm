@@ -50,17 +50,18 @@ import queue
 import threading
 
 from langchain_core.messages.human import HumanMessage
-from langchain_core.messages.ai import AIMessage
 
 
-class AgentChatViewDataService:
+class AgentChatWidgetDataService:
     def __init__(
         self,
         agent_graph,
         data_registry: DataRegistry,
         initial_message: str,
+        previous_messages: list,
         recursion_limit: int,
         show_tool_calls_and_results: bool,
+        reexecution_trigger: str,
         tool_converter: LangchainToolConverter,
     ):
         self._agent_graph = agent_graph
@@ -71,9 +72,11 @@ class AgentChatViewDataService:
             if data_registry.has_data or tool_converter.has_data_tools
             else []
         )
+        self._messages.extend(previous_messages)
         self._initial_message = initial_message
         self._recursion_limit = recursion_limit
         self._show_tool_calls_and_results = show_tool_calls_and_results
+        self._reexecution_trigger = reexecution_trigger
 
         self._message_queue = queue.Queue()
         self._thread = None
@@ -120,6 +123,7 @@ class AgentChatViewDataService:
     def get_configuration(self):
         return {
             "show_tool_calls_and_results": self._show_tool_calls_and_results,
+            "reexecution_trigger": self._reexecution_trigger,
         }
 
     def _post_user_message(self, user_message: str):
@@ -149,21 +153,8 @@ class AgentChatViewDataService:
                         continue
 
                     fe_messages = self._to_frontend_messages(new_message)
-                    is_ai = isinstance(new_message, AIMessage)
-
                     for fe_msg in fe_messages:
-                        should_send = False
-
-                        if self._show_tool_calls_and_results:
-                            # always send everything if showing tool calls
-                            should_send = True
-                        else:
-                            # otherwise only send Views and AI messages
-                            if fe_msg.get("type") == "view" or is_ai:
-                                should_send = True
-
-                        if should_send:
-                            self._message_queue.put(fe_msg)
+                        self._message_queue.put(fe_msg)
 
             if final_state:
                 self._messages = final_state["messages"]

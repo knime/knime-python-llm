@@ -3,9 +3,21 @@ import { mount } from "@vue/test-utils";
 import { createTestingPinia } from "@pinia/testing";
 import { setActivePinia } from "pinia";
 
-import type { AiMessage, ErrorMessage, HumanMessage, Timeline } from "@/types";
+import type {
+  AiMessage,
+  ErrorMessage,
+  HumanMessage,
+  Timeline,
+  ToolMessage,
+} from "@/types";
 import { useChatStore } from "@/stores/chat";
 import ChatInterface from "../ChatInterface.vue";
+import {
+  createAiMessage,
+  createToolMessage,
+  createUserMessage,
+} from "@/test/factories/messages";
+import { nextTick } from "process";
 
 vi.mock("@/composables/useScrollToBottom", () => ({
   useScrollToBottom: vi.fn(),
@@ -112,8 +124,16 @@ describe("ChatInterface", () => {
 
     // Mock the getter to return true
     chatStore.isLoading = true;
-    chatStore.isUsingTools = true;
-    chatStore.config = { show_tool_calls_and_results: false };
+    chatStore.lastMessage = {
+      type: "tool",
+      content: "",
+      toolCallId: "123",
+      id: "tool1",
+    };
+    chatStore.config = {
+      show_tool_calls_and_results: false,
+      reexecution_trigger: "NONE",
+    };
     await wrapper.vm.$nextTick();
 
     expect(wrapper.find(".tool-indicator").exists()).toBe(true);
@@ -124,7 +144,7 @@ describe("ChatInterface", () => {
     const chatStore = useChatStore();
 
     chatStore.isLoading = false;
-    chatStore.isUsingTools = false;
+    chatStore.lastMessage = createAiMessage("AI response");
 
     expect(wrapper.find(".tool-indicator").exists()).toBe(false);
   });
@@ -134,7 +154,7 @@ describe("ChatInterface", () => {
     const chatStore = useChatStore();
 
     chatStore.isLoading = true;
-    chatStore.isUsingTools = false;
+    chatStore.lastMessage = createUserMessage("User message");
     await wrapper.vm.$nextTick();
 
     expect(wrapper.find(".skeleton-item").exists()).toBe(true);
@@ -145,7 +165,7 @@ describe("ChatInterface", () => {
     const chatStore = useChatStore();
 
     chatStore.isLoading = false;
-    chatStore.isUsingTools = false;
+    chatStore.lastMessage = createAiMessage("AI response");
 
     expect(wrapper.find(".skeleton-item").exists()).toBe(false);
   });
@@ -156,7 +176,7 @@ describe("ChatInterface", () => {
 
     chatStore.chatItems = [];
     chatStore.isLoading = false;
-    chatStore.isUsingTools = false;
+    chatStore.lastMessage = createAiMessage("AI response");
 
     const messageList = wrapper.find(".message-list");
     expect(messageList.exists()).toBe(true);
@@ -178,10 +198,18 @@ describe("ChatInterface", () => {
       content: "Hello",
     };
 
+    const toolMessage: ToolMessage = createToolMessage(
+      "Tool response",
+      "tool1",
+    );
+
     chatStore.chatItems = [humanMessage];
+    chatStore.lastMessage = toolMessage;
     chatStore.isLoading = true;
-    chatStore.isUsingTools = true;
-    chatStore.config = { show_tool_calls_and_results: false };
+    chatStore.config = {
+      show_tool_calls_and_results: false,
+      reexecution_trigger: "NONE",
+    };
     await wrapper.vm.$nextTick();
 
     // Should show both the message and the tool indicator
@@ -194,5 +222,22 @@ describe("ChatInterface", () => {
     const wrapper = createWrapper();
 
     expect(wrapper.find(".message-input").exists()).toBe(true);
+  });
+
+  it("finishes loading when the last message is an AI message without tool calls", async () => {
+    const wrapper = createWrapper();
+    const chatStore = useChatStore();
+
+    chatStore.isLoading = true;
+    const humanMessage: HumanMessage = createUserMessage("Hello");
+    chatStore.addMessages([humanMessage], false);
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find(".skeleton-item").exists()).toBe(true);
+
+    const aiMessage: AiMessage = createAiMessage("AI response");
+    chatStore.addMessages([aiMessage], false);
+    await wrapper.vm.$nextTick();
+    expect(chatStore.isLoading).toBe(false);
+    expect(wrapper.find(".skeleton-item").exists()).toBe(false);
   });
 });

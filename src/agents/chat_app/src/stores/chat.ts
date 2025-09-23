@@ -12,9 +12,11 @@ import type {
   ToolCallTimelineItem,
   ToolMessage,
   InitializationState,
+  ViewData,
 } from "@/types";
-import { computed, ref, useId } from "vue";
+import { computed, ref, shallowRef, useId, watch } from "vue";
 
+// static utilities
 const ERROR_MESSAGES = {
   init: "Something went wrong. Try again later.",
   sending: "There was an error while sending your message.",
@@ -26,29 +28,186 @@ const ERROR_MESSAGES = {
     "Lost connection while waiting for response. Please try sending your message again.",
 };
 
+function completeActiveTimeline(timeline: Timeline) {
+  const toolCallCount = timeline.items.filter(
+    (item) => item.type === "tool_call",
+  ).length;
+  timeline.label = `Completed ${toolCallCount} tool call${toolCallCount === 1 ? "" : "s"}`;
+  timeline.status = "completed";
+}
+
+function addAiReasoningToTimeline(msg: AiMessage, timeline: Timeline) {
+  if (msg.content?.trim()) {
+    timeline.items.push({
+      id: msg.id,
+      type: "reasoning",
+      content: msg.content,
+    });
+  }
+}
+
+function addToolCallsToTimeline(msg: AiMessage, timeline: Timeline) {
+  if (msg.toolCalls) {
+    for (const tc of msg.toolCalls) {
+      timeline.items.push({
+        id: tc.id,
+        type: "tool_call",
+        name: tc.name,
+        args: tc.args,
+        status: "running",
+      });
+    }
+  }
+}
+
+function addAiMessageWithToolCallsToTimeline(
+  msg: AiMessage,
+  timelineParam?: Timeline,
+) {
+  let timeline;
+  // this either kicks off the agentic loop (create a new timeline)
+  // or contributes to the active timeline
+  if (!timelineParam) {
+    timeline = {
+      id: `timeline-${useId()}`,
+      label: "Using tools",
+      items: [],
+      status: "active",
+      type: "timeline",
+    };
+  } else {
+    timeline = timelineParam;
+  }
+
+  // extract and add reasoning to timeline
+  addAiReasoningToTimeline(msg, timeline);
+
+  // extract and add tool calls to timeline
+  addToolCallsToTimeline(msg, timeline);
+
+  return timeline;
+}
+
+function addToolMessageToTimeLine(msg: ToolMessage, timeline: Timeline) {
+  const index = timeline.items.findIndex((item) => item.id === msg.toolCallId);
+
+  if (index === -1) {
+    consola.error(
+      `Could not find tool call with ID ${msg.toolCallId} in the active timeline.`,
+    );
+  } else {
+    const originalItem = timeline.items[index] as ToolCallTimelineItem;
+
+    const content = msg.content ?? "";
+    const status = content.toLowerCase().startsWith("error")
+      ? "failed"
+      : "completed";
+
+    const updatedItem: ToolCallTimelineItem = {
+      ...originalItem,
+      content,
+      status,
+    };
+
+    timeline.items[index] = updatedItem;
+  }
+}
+
+function addMessagesToChatItems(
+  messages: Message[],
+  chatItems: ChatItem[],
+  timeline?: Timeline,
+) {
+  let activeTimeline = timeline;
+  for (const msg of messages) {
+    if (isAiMessageWithToolCalls(msg)) {
+      const updatedTimeline = addAiMessageWithToolCallsToTimeline(
+        msg as AiMessage,
+        activeTimeline,
+      );
+      if (!activeTimeline) {
+        activeTimeline = updatedTimeline;
+        chatItems.push(updatedTimeline);
+      }
+      continue;
+    }
+
+    if (activeTimeline) {
+      if (isToolMessage(msg)) {
+        addToolMessageToTimeLine(msg as ToolMessage, activeTimeline);
+        continue;
+      }
+      if (isAiMessageWithoutToolCalls(msg)) {
+        completeActiveTimeline(activeTimeline);
+        activeTimeline = undefined;
+        chatItems.push(msg);
+        continue;
+      }
+      if (msg.type === "error") {
+        completeActiveTimeline(activeTimeline!);
+        activeTimeline = undefined;
+        chatItems.push(msg);
+        continue;
+      }
+    }
+
+    // otherwise add message directly to the conversation
+    chatItems.push(msg);
+  }
+}
+
+function isToolMessage(msg?: Message): boolean {
+  if (!msg) {
+    return false;
+  }
+  return msg.type === "tool";
+}
+
+function isAiMessageWithToolCalls(msg?: Message): boolean {
+  if (!msg) {
+    return false;
+  }
+  return msg.type === "ai" && (msg.toolCalls?.length ?? 0) > 0;
+}
+
+function isAiMessageWithoutToolCalls(msg?: Message): boolean {
+  if (!msg) {
+    return false;
+  }
+  return msg.type === "ai" && !msg.toolCalls?.length;
+}
+
 export const useChatStore = defineStore("chat", () => {
   // state
-  const chatItems = ref<ChatItem[]>([]);
+  let messagesToPersist: Message[] = [];
+  const lastMessage = shallowRef<Message | undefined>();
   const config = ref<Config | null>(null); // node settings that affect rendering
   const isLoading = ref(false); // true if agent is currently responding to user message
-  const isUsingTools = ref(false);
+  const chatItems = ref<ChatItem[]>([]);
   const lastUserMessage = ref("");
-  const activeTimeline = ref<Timeline | null>(null);
   const jsonDataService = ref<JsonDataService | null>(null);
   const initState = ref<InitializationState>("idle");
   const requestQueue: Array<() => void> = []; // populated with messages sent before data service is ready
 
   // getters
-  const shouldShowToolUseIndicator = computed(() => {
+  const isUsingTools = computed(() => {
+    if (!isLoading.value || !lastMessage.value) {
+      return false;
+    }
     return (
-      isLoading.value &&
-      isUsingTools.value &&
-      !config.value?.show_tool_calls_and_results
+      isAiMessageWithToolCalls(lastMessage.value) ||
+      isToolMessage(lastMessage.value)
     );
   });
+
+  const shouldShowToolUseIndicator = computed(
+    () => isLoading.value && isUsingTools.value && !shouldShowToolCalls.value,
+  );
+
   const shouldShowGenericLoadingIndicator = computed(
     () => isLoading.value && !isUsingTools.value,
   );
+
   const shouldShowToolCalls = computed(
     () => config.value?.show_tool_calls_and_results,
   );
@@ -60,11 +219,9 @@ export const useChatStore = defineStore("chat", () => {
       type: "error",
       content: ERROR_MESSAGES[errorType],
     };
-    chatItems.value.push(errorMessage);
 
-    isLoading.value = false;
-    isUsingTools.value = false;
-    completeActiveTimeline();
+    addMessages([errorMessage], true);
+    finishLoading(false);
   }
 
   async function init() {
@@ -75,14 +232,22 @@ export const useChatStore = defineStore("chat", () => {
     try {
       await ensureJsonDataService();
 
-      const [configResponse, initialAiMessage] = await Promise.all([
-        getConfiguration(),
-        getInitialMessage(),
-      ]);
-
-      config.value = configResponse;
-      if (initialAiMessage) {
-        addItemsToChat([initialAiMessage]);
+      const viewData = await getInitialViewData();
+      if (viewData) {
+        addMessages(
+          viewData.conversation,
+          viewData.config.show_tool_calls_and_results,
+        );
+        config.value = viewData.config;
+      } else {
+        const [configResponse, initialAiMessage] = await Promise.all([
+          getConfiguration(),
+          getInitialMessage(),
+        ]);
+        config.value = configResponse;
+        if (initialAiMessage) {
+          addMessages([initialAiMessage], true);
+        }
       }
 
       initState.value = "ready";
@@ -91,149 +256,6 @@ export const useChatStore = defineStore("chat", () => {
       consola.error("Chat Store: Error during initialization:", error);
       addErrorMessage("init");
       initState.value = "error";
-    }
-  }
-
-  function ensureActiveTimeline() {
-    if (activeTimeline.value) {
-      return;
-    }
-
-    const newTimeline: Timeline = {
-      id: `timeline-${useId()}`,
-      label: "Using tools",
-      items: [],
-      status: "active",
-      type: "timeline",
-    };
-    chatItems.value.push(newTimeline);
-    activeTimeline.value = newTimeline;
-    isUsingTools.value = true;
-  }
-
-  function completeActiveTimeline() {
-    if (!activeTimeline.value) {
-      return;
-    }
-
-    isUsingTools.value = false;
-
-    const toolCallCount = activeTimeline.value.items.filter(
-      (item) => item.type === "tool_call",
-    ).length;
-    activeTimeline.value.label = `Completed ${toolCallCount} tool call${toolCallCount === 1 ? "" : "s"}`;
-    activeTimeline.value.status = "completed";
-    activeTimeline.value = null;
-  }
-
-  function addAiReasoningToTimeline(msg: AiMessage) {
-    if (msg.content?.trim()) {
-      activeTimeline.value?.items.push({
-        id: msg.id,
-        type: "reasoning",
-        content: msg.content,
-      });
-    }
-  }
-
-  function addToolCallsToTimeline(msg: AiMessage) {
-    if (msg.toolCalls) {
-      for (const tc of msg.toolCalls) {
-        activeTimeline.value?.items.push({
-          id: tc.id,
-          type: "tool_call",
-          name: tc.name,
-          args: tc.args,
-          status: "running",
-        });
-      }
-    }
-  }
-
-  function addAiMessageWithToolCalls(msg: AiMessage) {
-    if (!shouldShowToolCalls.value) {
-      isUsingTools.value = true;
-      return;
-    }
-    // this either kicks off the agentic loop (create a new timeline)
-    // or contributes to the active timeline
-    ensureActiveTimeline();
-
-    // extract and add reasoning to timeline
-    addAiReasoningToTimeline(msg);
-
-    // extract and add tool calls to timeline
-    addToolCallsToTimeline(msg);
-  }
-
-  function addToolMessage(msg: ToolMessage) {
-    if (!activeTimeline.value) {
-      return;
-    }
-
-    if (!shouldShowToolCalls.value) {
-      return;
-    }
-
-    const index = activeTimeline.value.items.findIndex(
-      (item) => item.id === msg.toolCallId,
-    );
-
-    if (index === -1) {
-      consola.error(
-        `Could not find tool call with ID ${msg.toolCallId} in the active timeline.`,
-      );
-    } else {
-      const originalItem = activeTimeline.value.items[
-        index
-      ] as ToolCallTimelineItem;
-
-      const content = msg.content ?? "";
-      const status = content.toLowerCase().startsWith("error")
-        ? "failed"
-        : "completed";
-
-      const updatedItem: ToolCallTimelineItem = {
-        ...originalItem,
-        content,
-        status,
-      };
-
-      activeTimeline.value.items[index] = updatedItem;
-    }
-  }
-
-  function addAiMessage(msg: AiMessage) {
-    // agent either finished the agentic loop, or simply replied without tool use
-    completeActiveTimeline();
-    isLoading.value = false;
-
-    chatItems.value.push(msg);
-  }
-
-  function addItemsToChat(messages: Message[]) {
-    if (!messages.length) {
-      return;
-    }
-
-    for (const msg of messages) {
-      if (msg.type === "ai" && msg.toolCalls?.length) {
-        addAiMessageWithToolCalls(msg);
-        continue;
-      }
-
-      if (msg.type === "tool") {
-        addToolMessage(msg);
-        continue;
-      }
-
-      if (msg.type === "ai" && !msg.toolCalls?.length) {
-        addAiMessage(msg);
-        continue;
-      }
-
-      // otherwise add message directly to the conversation
-      chatItems.value.push(msg);
     }
   }
 
@@ -269,7 +291,10 @@ export const useChatStore = defineStore("chat", () => {
       return response;
     } catch (error) {
       consola.error("Chat Store: Failed to get configuration:", error);
-      return { show_tool_calls_and_results: false };
+      return {
+        show_tool_calls_and_results: false,
+        reexecution_trigger: "NONE",
+      };
     }
   }
 
@@ -282,6 +307,13 @@ export const useChatStore = defineStore("chat", () => {
     } catch (error) {
       consola.error("Chat Store: Failed to get initial message:", error);
       return null;
+    }
+  }
+
+  async function getInitialViewData(): Promise<ViewData | undefined> {
+    var initialData = await jsonDataService.value?.initialData();
+    if (initialData) {
+      return initialData;
     }
   }
 
@@ -344,7 +376,8 @@ export const useChatStore = defineStore("chat", () => {
 
     const send = async () => {
       // 1. render user message
-      addItemsToChat([{ id: useId(), content: msg, type: "human" }]);
+      const message: Message = { id: useId(), content: msg, type: "human" };
+      addMessages([message], shouldShowToolCalls.value || false);
       // 2. send to backend
       await sendMessageToBackend(msg);
     };
@@ -368,7 +401,7 @@ export const useChatStore = defineStore("chat", () => {
           const msgs = await getLastMessages();
 
           if (msgs.length > 0) {
-            addItemsToChat(msgs);
+            addMessages(msgs, shouldShowToolCalls.value || false);
             consecutiveEmptyPolls = 0;
           } else {
             consecutiveEmptyPolls++;
@@ -377,8 +410,7 @@ export const useChatStore = defineStore("chat", () => {
               const response = await checkIsProcessing();
 
               if (!response?.is_processing) {
-                isLoading.value = false;
-                isUsingTools.value = false;
+                finishLoading(true);
                 break;
               }
 
@@ -398,13 +430,55 @@ export const useChatStore = defineStore("chat", () => {
     }
   }
 
-  function resetChat() {
-    chatItems.value = [];
-    config.value = null;
+  function addMessages(msgs: Message[], showToolCallsResults: boolean) {
+    messagesToPersist.push(...msgs);
+    lastMessage.value = msgs.at(-1);
+
+    if (isLoading.value && isAiMessageWithoutToolCalls(lastMessage.value)) {
+      finishLoading(initState.value !== "idle");
+    }
+
+    // update chatItems
+    const lastMessagesToDisplay = showToolCallsResults
+      ? msgs
+      : msgs.filter(
+          (msg) => !isToolMessage(msg) && !isAiMessageWithToolCalls(msg),
+        );
+    const activeTimeline = chatItems.value.findLast(
+      (item) => item.type === "timeline" && item.status === "active",
+    ) as Timeline | undefined;
+    addMessagesToChatItems(
+      lastMessagesToDisplay,
+      chatItems.value,
+      activeTimeline,
+    );
+  }
+
+  function finishLoading(shallApplyViewData: boolean) {
     isLoading.value = false;
-    isUsingTools.value = false;
+    if (
+      shallApplyViewData &&
+      config.value?.reexecution_trigger === "INTERACTION"
+    ) {
+      applyViewData();
+    }
+  }
+
+  function applyViewData() {
+    const viewData: ViewData = {
+      conversation: messagesToPersist,
+      config: config.value!,
+    };
+    jsonDataService.value?.applyData(viewData);
+  }
+
+  function resetChat() {
+    messagesToPersist = [];
+    lastMessage.value = undefined;
+    config.value = null;
+    chatItems.value = [];
+    isLoading.value = false;
     lastUserMessage.value = "";
-    activeTimeline.value = null;
     jsonDataService.value = null;
     initState.value = "idle";
     requestQueue.length = 0;
@@ -412,12 +486,11 @@ export const useChatStore = defineStore("chat", () => {
 
   return {
     //state
-    chatItems,
     config,
+    chatItems,
+    lastMessage,
     isLoading,
-    isUsingTools,
     lastUserMessage,
-    activeTimeline,
     jsonDataService,
     initState,
 
@@ -425,18 +498,12 @@ export const useChatStore = defineStore("chat", () => {
     shouldShowToolUseIndicator,
     shouldShowGenericLoadingIndicator,
     shouldShowToolCalls,
+    isUsingTools,
 
     // actions
     addErrorMessage,
+    addMessages,
     init,
-    ensureActiveTimeline,
-    completeActiveTimeline,
-    addAiReasoningToTimeline,
-    addToolCallsToTimeline,
-    addAiMessageWithToolCalls,
-    addToolMessage,
-    addAiMessage,
-    addItemsToChat,
     ensureJsonDataService,
     getConfiguration,
     getInitialMessage,

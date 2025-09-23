@@ -84,6 +84,14 @@ export type ChatItem = Message | Timeline;
 // misc types
 export interface Config {
   show_tool_calls_and_results: boolean;
+  reexecution_trigger: reexecution_trigger;
 }
 
+export type reexecution_trigger = "NONE" | "INTERACTION";
+
 export type InitializationState = "idle" | "ready" | "error";
+
+export interface ViewData {
+  conversation: Message[];
+  config: Config;
+}

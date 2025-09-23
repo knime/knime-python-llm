@@ -21,8 +21,8 @@ const handleClick = (event: MouseEvent) => {
   }
 };
 
-const handleSubmit = async () => {
-  await chatStore.sendUserMessage(input.value);
+const handleSubmit = () => {
+  chatStore.sendUserMessage(input.value);
   input.value = "";
 };
 

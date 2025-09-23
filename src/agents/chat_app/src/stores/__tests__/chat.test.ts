@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createTestingPinia } from "@pinia/testing";
 import { setActivePinia } from "pinia";
 
-import type { Timeline } from "@/types";
+import type { Timeline, ViewData } from "@/types";
 import { useChatStore } from "../chat";
 import {
   createAiMessage,
@@ -15,10 +15,12 @@ import {
   createUserMessage,
   createViewMessage,
 } from "@/test/factories/messages";
+import { nextTick } from "vue";
+import { mock } from "node:test";
 
 const mockJsonDataService = {
   data: vi.fn(),
-  initialData: vi.fn(() => Promise.resolve({})),
+  initialData: vi.fn(() => Promise.resolve(undefined as ViewData | undefined)),
   applyData: vi.fn(() => Promise.resolve({ isApplied: true })),
 };
 
@@ -39,7 +41,7 @@ vi.mock("consola", () => ({
 
 describe("chat store", () => {
   afterEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
   });
 
   const setupStore = () => {
@@ -59,12 +61,11 @@ describe("chat store", () => {
       const { store } = setupStore();
 
       expect(store).toMatchObject({
-        chatItems: [],
+        lastMessage: undefined,
         config: null,
+        chatItems: [],
         isLoading: false,
-        isUsingTools: false,
         lastUserMessage: "",
-        activeTimeline: null,
         jsonDataService: null,
         initState: "idle",
       });
@@ -75,7 +76,7 @@ describe("chat store", () => {
     it("shouldShowToolUseIndicator returns true when loading with tools and not showing tool calls", () => {
       const { store } = setupStore();
       store.isLoading = true;
-      store.isUsingTools = true;
+      store.lastMessage = createToolMessage("Tool response", "123");
       store.config = createConfig(false);
 
       expect(store.shouldShowToolUseIndicator).toBe(true);
@@ -84,7 +85,8 @@ describe("chat store", () => {
     it("shouldShowToolUseIndicator returns false when showing tool calls", () => {
       const { store } = setupStore();
       store.isLoading = true;
-      store.isUsingTools = true;
+      store.lastMessage = createToolMessage("Tool response", "123");
+
       store.config = createConfig(true);
 
       expect(store.shouldShowToolUseIndicator).toBe(false);
@@ -93,7 +95,7 @@ describe("chat store", () => {
     it("shouldShowGenericLoadingIndicator returns true when loading without tools", () => {
       const { store } = setupStore();
       store.isLoading = true;
-      store.isUsingTools = false;
+      store.lastMessage = createUserMessage("Hello");
 
       expect(store.shouldShowGenericLoadingIndicator).toBe(true);
     });
@@ -101,7 +103,7 @@ describe("chat store", () => {
     it("shouldShowGenericLoadingIndicator returns false when using tools", () => {
       const { store } = setupStore();
       store.isLoading = true;
-      store.isUsingTools = true;
+      store.lastMessage = createToolMessage("Tool response", "123");
 
       expect(store.shouldShowGenericLoadingIndicator).toBe(false);
     });
@@ -121,7 +123,7 @@ describe("chat store", () => {
     it("adds error message to chat items", () => {
       const { store } = setupStore();
       store.isLoading = true;
-      store.isUsingTools = true;
+      store.lastMessage = createToolMessage("Tool response", "123");
 
       store.addErrorMessage("sending");
 
@@ -136,12 +138,10 @@ describe("chat store", () => {
     it("completes active timeline when adding error", () => {
       const { store } = setupStore();
       const mockTimeline = createTimeline("Using tools", "active", []);
-      store.activeTimeline = mockTimeline;
       store.chatItems.push(mockTimeline);
 
       store.addErrorMessage("processing");
 
-      expect(store.activeTimeline).toBe(null);
       expect(mockTimeline.status).toBe("completed");
     });
   });
@@ -163,7 +163,7 @@ describe("chat store", () => {
       store.config = await store.getConfiguration();
       const initMsg = await store.getInitialMessage();
       if (initMsg) {
-        store.addItemsToChat([initMsg]);
+        store.addMessages([initMsg], false);
       }
 
       expect(store.config).toEqual(config);
@@ -183,7 +183,7 @@ describe("chat store", () => {
       store.config = await store.getConfiguration();
       const initMsg = await store.getInitialMessage();
       if (initMsg) {
-        store.addItemsToChat([initMsg]);
+        store.addMessages([initMsg], false);
       }
 
       expect(store.config).toEqual(config);
@@ -203,6 +203,30 @@ describe("chat store", () => {
       expect(store.chatItems).toHaveLength(1);
       expect(store.chatItems[0]).toMatchObject(
         createErrorMessage("Something went wrong. Try again later."),
+      );
+    });
+
+    it("uses 'initial view data' on init when provided", async () => {
+      mockJsonDataService.initialData.mockResolvedValue({
+        conversation: [
+          createAiMessage("Hello! How can I help you?"),
+          createUserMessage("I need assistance with my project."),
+          createAiMessage("", [createToolCall()]),
+        ],
+        config: createConfig(false),
+      });
+
+      const { store } = setupStore();
+
+      await store.init();
+
+      expect(mockJsonDataService.initialData).toHaveBeenCalled();
+      expect(store.chatItems).toHaveLength(2);
+      expect(store.chatItems[0]).toEqual(
+        createAiMessage("Hello! How can I help you?"),
+      );
+      expect(store.chatItems[1]).toEqual(
+        createUserMessage("I need assistance with my project."),
       );
     });
   });
@@ -319,9 +343,16 @@ describe("chat store", () => {
       const message = "Hello!";
 
       // 1. Add user message to chat (this happens first in sendUserMessage)
-      store.addItemsToChat([
-        { id: createUserMessage(message).id, content: message, type: "human" },
-      ]);
+      store.addMessages(
+        [
+          {
+            id: createUserMessage(message).id,
+            content: message,
+            type: "human",
+          },
+        ],
+        true,
+      );
 
       // 2. Store the message for recall
       store.lastUserMessage = message;
@@ -381,12 +412,18 @@ describe("chat store", () => {
   describe("timeline management", () => {
     it("creates active timeline when needed", () => {
       const { store } = setupStore();
+      store.isLoading = true;
 
-      store.ensureActiveTimeline();
+      // should create a new, active timeline
+      store.addMessages(
+        [createAiMessage("ai message", [createToolCall()])],
+        true,
+      );
 
-      expect(store.activeTimeline).toBeTruthy();
-      expect(store.activeTimeline?.status).toBe("active");
-      expect(store.activeTimeline?.label).toBe("Using tools");
+      const activeTimeline = store.chatItems.at(-1) as Timeline;
+      expect(activeTimeline).toBeTruthy();
+      expect(activeTimeline.status).toBe("active");
+      expect(activeTimeline.label).toBe("Using tools");
       expect(store.isUsingTools).toBe(true);
       expect(store.chatItems).toHaveLength(1);
     });
@@ -394,12 +431,16 @@ describe("chat store", () => {
     it("does not create timeline if one already exists", () => {
       const { store } = setupStore();
       const existingTimeline = createTimeline("Existing", "active", []);
-      store.activeTimeline = existingTimeline;
 
-      store.ensureActiveTimeline();
+      store.chatItems.push(existingTimeline);
 
-      expect(store.activeTimeline).toStrictEqual(existingTimeline);
-      expect(store.chatItems).toHaveLength(0);
+      // should add to exsiting timeline
+      store.addMessages([createToolMessage("Tool response", "123")], true);
+
+      const activeTimeline = store.chatItems.at(-1) as Timeline;
+
+      expect(activeTimeline).toStrictEqual(existingTimeline);
+      expect(store.chatItems).toHaveLength(1);
     });
 
     it("completes active timeline", () => {
@@ -407,12 +448,12 @@ describe("chat store", () => {
       const timeline = createTimeline("Using tools", "active", [
         createToolCallTimelineItem("search", "completed"),
       ]);
-      store.activeTimeline = timeline;
-      store.isUsingTools = true;
+      store.chatItems.push(timeline);
+      store.addMessages([createToolMessage("Tool response", "123")], true);
 
-      store.completeActiveTimeline();
+      // should complete the timeline
+      store.addMessages([createAiMessage("AI response")], true);
 
-      expect(store.activeTimeline).toBe(null);
       expect(store.isUsingTools).toBe(false);
       expect(timeline.status).toBe("completed");
       expect(timeline.label).toBe("Completed 1 tool call");
@@ -420,14 +461,16 @@ describe("chat store", () => {
 
     it("handles multiple tool calls in timeline label", () => {
       const { store } = setupStore();
-      const timeline = createTimeline("Using tools", "active", [
+      const activeTimeline = createTimeline("Using tools", "active", [
         createToolCallTimelineItem("search", "completed"),
         createToolCallTimelineItem("analyze", "completed"),
       ]);
-      store.activeTimeline = timeline;
+      store.chatItems.push(activeTimeline);
 
-      store.completeActiveTimeline();
+      // should complete the timeline
+      store.addMessages([createAiMessage("AI response")], true);
 
+      const timeline = store.chatItems.at(-2) as Timeline;
       expect(timeline.label).toBe("Completed 2 tool calls");
     });
   });
@@ -446,15 +489,16 @@ describe("chat store", () => {
       );
       store.config = createConfig(true);
 
-      store.addAiMessageWithToolCalls(aiMessageWithToolCalls);
+      store.addMessages([aiMessageWithToolCalls], true);
 
-      expect(store.activeTimeline).toBeTruthy();
-      expect(store.activeTimeline?.items).toHaveLength(2); // reasoning + tool call
-      expect(store.activeTimeline?.items[0]).toMatchObject({
+      const timeline = store.chatItems.at(-1) as Timeline;
+      expect(timeline).toBeTruthy();
+      expect(timeline.items).toHaveLength(2); // reasoning + tool call
+      expect(timeline.items[0]).toMatchObject({
         type: "reasoning",
         content: "Let me search for that information.",
       });
-      expect(store.activeTimeline?.items[1]).toMatchObject({
+      expect(timeline.items[1]).toMatchObject({
         type: "tool_call",
         name: "search_tool",
         status: "running",
@@ -474,9 +518,9 @@ describe("chat store", () => {
           status: "running",
         },
       ]);
-      store.activeTimeline = timeline;
+      store.chatItems.push(timeline);
 
-      store.addToolMessage(toolMessage);
+      store.addMessages([toolMessage], true);
 
       expect(timeline.items[0]).toMatchObject({
         type: "tool_call",
@@ -485,22 +529,22 @@ describe("chat store", () => {
       });
     });
 
-    it("adds final AI response to chat items", () => {
+    it("adds final AI response to chat items", async () => {
       const { store } = setupStore();
       const finalMessage = createAiMessage(
         "Based on the search results, here's your answer.",
       );
       const timeline = createTimeline("Using tools", "active", []);
-      store.activeTimeline = timeline;
+      store.chatItems.push(timeline);
       store.isLoading = true;
 
-      store.addAiMessage(finalMessage);
+      store.addMessages([finalMessage], true);
 
-      expect(store.chatItems).toHaveLength(1);
-      expect(store.chatItems[0]).toEqual(finalMessage);
-      expect(store.isLoading).toBe(false);
-      expect(store.activeTimeline).toBe(null);
+      expect(store.chatItems).toHaveLength(2);
+      expect(store.chatItems[1]).toEqual(finalMessage);
       expect(timeline.status).toBe("completed");
+      await nextTick();
+      expect(store.isLoading).toBe(false);
     });
 
     it("processes mixed message responses correctly", () => {
@@ -533,7 +577,7 @@ describe("chat store", () => {
         viewMessage,
       ];
 
-      store.addItemsToChat(messages);
+      store.addMessages(messages, true);
 
       // Should have timeline + final AI response + view response
       expect(store.chatItems).toHaveLength(3);
@@ -594,26 +638,24 @@ describe("chat store", () => {
       const { store } = setupStore();
       const config = createConfig(true);
       const userMessage = createUserMessage("test");
-      const timeline = createTimeline();
 
       // Set some state
-      store.chatItems = [userMessage];
+      store.lastMessage = userMessage;
       store.config = config;
+      store.chatItems.push(userMessage);
       store.isLoading = true;
-      store.isUsingTools = true;
       store.lastUserMessage = "test";
-      store.activeTimeline = timeline as Timeline;
       store.jsonDataService = mockJsonDataService;
 
       store.resetChat();
 
       expect(store).toMatchObject({
-        chatItems: [],
+        lastMessage: undefined,
         config: null,
+        chatItems: [],
         isLoading: false,
         isUsingTools: false,
         lastUserMessage: "",
-        activeTimeline: null,
         jsonDataService: null,
         initState: "idle",
       });

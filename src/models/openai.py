@@ -114,11 +114,11 @@ chat_models = [
     "o4-mini",
 ]
 chat_default = "gpt-4.1-nano"
-embeddings_models = [
-    "text-embedding-3-small",
-    "text-embedding-3-large",
-    "text-embedding-ada-002",
-]
+embeddings_models = list(map(_to_choice, [
+    ("text-embedding-3-small", "text-embedding-3-small", "Small and cheap embedding model sufficient for most use-cases. [Docs](https://platform.openai.com/docs/models/text-embedding-3-small)"),
+    ("text-embedding-3-large", "text-embedding-3-large", "Most capable but more expensive embedding model. [Docs](https://platform.openai.com/docs/models/text-embedding-3-large)"),
+    ("text-embedding-ada-002", "text-embedding-ada-002", "Older embedding model. [Docs](https://platform.openai.com/docs/models/text-embedding-ada-002)"),
+]))
 embeddings_default = "text-embedding-3-small"
 models_w_embed_dims_api = [
     "text-embedding-3-small",

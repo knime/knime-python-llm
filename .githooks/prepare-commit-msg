@@ -1,0 +1,28 @@
+#!/bin/sh
+# Git hook: automatically prepend branch ticket ID to commit messages
+# Usage: place this script in .githooks/prepare-commit-msg and run 'git config core.hooksPath .githooks'
+
+COMMIT_MSG_FILE="$1"
+HOOK_SOURCE="$2"
+
+# Do not modify merge commits or commits with templates, squash, etc.
+if [ "${HOOK_SOURCE}" = "merge" ] || [ "${HOOK_SOURCE}" = "commit" ]; then
+    exit 0
+fi
+
+# Get current branch name
+BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
+# Extract ticket ID pattern (e.g., AP-1234, HUB-2342)
+TICKET=$(echo "$BRANCH_NAME" | grep -Eo '[A-Z]+-[0-9]+' | head -n 1)
+
+if [ -n "$TICKET" ]; then
+    # Skip if ticket already appears anywhere in the commit message (case-insensitive, whole token)
+    # Use grep with word boundary like logic: allow surrounding non-alphanumerics.
+    if grep -qiE "(^|[^A-Z0-9])${TICKET}([^A-Z0-9]|$)" "$COMMIT_MSG_FILE"; then
+        exit 0
+    fi
+
+    # Otherwise prepend ticket ID
+    sed -i.bak -e "1s/^/${TICKET}: /" "$COMMIT_MSG_FILE"
+    rm -f "$COMMIT_MSG_FILE.bak"
+fi

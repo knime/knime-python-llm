@@ -1093,7 +1093,7 @@ def _create_model(
     ctx: knext.ExecutionContext,
     output_format: OutputFormatOptions,
 ):
-    from langchain_openai import ChatOpenAI
+    from ._openai import _ChatOpenAI
 
     model_kwargs = {}
     if output_format == OutputFormatOptions.JSON:
@@ -1105,7 +1105,7 @@ def _create_model(
         return is_o_series or is_gpt_5
 
     key = po_instance.spec.auth_spec.get_api_key(ctx)
-    return ChatOpenAI(
+    return _ChatOpenAI(
         openai_api_key=key,
         base_url=po_instance.spec.base_url,
         model=po_instance.spec.model,
@@ -1116,6 +1116,7 @@ def _create_model(
         seed=po_instance.spec.seed,
         model_kwargs=model_kwargs,
         default_headers=po_instance.spec.auth_spec.normalized_custom_headers,
+        ctx=ctx,
     )
 
 

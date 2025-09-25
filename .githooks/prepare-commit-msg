@@ -16,13 +16,16 @@ BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
 TICKET=$(echo "$BRANCH_NAME" | grep -Eo '[A-Z]+-[0-9]+' | head -n 1)
 
 if [ -n "$TICKET" ]; then
-    # Skip if ticket already appears anywhere in the commit message (case-insensitive, whole token)
-    # Use grep with word boundary like logic: allow surrounding non-alphanumerics.
-    if grep -qiE "(^|[^A-Z0-9])${TICKET}([^A-Z0-9]|$)" "$COMMIT_MSG_FILE"; then
+    # Read first line of existing commit message
+    FIRST_LINE=$(head -n1 "$COMMIT_MSG_FILE")
+
+    # If any ticket-like identifier already prefixes the message, do nothing
+    # Pattern: optional leading whitespace, TICKET-ID colon space
+    if echo "$FIRST_LINE" | grep -Eq '^[[:space:]]*[A-Z]+-[0-9]+:'; then
         exit 0
     fi
 
-    # Otherwise prepend ticket ID
+    # Otherwise prepend the branch ticket identifier
     sed -i.bak -e "1s/^/${TICKET}: /" "$COMMIT_MSG_FILE"
     rm -f "$COMMIT_MSG_FILE.bak"
 fi

@@ -90,13 +90,21 @@ _default_openai_api_base = "https://api.openai.com/v1"
 def _to_choice(model: tuple[str, str, str]) -> knext.StringParameter.Choice:
     return knext.StringParameter.Choice(*model)
 
-completion_models = [
-    "gpt-3.5-turbo-instruct",
-    "babbage-002",
-    "davinci-002",
-]
+def _to_choices(models: list[tuple[str, str, str]]) -> list[knext.StringParameter.Choice]:
+    return list(map(_to_choice, models))
+
+completion_models = _to_choices([
+    ("gpt-3.5-turbo-instruct", "GPT-3.5 Turbo Instruct",
+     "Legacy instruct-style GPT-3.5 model; optimized for following single-turn instructions. Use only for backward compatibility; prefer GPT-4o Mini. [Docs](https://platform.openai.com/docs/models/gpt-3.5-turbo-instruct)"),
+    
+    ("babbage-002", "Babbage-002",
+     "Legacy GPT-3.5 base model for simple tasks. Use only if migrating old applications; prefer GPT-4o Mini for new projects. [Docs](https://platform.openai.com/docs/models/babbage-002)"),
+    
+    ("davinci-002", "Davinci-002",
+     "Legacy GPT-3.5 base model; more capable than Babbage-002 but deprecated. Use only for legacy compatibility; modern tasks should use GPT-4o or GPT-4.1. [Docs](https://platform.openai.com/docs/models/davinci-002)"),
+])
 completion_default = "gpt-3.5-turbo-instruct"
-chat_models = list(map(_to_choice, [
+chat_models = _to_choices([
     ("gpt-3.5-turbo", "GPT-3.5 Turbo", 
      "Legacy chat/text model; OpenAI recommends GPT-4o Mini instead. Use only for backward compatibility. [Docs](https://platform.openai.com/docs/models/gpt-3.5-turbo)"),
     
@@ -150,13 +158,13 @@ chat_models = list(map(_to_choice, [
     
     ("o4-mini", "o4 Mini", 
      "Efficient reasoning model optimized for fast, affordable performance. Best for reasoning tasks with tight budgets. [Docs](https://platform.openai.com/docs/models/o4-mini)"),
-]))
+])
 chat_default = "gpt-4.1-nano"
-embeddings_models = list(map(_to_choice, [
+embeddings_models = _to_choices([
     ("text-embedding-3-small", "text-embedding-3-small", "Small and cheap embedding model sufficient for most use-cases. [Docs](https://platform.openai.com/docs/models/text-embedding-3-small)"),
     ("text-embedding-3-large", "text-embedding-3-large", "Most capable but more expensive embedding model. [Docs](https://platform.openai.com/docs/models/text-embedding-3-large)"),
     ("text-embedding-ada-002", "text-embedding-ada-002", "Older embedding model. [Docs](https://platform.openai.com/docs/models/text-embedding-ada-002)"),
-]))
+])
 embeddings_default = "text-embedding-3-small"
 models_w_embed_dims_api = [
     "text-embedding-3-small",
@@ -326,12 +334,12 @@ def _get_model_name(
     selection_mode: str,
     model: str,
     specific_model: str,
-    default_model_list: List[str],
+    default_model_list: List[knext.StringParameter.Choice],
     default_model: str,
 ) -> str:
     if selection_mode == OpenAIModelOptions.ALL_MODELS.name:
         return specific_model
-    if model not in default_model_list:
+    if model not in [choice.id for choice in default_model_list]:
         ctx.set_warning(
             f"Configured deprecated model, switching to fallback model: {default_model}"
         )
@@ -457,10 +465,10 @@ class ChatModelLoaderInputSettings:
     selection = _get_model_selection_value_switch()
 
     model_name = _EnumToStringParameter(
-        label="Model ID",
+        label="Model",
         description="Select a chat-optimized OpenAI model to be used.",
         # combined instruct and chat models after deprecating Instruct Model Selector nodes
-        choices=lambda c: completion_models + chat_models,
+        choices=completion_models + chat_models,
         default_value=chat_default,
         options=OpenAIModelCompletionsOptions,
     ).rule(
@@ -499,9 +507,9 @@ class EmbeddingsLoaderInputSettings:
     selection = _get_model_selection_value_switch()
 
     model_name = _EnumToStringParameter(
-        label="Model ID",
+        label="Model",
         description="Select an embedding OpenAI model to be used.",
-        choices=lambda c: embeddings_models,
+        choices=embeddings_models,
         default_value=embeddings_default,
         options=OpenAIEmbeddingsOptions,
     ).rule(

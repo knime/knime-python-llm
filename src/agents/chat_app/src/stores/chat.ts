@@ -1,6 +1,9 @@
 import { defineStore } from "pinia";
 
-import { JsonDataService } from "@knime/ui-extension-service";
+import {
+  JsonDataService,
+  SharedDataService,
+} from "@knime/ui-extension-service";
 
 import type {
   AiMessage,
@@ -14,7 +17,7 @@ import type {
   InitializationState,
   ViewData,
 } from "@/types";
-import { computed, ref, shallowRef, useId, watch } from "vue";
+import { computed, ref, shallowRef, toRaw, useId, watch } from "vue";
 
 // static utilities
 const ERROR_MESSAGES = {
@@ -181,6 +184,7 @@ export const useChatStore = defineStore("chat", () => {
   const chatItems = ref<ChatItem[]>([]);
   const lastUserMessage = ref("");
   const jsonDataService = ref<JsonDataService | null>(null);
+  const sharedDataService = ref<SharedDataService | null>(null);
   const initState = ref<InitializationState>("idle");
   const requestQueue: Array<() => void> = []; // populated with messages sent before data service is ready
 
@@ -225,7 +229,7 @@ export const useChatStore = defineStore("chat", () => {
     }
 
     try {
-      await ensureJsonDataService();
+      await ensureServices();
 
       const viewData = await getInitialViewData();
       if (viewData) {
@@ -234,6 +238,7 @@ export const useChatStore = defineStore("chat", () => {
           viewData.config.show_tool_calls_and_results,
         );
         config.value = viewData.config;
+        sharedDataService.value?.shareData(viewData);
       } else {
         const [configResponse, initialAiMessage] = await Promise.all([
           getConfiguration(),
@@ -243,6 +248,10 @@ export const useChatStore = defineStore("chat", () => {
         if (initialAiMessage) {
           addMessages([initialAiMessage], true);
         }
+        sharedDataService.value?.shareData({
+          conversation: messagesToPersist,
+          config: toRaw(config.value),
+        });
       }
 
       initState.value = "ready";
@@ -262,18 +271,16 @@ export const useChatStore = defineStore("chat", () => {
   }
 
   // ==== BACKEND API ACTIONS ====
-  async function ensureJsonDataService() {
-    if (jsonDataService.value) {
+  async function ensureServices() {
+    if (jsonDataService.value && sharedDataService.value) {
       return;
     }
 
     try {
       jsonDataService.value = await JsonDataService.getInstance();
+      sharedDataService.value = await SharedDataService.getInstance();
     } catch (error) {
-      consola.error(
-        "Chat Store: Failed to get JsonDataService instance:",
-        error,
-      );
+      consola.error("Chat Store: Failed to get service instances:", error);
       throw new Error("Failed to connect to the service");
     }
   }
@@ -451,20 +458,21 @@ export const useChatStore = defineStore("chat", () => {
 
   function finishLoading(shallApplyViewData: boolean) {
     isLoading.value = false;
+    const viewData: ViewData = {
+      conversation: messagesToPersist,
+      config: toRaw(config.value!),
+    };
+
+    // share view data
+    sharedDataService.value?.shareData(viewData);
+
+    // optionally apply view data
     if (
       shallApplyViewData &&
       config.value?.reexecution_trigger === "INTERACTION"
     ) {
-      applyViewData();
+      jsonDataService.value?.applyData(viewData);
     }
-  }
-
-  function applyViewData() {
-    const viewData: ViewData = {
-      conversation: messagesToPersist,
-      config: config.value!,
-    };
-    jsonDataService.value?.applyData(viewData);
   }
 
   function resetChat() {
@@ -499,7 +507,6 @@ export const useChatStore = defineStore("chat", () => {
     addErrorMessage,
     addMessages,
     init,
-    ensureJsonDataService,
     getConfiguration,
     getInitialMessage,
     getLastMessages,

@@ -16,7 +16,6 @@ import {
   createViewMessage,
 } from "@/test/factories/messages";
 import { nextTick } from "vue";
-import { mock } from "node:test";
 
 const mockJsonDataService = {
   data: vi.fn(),
@@ -24,9 +23,16 @@ const mockJsonDataService = {
   applyData: vi.fn(() => Promise.resolve({ isApplied: true })),
 };
 
+const mockSharedDataService = {
+  shareData: vi.fn(),
+};
+
 vi.mock("@knime/ui-extension-service", () => ({
   JsonDataService: {
     getInstance: vi.fn(() => Promise.resolve(mockJsonDataService)),
+  },
+  SharedDataService: {
+    getInstance: vi.fn(() => Promise.resolve(mockSharedDataService)),
   },
 }));
 

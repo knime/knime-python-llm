@@ -81,6 +81,8 @@ class LangchainToolConverter:
         self._execution_mode_hint = {"execution-mode": execution_mode.name}
         self.sanitized_to_original = {}
         self._has_data_tools = False
+        # lazily built reverse mapping (original -> sanitized)
+        self._original_to_sanitized_cache = None
 
     @property
     def has_data_tools(self) -> bool:
@@ -117,6 +119,51 @@ class LangchainToolConverter:
                     tool_call.name = self.desanitize_tool_name(tool_call.name)
         elif isinstance(msg, ToolMessage) and msg.name:
             msg.name = self.desanitize_tool_name(msg.name)
+        return msg
+
+    # --- Sanitization for historical messages ---
+    def _original_to_sanitized(self, original_name: str) -> str:
+        """Return the sanitized name for an original tool name.
+
+        Supports historical conversations that may reference tools unknown to the
+        currently provided tool list (e.g., conversation handover between agents).
+        For unknown tools we still sanitize the name (to avoid model/API rejections
+        due to invalid characters) and register a reversible mapping so that later
+        desanitization yields the original name in user-facing output.
+        """
+        # Build cache if missing
+        if self._original_to_sanitized_cache is None:
+            self._original_to_sanitized_cache = {
+                original: sanitized
+                for sanitized, original in self.sanitized_to_original.items()
+            }
+
+        if original_name in self._original_to_sanitized_cache:
+            return self._original_to_sanitized_cache[original_name]
+
+        # Unknown original name: create sanitized mapping now.
+        sanitized = self._sanitize_tool_name(original_name)
+        # Invalidate & rebuild reverse cache entry for this name only (cheap update)
+        if self._original_to_sanitized_cache is not None:
+            self._original_to_sanitized_cache[original_name] = sanitized
+        return sanitized
+
+    def sanitize_tool_names(self, msg: BaseMessage) -> BaseMessage:
+        """Sanitize tool names in an incoming (historical) message.
+
+        When conversation history is reused, it contains original tool names (we store
+        desanitized names for user readability). Before passing the history to the
+        language model, we need to replace those original names with the sanitized
+        variants that the current tool set (and thus tool calls) use internally.
+        """
+        if isinstance(msg, AIMessage) and msg.tool_calls:
+            for tool_call in msg.tool_calls:
+                if isinstance(tool_call, dict):
+                    tool_call["name"] = self._original_to_sanitized(tool_call["name"])
+                else:
+                    tool_call.name = self._original_to_sanitized(tool_call.name)
+        elif isinstance(msg, ToolMessage) and msg.name:
+            msg.name = self._original_to_sanitized(msg.name)
         return msg
 
     def to_langchain_tool(

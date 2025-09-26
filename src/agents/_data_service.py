@@ -126,6 +126,17 @@ class AgentChatWidgetDataService:
             "reexecution_trigger": self._reexecution_trigger,
         }
 
+    # called by java, not the frontend
+    def get_view_data(self):
+        import json
+
+        return json.dumps(
+            {
+                "config": self.get_configuration(),
+                "conversation": self._messages,
+            }
+        )
+
     def _post_user_message(self, user_message: str):
         self._messages.append(HumanMessage(content=user_message))
         config = {

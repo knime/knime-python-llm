@@ -772,8 +772,6 @@ class AgentChatWidget:
 
     data_message_prefix = _data_message_prefix_parameter()
 
-    import knime.types.message as MessageValue
-
     def configure(
         self,
         ctx: knext.ConfigurationContext,
@@ -799,6 +797,7 @@ class AgentChatWidget:
     ):
         import pandas as pd
         import json
+        from knime.types.message import from_langchain_message
 
         messages_str = ctx.get_internal_view_data()
 
@@ -812,73 +811,13 @@ class AgentChatWidget:
             )
 
         messages = json.loads(messages_str)["conversation"]
-        message_values = [self._to_message_value(msg) for msg in messages]
+        message_values = [from_langchain_message(msg) for msg in messages]
         # Filter out None messages (e.g., view messages that are ignored)
-        message_values = [msg for msg in message_values if msg is not None]
+        # TODO message_values = [msg for msg in message_values if msg is not None]
         result_df = pd.DataFrame({self.conversation_column_name: message_values})
 
         conversation_table = knext.Table.from_pandas(result_df)
         return conversation_table
-
-    def _to_message_value(self, msg: dict) -> MessageValue:
-        from knime.types.message import MessageType
-        from knime.types.message import MessageValue
-        from knime.types.message import ToolCall
-        import yaml
-
-        def _to_content_parts(content):
-            from knime.types.message import MessageContentPart
-            from knime.types.message import MessageContentPartType
-
-            return [
-                MessageContentPart(
-                    type=MessageContentPartType.TEXT, data=content.encode("utf-8")
-                )
-            ]
-
-        name = msg.get("name", None)
-        type = msg.get("type", None)
-
-        if type == "human":
-            msg_type = MessageType.USER
-            content = _to_content_parts(msg["content"])
-            return MessageValue(message_type=msg_type, content=content, name=name)
-        elif type == "ai":
-            msg_type = MessageType.AI
-            content = _to_content_parts(msg["content"])
-            toolCalls = msg.get("toolCalls", None)
-            if toolCalls and len(toolCalls) > 0:
-                tool_calls = [
-                    ToolCall(
-                        id=tc.get("id", ""),
-                        tool_name=tc.get("name", ""),
-                        arguments=yaml.safe_load(tc.get("args", "")),
-                    )
-                    for tc in toolCalls
-                ]
-            else:
-                tool_calls = None
-            return MessageValue(
-                message_type=msg_type,
-                content=content,
-                tool_calls=tool_calls,
-                tool_call_id=getattr(msg, "id", None),
-                name=name,
-            )
-        elif type == "tool":
-            msg_type = MessageType.TOOL
-            content = _to_content_parts(msg["content"])
-            return MessageValue(
-                message_type=msg_type,
-                content=content,
-                tool_call_id=getattr(msg, "toolCallId", None),
-                name=name,
-            )
-        elif type == "view":
-            # ignore
-            return None
-        else:
-            raise ValueError(f"Unsupported frontend message type: {type(msg)}")
 
     def get_data_service(
         self,
@@ -925,11 +864,6 @@ class AgentChatWidget:
             previous_messages = []
         else:
             previous_messages = json.loads(previous_messages_str)["conversation"]
-            previous_messages = [
-                self._to_langchain_message(msg) for msg in previous_messages
-            ]
-            # Filter out None messages (e.g., view messages that are ignored)
-            previous_messages = [msg for msg in previous_messages if msg is not None]
 
         return AgentChatWidgetDataService(
             agent,
@@ -941,45 +875,6 @@ class AgentChatWidget:
             self.reexecution_trigger,
             tool_converter,
         )
-
-    def _to_langchain_message(self, msg: dict):
-        from langchain_core.messages.human import HumanMessage
-        from langchain_core.messages.ai import AIMessage
-        from langchain_core.messages.tool import ToolMessage
-        from langchain_core.messages.system import SystemMessage
-        import yaml
-
-        type = msg.get("type", None)
-        name = msg.get("name", None)
-        content = msg.get("content", None)
-
-        if type == "human":
-            return HumanMessage(content=content, name=name)
-        elif type == "ai":
-            if msg.get("toolCalls"):
-                tool_calls = [
-                    {
-                        "name": tc.get("name", ""),
-                        "id": tc.get("id", ""),
-                        "args": yaml.safe_load(tc.get("args", "")),
-                        "type": "tool_call",
-                    }
-                    for tc in msg["toolCalls"]
-                ]
-                return AIMessage(content=content, name=name, tool_calls=tool_calls)
-            else:
-                return AIMessage(content=content, name=name)
-        elif type == "tool":
-            tool_call_id = msg.get("toolCallId", None)
-            return ToolMessage(content=content, name=name, tool_call_id=tool_call_id)
-        elif type == "error":
-            error_content = f"[ERROR] {content}"
-            return SystemMessage(content=error_content)
-        elif type == "view":
-            # ignore
-            return None
-        else:
-            raise ValueError(f"Unsupported message type: {type}")
 
 
 # endregion

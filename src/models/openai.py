@@ -243,6 +243,7 @@ def _create_specific_model_name(api_name: str) -> knext.StringParameter:
     def list_models(ctx: knext.DialogCreationContext) -> list[str]:
         model_list = []
         if (specs := ctx.get_input_specs()) and (auth_spec := specs[0]):
+            auth_spec: OpenAIAuthenticationPortObjectSpec
             model_list = auth_spec.get_model_list(ctx)
             model_list.sort()
         return model_list
@@ -915,12 +916,15 @@ class OpenAIAuthenticationPortObjectSpec(AIPortObjectSpec):
         )
 
     def get_model_list(self, ctx: knext.ConfigurationContext) -> list[str]:
-        client = self.get_openai_client(ctx)
         try:
+            client = self.get_openai_client(ctx)
             model_list = [
                 model.id for model in client.models.list().data if model.id is not None
             ]
         except Exception:
+            # TODO Add warning to user once possible
+            LOGGER.warning(
+                "Could not fetch model list from OpenAI. Returning empty model list.", exc_info=True)
             model_list = []
 
         model_list.sort()

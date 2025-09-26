@@ -592,10 +592,12 @@ class AgentPrompter2:
                     f"Column {self.conversation_column} not found in the conversation history table."
                 )
             history_df = history_table[self.conversation_column].to_pandas()
-            messages = [
-                to_langchain_message(msg)
-                for msg in history_df[self.conversation_column]
-            ]
+            messages = []
+            for msg in history_df[self.conversation_column]:
+                lc_msg = to_langchain_message(msg)
+                # Sanitize tool names so they match the current sanitized mapping
+                lc_msg = tool_converter.sanitize_tool_names(lc_msg)
+                messages.append(lc_msg)
 
         if data_registry.has_data or tool_converter.has_data_tools:
             messages.append(data_registry.create_data_message())

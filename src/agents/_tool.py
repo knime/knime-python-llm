@@ -116,6 +116,10 @@ class ExecutionMode(Enum):
     DETACHED = auto()
 
 
+def _sanitize_for_openai(name: str) -> str:
+    return re.sub(r"[^a-zA-Z0-9_-]", "_", name)
+
+
 class LangchainToolConverter:
     def __init__(self, data_registry: DataRegistry, ctx, execution_mode: ExecutionMode):
         self._data_registry = data_registry
@@ -130,7 +134,7 @@ class LangchainToolConverter:
         return self._has_data_tools
 
     def _sanitize_tool_name(self, name: str) -> str:
-        return self._name_map.add_or_get(name, lambda n: re.sub(r"[^a-zA-Z0-9_-]", "_", n))
+        return self._name_map.add_or_get(name, _sanitize_for_openai)
 
     def desanitize_tool_name(self, sanitized_name: str) -> str:
         return self._name_map.get_original(sanitized_name)
@@ -150,9 +154,7 @@ class LangchainToolConverter:
 
     # --- Sanitization for historical messages ---
     def _original_to_sanitized(self, original_name: str) -> str:
-        return self._name_map.get_sanitized(
-            original_name, lambda n: re.sub(r"[^a-zA-Z0-9_-]", "_", n)
-        )
+        return self._name_map.get_sanitized(original_name, _sanitize_for_openai)
 
     def sanitize_tool_names(self, msg: BaseMessage) -> BaseMessage:
         """Sanitize tool names in an incoming (historical) message.

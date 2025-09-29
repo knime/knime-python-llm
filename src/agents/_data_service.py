@@ -67,12 +67,13 @@ class AgentChatWidgetDataService:
         self._agent_graph = agent_graph
         self._data_registry = data_registry
         self._tool_converter = tool_converter
-        self._messages = (
-            [data_registry.create_data_message()]
-            if data_registry.has_data or tool_converter.has_data_tools
-            else []
-        )
-        self._messages.extend(previous_messages)
+        self._messages = []
+        if not previous_messages and (
+            data_registry.has_data or tool_converter.has_data_tools
+        ):
+            self._messages.append(data_registry.create_data_message())
+        elif previous_messages:
+            self._messages.extend(previous_messages)
         self._initial_message = initial_message
         self._recursion_limit = recursion_limit
         self._show_tool_calls_and_results = show_tool_calls_and_results
@@ -125,6 +126,17 @@ class AgentChatWidgetDataService:
             "show_tool_calls_and_results": self._show_tool_calls_and_results,
             "reexecution_trigger": self._reexecution_trigger,
         }
+
+    # called by java, not the frontend
+    def get_view_data(self):
+        import json
+        from langchain_core.messages.base import messages_to_dict
+
+        return json.dumps(
+            {
+                "conversation": messages_to_dict(self._messages),
+            }
+        )
 
     def _post_user_message(self, user_message: str):
         self._messages.append(HumanMessage(content=user_message))

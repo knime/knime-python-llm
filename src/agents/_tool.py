@@ -56,6 +56,48 @@ from enum import Enum, auto
 _logger = logging.getLogger(__name__)
 
 
+class ToolNameMap:
+    """Bidirectional mapping between original tool names and their sanitized variants.
+
+    Responsibilities:
+    - Ensure a single source of truth for both directions.
+    - Enforce uniqueness of sanitized names (adding numeric suffixes on collision).
+    - Provide add / get helpers used by the converter.
+    """
+
+    def __init__(self):
+        self._sanitized_to_original: dict[str, str] = {}
+        self._original_to_sanitized: dict[str, str] = {}
+
+    def add_or_get(self, original: str, sanitize_fn) -> str:
+        """Return sanitized name for original, creating a new mapping if needed.
+
+        sanitize_fn is a callable(original:str)->str that performs a *first pass* sanitization.
+        This method adds uniqueness handling (suffixing) on top.
+        """
+        if original in self._original_to_sanitized:
+            return self._original_to_sanitized[original]
+
+        base = sanitize_fn(original)
+        sanitized = base
+        i = 1
+        while (
+            sanitized in self._sanitized_to_original
+            and self._sanitized_to_original[sanitized] != original
+        ):
+            sanitized = f"{base}_{i}"
+            i += 1
+        self._sanitized_to_original[sanitized] = original
+        self._original_to_sanitized[original] = sanitized
+        return sanitized
+
+    def get_original(self, sanitized: str) -> str:
+        return self._sanitized_to_original.get(sanitized, sanitized)
+
+    def get_sanitized(self, original: str, sanitize_fn) -> str:
+        return self.add_or_get(original, sanitize_fn)
+
+
 @dataclass
 class WorkflowTool:
     """Mirrors the tool class defined in knime-python so we can use type hints here."""
@@ -79,10 +121,8 @@ class LangchainToolConverter:
         self._data_registry = data_registry
         self._ctx = ctx
         self._execution_mode_hint = {"execution-mode": execution_mode.name}
-        self.sanitized_to_original = {}
+        self._name_map = ToolNameMap()
         self._has_data_tools = False
-        # lazily built reverse mapping (original -> sanitized)
-        self._original_to_sanitized_cache = None
 
     @property
     def has_data_tools(self) -> bool:
@@ -90,23 +130,10 @@ class LangchainToolConverter:
         return self._has_data_tools
 
     def _sanitize_tool_name(self, name: str) -> str:
-        """Replaces characters that are not alphanumeric, underscores, or hyphens because
-        OpenAI rejects the tools otherwise. Also handles duplicates by appending a suffix."""
-        sanitized = re.sub(r"[^a-zA-Z0-9_-]", "_", name)
-        # Handle duplicates by appending a suffix if needed
-        base = sanitized
-        i = 1
-        while (
-            sanitized in self.sanitized_to_original
-            and self.sanitized_to_original[sanitized] != name
-        ):
-            sanitized = f"{base}_{i}"
-            i += 1
-        self.sanitized_to_original[sanitized] = name
-        return sanitized
+        return self._name_map.add_or_get(name, lambda n: re.sub(r"[^a-zA-Z0-9_-]", "_", n))
 
     def desanitize_tool_name(self, sanitized_name: str) -> str:
-        return self.sanitized_to_original.get(sanitized_name, sanitized_name)
+        return self._name_map.get_original(sanitized_name)
 
     def desanitize_tool_names(self, msg: BaseMessage) -> BaseMessage:
         """Desanitizes tool calls in a message by reverting the name back to the original user-provided name."""
@@ -123,30 +150,9 @@ class LangchainToolConverter:
 
     # --- Sanitization for historical messages ---
     def _original_to_sanitized(self, original_name: str) -> str:
-        """Return the sanitized name for an original tool name.
-
-        Supports historical conversations that may reference tools unknown to the
-        currently provided tool list (e.g., conversation handover between agents).
-        For unknown tools we still sanitize the name (to avoid model/API rejections
-        due to invalid characters) and register a reversible mapping so that later
-        desanitization yields the original name in user-facing output.
-        """
-        # Build cache if missing
-        if self._original_to_sanitized_cache is None:
-            self._original_to_sanitized_cache = {
-                original: sanitized
-                for sanitized, original in self.sanitized_to_original.items()
-            }
-
-        if original_name in self._original_to_sanitized_cache:
-            return self._original_to_sanitized_cache[original_name]
-
-        # Unknown original name: create sanitized mapping now.
-        sanitized = self._sanitize_tool_name(original_name)
-        # Invalidate & rebuild reverse cache entry for this name only (cheap update)
-        if self._original_to_sanitized_cache is not None:
-            self._original_to_sanitized_cache[original_name] = sanitized
-        return sanitized
+        return self._name_map.get_sanitized(
+            original_name, lambda n: re.sub(r"[^a-zA-Z0-9_-]", "_", n)
+        )
 
     def sanitize_tool_names(self, msg: BaseMessage) -> BaseMessage:
         """Sanitize tool names in an incoming (historical) message.

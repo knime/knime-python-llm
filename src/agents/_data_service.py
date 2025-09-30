@@ -129,14 +129,15 @@ class AgentChatWidgetDataService:
 
     # called by java, not the frontend
     def get_view_data(self):
-        import json
         from langchain_core.messages.base import messages_to_dict
 
-        return json.dumps(
-            {
+        view_data = {
+            "data": {
                 "conversation": messages_to_dict(self._messages),
             }
-        )
+        }
+        self._data_registry.dump_into_view_data(view_data)
+        return view_data
 
     def _post_user_message(self, user_message: str):
         self._messages.append(HumanMessage(content=user_message))

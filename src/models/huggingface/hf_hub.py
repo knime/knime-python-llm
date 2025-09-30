@@ -66,6 +66,15 @@ from .hf_base import (
     HFChatModelSettings,
     raise_for,
 )
+from ._provider import (
+    HF_DEFAULT_INFERENCE_PROVIDER,
+    HF_LEGACY_INFERENCE_PROVIDER,
+    ProviderSelectionOptions,
+    create_provider_parameter,
+    create_provider_selection_parameter,
+    validate_provider_model_pair,
+    select_first_provider,
+)
 
 hf_hub_category = knext.category(
     path=hf_category,
@@ -74,27 +83,6 @@ hf_hub_category = knext.category(
     description="Contains nodes that connect to Hugging Face Hub.",
     icon=hf_icon,
 )
-
-HF_DEFAULT_INFERENCE_PROVIDER = "hf-inference"
-HF_LEGACY_INFERENCE_PROVIDER = "hf-inference"  # for port objects created before 5.5
-
-
-def _create_provider_parameter(task: str) -> knext.StringParameter:
-    from huggingface_hub.inference._providers import PROVIDERS
-
-    return knext.StringParameter(
-        "Inference provider",
-        description="The [Inference Provider](https://huggingface.co/docs/inference-providers/en/index) that "
-        "runs the model. The HF Hub website shows for each model which providers are available.",
-        default_value=HF_DEFAULT_INFERENCE_PROVIDER,
-        choices=lambda ctx: [
-            provider
-            for provider in PROVIDERS.keys()
-            if task in PROVIDERS[provider]
-            and provider != "openai"  # openai is not listed on HF Hub
-        ],
-        since_version="5.8.0",
-    )
 
 
 def _create_repo_id_parameter() -> knext.StringParameter:
@@ -765,7 +753,11 @@ class HFHubChatModelConnector2:
     """
 
     hub_settings = HFHubSettings()
-    provider = _create_provider_parameter("conversational")
+    provider_selection = create_provider_selection_parameter()
+    provider = create_provider_parameter("conversational").rule(
+        knext.OneOf(provider_selection, [ProviderSelectionOptions.MANUAL.name]),
+        knext.Effect.SHOW,
+    )
     model_settings = HFChatModelSettings()
 
     def configure(
@@ -777,9 +769,13 @@ class HFHubChatModelConnector2:
         if not self.hub_settings.repo_id:
             raise knext.InvalidParametersError("Please enter a repo ID.")
         _validate_repo_id(self.hub_settings.repo_id, auth.get_token(ctx))
-        _validate_provider_model_pair(
-            self.hub_settings.repo_id, self.provider, "conversational"
-        )
+
+        # automatic provider selection is validated with select_first_provider() in _create_spec()
+        if self.provider_selection == ProviderSelectionOptions.MANUAL.name:
+            validate_provider_model_pair(
+                self.hub_settings.repo_id, self.provider, "conversational"
+            )
+
         return self._create_spec(auth)
 
     def _create_spec(
@@ -794,7 +790,9 @@ class HFHubChatModelConnector2:
         return HFHubChatModel2PortObjectSpec(
             auth,
             self.hub_settings.repo_id,
-            self.provider,
+            select_first_provider(self.hub_settings.repo_id, "conversational")
+            if self.provider_selection == ProviderSelectionOptions.AUTO.name
+            else self.provider,
             self.model_settings.n_requests,
             model_kwargs,
         )
@@ -803,43 +801,6 @@ class HFHubChatModelConnector2:
         self, ctx, auth: HFAuthenticationPortObject
     ) -> HFHubChatModel2PortObject:
         return HFHubChatModel2PortObject(self._create_spec(auth.spec))
-
-
-def _validate_provider_model_pair(model: str, provider: str, task: str):
-    from ._session import huggingface_hub
-
-    model_info_data = huggingface_hub.model_info(
-        repo_id=model, expand="inferenceProviderMapping"
-    )
-    provider_mapping = [
-        x
-        for x in getattr(model_info_data, "inference_provider_mapping", [])
-        if x.status == "live"
-    ]
-    matching = [x for x in provider_mapping if x.provider == provider]
-
-    if not matching:
-        if provider_mapping:
-            if len(provider_mapping) < 4:
-                raise knext.InvalidParametersError(
-                    f"The model is not supported by provider '{provider}'. Available providers are: "
-                    f"{', '.join([x.provider for x in provider_mapping])}."
-                )
-            else:
-                raise knext.InvalidParametersError(
-                    f"The model is not supported by provider '{provider}'. Available providers include: "
-                    f"{', '.join([x.provider for x in provider_mapping][:3])}. The complete list of "
-                    "providers for the model can be found on the HF Hub website."
-                )
-        else:
-            raise knext.InvalidParametersError(
-                "The model is not supported by any provider."
-            )
-
-    if matching[0].task != task:
-        raise knext.InvalidParametersError(
-            f"The model with the selected provider does not support the task '{task}'."
-        )
 
 
 hf_embeddings_port_type = knext.port_type(
@@ -895,7 +856,11 @@ class HFHubEmbeddingsConnector:
     """
 
     repo_id = _create_repo_id_parameter()
-    provider = _create_provider_parameter("feature-extraction")
+    provider_selection = create_provider_selection_parameter()
+    provider = create_provider_parameter("feature-extraction").rule(
+        knext.OneOf(provider_selection, [ProviderSelectionOptions.MANUAL.name]),
+        knext.Effect.SHOW,
+    )
 
     def configure(
         self,
@@ -906,14 +871,24 @@ class HFHubEmbeddingsConnector:
             raise knext.InvalidParametersError("Please enter a repo ID.")
         authentication_spec.validate_context(ctx)
         _validate_repo_id(self.repo_id, authentication_spec.get_token(ctx))
-        _validate_provider_model_pair(self.repo_id, self.provider, "feature-extraction")
+
+        # automatic provider selection is validated with select_first_provider() in _create_spec()
+        if self.provider_selection == ProviderSelectionOptions.MANUAL.name:
+            validate_provider_model_pair(
+                self.repo_id, self.provider, "feature-extraction"
+            )
+
         return self.create_spec(authentication_spec)
 
     def create_spec(
         self, authentication_spec: HFAuthenticationPortObjectSpec
     ) -> HFHubEmbeddingsPortObjectSpec:
         return HFHubEmbeddingsPortObjectSpec(
-            authentication_spec, self.repo_id, self.provider
+            authentication_spec,
+            self.repo_id,
+            select_first_provider(self.repo_id, "feature-extraction")
+            if self.provider_selection == ProviderSelectionOptions.AUTO.name
+            else self.provider,
         )
 
     def execute(

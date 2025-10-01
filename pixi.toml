@@ -9,26 +9,28 @@ no-build = true
 [tasks]
 
 [dependencies]
-knime-extension = "5.7.*"
-knime-python-versions = "5.7.*"
+knime-extension = "5.8.*"
+knime-python-versions = "5.8.*"
 python = "3.11.*"
 langchain = "0.3.23.*"
 langchain-community = "0.3.21.*"
 langchain-openai = "0.3.14.*"
 langchain-chroma = "0.2.3.*"
 langchain-anthropic = "0.3.12.*"
-packaging = "<=25"
+langchain-core = "0.3.75.*"
+langsmith = "0.3.45.*"
+packaging = "25.0.*"
 pydantic = "2.10.2.*"
 shapely = "*"
 httpx = "*"
 urllib3 = "*"
-requests = "2.32.2.*"
+requests = "*"
 pypika = "0.48.9.*"
 faiss-cpu = "1.7.4.*"
 docopt = "0.6.2.*"
 griffe = "0.48.0.*"
 bokeh = "3.3.4.*"
-scipy = "1.11.*"
+scipy = "*"
 umap-learn = "0.5.7.*"
 matplotlib = "*"
 ipython = "*"
@@ -67,7 +69,8 @@ langchain-ibm = "==0.3.10.*"
 
 [feature.build.dependencies]
 python = "3.9.*"
-knime-extension-bundling = "5.7.*"
+knime-extension-bundling = "5.8.*"
+jake = "*"
 
 [feature.dev.dependencies]
 debugpy = "*"

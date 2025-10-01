@@ -44,7 +44,7 @@
 
 from typing import List, Optional
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, model_validator, field_validator
 
 
 class ModelInfo(BaseModel):
@@ -58,7 +58,22 @@ class ModelInfo(BaseModel):
 	Unknown fields are ignored to remain forward compatible.
 	"""
 
-	id: Optional[str] = Field(None, description="Stable unique identifier of the model (falls back to name if missing)")
+	# Public type is always Optional[str] so downstream code can rely on a string.
+	# Older gateways may emit numeric ids; we coerce them to str in a field validator.
+	id: Optional[str] = Field(
+		None,
+		description="Stable unique identifier of the model (falls back to name if missing)",
+	)
+
+	@field_validator("id", mode="before")
+	@classmethod
+	def _coerce_id(cls, v):  # type: ignore[override]
+		if isinstance(v, int):
+			# The previous version of the gateway returned numeric IDs for the models
+			# but that ID was only used internally and useless to clients
+			# Instead the lookup happened by name
+			return None
+		return v
 	name: str = Field(..., description="Display name of the model")
 	mode: Optional[str] = Field(None, description="Operational mode (e.g. chat, embeddings)")
 	description: Optional[str] = Field(None, description="Human readable description")
@@ -66,7 +81,7 @@ class ModelInfo(BaseModel):
 	@model_validator(mode="after")
 	def _default_id(cls, values):  # type: ignore[override]
 		# Ensure id always populated for downstream consumers
-		if not values.id:
+		if values.id is None:
 			values.id = values.name
 		return values
 

@@ -55,6 +55,8 @@ from enum import Enum, auto
 
 _logger = logging.getLogger(__name__)
 
+def _sanitize_for_openai(name: str) -> str:
+    return re.sub(r"[^a-zA-Z0-9_-]", "_", name)
 
 class ToolNameMap:
     """Bidirectional mapping between original tool names and their sanitized variants.
@@ -65,11 +67,12 @@ class ToolNameMap:
     - Provide add / get helpers used by the converter.
     """
 
-    def __init__(self):
+    def __init__(self, sanitize_fn=_sanitize_for_openai):
         self._sanitized_to_original: dict[str, str] = {}
         self._original_to_sanitized: dict[str, str] = {}
+        self._sanitize_fn = sanitize_fn
 
-    def add_or_get(self, original: str, sanitize_fn) -> str:
+    def get_sanitized(self, original: str) -> str:
         """Return sanitized name for original, creating a new mapping if needed.
 
         sanitize_fn is a callable(original:str)->str that performs a *first pass* sanitization.
@@ -78,7 +81,7 @@ class ToolNameMap:
         if original in self._original_to_sanitized:
             return self._original_to_sanitized[original]
 
-        base = sanitize_fn(original)
+        base = self._sanitize_fn(original)
         sanitized = base
         i = 1
         while (
@@ -93,11 +96,39 @@ class ToolNameMap:
 
     def get_original(self, sanitized: str) -> str:
         return self._sanitized_to_original.get(sanitized, sanitized)
+    
+    def sanitize_tool_names(self, msg: BaseMessage) -> BaseMessage:
+        """Sanitize tool names in an incoming (historical) message.
 
-    def get_sanitized(self, original: str, sanitize_fn) -> str:
-        return self.add_or_get(original, sanitize_fn)
+        When conversation history is reused, it contains original tool names (we store
+        desanitized names for user readability). Before passing the history to the
+        language model, we need to replace those original names with the sanitized
+        variants that the current tool set (and thus tool calls) use internally.
+        """
+        if isinstance(msg, AIMessage) and msg.tool_calls:
+            for tool_call in msg.tool_calls:
+                if isinstance(tool_call, dict):
+                    tool_call["name"] = self.get_sanitized(tool_call["name"])
+                else:
+                    tool_call.name = self.get_sanitized(tool_call.name)
+        elif isinstance(msg, ToolMessage) and msg.name:
+            msg.name = self.get_sanitized(msg.name)
+        return msg
+    
+    def desanitize_tool_names(self, msg: BaseMessage) -> BaseMessage:
+        """Desanitizes tool calls in a message by reverting the name back to the original user-provided name."""
+        if isinstance(msg, AIMessage) and msg.tool_calls:
+            # Tool calls can be either a dict or a ToolCall object, so we handle both cases
+            for tool_call in msg.tool_calls:
+                if isinstance(tool_call, dict):
+                    tool_call["name"] = self.get_original(tool_call["name"])
+                else:
+                    tool_call.name = self.get_original(tool_call.name)
+        elif isinstance(msg, ToolMessage) and msg.name:
+            msg.name = self.get_original(msg.name)
+        return msg
 
-
+    
 @dataclass
 class WorkflowTool:
     """Mirrors the tool class defined in knime-python so we can use type hints here."""
@@ -114,10 +145,6 @@ class ExecutionMode(Enum):
     DEBUG = auto()
     DEFAULT = auto()
     DETACHED = auto()
-
-
-def _sanitize_for_openai(name: str) -> str:
-    return re.sub(r"[^a-zA-Z0-9_-]", "_", name)
 
 
 class LangchainToolConverter:
@@ -143,52 +170,22 @@ class LangchainToolConverter:
         """Returns True if there are tools that require data inputs or outputs."""
         return self._has_data_tools
 
-    def _sanitize_tool_name(self, name: str) -> str:
-        return self._name_map.add_or_get(name, _sanitize_for_openai)
 
     def desanitize_tool_name(self, sanitized_name: str) -> str:
         return self._name_map.get_original(sanitized_name)
 
     def desanitize_tool_names(self, msg: BaseMessage) -> BaseMessage:
-        """Desanitizes tool calls in a message by reverting the name back to the original user-provided name."""
-        if isinstance(msg, AIMessage) and msg.tool_calls:
-            # Tool calls can be either a dict or a ToolCall object, so we handle both cases
-            for tool_call in msg.tool_calls:
-                if isinstance(tool_call, dict):
-                    tool_call["name"] = self.desanitize_tool_name(tool_call["name"])
-                else:
-                    tool_call.name = self.desanitize_tool_name(tool_call.name)
-        elif isinstance(msg, ToolMessage) and msg.name:
-            msg.name = self.desanitize_tool_name(msg.name)
-        return msg
-
-    # --- Sanitization for historical messages ---
-    def _original_to_sanitized(self, original_name: str) -> str:
-        return self._name_map.get_sanitized(original_name, _sanitize_for_openai)
+        return self._name_map.desanitize_tool_names(msg)
 
     def sanitize_tool_names(self, msg: BaseMessage) -> BaseMessage:
-        """Sanitize tool names in an incoming (historical) message.
-
-        When conversation history is reused, it contains original tool names (we store
-        desanitized names for user readability). Before passing the history to the
-        language model, we need to replace those original names with the sanitized
-        variants that the current tool set (and thus tool calls) use internally.
-        """
-        if isinstance(msg, AIMessage) and msg.tool_calls:
-            for tool_call in msg.tool_calls:
-                if isinstance(tool_call, dict):
-                    tool_call["name"] = self._original_to_sanitized(tool_call["name"])
-                else:
-                    tool_call.name = self._original_to_sanitized(tool_call.name)
-        elif isinstance(msg, ToolMessage) and msg.name:
-            msg.name = self._original_to_sanitized(msg.name)
-        return msg
+        return self._name_map.sanitize_tool_names(msg)
+        
 
     def to_langchain_tool(
         self,
         tool: WorkflowTool,
     ) -> StructuredTool:
-        sanitized_name = self._sanitize_tool_name(tool.name)
+        sanitized_name = self._name_map.get_sanitized(tool.name)
         properties = {}
         if tool.parameter_schema:
             properties["configuration"] = _create_configuration_schema(tool)

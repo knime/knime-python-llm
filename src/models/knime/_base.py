@@ -95,18 +95,21 @@ def create_model_choice_provider(
         model_list = []
         if (specs := ctx.get_input_specs()) and (auth_spec := specs[0]):
             model_list = list_models(auth_spec, mode)
-            model_list.sort()
+            model_list.sort(key=lambda c: c.label)
         return model_list
 
     return model_choices_provider
 
 
-def list_models(auth_spec, mode: str) -> list[str]:
-    return [model_data["name"] for model_data in _get_model_data(auth_spec, mode)]
+def list_models(auth_spec, mode: str) -> list[knext.StringParameter.Choice]:
+    return [knext.StringParameter.Choice(model.id, model.name, model.description) for model in _get_model_data(auth_spec, mode)]
 
+def list_model_ids(auth_spec, mode: str) -> list[str]:
+    return [model.id for model in _get_model_data(auth_spec, mode)]
 
 def _get_model_data(auth_spec, mode: str):
     import requests
+    from ._models import ModelsResponse
 
     api_base = extract_api_base(auth_spec)
     model_info = api_base + "/management/models?mode=" + mode
@@ -118,11 +121,12 @@ def _get_model_data(auth_spec, mode: str):
             "The GenAI gateway is not reachable. Is it activated in the connected KNIME Hub?"
         )
     response.raise_for_status()
-    return response.json()["models"]
+    models_resp = ModelsResponse.model_validate(response.json())
+    return models_resp.models
 
 
 def list_models_with_descriptions(auth_spec, mode: str) -> list[tuple[str, str, str]]:
     return [
-        (data.get("name"), data.get("mode"), data.get("description") or None)
+        (data.name, data.mode, data.description or None)
         for data in _get_model_data(auth_spec, mode)
     ]

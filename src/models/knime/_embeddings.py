@@ -160,7 +160,8 @@ class KnimeHubEmbeddingsConnector:
 
     model_name = knext.StringParameter(
         "Model",
-        "Select the model to use.",
+        "Select the ID of the embedding model to use. "
+        "If set via flow variable, the ID can be obtained from the KNIME Hub AI Model Lister node.",
         choices=create_model_choice_provider("embedding"),
     )
 

@@ -73,7 +73,7 @@ class AgentChatWidgetDataService:
         ):
             self._messages.append(data_registry.create_data_message())
         elif previous_messages:
-            self._messages.extend(previous_messages)
+            self._messages.extend([tool_converter.sanitize_tool_names(msg) for msg in previous_messages])
         self._initial_message = initial_message
         self._recursion_limit = recursion_limit
         self._show_tool_calls_and_results = show_tool_calls_and_results
@@ -131,9 +131,13 @@ class AgentChatWidgetDataService:
     def get_view_data(self):
         from langchain_core.messages.base import messages_to_dict
 
+        desanitized_messages = [
+            self._tool_converter.desanitize_tool_names(msg) for msg in self._messages
+        ]
+
         view_data = {
             "data": {
-                "conversation": messages_to_dict(self._messages),
+                "conversation": messages_to_dict(desanitized_messages),
             }
         }
         self._data_registry.dump_into_view_data(view_data)

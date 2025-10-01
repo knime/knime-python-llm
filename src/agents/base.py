@@ -678,7 +678,7 @@ def _extract_tools_from_table(tools_table: knext.Table, tool_column: str):
 
 
 @knext.node(
-    "Agent Chat Widget",
+    "Agent Chat Widget (Labs)",
     node_type=knext.NodeType.VISUALIZER,
     icon_path=chat_agent_icon,
     category=agent_category,

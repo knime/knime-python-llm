@@ -208,7 +208,7 @@ def _extract_tools_from_table(tools_table: knext.Table, tool_column: str):
     node_type=knext.NodeType.VISUALIZER,
     icon_path=chat_agent_icon,
     category=agent_category,
-    is_deprecated=True,
+    is_deprecated=False,
 )
 @knext.input_port(
     "Chat model", "The chat model to use.", port_type=chat_model_port_type

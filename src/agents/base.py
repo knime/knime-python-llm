@@ -821,13 +821,8 @@ class AgentChatWidget:
             data_registry = DataRegistry.create_from_view_data(view_data)
             return conversation_table, data_registry.get_last_tables(num_data_outputs)
         else:
-            conversation_table = knext.Table.from_pandas(
-                pd.DataFrame(
-                    {
-                        self.conversation_column_name: [],
-                    }
-                )
-            )
+            message_type = _message_type()
+            conversation_table = util.create_empty_table(None, [util.OutputColumn(self.conversation_column_name, message_type, message_type.to_pyarrow())])
             return conversation_table, [
                 knext.Table.from_pandas(pd.DataFrame())  # empty table
             ] * num_data_outputs

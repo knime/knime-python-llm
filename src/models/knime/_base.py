@@ -94,25 +94,27 @@ def create_model_choice_provider(
     def model_choices_provider(ctx: knext.DialogCreationContext) -> list[str]:
         model_list = []
         if (specs := ctx.get_input_specs()) and (auth_spec := specs[0]):
-            model_list = list_models(auth_spec, mode)
+            model_list = list_model_choices(auth_spec, mode)
             model_list.sort(key=lambda c: c.label)
         return model_list
 
     return model_choices_provider
 
 
-def list_models(auth_spec, mode: str) -> list[knext.StringParameter.Choice]:
-    return [knext.StringParameter.Choice(model.id, model.name, model.description) for model in _get_model_data(auth_spec, mode)]
+def list_model_choices(auth_spec, mode: str | None = None) -> list[knext.StringParameter.Choice]:
+    return [knext.StringParameter.Choice(model.id, model.name, model.description) for model in list_models(auth_spec, mode)]
 
 def list_model_ids(auth_spec, mode: str) -> list[str]:
-    return [model.id for model in _get_model_data(auth_spec, mode)]
+    return [model.id for model in list_models(auth_spec, mode)]
 
-def _get_model_data(auth_spec, mode: str):
+def list_models(auth_spec, mode: str | None = None):
     import requests
     from ._models import ModelsResponse
 
     api_base = extract_api_base(auth_spec)
-    model_info = api_base + "/management/models?mode=" + mode
+    model_info = api_base + "/management/models"
+    if mode is not None:
+        model_info = model_info + "?mode=" + mode
     response = requests.get(
         url=model_info, headers=create_authorization_headers(auth_spec)
     )
@@ -128,5 +130,5 @@ def _get_model_data(auth_spec, mode: str):
 def list_models_with_descriptions(auth_spec, mode: str) -> list[tuple[str, str, str]]:
     return [
         (data.name, data.mode, data.description or None)
-        for data in _get_model_data(auth_spec, mode)
+        for data in list_models(auth_spec, mode)
     ]

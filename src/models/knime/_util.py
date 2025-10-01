@@ -49,7 +49,7 @@ import util
 from ._base import (
     hub_connector_icon,
     knime_category,
-    list_models_with_descriptions,
+    list_models,
     validate_auth_spec,
 )
 import pyarrow as pa
@@ -67,6 +67,38 @@ class ModelTypeSettings:
         "Embedding models",
         "List available embedding models.",
         True,
+    )
+
+
+@knext.parameter_group("Output columns", since_version="5.8.0")
+class OutputColumnSettings:
+    """Controls which metadata columns are included in the output table.
+    By default, all columns are included.
+    """
+
+    id = knext.BoolParameter(
+        "ID",
+        "Include the stable unique model identifier.",
+        default_value=lambda v: False if v < knext.Version(5, 8, 0) else True,
+    )
+
+    name = knext.BoolParameter(
+        "Name",
+        "Include the model's display name.",
+        default_value=True,
+    )
+
+
+    type = knext.BoolParameter(
+        "Type",
+        "Include the model's mode (e.g., chat, embedding).",
+        default_value=True,
+    )
+
+    description = knext.BoolParameter(
+        "Description",
+        "Include the model's description if available.",
+        default_value=True,
     )
 
 
@@ -98,12 +130,16 @@ class KnimeHubAIModelLister:
 
     model_types = ModelTypeSettings()
 
-    # Name, KNIME type, and PyArrow type of the columns to output
-    column_list = [
+    # Full set of potential output columns (order defines default order)
+    # Name retained first for backward compatibility. ID follows when enabled.
+    full_column_list = [
+        util.OutputColumn("ID", knext.string(), pa.string()),
         util.OutputColumn("Name", knext.string(), pa.string()),
         util.OutputColumn("Type", knext.string(), pa.string()),
         util.OutputColumn("Description", knext.string(), pa.string()),
     ]
+
+    output_columns = OutputColumnSettings()
 
     def configure(
         self,
@@ -112,38 +148,60 @@ class KnimeHubAIModelLister:
     ) -> knext.Schema:
         # raises exception if the hub authenticator has not been executed
         validate_auth_spec(authentication)
-
-        knime_columns = [column.to_knime_column() for column in self.column_list]
-
+        selected_columns = self._selected_columns()
+        knime_columns = [column.to_knime_column() for column in selected_columns]
         return knext.Schema.from_columns(knime_columns)
 
     def execute(
         self, ctx: knext.ExecutionContext, authentication: knext.PortObject
     ) -> knext.Table:
         import pandas as pd
+        from ._models import ModelInfo
 
-        available_models = []
+        models: list[ModelInfo] = list_models(authentication.spec)
+
+        modes = set()
 
         if self.model_types.chat_models:
-            available_models.extend(
-                list_models_with_descriptions(authentication.spec, "chat")
-            )
-
+            modes.add("chat")
         if self.model_types.embedding_models:
-            available_models.extend(
-                list_models_with_descriptions(authentication.spec, "embedding")
-            )
+            modes.add("embedding")
 
-        if not available_models:
+        models = [m for m in models if m.mode in modes]
+
+        # Sort models by mode for backwards compatibility
+        # chat before embedding
+        models.sort(key=lambda m: m.mode)
+
+        if not models:
             return self._create_empty_table()
 
-        models_df = pd.DataFrame(
-            available_models, columns=["Name", "Type", "Description"]
+        df = pd.DataFrame(
+            [self._to_tuple(model) for model in models],
+            columns=["ID", "Name", "Type", "Description"],
         )
 
-        return knext.Table.from_pandas(models_df)
+        # Reduce to selected columns (preserving order of full_column_list)
+        selected_names = [col.default_name for col in self._selected_columns()]
+        df = df[selected_names]
+        return knext.Table.from_pandas(df)
+
+    def _to_tuple(self, model) -> tuple:
+        return (model.id, model.name, model.mode, model.description)
 
     def _create_empty_table(self) -> knext.Table:
         """Constructs an empty KNIME Table with the correct output columns."""
 
-        return util.create_empty_table(None, self.column_list)
+        return util.create_empty_table(None, self._selected_columns())
+
+    # Helper methods -----------------------------------------------------
+    def _selected_columns(self):
+        """Return list of OutputColumn objects in order based on user selection."""
+        oc = self.output_columns
+        selection_flags = {
+            "ID": oc.id,
+            "Name": oc.name,
+            "Type": oc.type,
+            "Description": oc.description,
+        }
+        return [c for c in self.full_column_list if selection_flags[c.default_name]]

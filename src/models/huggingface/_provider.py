@@ -51,7 +51,7 @@ HF_LEGACY_INFERENCE_PROVIDER = "hf-inference"  # for port objects created before
 class ProviderSelectionOptions(knext.EnumParameterOptions):
     AUTO = (
         "Auto",
-        "A provider that supports the model is selected automatically.",
+        "The first provider that supports the model is selected automatically.",
     )
     MANUAL = (
         "Manual",

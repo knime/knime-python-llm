@@ -814,12 +814,6 @@ class AgentChatWidget:
 
         if view_data:
             conversation_table = view_data["ports"][0]
-            conversation_df = conversation_table.to_pandas()
-            conversation_df = conversation_df.rename(
-                columns={"conversation": self.conversation_column_name}
-            )
-            conversation_table = knext.Table.from_pandas(conversation_df)
-
             data_registry = DataRegistry.load(
                 view_data["data"]["data_registry"], view_data["ports"][1:]
             )
@@ -887,22 +881,16 @@ class AgentChatWidget:
         agent = create_react_agent(
             chat_model, tools=tools, prompt=self.developer_message, checkpointer=memory
         )
-
-        if view_data is None:
-            previous_messages = []
-        else:
+        conversation_table = None
+        if view_data is not None:
             conversation_table = view_data["ports"][0]
-            conversation_df = conversation_table["conversation"].to_pandas()
-            previous_messages = []
-            for msg in conversation_df["conversation"]:
-                lc_msg = to_langchain_message(msg)
-                previous_messages.append(lc_msg)
 
         return AgentChatWidgetDataService(
             agent,
             data_registry,
             self.initial_message,
-            previous_messages,
+            conversation_table,
+            self.conversation_column_name,
             self.recursion_limit,
             self.show_tool_calls_and_results,
             self.reexecution_trigger,

@@ -48,8 +48,13 @@ from ._agent import check_for_invalid_tool_calls
 import yaml
 import queue
 import threading
+import knime.extension as knext
 
 from langchain_core.messages.human import HumanMessage
+
+from knime.types.message import to_langchain_message, from_langchain_message
+
+import pandas as pd
 
 
 class AgentChatWidgetDataService:
@@ -58,7 +63,8 @@ class AgentChatWidgetDataService:
         agent_graph,
         data_registry: DataRegistry,
         initial_message: str,
-        previous_messages: list,
+        conversation_table: knext.Table | None,
+        conversation_column_name: str,
         recursion_limit: int,
         show_tool_calls_and_results: bool,
         reexecution_trigger: str,
@@ -68,14 +74,19 @@ class AgentChatWidgetDataService:
         self._data_registry = data_registry
         self._tool_converter = tool_converter
         self._messages = []
+        self._conversation_column_name = conversation_column_name
+        previous_messages = []
+        if conversation_table is not None:
+            conversation_df = conversation_table[conversation_column_name].to_pandas()
+            for msg in conversation_df[conversation_column_name]:
+                lc_msg = to_langchain_message(msg)
+                previous_messages.append(tool_converter.sanitize_tool_names(lc_msg))
         if not previous_messages and (
             data_registry.has_data or tool_converter.has_data_tools
         ):
             self._messages.append(data_registry.create_data_message())
         elif previous_messages:
-            self._messages.extend(
-                [tool_converter.sanitize_tool_names(msg) for msg in previous_messages]
-            )
+            self._messages.extend(previous_messages)
         self._initial_message = initial_message
         self._recursion_limit = recursion_limit
         self._show_tool_calls_and_results = show_tool_calls_and_results
@@ -131,15 +142,11 @@ class AgentChatWidgetDataService:
 
     # called by java, not the frontend
     def get_view_data(self):
-        import pandas as pd
-        import knime.extension as knext
-        from knime.types.message import from_langchain_message
-
         desanitized_messages = [
             self._tool_converter.desanitize_tool_names(msg) for msg in self._messages
         ]
         message_values = [from_langchain_message(msg) for msg in desanitized_messages]
-        conversation_df = pd.DataFrame({"conversation": message_values})
+        conversation_df = pd.DataFrame({self._conversation_column_name: message_values})
         conversation_table = knext.Table.from_pandas(conversation_df)
 
         meta_data, tables = self._data_registry.dump()

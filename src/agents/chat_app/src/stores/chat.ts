@@ -64,20 +64,15 @@ function addAiMessageWithToolCallsToTimeline(
   msg: AiMessage,
   timelineParam?: Timeline,
 ) {
-  let timeline;
   // this either kicks off the agentic loop (create a new timeline)
   // or contributes to the active timeline
-  if (!timelineParam) {
-    timeline = {
-      id: `timeline-${useId()}`,
-      label: "Using tools",
-      items: [],
-      status: "active",
-      type: "timeline",
-    };
-  } else {
-    timeline = timelineParam;
-  }
+  const timeline = timelineParam ?? {
+    id: `timeline-${useId()}`,
+    label: "Using tools",
+    items: [],
+    status: "active",
+    type: "timeline",
+  };
 
   // extract and add reasoning to timeline
   addAiReasoningToTimeline(msg, timeline);

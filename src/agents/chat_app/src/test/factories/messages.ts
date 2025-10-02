@@ -6,7 +6,7 @@ import type {
   ViewMessage,
   Timeline,
   ToolCallTimelineItem,
-  reexecution_trigger,
+  ReexecutionTrigger,
   HumanMessage,
 } from "@/types";
 
@@ -54,7 +54,7 @@ export const createViewMessage = (
 
 export const createConfig = (
   showToolCalls = true,
-  reexecution_trigger: reexecution_trigger = "NONE",
+  reexecution_trigger: ReexecutionTrigger = "NONE",
 ): Config => ({
   show_tool_calls_and_results: showToolCalls,
   reexecution_trigger,

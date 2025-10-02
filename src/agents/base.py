@@ -806,23 +806,35 @@ class AgentChatWidget:
         input_tables: list[knext.Table],
     ):
         import pandas as pd
-        from knime.types.message import from_langchain_message
-        from langchain_core.messages.utils import messages_from_dict
         from ._data_service import DataRegistry
 
         view_data = ctx._get_view_data()
         num_data_outputs = ctx.get_connected_output_port_numbers()[1]
 
         if view_data:
-            messages = messages_from_dict(view_data["data"]["conversation"])
-            message_values = [from_langchain_message(msg) for msg in messages]
-            result_df = pd.DataFrame({self.conversation_column_name: message_values})
-            conversation_table = knext.Table.from_pandas(result_df)
-            data_registry = DataRegistry.create_from_view_data(view_data)
+            conversation_table = view_data["ports"][0]
+            conversation_df = conversation_table.to_pandas()
+            conversation_df = conversation_df.rename(
+                columns={"conversation": self.conversation_column_name}
+            )
+            conversation_table = knext.Table.from_pandas(conversation_df)
+
+            data_registry = DataRegistry.load(
+                view_data["data"]["data_registry"], view_data["ports"][1:]
+            )
             return conversation_table, data_registry.get_last_tables(num_data_outputs)
         else:
             message_type = _message_type()
-            conversation_table = util.create_empty_table(None, [util.OutputColumn(self.conversation_column_name, message_type, message_type.to_pyarrow())])
+            conversation_table = util.create_empty_table(
+                None,
+                [
+                    util.OutputColumn(
+                        self.conversation_column_name,
+                        message_type,
+                        message_type.to_pyarrow(),
+                    )
+                ],
+            )
             return conversation_table, [
                 knext.Table.from_pandas(pd.DataFrame())  # empty table
             ] * num_data_outputs
@@ -842,7 +854,7 @@ class AgentChatWidget:
             AgentChatWidgetDataService,
         )
         from ._tool import ExecutionMode
-        from langchain_core.messages.utils import messages_from_dict
+        from knime.types.message import to_langchain_message
 
         view_data = ctx._get_view_data()
 
@@ -855,7 +867,9 @@ class AgentChatWidget:
                 input_tables, data_message_prefix=self.data_message_prefix
             )
         else:
-            data_registry = DataRegistry.create_from_view_data(view_data)
+            data_registry = DataRegistry.load(
+                view_data["data"]["data_registry"], view_data["ports"][1:]
+            )
 
         tool_converter = LangchainToolConverter(
             data_registry,
@@ -877,7 +891,12 @@ class AgentChatWidget:
         if view_data is None:
             previous_messages = []
         else:
-            previous_messages = messages_from_dict(view_data["data"]["conversation"])
+            conversation_table = view_data["ports"][0]
+            conversation_df = conversation_table["conversation"].to_pandas()
+            previous_messages = []
+            for msg in conversation_df["conversation"]:
+                lc_msg = to_langchain_message(msg)
+                previous_messages.append(lc_msg)
 
         return AgentChatWidgetDataService(
             agent,

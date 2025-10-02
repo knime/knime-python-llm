@@ -89,16 +89,14 @@ class DataRegistry:
         return registry
 
     @classmethod
-    def create_from_view_data(cls, view_data: dict) -> "DataRegistry":
-        """Creates a DataRegistry from the given view data dictionary."""
-        data_registry_info = view_data["data"]["data_registry"]
-        data_message_prefix = data_registry_info.get("data_message_prefix", "")
+    def load(cls, meta_data: dict, tables: list[knext.Table]) -> "DataRegistry":
+        """Creates a data registry from the given dictionary and list of tables (as returned by dump())."""
+        data_message_prefix = meta_data.get("data_message_prefix", "")
 
         registry = cls(data_message_prefix=data_message_prefix)
 
         # Restore the data items from ports metadata and actual data
-        ports_metadata = data_registry_info["ports"]
-        table_data = view_data["ports"]
+        ports_metadata = meta_data["ports"]
 
         for i, port_dict in enumerate(ports_metadata):
             # Convert dictionary back to Port object
@@ -110,22 +108,22 @@ class DataRegistry:
             )
 
             # Get the corresponding table data
-            table = table_data[i] if i < len(table_data) else None
+            table = tables[i] if i < len(tables) else None
             if table is not None:
                 registry._data.append(DataItem(meta_data=port, data=table))
 
         return registry
 
-    def dump_into_view_data(self, view_data: dict):
-        """Dumps the current data registry into the given view data dictionary."""
+    def dump(self):
+        """Dumps the state of current data registry into a dictionary and a list of tables."""
         data_registry_info = {
             "ports": [],
             "data_message_prefix": self._data_message_prefix,
         }
         for id, data in enumerate(self._data):
             data_registry_info["ports"].append(port_to_dict(data.meta_data))
-        view_data["data"]["data_registry"] = data_registry_info
-        view_data["ports"] = [self._data[i].data for i in range(len(self._data))]
+        tables = [self._data[i].data for i in range(len(self._data))]
+        return data_registry_info, tables
 
     def add_table(self, table: knext.Table, port: Port) -> dict:
         spec = _spec_representation(table)

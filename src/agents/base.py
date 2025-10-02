@@ -678,7 +678,7 @@ def _extract_tools_from_table(tools_table: knext.Table, tool_column: str):
 
 
 @knext.node(
-    "Agent Chat Widget (Labs)",
+    "Agent Chat Widget (experimental)",
     node_type=knext.NodeType.VISUALIZER,
     icon_path=chat_agent_icon,
     category=agent_category,
@@ -707,8 +707,9 @@ def _extract_tools_from_table(tools_table: knext.Table, tool_column: str):
 )
 class AgentChatWidget:
     """
-
     Enables interactive, multi-turn conversations with an AI agent that uses tools and data to fulfill user prompts.
+
+    **This node is experimental and intended to gather early feedback. It is providing the base functionality and will change in future releases, potentially in a non-backwards compatible way (e.g. requires to be re-executed).**
 
     This node enables interactive, multi-turn conversations with an AI agent, combining a chat model with a set of tools and optional input data.
 
@@ -735,16 +736,16 @@ class AgentChatWidget:
 
     class ReexecutionTrigger(knext.EnumParameterOptions):
         NONE = (
-            "Never",
-            "Never re-execute the node to update the conversation and data outputs explicitly from within the chat.",
+            "None",
+            "Node re-execution is never explicitly triggered explicitly from within the chat.",
         )
         INTERACTION = (
-            "After every interaction",
-            "Update the conversation and data outputs after each completed chat interaction.",
+            "Response completed",
+            "Re-execute the node once the last response has been received.",
         )
 
     reexecution_trigger = knext.EnumParameter(
-        "Re-execute node to update conversation output",
+        "Re-execution trigger",
         "The user action that triggers a re-execution of the node in order to update the conversation and data output tables.",
         ReexecutionTrigger.NONE.name,
         ReexecutionTrigger,
@@ -854,7 +855,6 @@ class AgentChatWidget:
             AgentChatWidgetDataService,
         )
         from ._tool import ExecutionMode
-        from knime.types.message import to_langchain_message
 
         view_data = ctx._get_view_data()
 

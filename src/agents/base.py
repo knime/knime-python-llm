@@ -686,7 +686,7 @@ def _extract_tools_from_table(tools_table: knext.Table, tool_column: str):
 @knext.output_view(
     "Chat",
     "Shows the chat interface for interacting with the agent.",
-    static_resources="src/agents/chat_app/dist/",
+    static_resources="src/agents/chat_app/dist",
     index_html_path="index.html",
 )
 class AgentChatView:

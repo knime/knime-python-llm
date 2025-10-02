@@ -61,15 +61,9 @@ class _ChatOpenAI(ChatOpenAI):
         self._ctx = ctx
 
     def _warn_if_reasoning_exhausted(self, msg) -> None:
-        def get_reasoning_tokens(msg):
-            metadata = getattr(msg, "usage_metadata", {}) or {}
-            output_details = metadata.get("output_token_details") or {}
-            return output_details.get("reasoning", 0)
-
         if (
             getattr(msg, "content", None) == ""
-            and not getattr(msg, "tool_calls", None)
-            and get_reasoning_tokens(msg) == self.max_tokens
+            and getattr(msg, "response_metadata", {}).get("finish_reason") == "length"
         ):
             warn_msg = (
                 "The model generated an empty response because it used all response tokens for its internal "

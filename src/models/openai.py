@@ -87,84 +87,151 @@ openai_category = knext.category(
 
 _default_openai_api_base = "https://api.openai.com/v1"
 
+
 def _to_choice(model: tuple[str, str, str]) -> knext.StringParameter.Choice:
     return knext.StringParameter.Choice(*model)
 
-def _to_choices(models: list[tuple[str, str, str]]) -> list[knext.StringParameter.Choice]:
+
+def _to_choices(
+    models: list[tuple[str, str, str]],
+) -> list[knext.StringParameter.Choice]:
     return list(map(_to_choice, models))
 
-completion_models = _to_choices([
-    ("gpt-3.5-turbo-instruct", "GPT-3.5 Turbo Instruct",
-     "Legacy instruct-style GPT-3.5 model; optimized for following single-turn instructions. Use only for backward compatibility; prefer GPT-4o mini. [Docs](https://platform.openai.com/docs/models/gpt-3.5-turbo-instruct)"),
-    
-    ("babbage-002", "Babbage-002",
-     "Legacy GPT-3.5 base model for simple tasks. Use only if migrating old applications; prefer GPT-4o mini for new projects. [Docs](https://platform.openai.com/docs/models/babbage-002)"),
-    
-    ("davinci-002", "Davinci-002",
-     "Legacy GPT-3.5 base model; more capable than Babbage-002 but deprecated. Use only for legacy compatibility; modern tasks should use GPT-4o or GPT-4.1. [Docs](https://platform.openai.com/docs/models/davinci-002)"),
-])
+
+completion_models = _to_choices(
+    [
+        (
+            "gpt-3.5-turbo-instruct",
+            "GPT-3.5 Turbo Instruct",
+            "Legacy instruct-style GPT-3.5 model; optimized for following single-turn instructions. Use only for backward compatibility; prefer GPT-4o mini. [Docs](https://platform.openai.com/docs/models/gpt-3.5-turbo-instruct)",
+        ),
+        (
+            "babbage-002",
+            "Babbage-002",
+            "Legacy GPT-3.5 base model for simple tasks. Use only if migrating old applications; prefer GPT-4o mini for new projects. [Docs](https://platform.openai.com/docs/models/babbage-002)",
+        ),
+        (
+            "davinci-002",
+            "Davinci-002",
+            "Legacy GPT-3.5 base model; more capable than Babbage-002 but deprecated. Use only for legacy compatibility; modern tasks should use GPT-4o or GPT-4.1. [Docs](https://platform.openai.com/docs/models/davinci-002)",
+        ),
+    ]
+)
 completion_default = "gpt-3.5-turbo-instruct"
-chat_models = _to_choices([
-    ("gpt-3.5-turbo", "GPT-3.5 Turbo", 
-     "Legacy chat/text model; OpenAI recommends GPT-4o mini instead. Use only for backward compatibility. [Docs](https://platform.openai.com/docs/models/gpt-3.5-turbo)"),
-    
-    ("gpt-3.5-turbo-16k", "GPT-3.5 Turbo (16k)", 
-     "Legacy 16k-context variant of GPT-3.5 Turbo. Use only for legacy apps needing longer context. [Docs](https://platform.openai.com/docs/models/gpt-3.5-turbo-16k-0613)"),
-    
-    ("gpt-4", "GPT-4", 
-     "Legacy high-intelligence GPT model. Avoid for new projects; prefer GPT-4o or GPT-4.1. [Docs](https://platform.openai.com/docs/models/gpt-4)"),
-    
-    ("gpt-4-32k", "GPT-4 (32k)", 
-     "Legacy 32k-context variant of GPT-4. Superseded by GPT-4o with larger context and lower cost."),
-    
-    ("gpt-4-turbo", "GPT-4 Turbo", 
-     "Legacy GPT-4 variant; superseded by GPT-4o. Use GPT-4o instead for cheaper, faster performance. [Docs](https://platform.openai.com/docs/models/gpt-4-turbo)"),
-    
-    ("gpt-4o", "GPT-4o", 
-     "Fast, intelligent, flexible GPT model. Best general-purpose choice with multimodal support. [Docs](https://platform.openai.com/docs/models/gpt-4o)"),
-    
-    ("gpt-4o-mini", "GPT-4o mini", 
-     "Smaller 4o variant for efficiency; supports multimodality. Great for lightweight or cost-sensitive tasks. [Docs](https://platform.openai.com/docs/models/gpt-4o-mini)"),
-    
-    ("gpt-4.1", "GPT-4.1", 
-     "Smartest non-reasoning model. Choose when you need the highest quality for complex instructions. [Docs](https://platform.openai.com/docs/models/gpt-4.1)"),
-    
-    ("gpt-4.1-mini", "GPT-4.1 mini", 
-     "Smaller, faster 4.1 model for cost-efficient tasks. Good balance between speed, cost, and quality. [Docs](https://platform.openai.com/docs/models/gpt-4.1-mini)"),
-    
-    ("gpt-4.1-nano", "GPT-4.1 nano", 
-     "Ultra-lightweight GPT-4.1 model. Best when efficiency and low cost matter most. [Docs](https://platform.openai.com/docs/models/gpt-4.1-nano)"),
-    
-    ("gpt-5", "GPT-5", 
-     "Latest flagship model with advanced reasoning and coding. Best for cutting-edge apps and agentic tasks. [Docs](https://platform.openai.com/docs/models/gpt-5)"),
-    
-    ("gpt-5-mini", "GPT-5 mini", 
-     "Smaller, faster GPT-5 variant. Use when you want GPT-5 quality at lower cost. [Docs](https://platform.openai.com/docs/models/gpt-5-mini)"),
-    
-    ("gpt-5-nano", "GPT-5 nano", 
-     "Ultra-small GPT-5 optimized for efficiency-critical tasks. Ideal for real-time or embedded use. [Docs](https://platform.openai.com/docs/models/gpt-5-nano)"),
-    
-    ("o1", "o1", 
-     "Reasoning-first model that spends more time thinking before responding. Best for challenging reasoning problems. [Docs](https://platform.openai.com/docs/models/o1)"),
-    
-    ("o1-mini", "o1 mini", 
-     "Lightweight variant of o1 optimized for STEM reasoning. Good for math-heavy or technical tasks. [Docs](https://platform.openai.com/docs/models/o1-mini)"),
-    
-    ("o3", "o3", 
-     "Well-rounded reasoning model; excels at math, coding, and vision. Strong choice for multi-domain reasoning. [Docs](https://platform.openai.com/docs/models/o3)"),
-    
-    ("o3-mini", "o3 mini", 
-     "Smaller o3-class model balancing speed and accuracy. Good for reasoning tasks when cost is a concern. [Docs](https://platform.openai.com/docs/models/o3-mini)"),
-    
-    ("o4-mini", "o4 mini", 
-     "Efficient reasoning model optimized for fast, affordable performance. Best for reasoning tasks with tight budgets. [Docs](https://platform.openai.com/docs/models/o4-mini)"),
-])
+chat_models = _to_choices(
+    [
+        (
+            "gpt-3.5-turbo",
+            "GPT-3.5 Turbo",
+            "Legacy chat/text model; OpenAI recommends GPT-4o mini instead. Use only for backward compatibility. [Docs](https://platform.openai.com/docs/models/gpt-3.5-turbo)",
+        ),
+        (
+            "gpt-3.5-turbo-16k",
+            "GPT-3.5 Turbo (16k)",
+            "Legacy 16k-context variant of GPT-3.5 Turbo. Use only for legacy apps needing longer context. [Docs](https://platform.openai.com/docs/models/gpt-3.5-turbo-16k-0613)",
+        ),
+        (
+            "gpt-4",
+            "GPT-4",
+            "Legacy high-intelligence GPT model. Avoid for new projects; prefer GPT-4o or GPT-4.1. [Docs](https://platform.openai.com/docs/models/gpt-4)",
+        ),
+        (
+            "gpt-4-32k",
+            "GPT-4 (32k)",
+            "Legacy 32k-context variant of GPT-4. Superseded by GPT-4o with larger context and lower cost.",
+        ),
+        (
+            "gpt-4-turbo",
+            "GPT-4 Turbo",
+            "Legacy GPT-4 variant; superseded by GPT-4o. Use GPT-4o instead for cheaper, faster performance. [Docs](https://platform.openai.com/docs/models/gpt-4-turbo)",
+        ),
+        (
+            "gpt-4o",
+            "GPT-4o",
+            "Fast, intelligent, flexible GPT model. Best general-purpose choice with multimodal support. [Docs](https://platform.openai.com/docs/models/gpt-4o)",
+        ),
+        (
+            "gpt-4o-mini",
+            "GPT-4o mini",
+            "Smaller 4o variant for efficiency; supports multimodality. Great for lightweight or cost-sensitive tasks. [Docs](https://platform.openai.com/docs/models/gpt-4o-mini)",
+        ),
+        (
+            "gpt-4.1",
+            "GPT-4.1",
+            "Smartest non-reasoning model. Choose when you need the highest quality for complex instructions. [Docs](https://platform.openai.com/docs/models/gpt-4.1)",
+        ),
+        (
+            "gpt-4.1-mini",
+            "GPT-4.1 mini",
+            "Smaller, faster 4.1 model for cost-efficient tasks. Good balance between speed, cost, and quality. [Docs](https://platform.openai.com/docs/models/gpt-4.1-mini)",
+        ),
+        (
+            "gpt-4.1-nano",
+            "GPT-4.1 nano",
+            "Ultra-lightweight GPT-4.1 model. Best when efficiency and low cost matter most. [Docs](https://platform.openai.com/docs/models/gpt-4.1-nano)",
+        ),
+        (
+            "gpt-5",
+            "GPT-5",
+            "Latest flagship model with advanced reasoning and coding. Best for cutting-edge apps and agentic tasks. [Docs](https://platform.openai.com/docs/models/gpt-5)",
+        ),
+        (
+            "gpt-5-mini",
+            "GPT-5 mini",
+            "Smaller, faster GPT-5 variant. Use when you want GPT-5 quality at lower cost. [Docs](https://platform.openai.com/docs/models/gpt-5-mini)",
+        ),
+        (
+            "gpt-5-nano",
+            "GPT-5 nano",
+            "Ultra-small GPT-5 optimized for efficiency-critical tasks. Ideal for real-time or embedded use. [Docs](https://platform.openai.com/docs/models/gpt-5-nano)",
+        ),
+        (
+            "o1",
+            "o1",
+            "Reasoning-first model that spends more time thinking before responding. Best for challenging reasoning problems. [Docs](https://platform.openai.com/docs/models/o1)",
+        ),
+        (
+            "o1-mini",
+            "o1 mini",
+            "Lightweight variant of o1 optimized for STEM reasoning. Good for math-heavy or technical tasks. [Docs](https://platform.openai.com/docs/models/o1-mini)",
+        ),
+        (
+            "o3",
+            "o3",
+            "Well-rounded reasoning model; excels at math, coding, and vision. Strong choice for multi-domain reasoning. [Docs](https://platform.openai.com/docs/models/o3)",
+        ),
+        (
+            "o3-mini",
+            "o3 mini",
+            "Smaller o3-class model balancing speed and accuracy. Good for reasoning tasks when cost is a concern. [Docs](https://platform.openai.com/docs/models/o3-mini)",
+        ),
+        (
+            "o4-mini",
+            "o4 mini",
+            "Efficient reasoning model optimized for fast, affordable performance. Best for reasoning tasks with tight budgets. [Docs](https://platform.openai.com/docs/models/o4-mini)",
+        ),
+    ]
+)
 chat_default = "gpt-4.1-nano"
-embeddings_models = _to_choices([
-    ("text-embedding-3-small", "text-embedding-3-small", "Small and cheap embedding model sufficient for most use-cases. [Docs](https://platform.openai.com/docs/models/text-embedding-3-small)"),
-    ("text-embedding-3-large", "text-embedding-3-large", "Most capable but more expensive embedding model. [Docs](https://platform.openai.com/docs/models/text-embedding-3-large)"),
-    ("text-embedding-ada-002", "text-embedding-ada-002", "Older embedding model. [Docs](https://platform.openai.com/docs/models/text-embedding-ada-002)"),
-])
+embeddings_models = _to_choices(
+    [
+        (
+            "text-embedding-3-small",
+            "text-embedding-3-small",
+            "Small and cheap embedding model sufficient for most use-cases. [Docs](https://platform.openai.com/docs/models/text-embedding-3-small)",
+        ),
+        (
+            "text-embedding-3-large",
+            "text-embedding-3-large",
+            "Most capable but more expensive embedding model. [Docs](https://platform.openai.com/docs/models/text-embedding-3-large)",
+        ),
+        (
+            "text-embedding-ada-002",
+            "text-embedding-ada-002",
+            "Older embedding model. [Docs](https://platform.openai.com/docs/models/text-embedding-ada-002)",
+        ),
+    ]
+)
 embeddings_default = "text-embedding-3-small"
 models_w_embed_dims_api = [
     "text-embedding-3-small",
@@ -242,7 +309,7 @@ class OpenAIGeneralSettings(GeneralRemoteSettings):
 
         This value, plus the token count of your prompt, cannot exceed the model's context length.
         """,
-        default_value=200,
+        default_value=1024,
         min_value=1,
     )
 
@@ -960,7 +1027,9 @@ class OpenAIAuthenticationPortObjectSpec(AIPortObjectSpec):
         except Exception:
             # TODO Add warning to user once possible
             LOGGER.warning(
-                "Could not fetch model list from OpenAI. Returning empty model list.", exc_info=True)
+                "Could not fetch model list from OpenAI. Returning empty model list.",
+                exc_info=True,
+            )
             model_list = []
 
         model_list.sort()

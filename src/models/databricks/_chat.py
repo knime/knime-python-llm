@@ -181,7 +181,7 @@ class DatabricksChatModelSettings(GeneralRemoteSettings):
 
         This value, plus the token count of your prompt, cannot exceed the model's context length.
         """,
-        default_value=200,
+        default_value=1024,
         min_value=1,
     )
 

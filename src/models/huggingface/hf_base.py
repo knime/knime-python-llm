@@ -97,7 +97,7 @@ class HFModelSettings(GeneralRemoteSettings):
 
         The token count of your prompt plus *max new tokens* cannot exceed the model's context length.
         """,
-        default_value=50,
+        default_value=1024,
         min_value=0,
     )
 
@@ -110,7 +110,7 @@ class HFChatModelSettings(GeneralRemoteSettings):
 
         This value, plus the token count of your prompt, cannot exceed the model's context length.
         """,
-        default_value=200,
+        default_value=1024,
         min_value=1,
     )
 

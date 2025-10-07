@@ -76,7 +76,7 @@ class GPT4AllModelParameterSettings(GeneralSettings):
 
         This value, plus the token count of your prompt, cannot exceed the model's context length.
         """,
-        default_value=250,
+        default_value=1024,
         min_value=1,
     )
 

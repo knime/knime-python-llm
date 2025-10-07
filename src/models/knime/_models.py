@@ -76,7 +76,16 @@ class ModelInfo(BaseModel):
 		return v
 	name: str = Field(..., description="Display name of the model")
 	mode: Optional[str] = Field(None, description="Operational mode (e.g. chat, embeddings)")
-	description: Optional[str] = Field(None, description="Human readable description")
+	# Public attribute should always be a string (never None) for backward compatibility
+	# The new gateway version omits the description; we normalize to "".
+	description: str = Field("", description="Human readable description (may be empty)")
+
+	@field_validator("description", mode="before")
+	@classmethod
+	def _coerce_description(cls, v):  # type: ignore[override]
+		if v is None:
+			return ""
+		return v
 
 	@model_validator(mode="after")
 	def _default_id(cls, values):  # type: ignore[override]

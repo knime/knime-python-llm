@@ -569,6 +569,8 @@ class AgentPrompter2:
         from ._agent import check_for_invalid_tool_calls
         from langgraph.prebuilt import create_react_agent
         from knime.types.message import to_langchain_message, from_langchain_message
+        from langgraph.checkpoint.memory import InMemorySaver
+        from util import check_canceled
 
         data_registry = DataRegistry.create_with_input_tables(
             input_tables, data_message_prefix=self.data_message_prefix
@@ -610,17 +612,39 @@ class AgentPrompter2:
 
         num_data_outputs = ctx.get_connected_output_port_numbers()[1]
 
+        interrupted_nodes = ["agent"]
+        if tools:
+            interrupted_nodes.append("tools")
+
+        memory = InMemorySaver()
         graph = create_react_agent(
             chat_model,
             tools=tools,
             prompt=self.developer_message,
+            checkpointer=memory,
+            interrupt_before=interrupted_nodes,
         )
 
         inputs = {"messages": messages}
-        config = {"recursion_limit": self.recursion_limit}
+        config = {
+            "recursion_limit": self.recursion_limit,
+            "configurable": {"thread_id": 1},
+        }
 
         try:
-            final_state = graph.invoke(inputs, config=config)
+            final_state = graph.invoke(
+                inputs,
+                config=config,
+            )
+            while True:
+                snap = graph.get_state(config)
+                if not snap.next:  # agent finished
+                    break
+                check_canceled(ctx)
+                final_state = graph.invoke(
+                    None,
+                    config=config,
+                )
         except Exception as e:
             if "Recursion limit" in str(e):
                 raise knext.InvalidParametersError(

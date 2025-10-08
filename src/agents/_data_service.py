@@ -44,7 +44,7 @@
 
 from ._data import DataRegistry
 from ._tool import LangchainToolConverter
-from ._agent import check_for_invalid_tool_calls
+from ._agent import check_for_invalid_tool_calls, check_for_empty_response
 import yaml
 import queue
 import threading
@@ -190,6 +190,7 @@ class AgentChatWidgetDataService:
                 self._messages = final_state["messages"]
                 if self._messages:
                     check_for_invalid_tool_calls(self._messages[-1])
+                    check_for_empty_response(self._messages[-1])
 
         except Exception as e:
             error_message = {"type": "error", "content": f"An error occurred: {e}"}

@@ -44,11 +44,11 @@
 
 from langchain_core.messages import AIMessage
 
+
 def check_for_invalid_tool_calls(msg: AIMessage):
     if not msg.invalid_tool_calls:
         return
-    
-    
+
     invalid_tool_call = msg.invalid_tool_calls[0]
     finish_reason = msg.response_metadata.get("finish_reason")
     name = invalid_tool_call.get("name", "<unknown tool>")
@@ -64,4 +64,13 @@ def check_for_invalid_tool_calls(msg: AIMessage):
             f"The LLM attempted to call the tool '{name}', but the request was invalid.\n"
             f"Details: {user_error}\n"
             "Tip: Check your tool definition and arguments, or try rephrasing your prompt."
+        )
+
+
+def check_for_empty_response(msg: AIMessage):
+    finish_reason = msg.response_metadata.get("finish_reason")
+    if msg.content == "" and finish_reason == "length":
+        raise RuntimeError(
+            "The LLM generated an empty response because it used all response tokens for its internal "
+            "reasoning. Tip: Try increasing the token limit in the LLM Selector."
         )

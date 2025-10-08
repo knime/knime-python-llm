@@ -44,13 +44,20 @@
 
 from langchain_core.messages import AIMessage
 
+
+# TODO rename function to make it more general
 def check_for_invalid_tool_calls(msg: AIMessage):
-    if not msg.invalid_tool_calls:
-        return
-    
-    
-    invalid_tool_call = msg.invalid_tool_calls[0]
     finish_reason = msg.response_metadata.get("finish_reason")
+
+    if not msg.invalid_tool_calls:
+        if msg.content == "" and finish_reason == "length":
+            raise RuntimeError(
+                "The LLM generated an empty response because it used all response tokens for its internal "
+                "reasoning. Tip: Try increasing the token limit in the LLM Selector."
+            )
+        return
+
+    invalid_tool_call = msg.invalid_tool_calls[0]
     name = invalid_tool_call.get("name", "<unknown tool>")
     error = invalid_tool_call.get("error", None)
     if finish_reason == "length":

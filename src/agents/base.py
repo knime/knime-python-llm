@@ -691,6 +691,11 @@ def _extract_tools_from_table(tools_table: knext.Table, tool_column: str):
     "Data inputs",
     "The data inputs for the agent.",
 )
+@knext.output_port(
+    "Combined tool workflow",
+    "TODO",
+    knext.PortType.WORKFLOW,
+)
 @knext.output_table(
     "Conversation",
     "The conversation between the LLM and the tools reflecting the agent execution.",

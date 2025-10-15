@@ -369,6 +369,35 @@ def _recursion_limit_parameter():
     )
 
 
+class RecLimitErrorHandlingOptions(knext.EnumParameterOptions):
+    FAIL = (
+        "Fail",
+        "Execution fails if the recursion limit is reached.",
+    )
+    STOP = (
+        "Stop",
+        "Execution is stopped if the recursion limit is reached.",
+    )
+    FINAL_RESPONSE = (
+        "Final response",
+        "The agent generates a final response based on all previous information once the recursion limit is "
+        "reached.",
+    )
+
+
+# TODO move since only useful in prompter
+def _recursion_limit_error_handling_parameter():
+    return knext.EnumParameter(
+        "Recursion limit handling",
+        "TODO...",
+        RecLimitErrorHandlingOptions.FAIL.name,
+        RecLimitErrorHandlingOptions,
+        style=knext.EnumParameter.Style.VALUE_SWITCH,
+        is_advanced=True,
+        since_version="5.9.0",
+    )
+
+
 def _debug_mode_parameter():
     return knext.BoolParameter(
         "Debug mode",
@@ -504,6 +533,8 @@ class AgentPrompter2:
 
     recursion_limit = _recursion_limit_parameter()
 
+    rec_limit_error_handling = _recursion_limit_error_handling_parameter()
+
     debug = _debug_mode_parameter()
 
     data_message_prefix = _data_message_prefix_parameter()
@@ -630,6 +661,7 @@ class AgentPrompter2:
             "recursion_limit": self.recursion_limit,
             "configurable": {"thread_id": 1},
         }
+        recursion_counter = 0
 
         try:
             final_state = graph.invoke(
@@ -640,6 +672,23 @@ class AgentPrompter2:
                 snap = graph.get_state(config)
                 if not snap.next:  # agent finished
                     break
+                recursion_counter += 1  # TODO handle after invoke?
+                if recursion_counter >= self.recursion_limit:
+                    if (
+                        self.rec_limit_error_handling
+                        == RecLimitErrorHandlingOptions.FINAL_RESPONSE.name
+                    ):
+                        # TODO handle tool calls. add system message
+                        # chat_model.invoke()
+                        break
+                    elif (
+                        self.rec_limit_error_handling
+                        == RecLimitErrorHandlingOptions.STOP.name
+                    ):
+                        break
+                    else:
+                        raise RuntimeError("Recursion limit")  # TODO improve
+
                 check_canceled(ctx)
                 final_state = graph.invoke(
                     None,
@@ -658,7 +707,10 @@ class AgentPrompter2:
 
         messages = final_state["messages"]
 
-        check_for_invalid_tool_calls(messages[-1])
+        from langchain_core.messages import AIMessage
+
+        if isinstance(messages[-1], AIMessage):
+            check_for_invalid_tool_calls(messages[-1])
 
         desanitized_messages = [
             tool_converter.desanitize_tool_names(msg) for msg in messages

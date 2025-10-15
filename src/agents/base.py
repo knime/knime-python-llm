@@ -70,6 +70,7 @@ from knime.extension.nodes import (
     FilestorePortObject,
 )
 from base import AIPortObjectSpec
+from ._parameters import recursion_limit_mode_param_for_view
 
 import os
 import logging
@@ -102,6 +103,23 @@ class CredentialsSettings:
 class ChatMessageSettings:
     message = knext.MultilineStringParameter(
         "New message", "Specify the new message to be sent to the agent."
+    )
+
+
+class RecursionLimitMode(knext.EnumParameterOptions):
+    FAIL = (
+        "Fail",
+        "Execution fails if the recursion limit is reached.",
+    )
+    STOP = (
+        "Stop",
+        "Execution is stopped if the recursion limit is reached. The output will contain the messages "
+        "generated before reaching the limit.",
+    )
+    FINAL_RESPONSE = (
+        "Final response",
+        "A user message is appended to the conversation that prompts the LLM to generate a final response "
+        "based on all previously generated messages.",
     )
 
 
@@ -504,6 +522,35 @@ class AgentPrompter2:
 
     recursion_limit = _recursion_limit_parameter()
 
+    recursion_limit_handling = knext.EnumParameter(
+        "Recursion limit handling",
+        "Specify the behavior of the agent when the recursion limit is reached.",
+        RecursionLimitMode.FAIL.name,
+        RecursionLimitMode,
+        style=knext.EnumParameter.Style.VALUE_SWITCH,
+        is_advanced=True,
+        since_version="5.9.0",
+    )
+
+    recursion_limit_prompt = knext.MultilineStringParameter(
+        "Recursion limit prompt",
+        "This message guides the chat model when generating the final response based on all previously "
+        "generated messages. It can be used to specify how the LLM should behave if information is missing "
+        "because the agent stopped before executing tools.",
+        default_value="""Please finalize the conversation using all previous messages.
+Tools are not available in this step. 
+If essential information is missing because tool calls in the previous message were deleted,
+state that the tool could not be executed due to reaching the recursion limit.""",
+        is_advanced=True,
+        since_version="5.9.0",
+    ).rule(
+        knext.OneOf(
+            recursion_limit_handling,
+            [RecursionLimitMode.FINAL_RESPONSE.name],
+        ),
+        knext.Effect.SHOW,
+    )
+
     debug = _debug_mode_parameter()
 
     data_message_prefix = _data_message_prefix_parameter()
@@ -571,6 +618,7 @@ class AgentPrompter2:
         from knime.types.message import to_langchain_message, from_langchain_message
         from langgraph.checkpoint.memory import InMemorySaver
         from util import check_canceled
+        import langchain_core.messages as lcm
 
         data_registry = DataRegistry.create_with_input_tables(
             input_tables, data_message_prefix=self.data_message_prefix
@@ -636,15 +684,21 @@ class AgentPrompter2:
                 inputs,
                 config=config,
             )
+            recursion_counter = 1
             while True:
                 snap = graph.get_state(config)
                 if not snap.next:  # agent finished
+                    break
+                if recursion_counter >= self.recursion_limit:
+                    if new_state := self._check_recursion_limit(chat_model, snap):
+                        final_state = new_state
                     break
                 check_canceled(ctx)
                 final_state = graph.invoke(
                     None,
                     config=config,
                 )
+                recursion_counter += 1
         except Exception as e:
             if "Recursion limit" in str(e):
                 raise knext.InvalidParametersError(
@@ -658,10 +712,11 @@ class AgentPrompter2:
 
         messages = final_state["messages"]
 
-        try:
-            validate_ai_message(messages[-1])
-        except Exception as e:
-            ctx.set_warning(str(e))
+        if isinstance(messages[-1], lcm.AIMessage):
+            try:
+                validate_ai_message(messages[-1])
+            except Exception as e:
+                ctx.set_warning(str(e))
 
         desanitized_messages = [
             tool_converter.desanitize_tool_names(msg) for msg in messages
@@ -688,6 +743,39 @@ class AgentPrompter2:
         else:
             # allow the model to pick which output tables to return
             return conversation_table, data_registry.get_last_tables(num_data_outputs)
+
+    def _check_recursion_limit(self, chat_model, snap):
+        """Depending on the selected handling option returns a new final state or None, or raises an error
+        that should be caught."""
+        if self.recursion_limit_handling == RecursionLimitMode.FINAL_RESPONSE.name:
+            import langchain_core.messages as lcm
+
+            messages = snap.values.get("messages")
+            if hasattr(messages[-1], "tool_calls"):
+                tool_calls = messages[-1].tool_calls
+                previous_content = (
+                    f"The content of the original message was: {messages[-1].content}."
+                    if messages[-1].content
+                    else ""
+                )
+                messages = messages[:-1] + [
+                    lcm.HumanMessage(
+                        "I deleted the previous AI message from the conversation because the agent reached "
+                        "the recursion limit and tried to make tool calls. "
+                        f"The tools it called were named: {', '.join([x.get('name', '<unknown tool>') for x in tool_calls])}. "
+                        + previous_content
+                        + "\n"
+                        + self.recursion_limit_prompt
+                    )
+                ]
+            else:
+                messages = messages + [lcm.HumanMessage(self.recursion_limit_prompt)]
+            final_response = chat_model.invoke([self.developer_message] + messages)
+            return {"messages": messages + [final_response]}
+        elif self.recursion_limit_handling == RecursionLimitMode.FAIL.name:
+            raise RuntimeError("Recursion limit")  # turned into user-facing message
+        else:
+            return None
 
 
 def _extract_tools_from_table(tools_table: knext.Table, tool_column: str):
@@ -808,6 +896,8 @@ class AgentChatWidget:
     )
 
     recursion_limit = _recursion_limit_parameter()
+
+    recursion_limit_handling = recursion_limit_mode_param_for_view()
 
     debug = _debug_mode_parameter()
 
@@ -948,6 +1038,7 @@ class AgentChatWidget:
             conversation_table,
             self.conversation_column_name,
             self.recursion_limit,
+            self.recursion_limit_handling,
             self.show_tool_calls_and_results,
             self.reexecution_trigger,
             tool_converter,

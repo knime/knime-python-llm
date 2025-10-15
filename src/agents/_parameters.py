@@ -42,44 +42,29 @@
 #  when such Node is propagated with or for interoperation with KNIME.
 # ------------------------------------------------------------------------
 
-from langchain_core.messages import AIMessage
 
-LANGGRAPH_RECURSION_MESSAGE = "Sorry, need more steps to process this request."
-RECURSION_CONTINUE_PROMPT = (
-    "I stopped due to reaching the recursion limit. Do you want me to continue?"
-)
+import knime_extension as knext
 
 
-def validate_ai_message(msg: AIMessage):
-    """Handles invalid tool calls and empty responses."""
+class RecursionLimitModeForView(knext.EnumParameterOptions):
+    FAIL = (
+        "Fail",
+        "Execution fails if the recursion limit is reached.",
+    )
+    CONFIRM = (
+        "Confirm",
+        "Execution is stopped if the recursion limit is reached. The user is asked whether execution should "
+        "continue.",
+    )
 
-    finish_reason = msg.response_metadata.get("finish_reason")
 
-    if msg.invalid_tool_calls:
-        invalid_tool_call = msg.invalid_tool_calls[0]
-        name = invalid_tool_call.get("name", "<unknown tool>")
-        error = invalid_tool_call.get("error", None)
-        if finish_reason == "length":
-            raise ValueError(
-                f"The LLM attempted to call the tool '{name}', but ran out of tokens before finishing the request.\n"
-                "Tip: Try increasing the token limit in the LLM Selector."
-            )
-        else:
-            user_error = (
-                error if error else "No error details were provided by the model."
-            )
-            raise ValueError(
-                f"The LLM attempted to call the tool '{name}', but the request was invalid.\n"
-                f"Details: {user_error}\n"
-                "Tip: Check your tool definition and arguments, or try rephrasing your prompt."
-            )
-    elif msg.content == "":
-        if finish_reason == "length":
-            raise ValueError(
-                "The LLM generated an empty response because it used all response tokens for its internal "
-                "reasoning. Tip: Try increasing the token limit in the LLM Selector.",
-            )
-        if finish_reason == "content_filter":
-            raise ValueError(
-                "The LLM generated an empty response because the message was filtered for harmful content.",
-            )
+def recursion_limit_mode_param_for_view():
+    return knext.EnumParameter(
+        "Recursion limit handling",
+        "Specify how the agent should behave when the recursion limit is reached.",
+        RecursionLimitModeForView.FAIL.name,
+        RecursionLimitModeForView,
+        style=knext.EnumParameter.Style.VALUE_SWITCH,
+        is_advanced=True,
+        since_version="5.9.0",
+    )

@@ -49,7 +49,15 @@ import util
 
 from ._data import DataRegistry
 from ._tool import LangchainToolConverter
-from ._agent import validate_ai_message
+from ._agent import (
+    validate_ai_message,
+    RECURSION_CONTINUE_PROMPT,
+    LANGGRAPH_RECURSION_MESSAGE,
+)
+from ._parameters import (
+    recursion_limit_mode_param_for_view,
+    RecursionLimitModeForView,
+)
 import yaml
 import queue
 import threading
@@ -267,6 +275,8 @@ class AgentChatView:
 
     recursion_limit = _recursion_limit_parameter()
 
+    recursion_limit_handling = recursion_limit_mode_param_for_view()
+
     debug = _debug_mode_parameter()
 
     data_message_prefix = _data_message_prefix_parameter()
@@ -339,6 +349,7 @@ class AgentChatView:
             data_registry,
             self.initial_message,
             self.recursion_limit,
+            self.recursion_limit_handling,
             self.show_tool_calls_and_results,
             tool_converter,
         )
@@ -351,6 +362,7 @@ class AgentChatViewDataService:
         data_registry: DataRegistry,
         initial_message: str,
         recursion_limit: int,
+        recursion_limit_handling: str,
         show_tool_calls_and_results: bool,
         tool_converter: LangchainToolConverter,
     ):
@@ -364,6 +376,7 @@ class AgentChatViewDataService:
         )
         self._initial_message = initial_message
         self._recursion_limit = recursion_limit
+        self._recursion_limit_handling = recursion_limit_handling
         self._show_tool_calls_and_results = show_tool_calls_and_results
 
         self._message_queue = queue.Queue()
@@ -460,14 +473,14 @@ class AgentChatViewDataService:
                 self._messages = final_state["messages"]
                 if self._messages:
                     validate_ai_message(self._messages[-1])
+                    self._optionally_put_recursion_limit_prompt()
 
         except Exception as e:
             error_message = {"type": "error", "content": f"An error occurred: {e}"}
             if "Recursion limit" in str(e):
-                error_message["content"] = (
-                    f"Recursion limit of {self._recursion_limit} reached."
-                )
-            self._message_queue.put(error_message)
+                self._handle_recursion_limit_error(error_message, final_state)
+            else:
+                self._message_queue.put(error_message)
 
     def _to_frontend_messages(self, message):
         # split the node-view-ids out into a separate message
@@ -519,6 +532,33 @@ class AgentChatViewDataService:
             "name": self._tool_converter.desanitize_tool_name(tool_call["name"]),
             "args": yaml.dump(args, indent=2) if args else None,
         }
+
+    def _handle_recursion_limit_error(self, error_message, final_state):
+        from ._parameters import RecursionLimitModeForView
+
+        if self._recursion_limit_handling == RecursionLimitModeForView.CONFIRM.name:
+            if final_state:
+                self._messages = final_state["messages"]
+            message = {
+                "type": "ai",
+                "content": RECURSION_CONTINUE_PROMPT,
+            }
+            self._message_queue.put(message)
+        else:
+            error_message["content"] = (
+                f"Recursion limit of {self._recursion_limit} reached."
+            )
+            self._message_queue.put(error_message)
+
+    def _optionally_put_recursion_limit_prompt(self):
+        if (
+            self._recursion_limit_handling == RecursionLimitModeForView.CONFIRM.name
+        ) and (self._messages[-1].content == LANGGRAPH_RECURSION_MESSAGE):
+            message = {
+                "type": "ai",
+                "content": RECURSION_CONTINUE_PROMPT,
+            }
+            self._message_queue.put(message)
 
 
 # endregion

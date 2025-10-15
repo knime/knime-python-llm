@@ -691,11 +691,11 @@ def _extract_tools_from_table(tools_table: knext.Table, tool_column: str):
     "Data inputs",
     "The data inputs for the agent.",
 )
-@knext.output_port(
-    "Combined tool workflow",
-    "TODO",
-    knext.PortType.WORKFLOW,
-)
+# @knext.output_port(
+#    "Combined tool workflow",
+#    "TODO",
+#    knext.PortType.WORKFLOW,
+# )
 @knext.output_table(
     "Conversation",
     "The conversation between the LLM and the tools reflecting the agent execution.",
@@ -861,9 +861,11 @@ class AgentChatWidget:
             ctx, output_format=OutputFormatOptions.Text
         )
 
+        port_ids = ctx._init_tool_execution(input_tables, {})
+
         if view_data is None:
             data_registry = DataRegistry.create_with_input_tables(
-                input_tables, data_message_prefix=self.data_message_prefix
+                input_tables, port_ids, data_message_prefix=self.data_message_prefix
             )
         else:
             data_registry = DataRegistry.load(

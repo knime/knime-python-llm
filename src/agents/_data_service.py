@@ -158,6 +158,7 @@ class AgentChatWidgetDataService:
             "data": {"data_registry": meta_data},
             # "ports": [combined_tools_workflow] + [conversation_table] + tables,
             "ports": [conversation_table] + tables,
+            "portIds": meta_data["ids"],
         }
         return view_data
 

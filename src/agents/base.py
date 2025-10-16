@@ -873,9 +873,8 @@ class AgentChatWidget:
             ctx, output_format=OutputFormatOptions.Text
         )
 
-        port_ids = ctx._init_tool_execution(input_tables, {})
-
         if view_data is None:
+            port_ids = ctx._init_tool_execution(input_tables, {})
             data_registry = DataRegistry.create_with_input_tables(
                 input_tables, port_ids, data_message_prefix=self.data_message_prefix
             )

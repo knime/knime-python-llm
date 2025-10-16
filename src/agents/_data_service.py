@@ -60,6 +60,7 @@ import pandas as pd
 class AgentChatWidgetDataService:
     def __init__(
         self,
+        ctx,
         agent_graph,
         data_registry: DataRegistry,
         initial_message: str,
@@ -70,6 +71,7 @@ class AgentChatWidgetDataService:
         reexecution_trigger: str,
         tool_converter: LangchainToolConverter,
     ):
+        self._ctx = ctx
         self._agent_graph = agent_graph
         self._data_registry = data_registry
         self._tool_converter = tool_converter
@@ -148,10 +150,13 @@ class AgentChatWidgetDataService:
         message_values = [from_langchain_message(msg) for msg in desanitized_messages]
         conversation_df = pd.DataFrame({self._conversation_column_name: message_values})
         conversation_table = knext.Table.from_pandas(conversation_df)
+        # combined_tools_workflow = self._ctx._get_combined_tools_workflow()
 
         meta_data, tables = self._data_registry.dump()
+        # TODO don't send tables - already known to the backend via the combinded tool workflow
         view_data = {
             "data": {"data_registry": meta_data},
+            # "ports": [combined_tools_workflow] + [conversation_table] + tables,
             "ports": [conversation_table] + tables,
         }
         return view_data

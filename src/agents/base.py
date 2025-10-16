@@ -692,7 +692,7 @@ def _extract_tools_from_table(tools_table: knext.Table, tool_column: str):
     "The data inputs for the agent.",
 )
 # @knext.output_port(
-#    "Combined tool workflow",
+#    "Combined tools workflow",
 #    "TODO",
 #    knext.PortType.WORKFLOW,
 # )
@@ -800,9 +800,12 @@ class AgentChatWidget:
                     f"Column {self.tool_column} not found in the tools table."
                 )
 
-        return knext.Schema.from_columns(
-            [knext.Column(_message_type(), self.conversation_column_name)]
-        ), [None] * ctx.get_connected_output_port_numbers()[1]
+        return (
+            knext.Schema.from_columns(
+                [knext.Column(_message_type(), self.conversation_column_name)]
+            ),
+            [None] * ctx.get_connected_output_port_numbers()[1],
+        )
 
     def execute(
         self,
@@ -818,11 +821,15 @@ class AgentChatWidget:
         num_data_outputs = ctx.get_connected_output_port_numbers()[1]
 
         if view_data:
+            # combined_tools_workflow = view_data["ports"][0]
             conversation_table = view_data["ports"][0]
             data_registry = DataRegistry.load(
                 view_data["data"]["data_registry"], view_data["ports"][1:]
             )
-            return conversation_table, data_registry.get_last_tables(num_data_outputs)
+            return (
+                conversation_table,
+                data_registry.get_last_tables(num_data_outputs),
+            )
         else:
             message_type = _message_type()
             conversation_table = util.create_empty_table(
@@ -835,9 +842,14 @@ class AgentChatWidget:
                     )
                 ],
             )
-            return conversation_table, [
-                knext.Table.from_pandas(pd.DataFrame())  # empty table
-            ] * num_data_outputs
+            return (
+                # None,  # combined tools workflow
+                conversation_table,
+                [
+                    knext.Table.from_pandas(pd.DataFrame())  # empty table
+                ]
+                * num_data_outputs,
+            )
 
     def get_data_service(
         self,
@@ -893,6 +905,7 @@ class AgentChatWidget:
             conversation_table = view_data["ports"][0]
 
         return AgentChatWidgetDataService(
+            ctx,
             agent,
             data_registry,
             self.initial_message,

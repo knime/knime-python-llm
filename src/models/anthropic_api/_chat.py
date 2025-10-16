@@ -199,7 +199,7 @@ class AnthropicChatModelConnector:
     max_tokens = knext.IntParameter(
         "Max Tokens",
         description="The maximum number of tokens to generate in the response.",
-        default_value=1024,
+        default_value=2048,
         min_value=1,
     )
 

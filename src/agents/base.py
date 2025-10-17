@@ -874,11 +874,15 @@ class AgentChatWidget:
         )
 
         if view_data is None:
-            port_ids = ctx._init_tool_execution(input_tables, {})
+            # TODO always 'init tool execution' (~ 'init combined tools workflow')
+            project_id, workflow_id, port_ids = ctx._init_tool_execution(
+                input_tables, {}
+            )
             data_registry = DataRegistry.create_with_input_tables(
                 input_tables, port_ids, data_message_prefix=self.data_message_prefix
             )
         else:
+            project_id, workflow_id, port_ids = ctx._init_tool_execution(None, {})
             data_registry = DataRegistry.load(
                 view_data["data"]["data_registry"], view_data["ports"][1:]
             )

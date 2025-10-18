@@ -566,7 +566,7 @@ class AgentPrompter2:
             LangchainToolConverter,
         )
         from ._tool import ExecutionMode
-        from ._agent import check_for_invalid_tool_calls
+        from ._agent import validate_ai_message
         from langgraph.prebuilt import create_react_agent
         from knime.types.message import to_langchain_message, from_langchain_message
         from langgraph.checkpoint.memory import InMemorySaver
@@ -658,7 +658,10 @@ class AgentPrompter2:
 
         messages = final_state["messages"]
 
-        check_for_invalid_tool_calls(messages[-1])
+        try:
+            validate_ai_message(messages[-1])
+        except Exception as e:
+            ctx.set_warning(str(e))
 
         desanitized_messages = [
             tool_converter.desanitize_tool_names(msg) for msg in messages

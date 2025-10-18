@@ -49,7 +49,7 @@ import util
 
 from ._data import DataRegistry
 from ._tool import LangchainToolConverter
-from ._agent import check_for_invalid_tool_calls, check_for_empty_response
+from ._agent import validate_ai_message
 import yaml
 import queue
 import threading
@@ -459,8 +459,7 @@ class AgentChatViewDataService:
             if final_state:
                 self._messages = final_state["messages"]
                 if self._messages:
-                    check_for_invalid_tool_calls(self._messages[-1])
-                    check_for_empty_response(self._messages[-1])
+                    validate_ai_message(self._messages[-1])
 
         except Exception as e:
             error_message = {"type": "error", "content": f"An error occurred: {e}"}

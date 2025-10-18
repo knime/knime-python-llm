@@ -45,32 +45,36 @@
 from langchain_core.messages import AIMessage
 
 
-def check_for_invalid_tool_calls(msg: AIMessage):
-    if not msg.invalid_tool_calls:
-        return
+def validate_ai_message(msg: AIMessage):
+    """Handles invalid tool calls and empty responses."""
 
-    invalid_tool_call = msg.invalid_tool_calls[0]
     finish_reason = msg.response_metadata.get("finish_reason")
-    name = invalid_tool_call.get("name", "<unknown tool>")
-    error = invalid_tool_call.get("error", None)
-    if finish_reason == "length":
-        raise ValueError(
-            f"The LLM attempted to call the tool '{name}', but ran out of tokens before finishing the request.\n"
-            "Tip: Try increasing the token limit in the LLM Selector."
-        )
-    else:
-        user_error = error if error else "No error details were provided by the model."
-        raise ValueError(
-            f"The LLM attempted to call the tool '{name}', but the request was invalid.\n"
-            f"Details: {user_error}\n"
-            "Tip: Check your tool definition and arguments, or try rephrasing your prompt."
-        )
 
-
-def check_for_empty_response(msg: AIMessage):
-    finish_reason = msg.response_metadata.get("finish_reason")
-    if msg.content == "" and finish_reason == "length":
-        raise RuntimeError(
-            "The LLM generated an empty response because it used all response tokens for its internal "
-            "reasoning. Tip: Try increasing the token limit in the LLM Selector."
-        )
+    if msg.invalid_tool_calls:
+        invalid_tool_call = msg.invalid_tool_calls[0]
+        name = invalid_tool_call.get("name", "<unknown tool>")
+        error = invalid_tool_call.get("error", None)
+        if finish_reason == "length":
+            raise ValueError(
+                f"The LLM attempted to call the tool '{name}', but ran out of tokens before finishing the request.\n"
+                "Tip: Try increasing the token limit in the LLM Selector."
+            )
+        else:
+            user_error = (
+                error if error else "No error details were provided by the model."
+            )
+            raise ValueError(
+                f"The LLM attempted to call the tool '{name}', but the request was invalid.\n"
+                f"Details: {user_error}\n"
+                "Tip: Check your tool definition and arguments, or try rephrasing your prompt."
+            )
+    elif msg.content == "":
+        if finish_reason == "length":
+            raise ValueError(
+                "The LLM generated an empty response because it used all response tokens for its internal "
+                "reasoning. Tip: Try increasing the token limit in the LLM Selector.",
+            )
+        if finish_reason == "content_filter":
+            raise ValueError(
+                "The LLM generated an empty response because the message was filtered for harmful content.",
+            )

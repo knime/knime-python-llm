@@ -95,3 +95,8 @@ export interface ViewData {
   conversation: Message[];
   config: Config;
 }
+
+export interface WorkflowInfo {
+  projectId: string;
+  workflowId: string;
+}

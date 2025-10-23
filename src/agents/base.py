@@ -718,6 +718,11 @@ def _extract_tools_from_table(tools_table: knext.Table, tool_column: str):
     "Data inputs",
     "The data inputs for the agent.",
 )
+# @knext.output_port(
+#    "Combined tools workflow",
+#    "TODO",
+#    knext.PortType.WORKFLOW,
+# )
 @knext.output_table(
     "Conversation",
     "The conversation between the LLM and the tools reflecting the agent execution.",
@@ -822,9 +827,12 @@ class AgentChatWidget:
                     f"Column {self.tool_column} not found in the tools table."
                 )
 
-        return knext.Schema.from_columns(
-            [knext.Column(_message_type(), self.conversation_column_name)]
-        ), [None] * ctx.get_connected_output_port_numbers()[1]
+        return (
+            knext.Schema.from_columns(
+                [knext.Column(_message_type(), self.conversation_column_name)]
+            ),
+            [None] * ctx.get_connected_output_port_numbers()[1],
+        )
 
     def execute(
         self,
@@ -840,11 +848,15 @@ class AgentChatWidget:
         num_data_outputs = ctx.get_connected_output_port_numbers()[1]
 
         if view_data:
+            # combined_tools_workflow = view_data["ports"][0]
             conversation_table = view_data["ports"][0]
             data_registry = DataRegistry.load(
-                view_data["data"]["data_registry"], view_data["ports"][1:]
+                view_data["data"]["data_registry"], view_data["ports_for_ids"]
             )
-            return conversation_table, data_registry.get_last_tables(num_data_outputs)
+            return (
+                conversation_table,
+                data_registry.get_last_tables(num_data_outputs),
+            )
         else:
             message_type = _message_type()
             conversation_table = util.create_empty_table(
@@ -857,9 +869,14 @@ class AgentChatWidget:
                     )
                 ],
             )
-            return conversation_table, [
-                knext.Table.from_pandas(pd.DataFrame())  # empty table
-            ] * num_data_outputs
+            return (
+                # None,  # combined tools workflow
+                conversation_table,
+                [
+                    knext.Table.from_pandas(pd.DataFrame())  # empty table
+                ]
+                * num_data_outputs,
+            )
 
     def get_data_service(
         self,
@@ -877,6 +894,8 @@ class AgentChatWidget:
         )
         from ._tool import ExecutionMode
 
+        execution_mode = ExecutionMode.DEBUG if self.debug else ExecutionMode.DETACHED
+
         view_data = ctx._get_view_data()
 
         chat_model = chat_model.create_model(
@@ -884,19 +903,24 @@ class AgentChatWidget:
         )
 
         if view_data is None:
+            project_id, workflow_id, input_ids = ctx._init_combined_tools_workflow(
+                input_tables, execution_mode.name
+            )
             data_registry = DataRegistry.create_with_input_tables(
-                input_tables, data_message_prefix=self.data_message_prefix
+                input_tables,
+                input_ids,
+                data_message_prefix=self.data_message_prefix,
             )
         else:
+            project_id, workflow_id, input_ids = ctx._init_combined_tools_workflow(
+                [], execution_mode.name
+            )
             data_registry = DataRegistry.load(
-                view_data["data"]["data_registry"], view_data["ports"][1:]
+                view_data["data"]["data_registry"], view_data["ports_for_ids"]
             )
 
         tool_converter = LangchainToolConverter(
-            data_registry,
-            ctx,
-            ExecutionMode.DEBUG if self.debug else ExecutionMode.DETACHED,
-            self.show_views,
+            data_registry, ctx, execution_mode, self.show_views, True
         )
         if tools_table is not None:
             tool_cells = _extract_tools_from_table(tools_table, self.tool_column)
@@ -913,6 +937,7 @@ class AgentChatWidget:
             conversation_table = view_data["ports"][0]
 
         return AgentChatWidgetDataService(
+            ctx,
             agent,
             data_registry,
             self.initial_message,
@@ -922,6 +947,10 @@ class AgentChatWidget:
             self.show_tool_calls_and_results,
             self.reexecution_trigger,
             tool_converter,
+            {
+                "project_id": project_id,
+                "workflow_id": workflow_id,
+            },
         )
 
 

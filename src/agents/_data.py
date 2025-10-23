@@ -62,6 +62,7 @@ class Port:
 class DataItem:
     """Represents a data item in the registry."""
 
+    id: str
     meta_data: Port
     data: knext.Table
 
@@ -73,7 +74,10 @@ class DataRegistry:
 
     @classmethod
     def create_with_input_tables(
-        cls, input_tables: Sequence[knext.Table], data_message_prefix: str = None
+        cls,
+        input_tables: Sequence[knext.Table],
+        input_ids: list[str] = [],
+        data_message_prefix: str = None,
     ) -> "DataRegistry":
         """Creates a DataRegistry with the given input tables and optional prefix."""
         registry = cls(data_message_prefix=data_message_prefix)
@@ -85,7 +89,11 @@ class DataRegistry:
                 type="Table",
                 spec=spec,
             )
-            registry._data.append(DataItem(meta_data=port, data=table))
+            if i >= len(input_ids):
+                id = str(i + 1)
+            else:
+                id = input_ids[i]
+            registry._data.append(DataItem(id=id, meta_data=port, data=table))
         return registry
 
     @classmethod
@@ -97,6 +105,7 @@ class DataRegistry:
 
         # Restore the data items from ports metadata and actual data
         ports_metadata = meta_data["ports"]
+        ids = meta_data["ids"]
 
         for i, port_dict in enumerate(ports_metadata):
             # Convert dictionary back to Port object
@@ -110,33 +119,43 @@ class DataRegistry:
             # Get the corresponding table data
             table = tables[i] if i < len(tables) else None
             if table is not None:
-                registry._data.append(DataItem(meta_data=port, data=table))
+                registry._data.append(DataItem(id=ids[i], meta_data=port, data=table))
 
         return registry
 
     def dump(self):
         """Dumps the state of current data registry into a dictionary and a list of tables."""
         data_registry_info = {
+            "ids": [],
             "ports": [],
             "data_message_prefix": self._data_message_prefix,
         }
         for id, data in enumerate(self._data):
             data_registry_info["ports"].append(port_to_dict(data.meta_data))
+            data_registry_info["ids"].append(data.id)
         tables = [self._data[i].data for i in range(len(self._data))]
         return data_registry_info, tables
 
-    def add_table(self, table: knext.Table, port: Port) -> dict:
+    def add_table(self, id: str, table: knext.Table, port: Port) -> dict:
         spec = _spec_representation(table)
         meta_data = Port(
-            name=port.name, description=port.description, type=port.type, spec=spec
+            name=port.name,
+            description=port.description,
+            type=port.type,
+            spec=spec,
         )
-        self._data.append(DataItem(meta_data=meta_data, data=table))
-        return {str(len(self._data) - 1): port_to_dict(meta_data)}
+        if id is None:
+            id = str(len(self._data) + 1)
+        self._data.append(DataItem(id=id, meta_data=meta_data, data=table))
+        return {id: port_to_dict(meta_data)}
 
-    def get_data(self, index: int) -> knext.Table:
-        if index < 0 or index >= len(self._data):
-            raise IndexError("Index out of range")
-        return self._data[index].data
+    def get_data(self, id: any) -> knext.Table:
+        for data_item in self._data:
+            if data_item.id == str(id):
+                return data_item.data
+        raise ValueError(
+            f"No data item found with id: {id}. Available ids: {[data.id for data in self._data]}"
+        )
 
     def get_last_tables(self, num_tables: int) -> list[knext.Table]:
         """Returns the last `num_tables` tables added to the registry."""
@@ -157,7 +176,7 @@ class DataRegistry:
         if self._data:
             content = render_structured(
                 **{
-                    str(id): port_to_dict(data.meta_data)
+                    data.id: port_to_dict(data.meta_data)
                     for id, data in enumerate(self._data)
                 }
             )

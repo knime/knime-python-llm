@@ -55,8 +55,10 @@ from enum import Enum, auto
 
 _logger = logging.getLogger(__name__)
 
+
 def _sanitize_for_openai(name: str) -> str:
     return re.sub(r"[^a-zA-Z0-9_-]", "_", name)
+
 
 class ToolNameMap:
     """Bidirectional mapping between original tool names and their sanitized variants.
@@ -96,7 +98,7 @@ class ToolNameMap:
 
     def get_original(self, sanitized: str) -> str:
         return self._sanitized_to_original.get(sanitized, sanitized)
-    
+
     def sanitize_tool_names(self, msg: BaseMessage) -> BaseMessage:
         """Sanitize tool names in an incoming (historical) message.
 
@@ -114,7 +116,7 @@ class ToolNameMap:
         elif isinstance(msg, ToolMessage) and msg.name:
             msg.name = self.get_sanitized(msg.name)
         return msg
-    
+
     def desanitize_tool_names(self, msg: BaseMessage) -> BaseMessage:
         """Desanitizes tool calls in a message by reverting the name back to the original user-provided name."""
         if isinstance(msg, AIMessage) and msg.tool_calls:
@@ -128,7 +130,7 @@ class ToolNameMap:
             msg.name = self.get_original(msg.name)
         return msg
 
-    
+
 @dataclass
 class WorkflowTool:
     """Mirrors the tool class defined in knime-python so we can use type hints here."""
@@ -154,6 +156,7 @@ class LangchainToolConverter:
         ctx,
         execution_mode: ExecutionMode,
         with_view_nodes: bool = False,
+        use_combined_tools_workflow: bool = False,
     ):
         self._data_registry = data_registry
         self._ctx = ctx
@@ -164,12 +167,12 @@ class LangchainToolConverter:
         self._name_map = ToolNameMap()
         self._has_data_tools = False
         self._with_view_nodes = with_view_nodes
+        self._use_combined_tools_workflow = use_combined_tools_workflow
 
     @property
     def has_data_tools(self) -> bool:
         """Returns True if there are tools that require data inputs or outputs."""
         return self._has_data_tools
-
 
     def desanitize_tool_name(self, sanitized_name: str) -> str:
         return self._name_map.get_original(sanitized_name)
@@ -179,7 +182,6 @@ class LangchainToolConverter:
 
     def sanitize_tool_names(self, msg: BaseMessage) -> BaseMessage:
         return self._name_map.sanitize_tool_names(msg)
-        
 
     def to_langchain_tool(
         self,
@@ -193,7 +195,9 @@ class LangchainToolConverter:
 
         if tool.input_ports:
             self._has_data_tools = True
-            properties["data_inputs"] = _create_input_data_schema(tool)
+            properties["data_inputs"] = _create_input_data_schema(
+                tool, use_string_id=self._use_combined_tools_workflow
+            )
             params_parser = self._create_data_input_parser(tool)
             description_parts["input_ports"] = list(map(port_to_dict, tool.input_ports))
         else:
@@ -216,11 +220,19 @@ class LangchainToolConverter:
         # Create the tool function
         def tool_function(**params: dict) -> str:
             try:
-                configuration, inputs = params_parser(params)
-                message, outputs, view_node_ids = self._ctx._execute_tool(
-                    tool, configuration, inputs, self._execution_hints
-                )
-                return outputs_processor(message, outputs, view_node_ids)
+                configuration, inputs, input_ids = params_parser(params)
+                if self._use_combined_tools_workflow:
+                    message, outputs, output_ids, view_node_ids = (
+                        self._ctx._execute_tool_in_combined_workflow(
+                            tool, configuration, input_ids, self._execution_hints
+                        )
+                    )
+                else:
+                    message, outputs, view_node_ids = self._ctx._execute_tool(
+                        tool, configuration, inputs, self._execution_hints
+                    )
+                    output_ids = [None] * len(outputs)
+                return outputs_processor(message, output_ids, outputs, view_node_ids)
             except Exception as e:
                 _logger.exception(e)
                 raise
@@ -234,11 +246,14 @@ class LangchainToolConverter:
 
     def _create_data_output_processor(self, tool: WorkflowTool):
         def _process_outputs_with_data(
-            message: str, outputs: list[knext.Table], view_node_ids: list[str]
+            message: str,
+            output_ids: list[str],
+            outputs: list[knext.Table],
+            view_node_ids: list[str],
         ):
             output_references = {}
-            for port, output in zip(tool.output_ports, outputs):
-                output_reference = self._data_registry.add_table(output, port)
+            for id, port, output in zip(output_ids, tool.output_ports, outputs):
+                output_reference = self._data_registry.add_table(id, output, port)
                 output_references.update(output_reference)
             return self._append_view_node_ids(
                 message
@@ -251,7 +266,10 @@ class LangchainToolConverter:
 
     def _create_no_data_output_processor(self):
         def _process_outputs_no_data(
-            message: str, outputs: list[knext.Table], view_node_ids: list[str]
+            message: str,
+            output_ids: list[str],
+            outputs: list[knext.Table],
+            view_node_ids: list[str],
         ):
             return self._append_view_node_ids(message, view_node_ids)
 
@@ -263,7 +281,7 @@ class LangchainToolConverter:
             _validate_required_fields(
                 tool.parameter_schema.keys(), configuration, "configuration parameters"
             )
-            return configuration, []
+            return configuration, [], []
 
         return _parse_params_no_data
 
@@ -280,8 +298,8 @@ class LangchainToolConverter:
                 data_inputs,
                 "data inputs for ports",
             )
-            inputs = [self._data_registry.get_data(i) for i in data_inputs.values()]
-            return configuration, inputs
+            inputs = [self._data_registry.get_data(id) for id in data_inputs.values()]
+            return configuration, inputs, data_inputs.values()
 
         return _parse_params_with_data
 
@@ -316,18 +334,29 @@ def _create_configuration_schema(tool: WorkflowTool) -> dict:
     )
 
 
-def _create_input_data_schema(tool: WorkflowTool) -> knext.Schema:
+def _create_input_data_schema(tool: WorkflowTool, use_string_id: bool) -> knext.Schema:
     return _create_object_schema(
         description="Data inputs for the tool.",
-        properties=_create_input_port_properties(tool.input_ports),
+        properties=_create_input_port_properties(tool.input_ports, use_string_id),
     )
 
 
-def _create_input_port_properties(ports: list[Port]):
-    return {
-        port.name: {
-            "type": "integer",
-            "description": "ID of the data to feed to the port for " + port.description,
+def _create_input_port_properties(ports: list[Port], use_string_id: bool):
+    if use_string_id:
+        return {
+            port.name: {
+                "type": "string",
+                "description": "ID (format <node_id>#<port_index>) of the data to feed to the port for "
+                + port.description,
+            }
+            for port in ports
         }
-        for port in ports
-    }
+    else:
+        return {
+            port.name: {
+                "type": "integer",
+                "description": "Index (starting at 1) of the data to feed to the port for "
+                + port.description,
+            }
+            for port in ports
+        }

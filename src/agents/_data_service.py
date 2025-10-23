@@ -60,6 +60,7 @@ import pandas as pd
 class AgentChatWidgetDataService:
     def __init__(
         self,
+        ctx,
         agent_graph,
         data_registry: DataRegistry,
         initial_message: str,
@@ -69,7 +70,9 @@ class AgentChatWidgetDataService:
         show_tool_calls_and_results: bool,
         reexecution_trigger: str,
         tool_converter: LangchainToolConverter,
+        combined_tools_workflow_info: dict,
     ):
+        self._ctx = ctx
         self._agent_graph = agent_graph
         self._data_registry = data_registry
         self._tool_converter = tool_converter
@@ -91,6 +94,8 @@ class AgentChatWidgetDataService:
         self._recursion_limit = recursion_limit
         self._show_tool_calls_and_results = show_tool_calls_and_results
         self._reexecution_trigger = reexecution_trigger
+
+        self._get_combined_tools_workflow_info = combined_tools_workflow_info
 
         self._message_queue = queue.Queue()
         self._thread = None
@@ -140,6 +145,9 @@ class AgentChatWidgetDataService:
             "reexecution_trigger": self._reexecution_trigger,
         }
 
+    def get_combined_tools_workflow_info(self):
+        return self._get_combined_tools_workflow_info
+
     # called by java, not the frontend
     def get_view_data(self):
         desanitized_messages = [
@@ -148,11 +156,14 @@ class AgentChatWidgetDataService:
         message_values = [from_langchain_message(msg) for msg in desanitized_messages]
         conversation_df = pd.DataFrame({self._conversation_column_name: message_values})
         conversation_table = knext.Table.from_pandas(conversation_df)
+        # combined_tools_workflow = self._ctx._get_combined_tools_workflow()
 
         meta_data, tables = self._data_registry.dump()
         view_data = {
             "data": {"data_registry": meta_data},
-            "ports": [conversation_table] + tables,
+            # "ports": [combined_tools_workflow] + [conversation_table],
+            "ports": [conversation_table],
+            "portIds": meta_data["ids"],
         }
         return view_data
 

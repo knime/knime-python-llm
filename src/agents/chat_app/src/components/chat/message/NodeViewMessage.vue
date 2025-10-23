@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watchEffect } from "vue";
+import { onMounted, onUnmounted, ref, watchEffect } from "vue";
 
 import ChartDotsIcon from "@knime/styles/img/icons/chart-dots.svg";
 import {
@@ -14,7 +14,8 @@ import {
   type UIExtensionService,
 } from "@knime/ui-extension-service";
 
-import type { ViewMessage } from "@/types";
+import { useChatStore } from "@/stores/chat";
+import type { ViewMessage, WorkflowInfo } from "@/types";
 
 import MessageBox from "./MessageBox.vue";
 
@@ -28,22 +29,11 @@ const extensionConfig = ref<ExtensionConfig | null>(null);
 const resourceLocation = ref<string | null>(null);
 const baseService = ref<UIExtensionService<UIExtensionAPILayer> | null>(null);
 
-const parsedNodeID = computed(() => {
-  const ids = props.content.split("#");
-  if (ids[0] === "not-a-virtual-project") {
-    return {
-      error: `View for node ${ids[1]} can't be rendered. Debug mode enabled?`,
-    };
-  }
-  const nodeId = ids[1];
-  return {
-    result: {
-      projectId: ids[0],
-      workflowId: nodeId.substring(0, nodeId.lastIndexOf(":")),
-      nodeId,
-    },
-  };
-});
+const chatStore = useChatStore();
+
+const resolvedNodeID = ref<{
+  result?: WorkflowInfo & { nodeId: string };
+}>({});
 
 const noop = () => {
   /* mock unused api fields */
@@ -52,10 +42,10 @@ const noop = () => {
 const apiLayer: UIExtensionAPILayer = {
   registerPushEventService: () => () => {},
   callNodeDataService: async ({ dataServiceRequest, serviceType }) => {
-    if (!parsedNodeID.value.result) {
+    if (!resolvedNodeID.value.result) {
       return { result: null };
     }
-    const { projectId, workflowId, nodeId } = parsedNodeID.value.result;
+    const { projectId, workflowId, nodeId } = resolvedNodeID.value.result;
     const response = await baseService.value?.callKnimeUiApi!(
       "NodeService.callNodeDataService",
       {
@@ -95,6 +85,25 @@ onMounted(async () => {
   baseService.value = (
     (await JsonDataService.getInstance()) as any
   ).baseService;
+
+  try {
+    const { projectId, workflowId } =
+      await chatStore.getCombinedToolsWorkflowInfo();
+    const id = props.content;
+    const nodeId = `${workflowId}:${id}`;
+    resolvedNodeID.value = {
+      result: {
+        projectId,
+        workflowId: nodeId.substring(0, nodeId.lastIndexOf(":")),
+        nodeId,
+      },
+    };
+  } catch (error) {
+    consola.error("Error while fetching workflow info", error);
+    renderError.value =
+      "View can't be rendered. Error resolving node ID. Debug workflow deleted?";
+    dataAvailable.value = false;
+  }
 });
 
 watchEffect(() => {
@@ -102,12 +111,10 @@ watchEffect(() => {
     return;
   }
 
-  if (!parsedNodeID.value.result) {
-    dataAvailable.value = false;
-    renderError.value = parsedNodeID.value.error ?? "View can't be rendered";
+  if (!resolvedNodeID.value.result) {
     return;
   }
-  const { projectId, workflowId, nodeId } = parsedNodeID.value.result;
+  const { projectId, workflowId, nodeId } = resolvedNodeID.value.result;
   baseService.value.callKnimeUiApi!("NodeService.getNodeView", {
     projectId,
     workflowId,
@@ -139,8 +146,8 @@ watchEffect(() => {
 });
 
 onUnmounted(() => {
-  if (parsedNodeID.value.result) {
-    const { projectId, workflowId, nodeId } = parsedNodeID.value.result;
+  if (resolvedNodeID.value.result) {
+    const { projectId, workflowId, nodeId } = resolvedNodeID.value.result;
     baseService.value?.callKnimeUiApi!(
       "NodeService.deactivateNodeDataServices",
       {

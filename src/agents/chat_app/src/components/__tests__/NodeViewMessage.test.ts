@@ -1,9 +1,13 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
+import { createTestingPinia } from "@pinia/testing";
+import { setActivePinia } from "pinia";
 
 import type { ViewMessage } from "@/types";
 import MessageBox from "../chat/message/MessageBox.vue";
 import NodeViewMessage from "../chat/message/NodeViewMessage.vue";
+import { useChatStore } from "@/stores/chat";
+import { version } from "os";
 
 const mockCallKnimeUiApi = vi.fn(() =>
   Promise.resolve({
@@ -12,6 +16,13 @@ const mockCallKnimeUiApi = vi.fn(() =>
   }),
 );
 
+const mockJsonDataService = {
+  data: vi.fn(),
+  applyData: vi.fn(),
+  initialData: vi.fn(),
+  baseService: { callKnimeUiApi: mockCallKnimeUiApi },
+};
+
 vi.mock("@knime/ui-extension-service", () => ({
   AlertingService: {
     getInstance: vi.fn(() =>
@@ -19,9 +30,7 @@ vi.mock("@knime/ui-extension-service", () => ({
     ),
   },
   JsonDataService: {
-    getInstance: vi.fn(() =>
-      Promise.resolve({ baseService: { callKnimeUiApi: mockCallKnimeUiApi } }),
-    ),
+    getInstance: vi.fn(() => Promise.resolve(mockJsonDataService)),
   },
   ResourceService: {
     getInstance: vi.fn(() =>
@@ -35,10 +44,26 @@ vi.mock("@knime/ui-extension-service", () => ({
 }));
 
 describe("NodeViewMessage", () => {
+  setActivePinia(
+    createTestingPinia({
+      createSpy: vi.fn,
+      stubActions: false,
+    }),
+  );
+
+  const store = useChatStore();
+  mockJsonDataService.data.mockImplementation(() =>
+    Promise.resolve({
+      project_id: "test_project_id",
+      workflow_id: "test_workflow_id",
+    }),
+  );
+  store.jsonDataService = mockJsonDataService;
+
   const doMount = (props: Partial<ViewMessage> = {}) => {
     const defaultProps = {
       id: "1",
-      content: "projectId#workflowId:nodeId",
+      content: "test_node_id",
       type: "view" as const,
       name: "Test View",
     };
@@ -99,19 +124,6 @@ describe("NodeViewMessage", () => {
     });
   });
 
-  it("shows error message if renderError is set", async () => {
-    const { wrapper } = doMount({
-      content: "not-a-virtual-project#brokenNode",
-    });
-
-    await flushPromises();
-
-    expect(wrapper.text()).toContain(
-      "View for node brokenNode can't be rendered",
-    );
-    expect(wrapper.findComponent({ name: "UIExtension" }).exists()).toBe(false);
-  });
-
   it("does not render UIExtension if data is not available", async () => {
     mockCallKnimeUiApi.mockImplementationOnce(() =>
       Promise.reject(new Error("fail")),
@@ -122,5 +134,38 @@ describe("NodeViewMessage", () => {
     await flushPromises();
 
     expect(wrapper.findComponent({ name: "UIExtension" }).exists()).toBe(false);
+  });
+
+  it("resolves node ID correctly", async () => {
+    doMount();
+
+    await flushPromises();
+
+    expect(mockJsonDataService.data).toHaveBeenCalledWith({
+      method: "get_combined_tools_workflow_info",
+    });
+    expect(mockCallKnimeUiApi).toHaveBeenCalledWith("NodeService.getNodeView", {
+      nodeId: "test_workflow_id:test_node_id",
+      projectId: "test_project_id",
+      workflowId: "test_workflow_id",
+      versionId: "current-state",
+    });
+  });
+
+  it("shows error when resolving node ID fails", async () => {
+    store.jsonDataService = mockJsonDataService;
+    mockJsonDataService.data.mockImplementationOnce(() =>
+      Promise.resolve(undefined),
+    );
+    const { wrapper } = doMount();
+
+    await flushPromises();
+
+    expect(mockJsonDataService.data).toHaveBeenCalledWith({
+      method: "get_combined_tools_workflow_info",
+    });
+    expect(wrapper.text()).toContain(
+      "View can't be rendered. Error resolving node ID. Debug workflow deleted?",
+    );
   });
 });

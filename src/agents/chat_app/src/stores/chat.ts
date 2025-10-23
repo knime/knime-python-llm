@@ -16,6 +16,7 @@ import type {
   ToolMessage,
   InitializationState,
   ViewData,
+  WorkflowInfo,
 } from "@/types";
 import { computed, ref, shallowRef, toRaw, useId, watch } from "vue";
 
@@ -331,6 +332,19 @@ export const useChatStore = defineStore("chat", () => {
     }
   }
 
+  async function getCombinedToolsWorkflowInfo(): Promise<WorkflowInfo> {
+    const response = await jsonDataService.value?.data({
+      method: "get_combined_tools_workflow_info",
+    });
+    if (response) {
+      return {
+        projectId: response.project_id,
+        workflowId: response.workflow_id,
+      };
+    }
+    throw new Error("Failed to get combined tools workflow info");
+  }
+
   async function checkIsProcessing() {
     try {
       const response = await jsonDataService.value?.data({
@@ -508,6 +522,7 @@ export const useChatStore = defineStore("chat", () => {
     addMessages,
     init,
     getConfiguration,
+    getCombinedToolsWorkflowInfo,
     getInitialMessage,
     getLastMessages,
     checkIsProcessing,

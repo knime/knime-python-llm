@@ -80,6 +80,8 @@ class ModelInfo(BaseModel):
 	# The new gateway version omits the description; we normalize to "".
 	description: str = Field("", description="Human readable description (may be empty)")
 
+	scope_id: Optional[str] = Field(None, description="Scope identifier of the model")
+
 	@field_validator("description", mode="before")
 	@classmethod
 	def _coerce_description(cls, v):  # type: ignore[override]

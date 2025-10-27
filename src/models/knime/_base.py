@@ -104,6 +104,16 @@ def create_model_choice_provider(
 def list_model_choices(auth_spec, mode: str | None = None) -> list[knext.StringParameter.Choice]:
     return [knext.StringParameter.Choice(model.id, model.name, model.description) for model in list_models(auth_spec, mode)]
 
+def is_available_model(auth_spec, model_id: str, mode: str) -> bool:
+    models = list_models(auth_spec, mode)
+    allowed_ids = set()
+    for model in models:
+        allowed_ids.add(model.id)
+        # models in hub:global scope can be referenced by name for backwards compatibility
+        if model.scope_id == "hub:global":
+            allowed_ids.add(model.name)
+    return model_id in allowed_ids
+
 def list_model_ids(auth_spec, mode: str) -> list[str]:
     return [model.id for model in list_models(auth_spec, mode)]
 

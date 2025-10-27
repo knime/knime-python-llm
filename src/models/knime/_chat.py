@@ -54,6 +54,7 @@ from ._base import (
     extract_api_base,
     create_model_choice_provider,
     list_model_ids,
+    is_available_model,
     validate_auth_spec,
 )
 
@@ -248,8 +249,7 @@ class KnimeHubChatModelConnector:
     def execute(
         self, ctx: knext.ExecutionContext, authentication: knext.PortObject
     ) -> KnimeHubChatModelPortObject:
-        available_models = list_model_ids(authentication.spec, "chat")
-        if self.model_name not in available_models:
+        if is_available_model(authentication.spec, self.model_name, "chat") is False:
             raise knext.InvalidParametersError(
                 f"The selected model {self.model_name} is not served by the connected Hub."
             )

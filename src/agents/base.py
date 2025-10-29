@@ -705,7 +705,7 @@ def _extract_tools_from_table(tools_table: knext.Table, tool_column: str):
 
 
 @knext.node(
-    "Agent Chat Widget (experimental)",
+    "Agent Chat Widget",
     node_type=knext.NodeType.VISUALIZER,
     icon_path=chat_agent_icon,
     category=agent_category,
@@ -736,8 +736,6 @@ class AgentChatWidget:
     """
     Enables interactive, multi-turn conversations with an AI agent that uses tools and data to fulfill user prompts.
 
-    **This node is experimental and intended to gather early feedback. It is providing the base functionality and will change in future releases, potentially in a non-backwards compatible way (e.g. requires to be re-executed).**
-
     This node enables interactive, multi-turn conversations with an AI agent, combining a chat model with a set of tools and optional input data.
 
     The agent is assembled from the provided chat model and tools, each defined as a KNIME workflow. Tools can include configurable parameters (e.g., string inputs, numeric settings, column selectors) and may optionally consume input data in the form of KNIME tables. While the agent does not access raw data directly, it is informed about the structure of available tables (i.e., column names and types). This allows the model to select and route data to tools during conversation.
@@ -747,6 +745,8 @@ class AgentChatWidget:
     This node is designed for real-time, interactive usage where the conversation takes place directly within the KNIME view, where the agent’s responses and reasoning are shown incrementally as the dialogue progresses. Additionally, it can also optionally output the conversation history as table.
 
     To ensure effective agent behavior, provide meaningful tool names and clear descriptions — including example use cases if applicable.
+
+    This node is very similar to the **Agent Chat View** but additionally outputs the conversation, tool output data and the combined tool workflow. The outputs are updated on re-execution, either implicitly when being used within a dataapp, or explicitly after each completed response (still experimental - see 'Re-execution trigger' setting).
     """
 
     developer_message = _system_message_parameter()
@@ -764,16 +764,16 @@ class AgentChatWidget:
     class ReexecutionTrigger(knext.EnumParameterOptions):
         NONE = (
             "None",
-            "Node re-execution is never explicitly triggered explicitly from within the chat.",
+            "Node re-execution is never triggered explicitly from within the chat. But the node will still be re-executed (and the outputs updated) when being used within a dataapp.",
         )
         INTERACTION = (
-            "Response completed",
-            "Re-execute the node once the last response has been received.",
+            "Response completed (experimental)",
+            "Re-execute the node once the last response has been received. It is an experimental feature because the user experience is not ideal, yet (the chat is refreshed on every re-execution).",
         )
 
     reexecution_trigger = knext.EnumParameter(
         "Re-execution trigger",
-        "The user action that triggers a re-execution of the node in order to update the conversation and data output tables.",
+        "The user action that triggers a re-execution of the node in order to update the conversation, tool output data and combined tool workflow.",
         ReexecutionTrigger.NONE.name,
         ReexecutionTrigger,
         style=knext.EnumParameter.Style.VALUE_SWITCH,

@@ -80,7 +80,7 @@ class ModelInfo(BaseModel):
 	# The new gateway version omits the description; we normalize to "".
 	description: str = Field("", description="Human readable description (may be empty)")
 
-	scope_id: Optional[str] = Field(None, description="Scope identifier of the model")
+	scope_id: Optional[str] = Field(None, description="Scope identifier of the model", alias="scopeId")
 
 	@field_validator("description", mode="before")
 	@classmethod

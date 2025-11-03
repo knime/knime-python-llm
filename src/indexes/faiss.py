@@ -279,7 +279,15 @@ class FAISSVectorStoreReader:
             allow_dangerous_deserialization=True,
         )
 
-        document_list = db.similarity_search("a", k=1)
+        try:
+            document_list = db.similarity_search("a", k=1)
+        except AssertionError:
+            raise knext.InvalidParametersError(
+                "The vector store has a different embedding dimensionality than the embedding model. "
+                "This could be because the vector store was created with a different model than the one "
+                "connected to the FAISS Vector Store Reader."
+            )
+
         metadata_keys = (
             [key for key in document_list[0].metadata] if len(document_list) > 0 else []
         )

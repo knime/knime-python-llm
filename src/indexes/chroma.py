@@ -495,10 +495,19 @@ class ChromaVectorStoreReader:
         ctx: knext.ExecutionContext,
         embeddings_port_object: EmbeddingsPortObject,
     ) -> ChromaVectorstorePortObject:
+        from chromadb.errors import InvalidDimensionException
+
         version = self._get_database_version(self.persist_directory)
         chroma = self._create_chroma_with_version(version, embeddings_port_object, ctx)
 
-        document_list = chroma.similarity_search("a", k=1)
+        try:
+            document_list = chroma.similarity_search("a", k=1)
+        except InvalidDimensionException as e:
+            raise knext.InvalidParametersError(
+                f"Accessing the vector store failed with: {str(e)}. This could be because the vector store "
+                "was created with a different model than the one connected to the Chroma Vector Store Reader."
+            )
+
         metadata_keys = (
             [key for key in document_list[0].metadata] if len(document_list) > 0 else []
         )

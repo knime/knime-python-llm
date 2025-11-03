@@ -274,7 +274,9 @@ class BaseMapper(ABC):
             text_array_trimmed = pc.utf8_trim_whitespace(pa_array)
             is_empty_string = pc.equal(pc.utf8_length(text_array_trimmed), 0)
             # A string is valid if it's not null AND not an empty string
-            return pc.fill_null(pc.and_(is_not_null_array, pc.invert(is_empty_string)), False)
+            return pc.fill_null(
+                pc.and_(is_not_null_array, pc.invert(is_empty_string)), False
+            )
 
         else:
             # For any other data type, just check if it's not null.
@@ -330,7 +332,7 @@ class OutputMissingMapper(BaseMapper):
 
     def map(self, table: pa.Table):
         is_valid = self._compute_validity(table)
-        if pc.any(is_valid).as_py():
+        if pc.any(is_valid).as_py() or table.num_rows == 0:
             self._all_missing = False
 
         all_valid = pc.all(is_valid).as_py()
@@ -483,16 +485,19 @@ def create_empty_table(
         )
     return knext.Table.from_pyarrow(pa_table)
 
+
 def image_table_present(ctx: knext.DialogCreationContext) -> bool:
     """Check if an image table is connected."""
     specs = ctx.get_input_specs()
     return len(specs) == 2 and specs[1] is not None
+
 
 def image_column_filter(column: knext.Column) -> bool:
     from PIL import Image
 
     img_type = knext.logical(Image.Image)
     return column.ktype == img_type
+
 
 def prepare_images(
     image_table: knext.Table,
@@ -531,6 +536,7 @@ def prepare_images(
             filename = f"{col}_{idx}.png"
             files.append((filename, raw, "image/png"))
     return files
+
 
 def _get_image_column_names(
     column_filter_config,

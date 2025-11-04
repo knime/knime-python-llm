@@ -272,21 +272,23 @@ class FAISSVectorStoreReader:
     ) -> FAISSVectorstorePortObject:
         from langchain_community.vectorstores import FAISS
 
+        model = embeddings_port_object.create_model(ctx)
+
         # TODO: Add check if .fiass and .pkl files are in the directory instead of instatiating as check
         db = FAISS.load_local(
             self.persist_directory,
-            embeddings_port_object.create_model(ctx),
+            model,
             allow_dangerous_deserialization=True,
         )
 
-        try:
-            document_list = db.similarity_search("a", k=1)
-        except AssertionError:
+        embedding = model.embed_query("a")
+        if len(embedding) != db.index.d:
             raise knext.InvalidParametersError(
                 "The vector store has a different embedding dimensionality than the embedding model. "
                 "This could be because the vector store was created with a different model than the one "
                 "connected to the FAISS Vector Store Reader."
             )
+        document_list = db.similarity_search_by_vector(embedding, k=1)
 
         metadata_keys = (
             [key for key in document_list[0].metadata] if len(document_list) > 0 else []

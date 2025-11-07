@@ -718,11 +718,11 @@ def _extract_tools_from_table(tools_table: knext.Table, tool_column: str):
     "Data inputs",
     "The data inputs for the agent.",
 )
-# @knext.output_port(
-#    "Combined tools workflow",
-#    "TODO",
-#    knext.PortType.WORKFLOW,
-# )
+@knext.output_port(
+    "Combined tools workflow",
+    "TODO",
+    knext.PortType.WORKFLOW,
+)
 @knext.output_table(
     "Conversation",
     "The conversation between the LLM and the tools reflecting the agent execution.",
@@ -828,6 +828,7 @@ class AgentChatWidget:
                 )
 
         return (
+            None,  # combined tools workflow
             knext.Schema.from_columns(
                 [knext.Column(_message_type(), self.conversation_column_name)]
             ),
@@ -846,14 +847,15 @@ class AgentChatWidget:
 
         view_data = ctx._get_view_data()
         num_data_outputs = ctx.get_connected_output_port_numbers()[1]
+        combined_tools_workflow = ctx._get_combined_tools_workflow()
 
         if view_data:
-            # combined_tools_workflow = view_data["ports"][0]
             conversation_table = view_data["ports"][0]
             data_registry = DataRegistry.load(
                 view_data["data"]["data_registry"], view_data["ports_for_ids"]
             )
             return (
+                combined_tools_workflow,
                 conversation_table,
                 data_registry.get_last_tables(num_data_outputs),
             )
@@ -870,7 +872,7 @@ class AgentChatWidget:
                 ],
             )
             return (
-                # None,  # combined tools workflow
+                combined_tools_workflow,
                 conversation_table,
                 [
                     knext.Table.from_pandas(pd.DataFrame())  # empty table

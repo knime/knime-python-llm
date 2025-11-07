@@ -156,12 +156,10 @@ class AgentChatWidgetDataService:
         message_values = [from_langchain_message(msg) for msg in desanitized_messages]
         conversation_df = pd.DataFrame({self._conversation_column_name: message_values})
         conversation_table = knext.Table.from_pandas(conversation_df)
-        # combined_tools_workflow = self._ctx._get_combined_tools_workflow()
 
         meta_data, tables = self._data_registry.dump()
         view_data = {
             "data": {"data_registry": meta_data},
-            # "ports": [combined_tools_workflow] + [conversation_table],
             "ports": [conversation_table],
             "portIds": meta_data["ids"],
         }

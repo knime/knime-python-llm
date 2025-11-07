@@ -69,6 +69,7 @@ class DataItem:
 
 class DataRegistry:
     def __init__(self, data_message_prefix: str):
+        # TODO turn it into a dict with ids as keys
         self._data: list[DataItem] = []
         self._data_message_prefix = data_message_prefix
 

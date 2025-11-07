@@ -45,6 +45,7 @@
 from ._data import DataRegistry
 from ._tool import LangchainToolConverter
 from ._agent import (
+    RecursionError,
     validate_ai_message,
     RECURSION_CONTINUE_PROMPT,
     LANGGRAPH_RECURSION_MESSAGE,
@@ -57,7 +58,7 @@ import knime.extension as knext
 
 from langchain_core.messages.human import HumanMessage
 
-from knime.types.message import to_langchain_message, from_langchain_message
+from knime.types.message import from_langchain_message
 
 import pandas as pd
 
@@ -69,7 +70,6 @@ class AgentChatWidgetDataService:
         agent_graph,
         data_registry: DataRegistry,
         initial_message: str,
-        conversation_table: knext.Table | None,
         conversation_column_name: str,
         recursion_limit: int,
         recursion_limit_handling: str,
@@ -82,20 +82,7 @@ class AgentChatWidgetDataService:
         self._agent_graph = agent_graph
         self._data_registry = data_registry
         self._tool_converter = tool_converter
-        self._messages = []
         self._conversation_column_name = conversation_column_name
-        previous_messages = []
-        if conversation_table is not None:
-            conversation_df = conversation_table[conversation_column_name].to_pandas()
-            for msg in conversation_df[conversation_column_name]:
-                lc_msg = to_langchain_message(msg)
-                previous_messages.append(tool_converter.sanitize_tool_names(lc_msg))
-        if not previous_messages and (
-            data_registry.has_data or tool_converter.has_data_tools
-        ):
-            self._messages.append(data_registry.create_data_message())
-        elif previous_messages:
-            self._messages.extend(previous_messages)
         self._initial_message = initial_message
         self._recursion_limit = recursion_limit
         self._recursion_limit_handling = recursion_limit_handling
@@ -106,6 +93,15 @@ class AgentChatWidgetDataService:
 
         self._message_queue = queue.Queue()
         self._thread = None
+
+    @property
+    def _messages(self):
+        return self._agent_graph.get_state(
+            {
+                "recursion_limit": self._recursion_limit,
+                "configurable": {"thread_id": "1"},
+            }
+        ).values.get("messages", [])
 
     def get_initial_message(self):
         if self._initial_message:
@@ -173,47 +169,51 @@ class AgentChatWidgetDataService:
         return view_data
 
     def _post_user_message(self, user_message: str):
-        self._messages.append(HumanMessage(content=user_message))
+        from langgraph.errors import GraphRecursionError
+
         config = {
             "recursion_limit": self._recursion_limit,
             "configurable": {"thread_id": "1"},
         }
 
         try:
-            num_messages_at_last_step = len(self._messages)
             state_stream = self._agent_graph.stream(
-                {"messages": self._messages},
+                {"messages": [HumanMessage(content=user_message)]},
                 config,
-                stream_mode="values",  # streams state by state
+                stream_mode="updates",  # streams state by state incrementally
             )
 
             final_state = None
             for state in state_stream:
-                new_messages = state["messages"][num_messages_at_last_step:]
-                num_messages_at_last_step = len(state["messages"])
-                final_state = state
+                extracted_state = state["agent"] if "agent" in state else state["tools"]
+                final_state = extracted_state
+                new_messages = extracted_state["messages"]
 
                 for new_message in new_messages:
                     # already added
                     if isinstance(new_message, HumanMessage):
                         continue
 
-                    fe_messages = self._to_frontend_messages(new_message)
-                    for fe_msg in fe_messages:
-                        self._message_queue.put(fe_msg)
+                    if (
+                        getattr(new_message, "content", None)
+                        != LANGGRAPH_RECURSION_MESSAGE
+                    ):
+                        fe_messages = self._to_frontend_messages(new_message)
+                        for fe_msg in fe_messages:
+                            self._message_queue.put(fe_msg)
+                    else:
+                        raise RecursionError("Recursion limit was reached.")
 
-            if final_state:
-                self._messages = final_state["messages"]
-                if self._messages:
-                    validate_ai_message(self._messages[-1])
-                    self._optionally_put_recursion_limit_prompt()
+            if final_state and final_state["messages"]:
+                validate_ai_message(self._messages[-1])
 
+        except (GraphRecursionError, RecursionError):
+            self._handle_recursion_limit_error()
         except Exception as e:
-            error_message = {"type": "error", "content": f"An error occurred: {e}"}
-            if "Recursion limit" in str(e):
-                self._handle_recursion_limit_error(error_message, final_state)
-            else:
-                self._message_queue.put(error_message)
+            content = f"An error occurred: {e}"
+            error_message = {"type": "error", "content": content}
+            self._message_queue.put(error_message)
+            self._append_ai_message_to_memory(content)
 
     def _to_frontend_messages(self, message):
         # split the node-view-ids out into a separate message
@@ -266,29 +266,29 @@ class AgentChatWidgetDataService:
             "args": yaml.dump(args, indent=2) if args else None,
         }
 
-    def _handle_recursion_limit_error(self, error_message, final_state):
-        from ._parameters import RecursionLimitModeForView
-
+    def _handle_recursion_limit_error(self):
         if self._recursion_limit_handling == RecursionLimitModeForView.CONFIRM.name:
-            if final_state:
-                self._messages = final_state["messages"]
             message = {
                 "type": "ai",
                 "content": RECURSION_CONTINUE_PROMPT,
             }
             self._message_queue.put(message)
+            self._append_ai_message_to_memory(RECURSION_CONTINUE_PROMPT)
         else:
-            error_message["content"] = (
-                f"Recursion limit of {self._recursion_limit} reached."
-            )
-            self._message_queue.put(error_message)
-
-    def _optionally_put_recursion_limit_prompt(self):
-        if (
-            self._recursion_limit_handling == RecursionLimitModeForView.CONFIRM.name
-        ) and (self._messages[-1].content == LANGGRAPH_RECURSION_MESSAGE):
-            message = {
-                "type": "ai",
-                "content": RECURSION_CONTINUE_PROMPT,
+            content = f"Recursion limit of {self._recursion_limit} reached."
+            error_message = {
+                "type": "error",
+                "content": content,
             }
-            self._message_queue.put(message)
+            self._message_queue.put(error_message)
+            self._append_ai_message_to_memory(content)
+
+    def _append_ai_message_to_memory(self, message: str):
+        from langchain_core import messages as lcm
+
+        config = {
+            "recursion_limit": self._recursion_limit,
+            "configurable": {"thread_id": "1"},
+        }
+        ai_message = lcm.AIMessage(message)
+        self._agent_graph.update_state(config, {"messages": [ai_message]}, "agent")

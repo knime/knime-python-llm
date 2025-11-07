@@ -66,5 +66,5 @@ def recursion_limit_mode_param_for_view():
         RecursionLimitModeForView,
         style=knext.EnumParameter.Style.VALUE_SWITCH,
         is_advanced=True,
-        since_version="5.9.0",
+        since_version="5.10.0",
     )

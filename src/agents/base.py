@@ -71,6 +71,7 @@ from knime.extension.nodes import (
 )
 from base import AIPortObjectSpec
 from ._parameters import recursion_limit_mode_param_for_view
+from ._agent import RecursionError
 
 import os
 import logging
@@ -529,7 +530,7 @@ class AgentPrompter2:
         RecursionLimitMode,
         style=knext.EnumParameter.Style.VALUE_SWITCH,
         is_advanced=True,
-        since_version="5.9.0",
+        since_version="5.10.0",
     )
 
     recursion_limit_prompt = knext.MultilineStringParameter(
@@ -542,7 +543,7 @@ Tools are not available in this step.
 If essential information is missing because tool calls in the previous message were deleted,
 state that the tool could not be executed due to reaching the recursion limit.""",
         is_advanced=True,
-        since_version="5.9.0",
+        since_version="5.10.0",
     ).rule(
         knext.OneOf(
             recursion_limit_handling,
@@ -699,16 +700,15 @@ state that the tool could not be executed due to reaching the recursion limit.""
                     config=config,
                 )
                 recursion_counter += 1
-        except Exception as e:
-            if "Recursion limit" in str(e):
-                raise knext.InvalidParametersError(
-                    f"""Recursion limit of {self.recursion_limit} reached. 
+        except RecursionError:
+            raise knext.InvalidParametersError(
+                f"""Recursion limit of {self.recursion_limit} reached. 
                     You can increase the limit by setting the `recursion_limit` parameter to a higher value."""
-                )
-            else:
-                raise knext.InvalidParametersError(
-                    f"An error occurred while executing the agent: {e}"
-                )
+            )
+        except Exception as e:
+            raise knext.InvalidParametersError(
+                f"An error occurred while executing the agent: {e}"
+            )
 
         messages = final_state["messages"]
 
@@ -773,7 +773,9 @@ state that the tool could not be executed due to reaching the recursion limit.""
             final_response = chat_model.invoke([self.developer_message] + messages)
             return {"messages": messages + [final_response]}
         elif self.recursion_limit_handling == RecursionLimitMode.FAIL.name:
-            raise RuntimeError("Recursion limit")  # turned into user-facing message
+            raise RecursionError(
+                "Recursion limit was reached."
+            )  # turned into user-facing message
         else:
             return None
 
@@ -1026,16 +1028,37 @@ class AgentChatWidget:
         agent = create_react_agent(
             chat_model, tools=tools, prompt=self.developer_message, checkpointer=memory
         )
-        conversation_table = None
+
+        previous_messages = []
+        config = {
+            "recursion_limit": self.recursion_limit,
+            "configurable": {"thread_id": "1"},
+        }
         if view_data is not None:
             conversation_table = view_data["ports"][0]
+            if conversation_table is not None:
+                from knime.types.message import to_langchain_message
+
+                conversation_df = conversation_table[
+                    self.conversation_column_name
+                ].to_pandas()
+                for msg in conversation_df[self.conversation_column_name]:
+                    lc_msg = to_langchain_message(msg)
+                    previous_messages.append(tool_converter.sanitize_tool_names(lc_msg))
+                agent.update_state(config, {"messages": previous_messages}, "agent")
+
+        if not previous_messages and (
+            data_registry.has_data or tool_converter.has_data_tools
+        ):
+            agent.update_state(
+                config, {"messages": [data_registry.create_data_message()]}, "agent"
+            )
 
         return AgentChatWidgetDataService(
             ctx,
             agent,
             data_registry,
             self.initial_message,
-            conversation_table,
             self.conversation_column_name,
             self.recursion_limit,
             self.recursion_limit_handling,

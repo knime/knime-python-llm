@@ -83,3 +83,7 @@ def validate_ai_message(msg: AIMessage):
             raise ValueError(
                 "The LLM generated an empty response because the message was filtered for harmful content.",
             )
+
+
+class RecursionError(RuntimeError):
+    pass

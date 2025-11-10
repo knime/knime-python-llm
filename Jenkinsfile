@@ -51,7 +51,6 @@ try {
                     'knime-javasnippet',
                     'knime-reporting',
                     'knime-filehandling',
-                    'knime-scripting-editor',
                     'knime-kerberos',
                     'knime-buildworkflows',
                     'knime-server-client',

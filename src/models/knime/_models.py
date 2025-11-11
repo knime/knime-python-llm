@@ -109,3 +109,20 @@ class ModelsResponse(BaseModel):
 		extra = "ignore"
 
 
+class TeamInfo(BaseModel):
+	"""Team information from accounts service."""
+	id: str
+	name: str
+	
+	class Config:
+		extra = "ignore"
+
+
+class AccountIdentityResponse(BaseModel):
+	"""Response from /accounts/identity endpoint."""
+	teams: List[TeamInfo] = []
+	
+	class Config:
+		extra = "ignore"
+
+

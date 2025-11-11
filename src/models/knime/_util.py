@@ -49,7 +49,7 @@ import util
 from ._base import (
     hub_connector_icon,
     knime_category,
-    list_models,
+    list_models_with_scope_info,
     validate_auth_spec,
 )
 import pyarrow as pa
@@ -76,10 +76,22 @@ class OutputColumnSettings:
     By default, all columns are included.
     """
 
+    scope_id = knext.BoolParameter(
+        "Scope ID",
+        "Include the model's scope identifier.",
+        default_value=lambda v: v >= knext.Version(5, 9, 0),
+    )
+
+    scope_name = knext.BoolParameter(
+        "Scope Name",
+        "Include the model's human-readable scope name (e.g., 'Global', team name).",
+        default_value=lambda v: v >= knext.Version(5, 9, 0),
+    )
+
     id = knext.BoolParameter(
         "ID",
         "Include the stable unique model identifier.",
-        default_value=lambda v: False if v < knext.Version(5, 8, 0) else True,
+        default_value=lambda v: v >= knext.Version(5, 8, 0),
     )
 
     name = knext.BoolParameter(
@@ -131,8 +143,10 @@ class KnimeHubAIModelLister:
     model_types = ModelTypeSettings()
 
     # Full set of potential output columns (order defines default order)
-    # Name retained first for backward compatibility. ID follows when enabled.
+    # Scope columns first, then ID, Name, Type, Description
     full_column_list = [
+        util.OutputColumn("Scope ID", knext.string(), pa.string()),
+        util.OutputColumn("Scope Name", knext.string(), pa.string()),
         util.OutputColumn("ID", knext.string(), pa.string()),
         util.OutputColumn("Name", knext.string(), pa.string()),
         util.OutputColumn("Type", knext.string(), pa.string()),
@@ -156,9 +170,9 @@ class KnimeHubAIModelLister:
         self, ctx: knext.ExecutionContext, authentication: knext.PortObject
     ) -> knext.Table:
         import pandas as pd
-        from ._models import ModelInfo
 
-        models: list[ModelInfo] = list_models(authentication.spec)
+        # Get models with scope information
+        models_with_scope = list_models_with_scope_info(authentication.spec, mode=None)
 
         modes = set()
 
@@ -167,18 +181,21 @@ class KnimeHubAIModelLister:
         if self.model_types.embedding_models:
             modes.add("embedding")
 
-        models = [m for m in models if m.mode in modes]
+        models_with_scope = [
+            (model, scope_id, scope_name)
+            for model, scope_id, scope_name in models_with_scope
+            if model.mode in modes
+        ]
 
-        # Sort models by mode for backwards compatibility
-        # chat before embedding
-        models.sort(key=lambda m: m.mode)
+        # Sort by mode, then scope name, then model name
+        models_with_scope.sort(key=lambda x: (x[0].mode, x[2] or "", x[0].name))
 
-        if not models:
+        if not models_with_scope:
             return self._create_empty_table()
 
         df = pd.DataFrame(
-            [self._to_tuple(model) for model in models],
-            columns=["ID", "Name", "Type", "Description"],
+            [self._to_tuple(model, scope_id, scope_name) for model, scope_id, scope_name in models_with_scope],
+            columns=["Scope ID", "Scope Name", "ID", "Name", "Type", "Description"],
         )
 
         # Reduce to selected columns (preserving order of full_column_list)
@@ -186,8 +203,8 @@ class KnimeHubAIModelLister:
         df = df[selected_names]
         return knext.Table.from_pandas(df)
 
-    def _to_tuple(self, model) -> tuple:
-        return (model.id, model.name, model.mode, model.description)
+    def _to_tuple(self, model, scope_id: str, scope_name: str) -> tuple:
+        return (scope_id, scope_name, model.id, model.name, model.mode, model.description)
 
     def _create_empty_table(self) -> knext.Table:
         """Constructs an empty KNIME Table with the correct output columns."""
@@ -199,6 +216,8 @@ class KnimeHubAIModelLister:
         """Return list of OutputColumn objects in order based on user selection."""
         oc = self.output_columns
         selection_flags = {
+            "Scope ID": oc.scope_id,
+            "Scope Name": oc.scope_name,
             "ID": oc.id,
             "Name": oc.name,
             "Type": oc.type,

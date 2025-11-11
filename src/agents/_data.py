@@ -91,7 +91,7 @@ class DataRegistry:
                 spec=spec,
             )
             if i >= len(input_ids):
-                id = str(i + 1)
+                id = str(i)
             else:
                 id = input_ids[i]
             registry._data.append(DataItem(id=id, meta_data=port, data=table))
@@ -146,7 +146,7 @@ class DataRegistry:
             spec=spec,
         )
         if id is None:
-            id = str(len(self._data) + 1)
+            id = str(len(self._data))
         self._data.append(DataItem(id=id, meta_data=meta_data, data=table))
         return {id: port_to_dict(meta_data)}
 

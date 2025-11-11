@@ -752,6 +752,8 @@ class AgentChatWidget:
     This node is designed for real-time, interactive usage where the conversation takes place directly within the KNIME view, where the agent’s responses and reasoning are shown incrementally as the dialogue progresses. Additionally, it can also optionally output the conversation history as table.
 
     To ensure effective agent behavior, provide meaningful tool names and clear descriptions — including example use cases if applicable.
+
+    This node is very similar to the **Agent Chat View** but additionally outputs the conversation, tool output data and the combined tools workflow. The outputs are updated on re-execution, either implicitly when being used within a dataapp, or explicitly after each completed response.
     """
 
     developer_message = _system_message_parameter()
@@ -769,7 +771,7 @@ class AgentChatWidget:
     class ReexecutionTrigger(knext.EnumParameterOptions):
         NONE = (
             "None",
-            "Node re-execution is never explicitly triggered explicitly from within the chat.",
+            "Node re-execution is never triggered explicitly from within the chat. But the node will still be re-executed (and the outputs updated) when being used within a dataapp.",
         )
         INTERACTION = (
             "Response completed",
@@ -778,7 +780,7 @@ class AgentChatWidget:
 
     reexecution_trigger = knext.EnumParameter(
         "Re-execution trigger",
-        "The user action that triggers a re-execution of the node in order to update the conversation and data output tables.",
+        "The user action that triggers a re-execution of the node in order to update the conversation, tool output data and combined tool workflow.",
         ReexecutionTrigger.NONE.name,
         ReexecutionTrigger,
         style=knext.EnumParameter.Style.VALUE_SWITCH,

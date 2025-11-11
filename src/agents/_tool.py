@@ -355,7 +355,7 @@ def _create_input_port_properties(ports: list[Port], use_string_id: bool):
         return {
             port.name: {
                 "type": "integer",
-                "description": "Index (starting at 1) of the data to feed to the port for "
+                "description": "Index of the data to feed to the port for "
                 + port.description,
             }
             for port in ports

@@ -95,7 +95,12 @@ public final class ToolMessageOutputNodeModel extends WebUINodeModel<ToolMessage
     @Override
     protected BufferedDataTable[] execute(final BufferedDataTable[] inData, final ExecutionContext exec,
         final ToolMessageOutputNodeSettings modelSettings) throws Exception {
-        WorkflowToolCell.extractToolMessageContent(inData[0]);
+        var table = inData[0];
+        if (table != null && table.size() > 0 && table.getDataTableSpec().getNumColumns() > 0) {
+            WorkflowToolCell.extractToolMessageContent(inData[0]);
+        } else {
+            setWarningMessage("Input table is empty. No message content can be extracted.");
+        }
         return null;
     }
 

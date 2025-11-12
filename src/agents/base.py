@@ -834,7 +834,7 @@ class AgentChatWidget:
             knext.Schema.from_columns(
                 [knext.Column(_message_type(), self.conversation_column_name)]
             ),
-            [None] * ctx.get_connected_output_port_numbers()[1],
+            [None] * ctx.get_connected_output_port_numbers()[2],
         )
 
     def execute(
@@ -848,7 +848,7 @@ class AgentChatWidget:
         from ._data_service import DataRegistry
 
         view_data = ctx._get_view_data()
-        num_data_outputs = ctx.get_connected_output_port_numbers()[1]
+        num_data_outputs = ctx.get_connected_output_port_numbers()[2]
         combined_tools_workflow = ctx._get_combined_tools_workflow()
 
         if view_data:

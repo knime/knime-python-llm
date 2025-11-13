@@ -84,13 +84,13 @@ class OutputColumnSettings:
 
     scope_name = knext.BoolParameter(
         "Scope Name",
-        "Include the model's human-readable scope name (e.g., 'Global', team name).",
+        "Include the model's scope name (e.g., 'Global', team name).",
         default_value=lambda v: v >= knext.Version(5, 9, 0),
     )
 
     id = knext.BoolParameter(
         "ID",
-        "Include the stable unique model identifier.",
+        "Include the model's unique identifier.",
         default_value=lambda v: v >= knext.Version(5, 8, 0),
     )
 
@@ -103,7 +103,7 @@ class OutputColumnSettings:
 
     type = knext.BoolParameter(
         "Type",
-        "Include the model's mode (e.g., chat, embedding).",
+        "Include the model's type (e.g., chat, embedding).",
         default_value=True,
     )
 

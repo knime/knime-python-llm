@@ -780,7 +780,7 @@ class AgentChatWidget:
 
     reexecution_trigger = knext.EnumParameter(
         "Re-execution trigger",
-        "The user action that triggers a re-execution of the node in order to update the conversation, tool output data and combined tool workflow.",
+        "The user action that triggers a re-execution of the node in order to update the conversation, tool output data and combined tools workflow. Re-execution also helps to retain the conversation of the chat view which is otherwise cleared as soon as the chat view is closed.",
         ReexecutionTrigger.NONE.name,
         ReexecutionTrigger,
         style=knext.EnumParameter.Style.VALUE_SWITCH,

@@ -776,6 +776,31 @@ class LLMPrompter:
 
     output_format = _get_output_format_value_switch()
 
+    structure_name = knext.StringParameter(
+        "Structure name",
+        """The name of the output structure. This helps the model understand what it is extracting.
+        
+        Example: 'PersonInfo', 'ProductDetails', 'SentimentAnalysis'""",
+        default_value="ExtractedData",
+        since_version="5.10.0",
+    ).rule(
+        knext.OneOf(output_format, [OutputFormatOptions.Structured.name]),
+        knext.Effect.SHOW,
+    )
+
+    structure_description = knext.StringParameter(
+        "Structure description",
+        """A description of what the output structure represents. This provides context to the model 
+        about the overall extraction task.
+        
+        Example: 'Information about a person including their name and age', 'Key details about a product'""",
+        default_value="",
+        since_version="5.10.0",
+    ).rule(
+        knext.OneOf(output_format, [OutputFormatOptions.Structured.name]),
+        knext.Effect.SHOW,
+    )
+
     output_fields = knext.MultiColumnParameter(
         "Output fields",
         """Define the fields to extract from each prompt. Each field will be added as a separate column 
@@ -1104,8 +1129,16 @@ class LLMPrompter:
                 Field(description=field_description),
             )
 
+        # Use structure_name as the model name (default: "ExtractedData")
+        model_name = self.structure_name if self.structure_name else "ExtractedData"
+        
+        # Use structure_description as the model docstring if provided
+        if self.structure_description:
+            # The __doc__ attribute can be set via __config__ in Pydantic v2
+            field_definitions["__doc__"] = self.structure_description
+
         # Create the Pydantic model dynamically
-        return create_model("StructuredOutput", **field_definitions)
+        return create_model(model_name, **field_definitions)
 
     def _get_output_field_knime_type(self, field_type: str):
         """Map OutputFieldType to KNIME column type."""

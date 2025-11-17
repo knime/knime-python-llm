@@ -142,6 +142,15 @@ class OutputFormatOptions(knext.EnumParameterOptions):
         """,
     )
 
+    Structured = (
+        "Structured",
+        """
+        When Structured is selected, the model is constrained to output data matching 
+        the defined structure. Each defined field will be extracted and added as a 
+        separate column in the output table.
+        """,
+    )
+
 
 def _get_output_format_value_switch() -> knext.EnumParameter:
     return knext.EnumParameter(
@@ -154,6 +163,48 @@ def _get_output_format_value_switch() -> knext.EnumParameter:
     ).rule(
         knext.DialogContextCondition(_supports_json_mode),
         knext.Effect.ENABLE,
+    )
+
+
+class OutputFieldType(knext.EnumParameterOptions):
+    String = (
+        "String",
+        "Text field.",
+    )
+    Integer = (
+        "Integer",
+        "Whole number field.",
+    )
+    Double = (
+        "Double",
+        "Floating point number field.",
+    )
+    Boolean = (
+        "Boolean",
+        "True/False field.",
+    )
+
+
+@knext.parameter_group(label="Output field")
+class OutputField:
+    name = knext.StringParameter(
+        "Field name",
+        "The name of the output field. This will be used as the column name in the output table.",
+        default_value="",
+    )
+
+    field_type = knext.EnumParameter(
+        "Field type",
+        "The data type of this field.",
+        OutputFieldType.String.name,
+        OutputFieldType,
+        style=knext.EnumParameter.Style.DROPDOWN,
+    )
+
+    description = knext.StringParameter(
+        "Description",
+        "A description of this field to help the model understand what to extract.",
+        default_value="",
     )
 
 
@@ -725,6 +776,17 @@ class LLMPrompter:
 
     output_format = _get_output_format_value_switch()
 
+    output_fields = knext.MultiColumnParameter(
+        "Output fields",
+        """Define the fields to extract from each prompt. Each field will be added as a separate column 
+        in the output table. The model will be instructed to extract these fields from the input text.""",
+        OutputField(),
+        since_version="5.10.0",
+    ).rule(
+        knext.OneOf(output_format, [OutputFormatOptions.Structured.name]),
+        knext.Effect.SHOW,
+    )
+
     async def aprocess_batch(
         self,
         llm,
@@ -810,18 +872,34 @@ class LLMPrompter:
 
         llm_spec.validate_context(ctx)
 
-        if not self.response_column_name:
-            raise knext.InvalidParametersError(
-                "The response column name must not be empty."
+        # Validate structured output settings if selected
+        if self.output_format == OutputFormatOptions.Structured.name:
+            self._validate_output_fields()
+            # Create output schema with one column per field
+            output_schema = input_table_spec
+            for field in self.output_fields:
+                column_name = util.handle_column_name_collision(
+                    output_schema.column_names, field.name
+                )
+                knime_type = self._get_output_field_knime_type(field.field_type)
+                output_schema = output_schema.append(
+                    knext.Column(ktype=knime_type, name=column_name)
+                )
+            return output_schema
+        else:
+            # Text or JSON output format
+            if not self.response_column_name:
+                raise knext.InvalidParametersError(
+                    "The response column name must not be empty."
+                )
+
+            output_column_name = util.handle_column_name_collision(
+                input_table_spec.column_names, self.response_column_name
             )
 
-        output_column_name = util.handle_column_name_collision(
-            input_table_spec.column_names, self.response_column_name
-        )
-
-        return input_table_spec.append(
-            knext.Column(ktype=knext.string(), name=output_column_name)
-        )
+            return input_table_spec.append(
+                knext.Column(ktype=knext.string(), name=output_column_name)
+            )
 
     def execute(
         self,
@@ -838,9 +916,12 @@ class LLMPrompter:
         ]
         num_rows = input_table.num_rows
 
-        output_column_name = util.handle_column_name_collision(
-            input_table.schema.column_names, self.response_column_name
-        )
+        is_structured = self.output_format == OutputFormatOptions.Structured.name
+
+        if not is_structured:
+            output_column_name = util.handle_column_name_collision(
+                input_table.schema.column_names, self.response_column_name
+            )
 
         output_table: knext.BatchOutputTable = knext.BatchOutputTable.create()
 
@@ -848,6 +929,10 @@ class LLMPrompter:
         progress_tracker = util.ProgressTracker(total_rows=num_rows, ctx=ctx)
         llm = _initialize_model(llm_port, ctx, self.output_format)
         is_chat_model = not llm_port.spec.is_instruct_model
+
+        if is_structured:
+            pydantic_model = self._create_pydantic_model()
+            llm = llm.with_structured_output(pydantic_model)
 
         def _call_model(messages: list) -> list:
             def get_responses(model):
@@ -864,21 +949,33 @@ class LLMPrompter:
 
         def apply_model(prompt_table: pa.Table):
             messages = self._extract_messages(prompt_table, is_chat_model)
-            output_schema = pa.schema([(self.response_column_name, pa.string())])
 
             # Check if all prompts are empty/missing
             if not messages:
-                missing_values_table = pa.table(
-                    {self.response_column_name: [None] * len(messages)},
-                    schema=output_schema,
-                )
-                return missing_values_table
+                if is_structured:
+                    # Create empty table with all structured fields
+                    empty_data = {
+                        field.name: [None] * len(messages) for field in self.output_fields
+                    }
+                    return pa.table(empty_data)
+                else:
+                    output_schema = pa.schema([(self.response_column_name, pa.string())])
+                    missing_values_table = pa.table(
+                        {self.response_column_name: [None] * len(messages)},
+                        schema=output_schema,
+                    )
+                    return missing_values_table
 
             _validate_json_output_format(self.output_format, messages)
 
             responses = _call_model(messages)
-            response_table = pa.table({output_column_name: responses})
-            return response_table
+
+            if is_structured:
+                # Convert Pydantic model responses to table columns
+                return self._structured_responses_to_table(responses)
+            else:
+                response_table = pa.table({output_column_name: responses})
+                return response_table
 
         mapper = self._get_mapper(missing_value_handling_setting, apply_model)
 
@@ -961,6 +1058,100 @@ class LLMPrompter:
             raise NotImplementedError(
                 f"System messages handled via '{SystemMessageHandling[self.system_message_handling].label}' are not implemented yet."
             )
+
+    def _validate_output_fields(self):
+        """Validate that output fields are properly configured."""
+        if not self.output_fields:
+            raise knext.InvalidParametersError(
+                "At least one output field must be defined when using structured output format."
+            )
+
+        field_names = set()
+        for i, field in enumerate(self.output_fields):
+            if not field.name:
+                raise knext.InvalidParametersError(
+                    f"Output field {i + 1} must have a name."
+                )
+            if not field.name.replace("_", "").replace(" ", "").isalnum():
+                raise knext.InvalidParametersError(
+                    f"Output field name '{field.name}' must contain only letters, numbers, underscores, and spaces."
+                )
+            if field.name in field_names:
+                raise knext.InvalidParametersError(
+                    f"Duplicate output field name: '{field.name}'. Each field must have a unique name."
+                )
+            field_names.add(field.name)
+
+    def _create_pydantic_model(self):
+        """Create a Pydantic model from the output field definitions."""
+        from pydantic import Field, create_model
+
+        # Map OutputFieldType to Python types
+        type_mapping = {
+            OutputFieldType.String.name: str,
+            OutputFieldType.Integer.name: int,
+            OutputFieldType.Double.name: float,
+            OutputFieldType.Boolean.name: bool,
+        }
+
+        # Build field definitions for Pydantic
+        field_definitions = {}
+        for field in self.output_fields:
+            python_type = type_mapping[field.field_type]
+            field_description = field.description if field.description else field.name
+            field_definitions[field.name] = (
+                python_type,
+                Field(description=field_description),
+            )
+
+        # Create the Pydantic model dynamically
+        return create_model("StructuredOutput", **field_definitions)
+
+    def _get_output_field_knime_type(self, field_type: str):
+        """Map OutputFieldType to KNIME column type."""
+        type_mapping = {
+            OutputFieldType.String.name: knext.string(),
+            OutputFieldType.Integer.name: knext.int64(),
+            OutputFieldType.Double.name: knext.double(),
+            OutputFieldType.Boolean.name: knext.bool_(),
+        }
+        return type_mapping[field_type]
+
+    def _get_output_field_pyarrow_type(self, field_type: str):
+        """Map OutputFieldType to PyArrow type."""
+        import pyarrow as pa
+
+        type_mapping = {
+            OutputFieldType.String.name: pa.string(),
+            OutputFieldType.Integer.name: pa.int64(),
+            OutputFieldType.Double.name: pa.float64(),
+            OutputFieldType.Boolean.name: pa.bool_(),
+        }
+        return type_mapping[field_type]
+
+    def _structured_responses_to_table(self, responses: list):
+        """Convert a list of Pydantic model instances to a PyArrow table."""
+        import pyarrow as pa
+
+        # Extract field values from each Pydantic model response
+        column_data = {field.name: [] for field in self.output_fields}
+
+        for response in responses:
+            # response is a Pydantic model instance
+            for field in self.output_fields:
+                value = getattr(response, field.name, None)
+                column_data[field.name].append(value)
+
+        # Create PyArrow table with appropriate types
+        arrays = []
+        schema_fields = []
+        for field in self.output_fields:
+            pa_type = self._get_output_field_pyarrow_type(field.field_type)
+            schema_fields.append(pa.field(field.name, pa_type))
+            arrays.append(pa.array(column_data[field.name], type=pa_type))
+
+        schema = pa.schema(schema_fields)
+        return pa.table(dict(zip([f.name for f in self.output_fields], arrays)), schema=schema)
 
 
 # region Chat Model Prompter (deprecated)

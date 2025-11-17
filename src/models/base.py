@@ -183,6 +183,22 @@ class OutputFieldType(knext.EnumParameterOptions):
         "Boolean",
         "True/False field.",
     )
+    StringList = (
+        "String List",
+        "List of text values.",
+    )
+    IntegerList = (
+        "Integer List",
+        "List of whole numbers.",
+    )
+    DoubleList = (
+        "Double List",
+        "List of floating point numbers.",
+    )
+    BooleanList = (
+        "Boolean List",
+        "List of True/False values.",
+    )
 
 
 @knext.parameter_group(label="Output field")
@@ -195,7 +211,7 @@ class OutputField:
 
     field_type = knext.EnumParameter(
         "Field type",
-        "The data type of this field.",
+        "The data type of this field. List types will create columns that can contain multiple values.",
         OutputFieldType.String.name,
         OutputFieldType,
         style=knext.EnumParameter.Style.DROPDOWN,
@@ -1110,6 +1126,7 @@ class LLMPrompter:
     def _create_pydantic_model(self):
         """Create a Pydantic model from the output field definitions."""
         from pydantic import Field, create_model
+        from typing import List as TypingList
 
         # Map OutputFieldType to Python types
         type_mapping = {
@@ -1117,6 +1134,10 @@ class LLMPrompter:
             OutputFieldType.Integer.name: int,
             OutputFieldType.Double.name: float,
             OutputFieldType.Boolean.name: bool,
+            OutputFieldType.StringList.name: TypingList[str],
+            OutputFieldType.IntegerList.name: TypingList[int],
+            OutputFieldType.DoubleList.name: TypingList[float],
+            OutputFieldType.BooleanList.name: TypingList[bool],
         }
 
         # Build field definitions for Pydantic
@@ -1147,6 +1168,10 @@ class LLMPrompter:
             OutputFieldType.Integer.name: knext.int64(),
             OutputFieldType.Double.name: knext.double(),
             OutputFieldType.Boolean.name: knext.bool_(),
+            OutputFieldType.StringList.name: knext.list_(knext.string()),
+            OutputFieldType.IntegerList.name: knext.list_(knext.int64()),
+            OutputFieldType.DoubleList.name: knext.list_(knext.double()),
+            OutputFieldType.BooleanList.name: knext.list_(knext.bool_()),
         }
         return type_mapping[field_type]
 
@@ -1159,6 +1184,10 @@ class LLMPrompter:
             OutputFieldType.Integer.name: pa.int64(),
             OutputFieldType.Double.name: pa.float64(),
             OutputFieldType.Boolean.name: pa.bool_(),
+            OutputFieldType.StringList.name: pa.list_(pa.string()),
+            OutputFieldType.IntegerList.name: pa.list_(pa.int64()),
+            OutputFieldType.DoubleList.name: pa.list_(pa.float64()),
+            OutputFieldType.BooleanList.name: pa.list_(pa.bool_()),
         }
         return type_mapping[field_type]
 

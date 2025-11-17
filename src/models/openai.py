@@ -1159,7 +1159,11 @@ class OpenAILLMPortObjectSpec(OpenAIModelPortObjectSpec, LLMPortObjectSpec):
 
     @property
     def supported_output_formats(self) -> list[OutputFormatOptions]:
-        return [OutputFormatOptions.Text, OutputFormatOptions.JSON]
+        return [
+            OutputFormatOptions.Text,
+            OutputFormatOptions.JSON,
+            OutputFormatOptions.Structured,
+        ]
 
     def serialize(self) -> dict:
         return {

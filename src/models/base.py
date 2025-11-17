@@ -828,6 +828,33 @@ class LLMPrompter:
         knext.Effect.SHOW,
     )
 
+    extract_multiple = knext.BoolParameter(
+        "Extract multiple objects",
+        """If enabled, the model will extract multiple objects of the defined structure from each input row.
+        Each extracted object will create a separate row in the output table, with all input columns duplicated.
+        
+        If no objects are extracted for an input row, one output row with missing values will be created.""",
+        default_value=False,
+        since_version="5.10.0",
+    ).rule(
+        knext.OneOf(output_format, [OutputFormatOptions.Structured.name]),
+        knext.Effect.SHOW,
+    )
+
+    row_id_column_name = knext.StringParameter(
+        "Input row ID column name",
+        """Name for an optional column that will contain the index of the input row from which each output row was extracted.
+        This helps track which input row produced which output rows. Leave empty to not add this column.""",
+        default_value="",
+        since_version="5.10.0",
+    ).rule(
+        knext.And(
+            knext.OneOf(output_format, [OutputFormatOptions.Structured.name]),
+            knext.OneOf(extract_multiple, [True]),
+        ),
+        knext.Effect.SHOW,
+    )
+
     async def aprocess_batch(
         self,
         llm,
@@ -918,6 +945,16 @@ class LLMPrompter:
             self._validate_output_fields()
             # Create output schema with one column per field
             output_schema = input_table_spec
+            
+            # Add row ID column when extract_multiple is enabled
+            if self.extract_multiple:
+                row_id_col_name = util.handle_column_name_collision(
+                    output_schema.column_names, self.row_id_column_name
+                )
+                output_schema = output_schema.append(
+                    knext.Column(ktype=knext.string(), name=row_id_col_name)
+                )
+            
             for field in self.output_fields:
                 column_name = util.handle_column_name_collision(
                     output_schema.column_names, field.name
@@ -1015,8 +1052,7 @@ class LLMPrompter:
                 # Convert Pydantic model responses to table columns
                 return self._structured_responses_to_table(responses)
             else:
-                response_table = pa.table({output_column_name: responses})
-                return response_table
+                return pa.table({output_column_name: responses})
 
         mapper = self._get_mapper(missing_value_handling_setting, apply_model)
 
@@ -1024,16 +1060,32 @@ class LLMPrompter:
             util.check_canceled(ctx)
             pa_table = batch.to_pyarrow()
 
-            prompt_table = pa_table
-
-            table_from_batch = pa.Table.from_batches([prompt_table])
-            response_table = mapper.map(table_from_batch)
-
-            table_from_batch = pa.Table.from_arrays(
-                pa_table.columns + response_table.columns,
-                pa_table.column_names + response_table.column_names,
+            table_from_batch = pa.Table.from_batches([pa_table])
+            result_table = mapper.map(table_from_batch)
+            
+            # Add row ID column for structured output with extract_multiple
+            if is_structured and self.extract_multiple:
+                row_id_col_name = util.handle_column_name_collision(
+                    pa_table.column_names, self.row_id_column_name
+                )
+                # Create row IDs as strings (batch row indices)
+                row_ids = pa.array([str(i) for i in range(len(pa_table))], type=pa.string())
+                pa_table = pa_table.append_column(row_id_col_name, row_ids)
+            
+            # Combine input and result columns
+            combined_table = pa.Table.from_arrays(
+                pa_table.columns + result_table.columns,
+                pa_table.column_names + result_table.column_names,
             )
-            output_table.append(knext.Table.from_pyarrow(table_from_batch))
+            
+            # Handle row expansion for structured output with extract_multiple
+            if is_structured and self.extract_multiple:
+                # Explode list columns into separate rows
+                final_table = self._explode_lists(combined_table)
+            else:
+                final_table = combined_table
+            
+            output_table.append(knext.Table.from_pyarrow(final_table))
 
         if mapper.all_missing:
             ctx.set_warning("All rows contain missing or empty values.")
@@ -1159,7 +1211,19 @@ class LLMPrompter:
             field_definitions["__doc__"] = self.structure_description
 
         # Create the Pydantic model dynamically
-        return create_model(model_name, **field_definitions)
+        base_model = create_model(model_name, **field_definitions)
+        
+        # If extract_multiple is enabled, wrap it in a list model
+        if self.extract_multiple:
+            from typing import List as TypingList
+            
+            list_model_name = f"{model_name}List"
+            return create_model(
+                list_model_name,
+                items=(TypingList[base_model], Field(description=f"List of {model_name} objects"))
+            )
+        
+        return base_model
 
     def _get_output_field_knime_type(self, field_type: str):
         """Map OutputFieldType to KNIME column type."""
@@ -1191,29 +1255,112 @@ class LLMPrompter:
         }
         return type_mapping[field_type]
 
+    def _explode_lists(self, table):
+        """
+        Explode list columns into multiple rows.
+        
+        Takes a table where output field columns contain lists and expands it so that:
+        - Each list element gets its own row
+        - Input columns are duplicated for each list element
+        - All list columns must have the same length per row
+        
+        Args:
+            table: PyArrow table with list columns to explode
+            
+        Returns:
+            PyArrow table with exploded rows
+        """
+        import pyarrow as pa
+        import pyarrow.compute as pc
+        
+        # Pick one of the list columns to derive the parent index mapping
+        # Use the first output field column
+        first_list_col_name = self.output_fields[0].name
+        parent_indices = pc.list_parent_indices(table[first_list_col_name])
+        
+        # Flatten all list columns (the output field columns)
+        list_column_names = {field.name for field in self.output_fields}
+        flattened_list_cols = {
+            name: pc.list_flatten(table[name])
+            for name in table.column_names
+            if name in list_column_names
+        }
+        
+        # Duplicate scalar columns (input columns + Row ID) using parent indices
+        scalar_cols = {
+            name: pc.take(table[name], parent_indices)
+            for name in table.column_names
+            if name not in list_column_names
+        }
+        
+        # Build final exploded table (preserve original column order)
+        return pa.table({**scalar_cols, **flattened_list_cols})
+
     def _structured_responses_to_table(self, responses: list):
-        """Convert a list of Pydantic model instances to a PyArrow table."""
+        """Convert a list of Pydantic model instances to a PyArrow table.
+        
+        Args:
+            responses: List of Pydantic model instances (or list wrapper models if extract_multiple=True)
+        
+        Returns:
+            PyArrow table where:
+            - If extract_multiple=False: each row has scalar values
+            - If extract_multiple=True: each row has list values (one list per input row containing extracted objects)
+        """
         import pyarrow as pa
 
-        # Extract field values from each Pydantic model response
-        column_data = {field.name: [] for field in self.output_fields}
-
-        for response in responses:
-            # response is a Pydantic model instance
+        if self.extract_multiple:
+            # When extract_multiple is enabled, each response is a wrapper model with an 'items' field
+            # Create columns with lists (one list per input row)
+            column_data = {field.name: [] for field in self.output_fields}
+            
+            for idx, response in enumerate(responses):
+                # Get the list of items from the wrapper model
+                items = getattr(response, 'items', [])
+                
+                # If no items extracted, add lists with single None value
+                if not items:
+                    for field in self.output_fields:
+                        column_data[field.name].append([None])
+                else:
+                    # Create a list of values for each field
+                    for field in self.output_fields:
+                        field_values = [getattr(item, field.name, None) for item in items]
+                        column_data[field.name].append(field_values)
+            
+            # Create PyArrow table with list columns
+            arrays = []
+            schema_fields = []
+            
             for field in self.output_fields:
-                value = getattr(response, field.name, None)
-                column_data[field.name].append(value)
+                inner_type = self._get_output_field_pyarrow_type(field.field_type)
+                schema_fields.append(pa.field(field.name, pa.list_(inner_type)))
+                arrays.append(pa.array(column_data[field.name]))
+            
+            schema = pa.schema(schema_fields)
+            column_names = [f.name for f in schema_fields]
+            return pa.table(dict(zip(column_names, arrays)), schema=schema)
+        else:
+            # Single object per input row - original behavior
+            column_data = {field.name: [] for field in self.output_fields}
 
-        # Create PyArrow table with appropriate types
-        arrays = []
-        schema_fields = []
-        for field in self.output_fields:
-            pa_type = self._get_output_field_pyarrow_type(field.field_type)
-            schema_fields.append(pa.field(field.name, pa_type))
-            arrays.append(pa.array(column_data[field.name], type=pa_type))
+            for response in responses:
+                # response is a Pydantic model instance
+                for field in self.output_fields:
+                    value = getattr(response, field.name, None)
+                    column_data[field.name].append(value)
 
-        schema = pa.schema(schema_fields)
-        return pa.table(dict(zip([f.name for f in self.output_fields], arrays)), schema=schema)
+            # Create PyArrow table with appropriate types
+            arrays = []
+            schema_fields = []
+            for field in self.output_fields:
+                pa_type = self._get_output_field_pyarrow_type(field.field_type)
+                schema_fields.append(pa.field(field.name, pa_type))
+                arrays.append(pa.array(column_data[field.name], type=pa_type))
+
+            schema = pa.schema(schema_fields)
+            # Return just table for regular mappers
+            return pa.table(dict(zip([f.name for f in self.output_fields], arrays)), schema=schema)
 
 
 # region Chat Model Prompter (deprecated)

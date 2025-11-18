@@ -50,6 +50,7 @@ import util
 from base import AIPortObjectSpec
 from typing import List, Callable, Optional, Type
 from functools import partial
+import models.structured_output as so
 
 model_category = knext.category(
     path=util.main_category,
@@ -164,109 +165,6 @@ def _get_output_format_value_switch() -> knext.EnumParameter:
         knext.DialogContextCondition(_supports_json_mode),
         knext.Effect.ENABLE,
     )
-
-
-class OutputFieldType(knext.EnumParameterOptions):
-    String = (
-        "String",
-        "Text field.",
-    )
-    Integer = (
-        "Integer",
-        "Whole number field.",
-    )
-    Double = (
-        "Double",
-        "Floating point number field.",
-    )
-    Boolean = (
-        "Boolean",
-        "True/False field.",
-    )
-    StringList = (
-        "String List",
-        "List of text values.",
-    )
-    IntegerList = (
-        "Integer List",
-        "List of whole numbers.",
-    )
-    DoubleList = (
-        "Double List",
-        "List of floating point numbers.",
-    )
-    BooleanList = (
-        "Boolean List",
-        "List of True/False values.",
-    )
-
-
-@knext.parameter_group(label="Output field")
-class OutputField:
-    name = knext.StringParameter(
-        label="Field name",
-        description="The name of the output field. This will be used as the column name in the output table.",
-        default_value="",
-    )
-
-    field_type = knext.EnumParameter(
-        label="Field type",
-        description="The data type of this field. List types will create columns that can contain multiple values.",
-        default_value=OutputFieldType.String.name,
-        enum=OutputFieldType,
-        style=knext.EnumParameter.Style.DROPDOWN,
-    )
-
-    description = knext.StringParameter(
-        label="Description",
-        description="A description of this field to help the model understand what to extract.",
-        default_value="",
-    )
-
-
-@knext.parameter_group(label="Structured Output")
-class StructuredOutputSettings:
-    """Settings for structured output extraction."""
-    structure_name = knext.StringParameter(
-        label="Structure name",
-        description="""The name of the output structure. This helps the model understand what it is extracting.
-        
-        Example: 'PersonInfo', 'ProductDetails', 'SentimentAnalysis'""",
-        default_value="ExtractedData",
-    )
-
-    structure_description = knext.StringParameter(
-        label="Structure description",
-        description="""A description of what the output structure represents. This provides context to the model 
-        about the overall extraction task.
-        
-        Example: 'Information about a person including their name and age', 'Key details about a product'""",
-        default_value="",
-    )
-
-    output_fields = knext.ParameterArray(
-        parameters=OutputField(),
-        label="Output fields",
-        description="""Define the fields to extract from each prompt. Each field will be added as a separate column 
-        in the output table. The model will be instructed to extract these fields from the input text.""",
-        button_text="Add field",
-        array_title="Output fields"
-    )
-
-    extract_multiple = knext.BoolParameter(
-        label="Extract multiple objects",
-        description="""If enabled, the model will extract multiple objects of the defined structure from each input row.
-        Each extracted object will create a separate row in the output table, with all input columns duplicated.
-        
-        If no objects are extracted for an input row, one output row with missing values will be created.""",
-        default_value=False,
-    )
-
-    row_id_column_name = knext.StringParameter(
-        label="RowID column",
-        description="""The name of the column that holds the original RowID.""",
-        default_value="RowID"
-    ) # TODO only show if extract_multiple is selected
 
 
 def _tool_definition_table_present(ctx: knext.DialogCreationContext) -> bool:
@@ -837,13 +735,12 @@ class LLMPrompter:
 
     output_format = _get_output_format_value_switch()
 
-    structured_output_settings = StructuredOutputSettings(
-        # since_version="5.10.0"
+    structured_output_settings = so.StructuredOutputSettings(
+        # since_version="5.10.0" TODO since version seems to be broken
+    ).rule(
+        knext.OneOf(output_format, [OutputFormatOptions.Structured.name]),
+        knext.Effect.SHOW,
     )
-    # .rule(
-    #     knext.OneOf(output_format, [OutputFormatOptions.Structured.name]),
-    #     knext.Effect.SHOW,
-    # )
 
     async def aprocess_batch(
         self,
@@ -932,28 +829,13 @@ class LLMPrompter:
 
         # Validate structured output settings if selected
         if self.output_format == OutputFormatOptions.Structured.name:
-            self._validate_output_fields()
-            # Create output schema with one column per field
-            output_schema = input_table_spec
-            
-            # Add row ID column when extract_multiple is enabled
-            if self.structured_output_settings.extract_multiple:
-                row_id_col_name = util.handle_column_name_collision(
-                    output_schema.column_names, self.structured_output_settings.row_id_column_name
-                )
-                output_schema = output_schema.append(
-                    knext.Column(ktype=knext.string(), name=row_id_col_name)
-                )
-            
-            for field in self.structured_output_settings.output_fields:
-                column_name = util.handle_column_name_collision(
-                    output_schema.column_names, field.name
-                )
-                knime_type = self._get_output_field_knime_type(field.field_type)
-                output_schema = output_schema.append(
-                    knext.Column(ktype=knime_type, name=column_name)
-                )
-            return output_schema
+            so.validate_output_fields(self.structured_output_settings.output_fields)
+            # Create output schema with structured output columns
+            return so.add_structured_output_columns(
+                input_table_spec, 
+                self.structured_output_settings,
+                add_row_id=self.structured_output_settings.extract_multiple
+            )
         else:
             # Text or JSON output format
             if not self.response_column_name:
@@ -999,7 +881,7 @@ class LLMPrompter:
         is_chat_model = not llm_port.spec.is_instruct_model
 
         if is_structured:
-            pydantic_model = self._create_pydantic_model()
+            pydantic_model = so.create_pydantic_model(self.structured_output_settings)
             llm = llm.with_structured_output(pydantic_model)
 
         def _call_model(messages: list) -> list:
@@ -1021,11 +903,7 @@ class LLMPrompter:
             # Check if all prompts are empty/missing
             if not messages:
                 if is_structured:
-                    # Create empty table with all structured fields
-                    empty_data = {
-                        field.name: [None] * len(messages) for field in self.structured_output_settings.output_fields
-                    }
-                    return pa.table(empty_data)
+                    return so.create_empty(self.structured_output_settings, len(messages))
                 else:
                     output_schema = pa.schema([(self.response_column_name, pa.string())])
                     missing_values_table = pa.table(
@@ -1040,7 +918,7 @@ class LLMPrompter:
 
             if is_structured:
                 # Convert Pydantic model responses to table columns
-                return self._structured_responses_to_table(responses)
+                return so.structured_responses_to_table(responses, self.structured_output_settings)
             else:
                 return pa.table({output_column_name: responses})
 
@@ -1056,7 +934,7 @@ class LLMPrompter:
             # Add row ID column for structured output with extract_multiple
             if is_structured and self.structured_output_settings.extract_multiple:
                 row_id_col_name = util.handle_column_name_collision(
-                    pa_table.column_names, self.structured_output_settings.row_id_column_name
+                    pa_table.column_names, so.ROW_ID_COLUMN
                 )
                 # Create row IDs as strings (batch row indices)
                 row_ids = pa.array([str(i) for i in range(len(pa_table))], type=pa.string())
@@ -1071,7 +949,7 @@ class LLMPrompter:
             # Handle row expansion for structured output with extract_multiple
             if is_structured and self.structured_output_settings.extract_multiple:
                 # Explode list columns into separate rows
-                final_table = self._explode_lists(combined_table)
+                final_table = so.explode_lists(combined_table, self.structured_output_settings.output_fields)
             else:
                 final_table = combined_table
             
@@ -1142,215 +1020,6 @@ class LLMPrompter:
                 f"System messages handled via '{SystemMessageHandling[self.system_message_handling].label}' are not implemented yet."
             )
 
-    def _validate_output_fields(self):
-        """Validate that output fields are properly configured."""
-        if not self.structured_output_settings.output_fields:
-            raise knext.InvalidParametersError(
-                "At least one output field must be defined when using structured output format."
-            )
-
-        field_names = set()
-        for i, field in enumerate(self.structured_output_settings.output_fields):
-            if not field.name:
-                raise knext.InvalidParametersError(
-                    f"Output field {i + 1} must have a name."
-                )
-            if not field.name.replace("_", "").replace(" ", "").isalnum():
-                raise knext.InvalidParametersError(
-                    f"Output field name '{field.name}' must contain only letters, numbers, underscores, and spaces."
-                )
-            if field.name in field_names:
-                raise knext.InvalidParametersError(
-                    f"Duplicate output field name: '{field.name}'. Each field must have a unique name."
-                )
-            field_names.add(field.name)
-
-    def _create_pydantic_model(self):
-        """Create a Pydantic model from the output field definitions."""
-        from pydantic import Field, create_model
-        from typing import List as TypingList
-
-        # Map OutputFieldType to Python types
-        type_mapping = {
-            OutputFieldType.String.name: str,
-            OutputFieldType.Integer.name: int,
-            OutputFieldType.Double.name: float,
-            OutputFieldType.Boolean.name: bool,
-            OutputFieldType.StringList.name: TypingList[str],
-            OutputFieldType.IntegerList.name: TypingList[int],
-            OutputFieldType.DoubleList.name: TypingList[float],
-            OutputFieldType.BooleanList.name: TypingList[bool],
-        }
-
-        # Build field definitions for Pydantic
-        field_definitions = {}
-        for field in self.structured_output_settings.output_fields:
-            python_type = type_mapping[field.field_type]
-            field_description = field.description if field.description else field.name
-            field_definitions[field.name] = (
-                python_type,
-                Field(description=field_description),
-            )
-
-        # Use structure_name as the model name (default: "ExtractedData")
-        model_name = self.structured_output_settings.structure_name if self.structured_output_settings.structure_name else "ExtractedData"
-        
-        # Use structure_description as the model docstring if provided
-        if self.structured_output_settings.structure_description:
-            # The __doc__ attribute can be set via __config__ in Pydantic v2
-            field_definitions["__doc__"] = self.structured_output_settings.structure_description
-
-        # Create the Pydantic model dynamically
-        base_model = create_model(model_name, **field_definitions)
-        
-        # If extract_multiple is enabled, wrap it in a list model
-        if self.structured_output_settings.extract_multiple:
-            from typing import List as TypingList
-            
-            list_model_name = f"{model_name}List"
-            return create_model(
-                list_model_name,
-                items=(TypingList[base_model], Field(description=f"List of {model_name} objects"))
-            )
-        
-        return base_model
-
-    def _get_output_field_knime_type(self, field_type: str):
-        """Map OutputFieldType to KNIME column type."""
-        type_mapping = {
-            OutputFieldType.String.name: knext.string(),
-            OutputFieldType.Integer.name: knext.int64(),
-            OutputFieldType.Double.name: knext.double(),
-            OutputFieldType.Boolean.name: knext.bool_(),
-            OutputFieldType.StringList.name: knext.list_(knext.string()),
-            OutputFieldType.IntegerList.name: knext.list_(knext.int64()),
-            OutputFieldType.DoubleList.name: knext.list_(knext.double()),
-            OutputFieldType.BooleanList.name: knext.list_(knext.bool_()),
-        }
-        return type_mapping[field_type]
-
-    def _get_output_field_pyarrow_type(self, field_type: str):
-        """Map OutputFieldType to PyArrow type."""
-        import pyarrow as pa
-
-        type_mapping = {
-            OutputFieldType.String.name: pa.string(),
-            OutputFieldType.Integer.name: pa.int64(),
-            OutputFieldType.Double.name: pa.float64(),
-            OutputFieldType.Boolean.name: pa.bool_(),
-            OutputFieldType.StringList.name: pa.list_(pa.string()),
-            OutputFieldType.IntegerList.name: pa.list_(pa.int64()),
-            OutputFieldType.DoubleList.name: pa.list_(pa.float64()),
-            OutputFieldType.BooleanList.name: pa.list_(pa.bool_()),
-        }
-        return type_mapping[field_type]
-
-    def _explode_lists(self, table):
-        """
-        Explode list columns into multiple rows.
-        
-        Takes a table where output field columns contain lists and expands it so that:
-        - Each list element gets its own row
-        - Input columns are duplicated for each list element
-        - All list columns must have the same length per row
-        
-        Args:
-            table: PyArrow table with list columns to explode
-            
-        Returns:
-            PyArrow table with exploded rows
-        """
-        import pyarrow as pa
-        import pyarrow.compute as pc
-        
-        # Pick one of the list columns to derive the parent index mapping
-        # Use the first output field column
-        first_list_col_name = self.structured_output_settings.output_fields[0].name
-        parent_indices = pc.list_parent_indices(table[first_list_col_name])
-        
-        # Flatten all list columns (the output field columns)
-        list_column_names = {field.name for field in self.structured_output_settings.output_fields}
-        flattened_list_cols = {
-            name: pc.list_flatten(table[name])
-            for name in table.column_names
-            if name in list_column_names
-        }
-        
-        # Duplicate scalar columns (input columns + Row ID) using parent indices
-        scalar_cols = {
-            name: pc.take(table[name], parent_indices)
-            for name in table.column_names
-            if name not in list_column_names
-        }
-        
-        # Build final exploded table (preserve original column order)
-        return pa.table({**scalar_cols, **flattened_list_cols})
-
-    def _structured_responses_to_table(self, responses: list):
-        """Convert a list of Pydantic model instances to a PyArrow table.
-        
-        Args:
-            responses: List of Pydantic model instances (or list wrapper models if extract_multiple=True)
-        
-        Returns:
-            PyArrow table where:
-            - If extract_multiple=False: each row has scalar values
-            - If extract_multiple=True: each row has list values (one list per input row containing extracted objects)
-        """
-        import pyarrow as pa
-
-        if self.structured_output_settings.extract_multiple:
-            # When extract_multiple is enabled, each response is a wrapper model with an 'items' field
-            # Create columns with lists (one list per input row)
-            column_data = {field.name: [] for field in self.structured_output_settings.output_fields}
-            
-            for idx, response in enumerate(responses):
-                # Get the list of items from the wrapper model
-                items = getattr(response, 'items', [])
-                
-                # If no items extracted, add lists with single None value
-                if not items:
-                    for field in self.structured_output_settings.output_fields:
-                        column_data[field.name].append([None])
-                else:
-                    # Create a list of values for each field
-                    for field in self.structured_output_settings.output_fields:
-                        field_values = [getattr(item, field.name, None) for item in items]
-                        column_data[field.name].append(field_values)
-            
-            # Create PyArrow table with list columns
-            arrays = []
-            schema_fields = []
-            
-            for field in self.structured_output_settings.output_fields:
-                inner_type = self._get_output_field_pyarrow_type(field.field_type)
-                schema_fields.append(pa.field(field.name, pa.list_(inner_type)))
-                arrays.append(pa.array(column_data[field.name]))
-            
-            schema = pa.schema(schema_fields)
-            column_names = [f.name for f in schema_fields]
-            return pa.table(dict(zip(column_names, arrays)), schema=schema)
-        else:
-            # Single object per input row - original behavior
-            column_data = {field.name: [] for field in self.structured_output_settings.output_fields}
-
-            for response in responses:
-                # response is a Pydantic model instance
-                for field in self.structured_output_settings.output_fields:
-                    value = getattr(response, field.name, None)
-                    column_data[field.name].append(value)
-
-            # Create PyArrow table with appropriate types
-            arrays = []
-            schema_fields = []
-            for field in self.structured_output_settings.output_fields:
-                pa_type = self._get_output_field_pyarrow_type(field.field_type)
-                schema_fields.append(pa.field(field.name, pa_type))
-                arrays.append(pa.array(column_data[field.name], type=pa_type))
-
-            schema = pa.schema(schema_fields)
-            # Return just table for regular mappers
-            return pa.table(dict(zip([f.name for f in self.structured_output_settings.output_fields], arrays)), schema=schema)
 
 
 # region Chat Model Prompter (deprecated)

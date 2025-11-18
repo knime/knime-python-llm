@@ -817,7 +817,7 @@ class LLMPrompter:
         knext.Effect.SHOW,
     )
 
-    output_fields = knext.MultiColumnParameter(
+    output_fields = knext.ParameterArray(
         "Output fields",
         """Define the fields to extract from each prompt. Each field will be added as a separate column 
         in the output table. The model will be instructed to extract these fields from the input text.""",

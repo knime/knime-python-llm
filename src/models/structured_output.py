@@ -294,6 +294,34 @@ def get_output_field_pyarrow_type(field_type: str):
     return type_mapping[field_type]
 
 
+def _make_row_ids_unique(duplicated_row_ids, list_column):
+    """
+    Make Row IDs unique by appending an index for each exploded row.
+    
+    Args:
+        duplicated_row_ids: PyArrow array of duplicated Row IDs after explosion
+        list_column: PyArrow list column used to determine list lengths
+        
+    Returns:
+        PyArrow array of unique Row IDs with appended indices (e.g., "Row0_0", "Row0_1")
+    """
+    import pyarrow as pa
+    import pyarrow.compute as pc
+    
+    # Calculate index within each group
+    list_lengths = pc.list_value_length(list_column)
+    
+    # Create indices for each element within its list
+    indices_within_group = []
+    for length in list_lengths.to_pylist():
+        indices_within_group.extend(range(length))
+    
+    # Append index to each Row ID
+    row_ids = duplicated_row_ids.to_pylist()
+    unique_row_ids = [f"{row_id}_{idx}" for row_id, idx in zip(row_ids, indices_within_group)]
+    return pa.array(unique_row_ids, type=pa.string())
+
+
 def explode_lists(table, output_fields):
     """
     Explode list columns into multiple rows.
@@ -332,6 +360,10 @@ def explode_lists(table, output_fields):
         for name in table.column_names
         if name not in list_column_names
     }
+    
+    # Make Row IDs unique by appending index (first column is assumed to be Row ID)
+    first_col_name = table.column_names[0]
+    scalar_cols[first_col_name] = _make_row_ids_unique(scalar_cols[first_col_name], table[first_list_col_name])
     
     # Build final exploded table (preserve original column order)
     return pa.table({**scalar_cols, **flattened_list_cols})

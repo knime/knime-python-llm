@@ -204,24 +204,69 @@ class OutputFieldType(knext.EnumParameterOptions):
 @knext.parameter_group(label="Output field")
 class OutputField:
     name = knext.StringParameter(
-        "Field name",
-        "The name of the output field. This will be used as the column name in the output table.",
+        label="Field name",
+        description="The name of the output field. This will be used as the column name in the output table.",
         default_value="",
     )
 
     field_type = knext.EnumParameter(
-        "Field type",
-        "The data type of this field. List types will create columns that can contain multiple values.",
-        OutputFieldType.String.name,
-        OutputFieldType,
+        label="Field type",
+        description="The data type of this field. List types will create columns that can contain multiple values.",
+        default_value=OutputFieldType.String.name,
+        enum=OutputFieldType,
         style=knext.EnumParameter.Style.DROPDOWN,
     )
 
     description = knext.StringParameter(
-        "Description",
-        "A description of this field to help the model understand what to extract.",
+        label="Description",
+        description="A description of this field to help the model understand what to extract.",
         default_value="",
     )
+
+
+@knext.parameter_group(label="Structured Output")
+class StructuredOutputSettings:
+    """Settings for structured output extraction."""
+    structure_name = knext.StringParameter(
+        label="Structure name",
+        description="""The name of the output structure. This helps the model understand what it is extracting.
+        
+        Example: 'PersonInfo', 'ProductDetails', 'SentimentAnalysis'""",
+        default_value="ExtractedData",
+    )
+
+    structure_description = knext.StringParameter(
+        label="Structure description",
+        description="""A description of what the output structure represents. This provides context to the model 
+        about the overall extraction task.
+        
+        Example: 'Information about a person including their name and age', 'Key details about a product'""",
+        default_value="",
+    )
+
+    output_fields = knext.ParameterArray(
+        parameters=OutputField(),
+        label="Output fields",
+        description="""Define the fields to extract from each prompt. Each field will be added as a separate column 
+        in the output table. The model will be instructed to extract these fields from the input text.""",
+        button_text="Add field",
+        array_title="Output fields"
+    )
+
+    extract_multiple = knext.BoolParameter(
+        label="Extract multiple objects",
+        description="""If enabled, the model will extract multiple objects of the defined structure from each input row.
+        Each extracted object will create a separate row in the output table, with all input columns duplicated.
+        
+        If no objects are extracted for an input row, one output row with missing values will be created.""",
+        default_value=False,
+    )
+
+    row_id_column_name = knext.StringParameter(
+        label="RowID column",
+        description="""The name of the column that holds the original RowID.""",
+        default_value="RowID"
+    ) # TODO only show if extract_multiple is selected
 
 
 def _tool_definition_table_present(ctx: knext.DialogCreationContext) -> bool:
@@ -792,68 +837,13 @@ class LLMPrompter:
 
     output_format = _get_output_format_value_switch()
 
-    structure_name = knext.StringParameter(
-        "Structure name",
-        """The name of the output structure. This helps the model understand what it is extracting.
-        
-        Example: 'PersonInfo', 'ProductDetails', 'SentimentAnalysis'""",
-        default_value="ExtractedData",
-        since_version="5.10.0",
-    ).rule(
-        knext.OneOf(output_format, [OutputFormatOptions.Structured.name]),
-        knext.Effect.SHOW,
+    structured_output_settings = StructuredOutputSettings(
+        # since_version="5.10.0"
     )
-
-    structure_description = knext.StringParameter(
-        "Structure description",
-        """A description of what the output structure represents. This provides context to the model 
-        about the overall extraction task.
-        
-        Example: 'Information about a person including their name and age', 'Key details about a product'""",
-        default_value="",
-        since_version="5.10.0",
-    ).rule(
-        knext.OneOf(output_format, [OutputFormatOptions.Structured.name]),
-        knext.Effect.SHOW,
-    )
-
-    output_fields = knext.ParameterArray(
-        "Output fields",
-        """Define the fields to extract from each prompt. Each field will be added as a separate column 
-        in the output table. The model will be instructed to extract these fields from the input text.""",
-        OutputField(),
-        since_version="5.10.0",
-    ).rule(
-        knext.OneOf(output_format, [OutputFormatOptions.Structured.name]),
-        knext.Effect.SHOW,
-    )
-
-    extract_multiple = knext.BoolParameter(
-        "Extract multiple objects",
-        """If enabled, the model will extract multiple objects of the defined structure from each input row.
-        Each extracted object will create a separate row in the output table, with all input columns duplicated.
-        
-        If no objects are extracted for an input row, one output row with missing values will be created.""",
-        default_value=False,
-        since_version="5.10.0",
-    ).rule(
-        knext.OneOf(output_format, [OutputFormatOptions.Structured.name]),
-        knext.Effect.SHOW,
-    )
-
-    row_id_column_name = knext.StringParameter(
-        "Input row ID column name",
-        """Name for an optional column that will contain the index of the input row from which each output row was extracted.
-        This helps track which input row produced which output rows. Leave empty to not add this column.""",
-        default_value="",
-        since_version="5.10.0",
-    ).rule(
-        knext.And(
-            knext.OneOf(output_format, [OutputFormatOptions.Structured.name]),
-            knext.OneOf(extract_multiple, [True]),
-        ),
-        knext.Effect.SHOW,
-    )
+    # .rule(
+    #     knext.OneOf(output_format, [OutputFormatOptions.Structured.name]),
+    #     knext.Effect.SHOW,
+    # )
 
     async def aprocess_batch(
         self,
@@ -947,15 +937,15 @@ class LLMPrompter:
             output_schema = input_table_spec
             
             # Add row ID column when extract_multiple is enabled
-            if self.extract_multiple:
+            if self.structured_output_settings.extract_multiple:
                 row_id_col_name = util.handle_column_name_collision(
-                    output_schema.column_names, self.row_id_column_name
+                    output_schema.column_names, self.structured_output_settings.row_id_column_name
                 )
                 output_schema = output_schema.append(
                     knext.Column(ktype=knext.string(), name=row_id_col_name)
                 )
             
-            for field in self.output_fields:
+            for field in self.structured_output_settings.output_fields:
                 column_name = util.handle_column_name_collision(
                     output_schema.column_names, field.name
                 )
@@ -1033,7 +1023,7 @@ class LLMPrompter:
                 if is_structured:
                     # Create empty table with all structured fields
                     empty_data = {
-                        field.name: [None] * len(messages) for field in self.output_fields
+                        field.name: [None] * len(messages) for field in self.structured_output_settings.output_fields
                     }
                     return pa.table(empty_data)
                 else:
@@ -1064,9 +1054,9 @@ class LLMPrompter:
             result_table = mapper.map(table_from_batch)
             
             # Add row ID column for structured output with extract_multiple
-            if is_structured and self.extract_multiple:
+            if is_structured and self.structured_output_settings.extract_multiple:
                 row_id_col_name = util.handle_column_name_collision(
-                    pa_table.column_names, self.row_id_column_name
+                    pa_table.column_names, self.structured_output_settings.row_id_column_name
                 )
                 # Create row IDs as strings (batch row indices)
                 row_ids = pa.array([str(i) for i in range(len(pa_table))], type=pa.string())
@@ -1079,7 +1069,7 @@ class LLMPrompter:
             )
             
             # Handle row expansion for structured output with extract_multiple
-            if is_structured and self.extract_multiple:
+            if is_structured and self.structured_output_settings.extract_multiple:
                 # Explode list columns into separate rows
                 final_table = self._explode_lists(combined_table)
             else:
@@ -1154,13 +1144,13 @@ class LLMPrompter:
 
     def _validate_output_fields(self):
         """Validate that output fields are properly configured."""
-        if not self.output_fields:
+        if not self.structured_output_settings.output_fields:
             raise knext.InvalidParametersError(
                 "At least one output field must be defined when using structured output format."
             )
 
         field_names = set()
-        for i, field in enumerate(self.output_fields):
+        for i, field in enumerate(self.structured_output_settings.output_fields):
             if not field.name:
                 raise knext.InvalidParametersError(
                     f"Output field {i + 1} must have a name."
@@ -1194,7 +1184,7 @@ class LLMPrompter:
 
         # Build field definitions for Pydantic
         field_definitions = {}
-        for field in self.output_fields:
+        for field in self.structured_output_settings.output_fields:
             python_type = type_mapping[field.field_type]
             field_description = field.description if field.description else field.name
             field_definitions[field.name] = (
@@ -1203,18 +1193,18 @@ class LLMPrompter:
             )
 
         # Use structure_name as the model name (default: "ExtractedData")
-        model_name = self.structure_name if self.structure_name else "ExtractedData"
+        model_name = self.structured_output_settings.structure_name if self.structured_output_settings.structure_name else "ExtractedData"
         
         # Use structure_description as the model docstring if provided
-        if self.structure_description:
+        if self.structured_output_settings.structure_description:
             # The __doc__ attribute can be set via __config__ in Pydantic v2
-            field_definitions["__doc__"] = self.structure_description
+            field_definitions["__doc__"] = self.structured_output_settings.structure_description
 
         # Create the Pydantic model dynamically
         base_model = create_model(model_name, **field_definitions)
         
         # If extract_multiple is enabled, wrap it in a list model
-        if self.extract_multiple:
+        if self.structured_output_settings.extract_multiple:
             from typing import List as TypingList
             
             list_model_name = f"{model_name}List"
@@ -1275,11 +1265,11 @@ class LLMPrompter:
         
         # Pick one of the list columns to derive the parent index mapping
         # Use the first output field column
-        first_list_col_name = self.output_fields[0].name
+        first_list_col_name = self.structured_output_settings.output_fields[0].name
         parent_indices = pc.list_parent_indices(table[first_list_col_name])
         
         # Flatten all list columns (the output field columns)
-        list_column_names = {field.name for field in self.output_fields}
+        list_column_names = {field.name for field in self.structured_output_settings.output_fields}
         flattened_list_cols = {
             name: pc.list_flatten(table[name])
             for name in table.column_names
@@ -1309,10 +1299,10 @@ class LLMPrompter:
         """
         import pyarrow as pa
 
-        if self.extract_multiple:
+        if self.structured_output_settings.extract_multiple:
             # When extract_multiple is enabled, each response is a wrapper model with an 'items' field
             # Create columns with lists (one list per input row)
-            column_data = {field.name: [] for field in self.output_fields}
+            column_data = {field.name: [] for field in self.structured_output_settings.output_fields}
             
             for idx, response in enumerate(responses):
                 # Get the list of items from the wrapper model
@@ -1320,11 +1310,11 @@ class LLMPrompter:
                 
                 # If no items extracted, add lists with single None value
                 if not items:
-                    for field in self.output_fields:
+                    for field in self.structured_output_settings.output_fields:
                         column_data[field.name].append([None])
                 else:
                     # Create a list of values for each field
-                    for field in self.output_fields:
+                    for field in self.structured_output_settings.output_fields:
                         field_values = [getattr(item, field.name, None) for item in items]
                         column_data[field.name].append(field_values)
             
@@ -1332,7 +1322,7 @@ class LLMPrompter:
             arrays = []
             schema_fields = []
             
-            for field in self.output_fields:
+            for field in self.structured_output_settings.output_fields:
                 inner_type = self._get_output_field_pyarrow_type(field.field_type)
                 schema_fields.append(pa.field(field.name, pa.list_(inner_type)))
                 arrays.append(pa.array(column_data[field.name]))
@@ -1342,25 +1332,25 @@ class LLMPrompter:
             return pa.table(dict(zip(column_names, arrays)), schema=schema)
         else:
             # Single object per input row - original behavior
-            column_data = {field.name: [] for field in self.output_fields}
+            column_data = {field.name: [] for field in self.structured_output_settings.output_fields}
 
             for response in responses:
                 # response is a Pydantic model instance
-                for field in self.output_fields:
+                for field in self.structured_output_settings.output_fields:
                     value = getattr(response, field.name, None)
                     column_data[field.name].append(value)
 
             # Create PyArrow table with appropriate types
             arrays = []
             schema_fields = []
-            for field in self.output_fields:
+            for field in self.structured_output_settings.output_fields:
                 pa_type = self._get_output_field_pyarrow_type(field.field_type)
                 schema_fields.append(pa.field(field.name, pa_type))
                 arrays.append(pa.array(column_data[field.name], type=pa_type))
 
             schema = pa.schema(schema_fields)
             # Return just table for regular mappers
-            return pa.table(dict(zip([f.name for f in self.output_fields], arrays)), schema=schema)
+            return pa.table(dict(zip([f.name for f in self.structured_output_settings.output_fields], arrays)), schema=schema)
 
 
 # region Chat Model Prompter (deprecated)

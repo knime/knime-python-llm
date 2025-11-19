@@ -94,6 +94,12 @@ class OutputColumnSettings:
         default_value=lambda v: v >= knext.Version(5, 8, 0),
     )
 
+    platform = knext.BoolParameter(
+        "Platform",
+        "Include the model's platform (e.g., OpenAI, Anthropic).",
+        default_value=lambda v: v >= knext.Version(5, 9, 0),
+    )
+
     name = knext.BoolParameter(
         "Name",
         "Include the model's display name.",
@@ -143,11 +149,12 @@ class KnimeHubAIModelLister:
     model_types = ModelTypeSettings()
 
     # Full set of potential output columns (order defines default order)
-    # Scope columns first, then ID, Name, Type, Description
+    # Scope columns first, then ID, Platform, Name, Type, Description
     full_column_list = [
         util.OutputColumn("Scope ID", knext.string(), pa.string()),
         util.OutputColumn("Scope Name", knext.string(), pa.string()),
         util.OutputColumn("ID", knext.string(), pa.string()),
+        util.OutputColumn("Platform", knext.string(), pa.string()),
         util.OutputColumn("Name", knext.string(), pa.string()),
         util.OutputColumn("Type", knext.string(), pa.string()),
         util.OutputColumn("Description", knext.string(), pa.string()),
@@ -195,7 +202,7 @@ class KnimeHubAIModelLister:
 
         df = pd.DataFrame(
             [self._to_tuple(model, scope_id, scope_name) for model, scope_id, scope_name in models_with_scope],
-            columns=["Scope ID", "Scope Name", "ID", "Name", "Type", "Description"],
+            columns=["Scope ID", "Scope Name", "ID", "Platform", "Name", "Type", "Description"],
         )
 
         # Reduce to selected columns (preserving order of full_column_list)
@@ -204,7 +211,8 @@ class KnimeHubAIModelLister:
         return knext.Table.from_pandas(df)
 
     def _to_tuple(self, model, scope_id: str, scope_name: str) -> tuple:
-        return (scope_id, scope_name, model.id, model.name, model.mode, model.description)
+        platform_title = _get_platform_title(model.platform)
+        return (scope_id, scope_name, model.id, platform_title, model.name, model.mode, model.description)
 
     def _create_empty_table(self) -> knext.Table:
         """Constructs an empty KNIME Table with the correct output columns."""
@@ -219,8 +227,30 @@ class KnimeHubAIModelLister:
             "Scope ID": oc.scope_id,
             "Scope Name": oc.scope_name,
             "ID": oc.id,
+            "Platform": oc.platform,
             "Name": oc.name,
             "Type": oc.type,
             "Description": oc.description,
         }
         return [c for c in self.full_column_list if selection_flags[c.default_name]]
+
+def _get_platform_title(platform: str | None) -> str:
+    """
+    Convert platform identifier to user-friendly title.
+    Taken from "knime-hub-webapp/jsonforms/ai-models/constants.ts"
+    to make it consistent with the frontend.
+    """
+    if platform is None:
+        return ""
+    
+    PLATFORM_TITLES = {
+        "openai": "OpenAI",
+        "azure": "Azure OpenAI",
+        "bedrock": "Amazon Bedrock",
+        "aistudio": "Google AI Studio",
+        "anthropic": "Anthropic",
+        "huggingface": "Hugging Face Hub",
+        "openaiCompatible": "OpenAI API-compatible Providers",
+    }
+    
+    return PLATFORM_TITLES.get(platform, platform)

@@ -79,6 +79,7 @@ class ModelInfo(BaseModel):
 	# Public attribute should always be a string (never None) for backward compatibility
 	# The new gateway version omits the description; we normalize to "".
 	description: str = Field("", description="Human readable description (may be empty)")
+	platform: Optional[str] = Field(None, description="Platform identifier of the model (e.g. OpenAI, Anthropic)")
 
 	scope_id: Optional[str] = Field(None, description="Scope identifier of the model", alias="scopeId")
 

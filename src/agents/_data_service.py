@@ -77,6 +77,9 @@ class AgentChatWidgetDataService:
         reexecution_trigger: str,
         tool_converter: LangchainToolConverter,
         combined_tools_workflow_info: dict,
+        has_error_column: bool,
+        error_column_name: str,
+        error_messages: dict,
     ):
         self._ctx = ctx
         self._agent_graph = agent_graph
@@ -88,6 +91,10 @@ class AgentChatWidgetDataService:
         self._recursion_limit_handling = recursion_limit_handling
         self._show_tool_calls_and_results = show_tool_calls_and_results
         self._reexecution_trigger = reexecution_trigger
+
+        self._has_error_column = has_error_column
+        self._error_column_name = error_column_name
+        self._error_messages = error_messages
 
         self._get_combined_tools_workflow_info = combined_tools_workflow_info
 
@@ -155,12 +162,7 @@ class AgentChatWidgetDataService:
 
     # called by java, not the frontend
     def get_view_data(self):
-        desanitized_messages = [
-            self._tool_converter.desanitize_tool_names(msg) for msg in self._messages
-        ]
-        message_values = [from_langchain_message(msg) for msg in desanitized_messages]
-        conversation_df = pd.DataFrame({self._conversation_column_name: message_values})
-        conversation_table = knext.Table.from_pandas(conversation_df)
+        conversation_table = self._create_conversation_table()
 
         meta_data, tables = self._data_registry.dump()
         view_data = {
@@ -206,7 +208,7 @@ class AgentChatWidgetDataService:
             content = f"An error occurred: {e}"
             error_message = {"type": "error", "content": content}
             self._message_queue.put(error_message)
-            self._append_ai_message_to_memory(content)
+            self._store_error_for_index(content)
 
     def _to_frontend_messages(self, message):
         # split the node-view-ids out into a separate message
@@ -274,7 +276,7 @@ class AgentChatWidgetDataService:
                 "content": content,
             }
             self._message_queue.put(error_message)
-            self._append_ai_message_to_memory(content)
+            self._store_error_for_id(content)
 
     def _append_ai_message_to_memory(self, message: str):
         from langchain_core import messages as lcm
@@ -283,3 +285,55 @@ class AgentChatWidgetDataService:
         self._agent_graph.update_state(
             self._config, {"messages": [ai_message]}, "agent"
         )
+
+    def _store_error_for_index(self, error: str):
+        if self._has_error_column:
+            self._error_messages[len(self._messages) + len(self._error_messages)] = (
+                error
+            )
+
+    def _create_conversation_table(self):
+        from knime.types.message import MessageValue
+
+        desanitized_messages = [
+            self._tool_converter.desanitize_tool_names(msg) for msg in self._messages
+        ]
+
+        if not self._has_error_column:
+            message_values = [
+                from_langchain_message(msg) for msg in desanitized_messages
+            ]
+            conversation_df = pd.DataFrame(
+                {self._conversation_column_name: message_values}
+            )
+            return knext.Table.from_pandas(conversation_df)
+        else:
+            msg_idx = 0
+            message_rows = []
+            error_rows = []
+            for row_idx in range(len(desanitized_messages) + len(self._error_messages)):
+                if row_idx in self._error_messages:
+                    message_rows.append(None)
+                    error_rows.append(self._error_messages[row_idx])
+                else:
+                    msg = desanitized_messages[msg_idx]
+                    msg_idx += 1
+                    message_rows.append(from_langchain_message(msg))
+                    error_rows.append(None)
+            conversation_df = pd.DataFrame(
+                {
+                    self._conversation_column_name: message_rows,
+                    self._error_column_name: error_rows,
+                }
+            )
+
+            if not desanitized_messages:
+                conversation_df[self._conversation_column_name] = conversation_df[
+                    self._conversation_column_name
+                ].astype(knext.logical(MessageValue).to_pandas())
+            if self._has_error_column:
+                conversation_df[self._error_column_name] = conversation_df[
+                    self._error_column_name
+                ].astype("string")
+
+            return knext.Table.from_pandas(conversation_df)

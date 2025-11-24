@@ -490,7 +490,6 @@ class AgentChatViewDataService:
             content = f"An error occurred: {e}"
             error_message = {"type": "error", "content": content}
             self._message_queue.put(error_message)
-            self._append_ai_message_to_memory(content)
 
     def _to_frontend_messages(self, message):
         # split the node-view-ids out into a separate message
@@ -558,7 +557,6 @@ class AgentChatViewDataService:
                 "content": content,
             }
             self._message_queue.put(error_message)
-            self._append_ai_message_to_memory(content)
 
     def _append_ai_message_to_memory(self, message: str):
         from langchain_core import messages as lcm

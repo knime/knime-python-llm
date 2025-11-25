@@ -5,7 +5,7 @@ extension_module: src/knime_llm
 description: KNIME AI Extension
 long_description: The extension offers nodes for building LLM-powered no-code workflows, and supports interfacing with hosted services, as well as locally-running models.
 group_id: org.knime.python
-version: 5.9.0
+version: 5.10.0
 vendor: KNIME AG, Zurich, Switzerland
 license_file: LICENSE.txt
 java_bundles:

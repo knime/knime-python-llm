@@ -376,10 +376,14 @@ class GeminiImageGenerator:
 
                 # Extract the generated image bytes
                 if response and response.candidates:
-                    for part in response.candidates[0].content.parts:
+                    for part in response.parts:
                         if part.inline_data is not None:
-                            return part.inline_data.data
-
+                            image_pil = part.as_image()
+                            if not image_pil.mime_type.startswith("image/png"):
+                                png_bytes = self._to_png_bytes(image_pil.image_bytes)
+                                return png_bytes
+                            else:
+                                return image_pil.image_bytes
                 raise RuntimeError("No image was generated in the response. Please try with a more descriptive prompt or check if your prompt complies with"
                 " Google policy guidelines.")
 
@@ -393,3 +397,13 @@ class GeminiImageGenerator:
                 )
             
             raise RuntimeError(f"Failed to generate image: {error_message}")
+
+    def _to_png_bytes(self, raw_bytes: bytes) -> bytes:
+        """
+        Convert raw image bytes to PNG format. This is needed because
+        Gemini 3 Pro Image may return other formats like JPEG and WEBP.
+        """
+        with Image.open(io.BytesIO(raw_bytes)) as img:
+            buf = io.BytesIO()
+            img.save(buf, format="PNG")
+            return buf.getvalue()

@@ -56,7 +56,10 @@ from ._port_types import (
     GoogleAiStudioAuthenticationPortObject,
 )
 
-GEMINI_IMAGE_MODEL = "gemini-2.5-flash-image-preview"
+GEMINI_IMAGE_MODELS = [
+    "gemini-2.5-flash-image-preview",
+    "gemini-3-pro-image-preview",
+]
 
 IMAGEN_MODELS = [
     "imagen-3.0-generate-002", 
@@ -136,13 +139,13 @@ def _get_gemini_model_choices(ctx: knext.DialogCreationContext):
     auth_spec: GoogleAiStudioAuthenticationPortObjectSpec = input_specs[0]
     
     if auth_spec is None:
-        return [GEMINI_IMAGE_MODEL]
+        return GEMINI_IMAGE_MODELS
     
     try:
         all_models = auth_spec.get_image_model_list(ctx)
         return [model for model in all_models if "gemini" in model.lower()]
     except (KeyError, Exception):
-        return [GEMINI_IMAGE_MODEL]
+        return GEMINI_IMAGE_MODELS
 
 def _get_imagen_model_choices(ctx: knext.DialogCreationContext):
     """Get Imagen models for the choices list."""

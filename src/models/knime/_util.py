@@ -94,10 +94,16 @@ class OutputColumnSettings:
         default_value=lambda v: v >= knext.Version(5, 8, 0),
     )
 
-    platform = knext.BoolParameter(
-        "Platform",
-        "Include the model's platform (e.g., OpenAI, Anthropic).",
-        default_value=lambda v: v >= knext.Version(5, 9, 0),
+    platform_id = knext.BoolParameter(
+        "Platform ID",
+        "Include the model's platform identifier.",
+        default_value=lambda v: v >= knext.Version(5, 10, 0),
+    )
+
+    platform_name = knext.BoolParameter(
+        "Platform Name",
+        "Include the model's platform name (e.g., OpenAI, Anthropic).",
+        default_value=lambda v: v >= knext.Version(5, 10, 0),
     )
 
     name = knext.BoolParameter(
@@ -149,12 +155,13 @@ class KnimeHubAIModelLister:
     model_types = ModelTypeSettings()
 
     # Full set of potential output columns (order defines default order)
-    # Scope columns first, then ID, Platform, Name, Type, Description
+    # Scope columns first, then ID, Platform ID, Platform Name, Name, Type, Description
     full_column_list = [
         util.OutputColumn("Scope ID", knext.string(), pa.string()),
         util.OutputColumn("Scope Name", knext.string(), pa.string()),
         util.OutputColumn("ID", knext.string(), pa.string()),
-        util.OutputColumn("Platform", knext.string(), pa.string()),
+        util.OutputColumn("Platform ID", knext.string(), pa.string()),
+        util.OutputColumn("Platform Name", knext.string(), pa.string()),
         util.OutputColumn("Name", knext.string(), pa.string()),
         util.OutputColumn("Type", knext.string(), pa.string()),
         util.OutputColumn("Description", knext.string(), pa.string()),
@@ -202,7 +209,7 @@ class KnimeHubAIModelLister:
 
         df = pd.DataFrame(
             [self._to_tuple(model, scope_id, scope_name) for model, scope_id, scope_name in models_with_scope],
-            columns=["Scope ID", "Scope Name", "ID", "Platform", "Name", "Type", "Description"],
+            columns=["Scope ID", "Scope Name", "ID", "Platform ID", "Platform Name", "Name", "Type", "Description"],
         )
 
         # Reduce to selected columns (preserving order of full_column_list)
@@ -211,8 +218,8 @@ class KnimeHubAIModelLister:
         return knext.Table.from_pandas(df)
 
     def _to_tuple(self, model, scope_id: str, scope_name: str) -> tuple:
-        platform_title = _get_platform_title(model.platform)
-        return (scope_id, scope_name, model.id, platform_title, model.name, model.mode, model.description)
+        platform_name = _get_platform_title(model.platform)
+        return (scope_id, scope_name, model.id, model.platform, platform_name, model.name, model.mode, model.description)
 
     def _create_empty_table(self) -> knext.Table:
         """Constructs an empty KNIME Table with the correct output columns."""
@@ -227,7 +234,8 @@ class KnimeHubAIModelLister:
             "Scope ID": oc.scope_id,
             "Scope Name": oc.scope_name,
             "ID": oc.id,
-            "Platform": oc.platform,
+            "Platform ID": oc.platform_id,
+            "Platform Name": oc.platform_name,
             "Name": oc.name,
             "Type": oc.type,
             "Description": oc.description,

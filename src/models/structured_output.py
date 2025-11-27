@@ -335,7 +335,7 @@ def _make_row_ids_unique(duplicated_row_ids, list_column):
     return pa.array(unique_row_ids, type=pa.string())
 
 
-def explode_lists(table, output_fields):
+def explode_lists(table, output_fields: list[OutputField], input_row_id_column_name: str):
     """
     Explode list columns into multiple rows.
     
@@ -347,6 +347,7 @@ def explode_lists(table, output_fields):
     Args:
         table: PyArrow table with list columns to explode
         output_fields: List of OutputField parameter groups defining which columns contain lists
+        input_row_id_column_name: Name of the column to store the original input row IDs
         
     Returns:
         PyArrow table with exploded rows
@@ -357,7 +358,8 @@ def explode_lists(table, output_fields):
     # Pick one of the list columns to derive the parent index mapping
     # Use the first output column
     first_list_col_name = output_fields[0].name
-    parent_indices = pc.list_parent_indices(table[first_list_col_name])
+    first_list_col = table[first_list_col_name]
+    parent_indices = pc.list_parent_indices(first_list_col)
     
     # Flatten all list columns (the output columns)
     list_column_names = {field.name for field in output_fields}
@@ -375,11 +377,12 @@ def explode_lists(table, output_fields):
     }
     
     # Make Row IDs unique by appending index (first column is assumed to be Row ID)
-    first_col_name = table.column_names[0]
-    scalar_cols[first_col_name] = _make_row_ids_unique(scalar_cols[first_col_name], table[first_list_col_name])
+    row_id_col_name = table.column_names[0]
+    row_id_col = scalar_cols.pop(row_id_col_name)
+    new_row_id_col = _make_row_ids_unique(row_id_col, first_list_col)
     
     # Build final exploded table (preserve original column order)
-    return pa.table({**scalar_cols, **flattened_list_cols})
+    return pa.table({row_id_col_name: new_row_id_col, **scalar_cols, input_row_id_column_name: row_id_col, **flattened_list_cols})
 
 def create_empty(settings: StructuredOutputSettings, num_messages: int):
     import pyarrow as pa

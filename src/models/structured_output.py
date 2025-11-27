@@ -51,28 +51,28 @@ including parameter definitions, Pydantic model creation, and table conversion u
 
 import knime.extension as knext
 
-# Column name for tracking original row IDs when extracting multiple objects
+# Column name for tracking original row IDs when creating multiple output rows
 ROW_ID_COLUMN = "Row ID"
 
 
 class OutputFieldType(knext.EnumParameterOptions):
-    """Types of fields that can be extracted from LLM responses."""
+    """Types of columns that can be extracted from LLM responses."""
     
     String = (
         "String",
-        "Text field.",
+        "Text column.",
     )
     Integer = (
         "Integer",
-        "Whole number field.",
+        "Whole number column.",
     )
     Double = (
         "Double",
-        "Floating point number field.",
+        "Floating point number column.",
     )
     Boolean = (
         "Boolean",
-        "True/False field.",
+        "True/False column.",
     )
     StringList = (
         "String List",
@@ -92,19 +92,19 @@ class OutputFieldType(knext.EnumParameterOptions):
     )
 
 
-@knext.parameter_group(label="Output field")
+@knext.parameter_group(label="Output column")
 class OutputField:
-    """Definition of a single field to extract from LLM responses."""
+    """Definition of a single column to extract from LLM responses."""
     
     name = knext.StringParameter(
-        label="Field name",
-        description="The name of the output field. This will be used as the column name in the output table.",
+        label="Column name",
+        description="The name of the output column in the table.",
         default_value="",
     )
 
     field_type = knext.EnumParameter(
-        label="Field type",
-        description="The data type of this field. List types will create columns that can contain multiple values.",
+        label="Data type",
+        description="The data type of this column. List types can contain multiple values per row.",
         default_value=OutputFieldType.String.name,
         enum=OutputFieldType,
         style=knext.EnumParameter.Style.DROPDOWN,
@@ -112,12 +112,26 @@ class OutputField:
 
     description = knext.StringParameter(
         label="Description",
-        description="A description of this field to help the model understand what to extract.",
+        description="A description of this column to help the model understand what to extract.",
         default_value="",
     )
 
 
-@knext.parameter_group(label="Structured Output")
+class OutputRowsPerInputRow(knext.EnumParameterOptions):
+    """Number of output rows to create per input row."""
+    
+    One = (
+        "One",
+        "Extract exactly one output row with the defined columns per input row.",
+    )
+    Many = (
+        "Many",
+        "Allow the model to extract one or more output rows with the defined structure per input row. "
+        "The input columns will be duplicated for each extracted row.",
+    )
+
+
+@knext.parameter_group(label="Output Structure")
 class StructuredOutputSettings:
     """Settings for structured output extraction."""
     
@@ -140,26 +154,25 @@ class StructuredOutputSettings:
 
     output_fields = knext.ParameterArray(
         parameters=OutputField(),
-        label="Output fields",
-        description="""Define the fields to extract from each prompt. Each field will be added as a separate column 
-        in the output table. The model will be instructed to extract these fields from the input text.""",
-        button_text="Add field",
-        array_title="Output fields"
+        label="Output columns",
+        description="""Define the columns to extract from each prompt. Each column will be added to the output table. 
+        The model will be instructed to extract these columns from the input text.""",
+        button_text="Add column",
+        array_title="Output columns"
     )
 
-    extract_multiple = knext.BoolParameter(
-        label="Extract multiple objects",
-        description="""If enabled, the model will extract multiple objects of the defined structure from each input row.
-        Each extracted object will create a separate row in the output table, with all input columns duplicated.
-        
-        If no objects are extracted for an input row, one output row with missing values will be created.""",
-        default_value=False,
+    output_rows_per_input_row = knext.EnumParameter(
+        label="Output rows per input row",
+        description="Determines how many output rows are created for each input row.",
+        default_value=OutputRowsPerInputRow.One.name,
+        enum=OutputRowsPerInputRow,
+        style=knext.EnumParameter.Style.VALUE_SWITCH,
     )
 
 
 def validate_output_fields(output_fields):
     """
-    Validate that output fields are properly configured.
+    Validate that output columns are properly configured.
     
     Args:
         output_fields: List of OutputField parameter groups
@@ -169,22 +182,22 @@ def validate_output_fields(output_fields):
     """
     if not output_fields:
         raise knext.InvalidParametersError(
-            "At least one output field must be defined when using structured output format."
+            "At least one output column must be defined when using structured output format."
         )
 
     field_names = set()
     for i, field in enumerate(output_fields):
         if not field.name:
             raise knext.InvalidParametersError(
-                f"Output field {i + 1} must have a name."
+                f"Output column {i + 1} must have a name."
             )
         if not field.name.replace("_", "").replace(" ", "").isalnum():
             raise knext.InvalidParametersError(
-                f"Output field name '{field.name}' must contain only letters, numbers, underscores, and spaces."
+                f"Output column name '{field.name}' must contain only letters, numbers, underscores, and spaces."
             )
         if field.name in field_names:
             raise knext.InvalidParametersError(
-                f"Duplicate output field name: '{field.name}'. Each field must have a unique name."
+                f"Duplicate output column name: '{field.name}'. Each column must have a unique name."
             )
         field_names.add(field.name)
 
@@ -235,12 +248,12 @@ def create_pydantic_model(settings):
     # Create the Pydantic model dynamically
     base_model = create_model(model_name, **field_definitions)
     
-    # If extract_multiple is enabled, wrap it in a list model
-    if settings.extract_multiple:
+    # If output_rows_per_input_row is Many, wrap it in a list model
+    if settings.output_rows_per_input_row == OutputRowsPerInputRow.Many.name:
         list_model_name = f"{model_name}List"
         return create_model(
             list_model_name,
-            items=(TypingList[base_model], Field(description=f"List of {model_name} objects"))
+            items=(TypingList[base_model], Field(description=f"List of {model_name} items"))
         )
     
     return base_model
@@ -326,7 +339,7 @@ def explode_lists(table, output_fields):
     """
     Explode list columns into multiple rows.
     
-    Takes a table where output field columns contain lists and expands it so that:
+    Takes a table where output columns contain lists and expands it so that:
     - Each list element gets its own row
     - Input columns are duplicated for each list element
     - All list columns must have the same length per row
@@ -342,11 +355,11 @@ def explode_lists(table, output_fields):
     import pyarrow.compute as pc
     
     # Pick one of the list columns to derive the parent index mapping
-    # Use the first output field column
+    # Use the first output column
     first_list_col_name = output_fields[0].name
     parent_indices = pc.list_parent_indices(table[first_list_col_name])
     
-    # Flatten all list columns (the output field columns)
+    # Flatten all list columns (the output columns)
     list_column_names = {field.name for field in output_fields}
     flattened_list_cols = {
         name: pc.list_flatten(table[name])
@@ -381,18 +394,18 @@ def structured_responses_to_table(responses, settings):
     Convert a list of Pydantic model instances to a PyArrow table.
     
     Args:
-        responses: List of Pydantic model instances (or list wrapper models if extract_multiple=True)
+        responses: List of Pydantic model instances (or list wrapper models if output_rows_per_input_row=Many)
         settings: StructuredOutputSettings parameter group
     
     Returns:
         PyArrow table where:
-        - If extract_multiple=False: each row has scalar values
-        - If extract_multiple=True: each row has list values (one list per input row containing extracted objects)
+        - If output_rows_per_input_row=One: each row has scalar values
+        - If output_rows_per_input_row=Many: each row has list values (one list per input row containing extracted items)
     """
     import pyarrow as pa
 
-    if settings.extract_multiple:
-        # When extract_multiple is enabled, each response is a wrapper model with an 'items' field
+    if settings.output_rows_per_input_row == OutputRowsPerInputRow.Many.name:
+        # When Many is selected, each response is a wrapper model with an 'items' field
         # Create columns with lists (one list per input row)
         column_data = {field.name: [] for field in settings.output_fields}
         
@@ -405,7 +418,7 @@ def structured_responses_to_table(responses, settings):
                 for field in settings.output_fields:
                     column_data[field.name].append([None])
             else:
-                # Create a list of values for each field
+                # Create a list of values for each column
                 for field in settings.output_fields:
                     field_values = [getattr(item, field.name, None) for item in items]
                     column_data[field.name].append(field_values)
@@ -423,7 +436,7 @@ def structured_responses_to_table(responses, settings):
         column_names = [f.name for f in schema_fields]
         return pa.table(dict(zip(column_names, arrays)), schema=schema)
     else:
-        # Single object per input row - original behavior
+        # Single item per input row - original behavior
         column_data = {field.name: [] for field in settings.output_fields}
 
         for response in responses:
@@ -451,7 +464,7 @@ def add_structured_output_columns(input_schema, settings, add_row_id=False):
     Args:
         input_schema: Input table schema
         settings: StructuredOutputSettings parameter group
-        add_row_id: Whether to add a row ID column (for extract_multiple)
+        add_row_id: Whether to add a row ID column (for output_rows_per_input_row=Many)
         
     Returns:
         Schema with added structured output columns
@@ -460,7 +473,7 @@ def add_structured_output_columns(input_schema, settings, add_row_id=False):
     
     output_schema = input_schema
     
-    # Add row ID column when extract_multiple is enabled
+    # Add row ID column when output_rows_per_input_row is Many
     if add_row_id:
         row_id_col_name = util.handle_column_name_collision(
             output_schema.column_names, ROW_ID_COLUMN
@@ -469,7 +482,7 @@ def add_structured_output_columns(input_schema, settings, add_row_id=False):
             knext.Column(ktype=knext.string(), name=row_id_col_name)
         )
     
-    # Add field columns
+    # Add output columns
     for field in settings.output_fields:
         column_name = util.handle_column_name_collision(
             output_schema.column_names, field.name

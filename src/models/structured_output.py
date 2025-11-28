@@ -173,6 +173,9 @@ class StructuredOutputSettings:
         label="Input row ID column name",
         description="Name of the column that will store the original input row ID when multiple output rows are created per input row.",
         default_value="Input Row ID",
+    ).rule(
+        knext.OneOf(output_rows_per_input_row, [OutputRowsPerInputRow.Many.name]),
+        knext.Effect.SHOW,
     )
 
 
@@ -524,13 +527,14 @@ def add_structured_output_columns(input_schema, settings):
     
     output_schema = input_schema
     
-    # Add row ID column when output_rows_per_input_row is Many
+    # Add input row ID column when output_rows_per_input_row is Many
+    # This column stores the original input row ID before explosion
     if settings.output_rows_per_input_row == OutputRowsPerInputRow.Many.name:
-        row_id_col_name = util.handle_column_name_collision(
+        input_row_id_col_name = util.handle_column_name_collision(
             output_schema.column_names, settings.input_row_id_column_name
         )
         output_schema = output_schema.append(
-            knext.Column(ktype=knext.string(), name=row_id_col_name)
+            knext.Column(ktype=knext.string(), name=input_row_id_col_name)
         )
     
     # Add output columns

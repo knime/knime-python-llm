@@ -833,8 +833,7 @@ class LLMPrompter:
             # Create output schema with structured output columns
             return so.add_structured_output_columns(
                 input_table_spec, 
-                self.structured_output_settings,
-                add_row_id=self.structured_output_settings.extract_multiple
+                self.structured_output_settings
             )
         else:
             # Text or JSON output format
@@ -931,27 +930,15 @@ class LLMPrompter:
             table_from_batch = pa.Table.from_batches([pa_table])
             result_table = mapper.map(table_from_batch)
             
-            # Add row ID column for structured output with extract_multiple
-            if is_structured and self.structured_output_settings.extract_multiple:
-                row_id_col_name = util.handle_column_name_collision(
-                    pa_table.column_names, so.ROW_ID_COLUMN
-                )
-                # Create row IDs as strings (batch row indices)
-                row_ids = pa.array([str(i) for i in range(len(pa_table))], type=pa.string())
-                pa_table = pa_table.append_column(row_id_col_name, row_ids)
-            
-            # Combine input and result columns
-            combined_table = pa.Table.from_arrays(
-                pa_table.columns + result_table.columns,
-                pa_table.column_names + result_table.column_names,
-            )
-            
-            # Handle row expansion for structured output with extract_multiple
-            if is_structured and self.structured_output_settings.extract_multiple:
-                # Explode list columns into separate rows
-                final_table = so.explode_lists(combined_table, self.structured_output_settings.output_fields)
+            # Postprocess structured output (add row IDs, explode lists if needed)
+            if is_structured:
+                final_table = so.postprocess_table(pa_table, result_table, self.structured_output_settings)
             else:
-                final_table = combined_table
+                # Combine input and result columns for non-structured output
+                final_table = pa.Table.from_arrays(
+                    pa_table.columns + result_table.columns,
+                    pa_table.column_names + result_table.column_names,
+                )
             
             output_table.append(knext.Table.from_pyarrow(final_table))
 

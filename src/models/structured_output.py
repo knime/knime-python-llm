@@ -169,6 +169,12 @@ class StructuredOutputSettings:
         style=knext.EnumParameter.Style.VALUE_SWITCH,
     )
 
+    input_row_id_column_name = knext.StringParameter(
+        label="Input row ID column name",
+        description="Name of the column that will store the original input row ID when multiple output rows are created per input row.",
+        default_value="Input Row ID",
+    )
+
 
 def validate_output_fields(output_fields):
     """
@@ -335,7 +341,7 @@ def _make_row_ids_unique(duplicated_row_ids, list_column):
     return pa.array(unique_row_ids, type=pa.string())
 
 
-def explode_lists(table, output_fields: list[OutputField], input_row_id_column_name: str):
+def explode_lists(table, settings: StructuredOutputSettings):
     """
     Explode list columns into multiple rows.
     
@@ -346,23 +352,28 @@ def explode_lists(table, output_fields: list[OutputField], input_row_id_column_n
     
     Args:
         table: PyArrow table with list columns to explode
-        output_fields: List of OutputField parameter groups defining which columns contain lists
-        input_row_id_column_name: Name of the column to store the original input row IDs
+        settings: StructuredOutputSettings parameter group
         
     Returns:
         PyArrow table with exploded rows
     """
     import pyarrow as pa
     import pyarrow.compute as pc
+    import util
+    
+    # Get the input row ID column name from settings
+    input_row_id_column_name = util.handle_column_name_collision(
+        table.column_names, settings.input_row_id_column_name
+    )
     
     # Pick one of the list columns to derive the parent index mapping
     # Use the first output column
-    first_list_col_name = output_fields[0].name
+    first_list_col_name = settings.output_fields[0].name
     first_list_col = table[first_list_col_name]
     parent_indices = pc.list_parent_indices(first_list_col)
     
     # Flatten all list columns (the output columns)
-    list_column_names = {field.name for field in output_fields}
+    list_column_names = {field.name for field in settings.output_fields}
     flattened_list_cols = {
         name: pc.list_flatten(table[name])
         for name in table.column_names
@@ -460,14 +471,51 @@ def structured_responses_to_table(responses, settings):
         return pa.table(dict(zip([f.name for f in settings.output_fields], arrays)), schema=schema)
 
 
-def add_structured_output_columns(input_schema, settings, add_row_id=False):
+def postprocess_table(input_table, result_table, settings):
+    """
+    Postprocess structured output by adding row IDs and optionally exploding list columns.
+    
+    Args:
+        input_table: PyArrow table with input columns
+        result_table: PyArrow table with structured output columns (from LLM)
+        settings: StructuredOutputSettings parameter group
+        
+    Returns:
+        PyArrow table with combined input and output columns, optionally exploded into multiple rows
+    """
+    import pyarrow as pa
+    import util
+    
+    # Add row ID column for structured output with output_rows_per_input_row
+    if settings.output_rows_per_input_row == OutputRowsPerInputRow.Many.name:
+        row_id_col_name = util.handle_column_name_collision(
+            input_table.column_names, ROW_ID_COLUMN
+        )
+        # Create row IDs as strings (batch row indices)
+        row_ids = pa.array([str(i) for i in range(len(input_table))], type=pa.string())
+        input_table = input_table.append_column(row_id_col_name, row_ids)
+    
+    # Combine input and result columns
+    combined_table = pa.Table.from_arrays(
+        input_table.columns + result_table.columns,
+        input_table.column_names + result_table.column_names,
+    )
+    
+    # Handle row expansion for structured output with output_rows_per_input_row
+    if settings.output_rows_per_input_row == OutputRowsPerInputRow.Many.name:
+        # Explode list columns into separate rows
+        return explode_lists(combined_table, settings)
+    else:
+        return combined_table
+
+
+def add_structured_output_columns(input_schema, settings):
     """
     Add structured output columns to an input schema.
     
     Args:
         input_schema: Input table schema
         settings: StructuredOutputSettings parameter group
-        add_row_id: Whether to add a row ID column (for output_rows_per_input_row=Many)
         
     Returns:
         Schema with added structured output columns
@@ -477,9 +525,9 @@ def add_structured_output_columns(input_schema, settings, add_row_id=False):
     output_schema = input_schema
     
     # Add row ID column when output_rows_per_input_row is Many
-    if add_row_id:
+    if settings.output_rows_per_input_row == OutputRowsPerInputRow.Many.name:
         row_id_col_name = util.handle_column_name_collision(
-            output_schema.column_names, ROW_ID_COLUMN
+            output_schema.column_names, settings.input_row_id_column_name
         )
         output_schema = output_schema.append(
             knext.Column(ktype=knext.string(), name=row_id_col_name)

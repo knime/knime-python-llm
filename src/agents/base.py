@@ -1029,30 +1029,7 @@ class AgentChatWidget:
             chat_model, tools=tools, prompt=self.developer_message, checkpointer=memory
         )
 
-        previous_messages = []
-        config = {
-            "recursion_limit": self.recursion_limit,
-            "configurable": {"thread_id": "1"},
-        }
-        if view_data is not None:
-            conversation_table = view_data["ports"][0]
-            if conversation_table is not None:
-                from knime.types.message import to_langchain_message
-
-                conversation_df = conversation_table[
-                    self.conversation_column_name
-                ].to_pandas()
-                for msg in conversation_df[self.conversation_column_name]:
-                    lc_msg = to_langchain_message(msg)
-                    previous_messages.append(tool_converter.sanitize_tool_names(lc_msg))
-                agent.update_state(config, {"messages": previous_messages}, "agent")
-
-        if not previous_messages and (
-            data_registry.has_data or tool_converter.has_data_tools
-        ):
-            agent.update_state(
-                config, {"messages": [data_registry.create_data_message()]}, "agent"
-            )
+        self._fill_memory_with_messages(agent, view_data, data_registry, tool_converter)
 
         return AgentChatWidgetDataService(
             ctx,
@@ -1069,6 +1046,43 @@ class AgentChatWidget:
                 "project_id": project_id,
                 "workflow_id": workflow_id,
             },
+        )
+
+    def _fill_memory_with_messages(
+        self, agent, view_data, data_registry, tool_converter
+    ):
+        config = {
+            "recursion_limit": self.recursion_limit,
+            "configurable": {"thread_id": "1"},
+        }
+        previous_messages = []
+
+        if view_data is not None:
+            conversation_table = view_data["ports"][0]
+            if conversation_table is not None:
+                self._fill_memory_with_previous_messages(
+                    agent, config, conversation_table, tool_converter, previous_messages
+                )
+
+        if not previous_messages and (
+            data_registry.has_data or tool_converter.has_data_tools
+        ):
+            self._fill_memory_with_data_message(agent, config, data_registry)
+
+    def _fill_memory_with_previous_messages(
+        self, agent, config, conversation_table, tool_converter, previous_messages
+    ):
+        from knime.types.message import to_langchain_message
+
+        conversation_df = conversation_table[self.conversation_column_name].to_pandas()
+        for msg in conversation_df[self.conversation_column_name]:
+            lc_msg = to_langchain_message(msg)
+            previous_messages.append(tool_converter.sanitize_tool_names(lc_msg))
+        agent.update_state(config, {"messages": previous_messages}, "agent")
+
+    def _fill_memory_with_data_message(self, agent, config, data_registry):
+        agent.update_state(
+            config, {"messages": [data_registry.create_data_message()]}, "agent"
         )
 
 

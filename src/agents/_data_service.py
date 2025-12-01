@@ -95,13 +95,15 @@ class AgentChatWidgetDataService:
         self._thread = None
 
     @property
+    def _config(self):
+        return {
+            "recursion_limit": self._recursion_limit,
+            "configurable": {"thread_id": "1"},
+        }
+
+    @property
     def _messages(self):
-        return self._agent_graph.get_state(
-            {
-                "recursion_limit": self._recursion_limit,
-                "configurable": {"thread_id": "1"},
-            }
-        ).values.get("messages", [])
+        return self._agent_graph.get_state(self._config).values.get("messages", [])
 
     def get_initial_message(self):
         if self._initial_message:
@@ -171,33 +173,24 @@ class AgentChatWidgetDataService:
     def _post_user_message(self, user_message: str):
         from langgraph.errors import GraphRecursionError
 
-        config = {
-            "recursion_limit": self._recursion_limit,
-            "configurable": {"thread_id": "1"},
-        }
-
         try:
             state_stream = self._agent_graph.stream(
                 {"messages": [HumanMessage(content=user_message)]},
-                config,
+                self._config,
                 stream_mode="updates",  # streams state by state incrementally
             )
 
             final_state = None
             for state in state_stream:
-                extracted_state = state["agent"] if "agent" in state else state["tools"]
-                final_state = extracted_state
-                new_messages = extracted_state["messages"]
+                final_state = state["agent"] if "agent" in state else state["tools"]
+                new_messages = final_state["messages"]
 
                 for new_message in new_messages:
                     # already added
                     if isinstance(new_message, HumanMessage):
                         continue
 
-                    if (
-                        getattr(new_message, "content", None)
-                        != LANGGRAPH_RECURSION_MESSAGE
-                    ):
+                    if new_message.content != LANGGRAPH_RECURSION_MESSAGE:
                         fe_messages = self._to_frontend_messages(new_message)
                         for fe_msg in fe_messages:
                             self._message_queue.put(fe_msg)
@@ -286,9 +279,7 @@ class AgentChatWidgetDataService:
     def _append_ai_message_to_memory(self, message: str):
         from langchain_core import messages as lcm
 
-        config = {
-            "recursion_limit": self._recursion_limit,
-            "configurable": {"thread_id": "1"},
-        }
         ai_message = lcm.AIMessage(message)
-        self._agent_graph.update_state(config, {"messages": [ai_message]}, "agent")
+        self._agent_graph.update_state(
+            self._config, {"messages": [ai_message]}, "agent"
+        )

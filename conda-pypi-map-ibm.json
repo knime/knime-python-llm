@@ -1,5 +1,0 @@
-{
-	"ibm_cos_sdk_core": "ibm_cos_sdk_core", 
-	"ibm_cos_sdk_s3transfer": "ibm_cos_sdk_s3transfer", 
-	"ibm_cos_sdk": "ibm_cos_sdk"
-}

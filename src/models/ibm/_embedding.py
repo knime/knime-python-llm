@@ -96,7 +96,7 @@ class IBMwatsonxEmbeddingPortObject(EmbeddingsPortObject):
         return super().spec
 
     def create_model(self, ctx):
-        from ._embedding_model import WatsonxEmbeddings
+        from ._langchain_models import WatsonxEmbeddings
 
         # Retrieve the name-id map for projects or spaces
         project_id, space_id = self.spec.auth.get_project_or_space_ids(ctx)

@@ -53,6 +53,7 @@ from ._util import (
     get_project_or_space,
     ProjectOrSpace,
 )
+from ._api_client import WatsonxAPIClient
 
 
 class IBMwatsonxAuthenticationPortObjectSpec(AIPortObjectSpec):
@@ -122,28 +123,19 @@ class IBMwatsonxAuthenticationPortObjectSpec(AIPortObjectSpec):
 
         api_client = self._get_api_client(ctx)
 
-        chat_models = (
-            api_client.foundation_models.get_chat_function_calling_model_specs()
-        )
+        chat_models = api_client.get_chat_function_calling_model_specs()
 
         return any(
             chat_model["model_id"] == model for chat_model in chat_models["resources"]
         )
 
-    def _get_api_client(self, ctx: knext.ConfigurationContext | knext.ExecutionContext):
-        from ibm_watsonx_ai import APIClient
-        from ibm_watsonx_ai import Credentials
-
+    def _get_api_client(
+        self, ctx: knext.ConfigurationContext | knext.ExecutionContext
+    ) -> WatsonxAPIClient:
         api_key = ctx.get_credentials(self.credentials).password
         base_url = self.base_url
 
-        credentials = Credentials(
-            url=base_url,
-            api_key=api_key,
-        )
-
-        api_client = APIClient(credentials)
-        return api_client
+        return WatsonxAPIClient(api_key=api_key, base_url=base_url)
 
     def get_chat_model_list(
         self,
@@ -155,7 +147,7 @@ class IBMwatsonxAuthenticationPortObjectSpec(AIPortObjectSpec):
 
         api_client = self._get_api_client(ctx)
 
-        chat_models = api_client.foundation_models.get_chat_model_specs()
+        chat_models = api_client.get_chat_model_specs()
 
         return [model["model_id"] for model in chat_models["resources"]]
 
@@ -169,7 +161,7 @@ class IBMwatsonxAuthenticationPortObjectSpec(AIPortObjectSpec):
 
         api_client = self._get_api_client(ctx)
 
-        embedding_models = api_client.foundation_models.get_embeddings_model_specs()
+        embedding_models = api_client.get_embeddings_model_specs()
 
         return [model["model_id"] for model in embedding_models["resources"]]
 
@@ -188,9 +180,9 @@ class IBMwatsonxAuthenticationPortObjectSpec(AIPortObjectSpec):
         type = self.project_or_space.type
 
         items = (
-            api_client.projects.list()
+            api_client.list_projects()
             if type == ProjectOrSpaceSelection.PROJECT.name
-            else api_client.spaces.list()
+            else api_client.list_spaces()
         )
 
         for item_name, item_id in zip(items["NAME"], items["ID"]):

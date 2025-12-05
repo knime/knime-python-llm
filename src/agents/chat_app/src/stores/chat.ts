@@ -182,6 +182,7 @@ export const useChatStore = defineStore("chat", () => {
   const lastMessage = shallowRef<Message | undefined>();
   const config = ref<Config | null>(null); // node settings that affect rendering
   const isLoading = ref(false); // true if agent is currently responding to user message
+  const isInterrupted = ref(false); // true if agent is currently responding to cancellation
   const chatItems = ref<ChatItem[]>([]);
   const lastUserMessage = ref("");
   const jsonDataService = ref<JsonDataService | null>(null);
@@ -357,6 +358,19 @@ export const useChatStore = defineStore("chat", () => {
     }
   }
 
+  async function cancelAgent() {
+    try {
+      isInterrupted.value = true;
+      await jsonDataService.value?.data({
+        method: "cancel_agent",
+      });
+      return;
+    } catch (error) {
+      consola.error("Chat Store: Failed to cancel agent:", error);
+      throw error;
+    }
+  }
+
   async function postUserMessage(msg: string) {
     try {
       await jsonDataService.value?.data({
@@ -458,8 +472,8 @@ export const useChatStore = defineStore("chat", () => {
     const lastMessagesToDisplay = showToolCallsResults
       ? msgs
       : msgs.filter(
-          (msg) => !isToolMessage(msg) && !isAiMessageWithToolCalls(msg),
-        );
+        (msg) => !isToolMessage(msg) && !isAiMessageWithToolCalls(msg),
+      );
     const activeTimeline = chatItems.value.findLast(
       (item) => item.type === "timeline" && item.status === "active",
     ) as Timeline | undefined;
@@ -472,6 +486,7 @@ export const useChatStore = defineStore("chat", () => {
 
   function finishLoading(shallApplyViewData: boolean) {
     isLoading.value = false;
+    isInterrupted.value = false;
     const viewData: ViewData = {
       conversation: messagesToPersist,
       config: toRaw(config.value!),
@@ -495,6 +510,7 @@ export const useChatStore = defineStore("chat", () => {
     config.value = null;
     chatItems.value = [];
     isLoading.value = false;
+    isInterrupted.value = false;
     lastUserMessage.value = "";
     jsonDataService.value = null;
     initState.value = "idle";
@@ -507,6 +523,7 @@ export const useChatStore = defineStore("chat", () => {
     chatItems,
     lastMessage,
     isLoading,
+    isInterrupted,
     lastUserMessage,
     jsonDataService,
     initState,
@@ -532,5 +549,6 @@ export const useChatStore = defineStore("chat", () => {
     flushRequestQueue,
     pollForNewMessages,
     resetChat,
+    cancelAgent,
   };
 });

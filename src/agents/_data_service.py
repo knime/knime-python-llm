@@ -106,7 +106,7 @@ class AgentChatWidgetDataService:
 
         self._message_queue = self._conversation.frontend
         self._thread = None
-        self._is_canceled = False  # TODO modified by frontend
+        self._is_canceled = False
 
     def get_initial_message(self):
         if self._widget_config.initial_message:
@@ -116,6 +116,7 @@ class AgentChatWidgetDataService:
             }
 
     def post_user_message(self, user_message: str):
+        self._is_canceled = False
         if not self._thread or not self._thread.is_alive():
             while not self._message_queue.empty():
                 try:
@@ -156,6 +157,9 @@ class AgentChatWidgetDataService:
     def get_combined_tools_workflow_info(self):
         return self._get_combined_tools_workflow_info
 
+    def cancel_agent(self):
+        self._is_canceled = True
+
     # called by java, not the frontend
     def get_view_data(self):
         
@@ -192,6 +196,8 @@ class AgentChatWidgetDataService:
             self._handle_iteration_limit_error()
         except Exception as e:
             self._conversation.append_error(e)
+        finally:
+            self._is_canceled = False
 
     def _handle_iteration_limit_error(self):
         from langchain_core.messages import AIMessage

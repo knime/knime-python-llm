@@ -357,6 +357,18 @@ export const useChatStore = defineStore("chat", () => {
     }
   }
 
+  async function cancelAgent() {
+    try {
+      await jsonDataService.value?.data({
+        method: "cancel_agent",
+      });
+      return;
+    } catch (error) {
+      consola.error("Chat Store: Failed to cancel agent:", error);
+      throw error;
+    }
+  }
+
   async function postUserMessage(msg: string) {
     try {
       await jsonDataService.value?.data({
@@ -458,8 +470,8 @@ export const useChatStore = defineStore("chat", () => {
     const lastMessagesToDisplay = showToolCallsResults
       ? msgs
       : msgs.filter(
-          (msg) => !isToolMessage(msg) && !isAiMessageWithToolCalls(msg),
-        );
+        (msg) => !isToolMessage(msg) && !isAiMessageWithToolCalls(msg),
+      );
     const activeTimeline = chatItems.value.findLast(
       (item) => item.type === "timeline" && item.status === "active",
     ) as Timeline | undefined;
@@ -532,5 +544,6 @@ export const useChatStore = defineStore("chat", () => {
     flushRequestQueue,
     pollForNewMessages,
     resetChat,
+    cancelAgent,
   };
 });

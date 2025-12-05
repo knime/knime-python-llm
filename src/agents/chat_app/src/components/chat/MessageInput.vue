@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { useTextareaAutosize } from "@vueuse/core";
 
 import { FunctionButton } from "@knime/components";
 import SendIcon from "@knime/styles/img/icons/paper-flier.svg";
+import AbortIcon from "@knime/styles/img/icons/close.svg";
 
 import { useChatStore } from "@/stores/chat";
 
@@ -13,7 +14,10 @@ const { textarea, input } = useTextareaAutosize();
 const characterLimit = 5000;
 
 const isInputValid = computed(() => input.value?.trim().length > 0);
-const isDisabled = computed(() => !isInputValid.value || chatStore.isLoading);
+const isCanceled = ref(false); // would need to be reset
+const isDisabled = computed(() => (!isInputValid.value && !chatStore.isLoading) || isCanceled.value);
+const isProcessing = computed(() => chatStore.isLoading);
+
 
 const handleClick = (event: MouseEvent) => {
   if (event.target === event.currentTarget) {
@@ -22,8 +26,13 @@ const handleClick = (event: MouseEvent) => {
 };
 
 const handleSubmit = () => {
-  chatStore.sendUserMessage(input.value);
-  input.value = "";
+  if (isProcessing.value) {
+    isCanceled.value = true;
+    chatStore.cancelAgent();
+  } else {
+    chatStore.sendUserMessage(input.value);
+    input.value = "";
+  }
 };
 
 const handleKeyDown = (event: KeyboardEvent) => {
@@ -60,7 +69,18 @@ const handleKeyDown = (event: KeyboardEvent) => {
       :disabled="isDisabled"
       @click="handleSubmit"
     >
-      <SendIcon class="send-icon" aria-hidden="true" focusable="false" />
+      <AbortIcon
+        v-if="isProcessing"
+        class="abort-icon"
+        aria-hidden="true"
+        focusable="false"
+      />
+      <SendIcon
+        v-else
+        class="send-icon"
+        aria-hidden="true"
+        focusable="false"
+      />
     </FunctionButton>
   </div>
 </template>
@@ -102,7 +122,7 @@ const handleKeyDown = (event: KeyboardEvent) => {
     & svg {
       stroke: var(--knime-dove-gray);
 
-      &.send-icon {
+      & .send-icon .abort-icon {
         margin-left: -1px;
       }
     }

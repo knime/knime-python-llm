@@ -62,7 +62,6 @@ from knime.types.message import from_langchain_message
 
 import pandas as pd
 
-
 class AgentChatWidgetDataService:
     def __init__(
         self,
@@ -94,6 +93,8 @@ class AgentChatWidgetDataService:
         self._message_queue = queue.Queue()
         self._thread = None
 
+        self._is_canceled = False
+        
     @property
     def _config(self):
         return {
@@ -113,6 +114,7 @@ class AgentChatWidgetDataService:
             }
 
     def post_user_message(self, user_message: str):
+        self._is_canceled = False
         if not self._thread or not self._thread.is_alive():
             while not self._message_queue.empty():
                 try:
@@ -153,6 +155,9 @@ class AgentChatWidgetDataService:
     def get_combined_tools_workflow_info(self):
         return self._get_combined_tools_workflow_info
 
+    def cancel_agent(self):
+        self._is_canceled = True
+
     # called by java, not the frontend
     def get_view_data(self):
         desanitized_messages = [
@@ -181,6 +186,9 @@ class AgentChatWidgetDataService:
             )
 
             final_state = None
+            # TODO have interrupts and check self.is_canceled
+            # TODO keep messages or revert to older snapshot
+            # TODO handle if tool messages are missing for tool id
             for state in state_stream:
                 final_state = state["agent"] if "agent" in state else state["tools"]
                 new_messages = final_state["messages"]

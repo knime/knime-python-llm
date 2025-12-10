@@ -901,6 +901,14 @@ class AgentChatWidget:
 
     recursion_limit_handling = recursion_limit_mode_param_for_view()
 
+    keep_failed_tools = knext.BoolParameter(
+        "Keep failed tools",
+        "If checked, failed tool calls will be kept in the combined tools workflow being output by the node.",
+        default_value=True,
+        is_advanced=True,
+        since_version="5.10.0",
+    )
+
     debug = _debug_mode_parameter()
 
     data_message_prefix = _data_message_prefix_parameter()
@@ -1000,7 +1008,7 @@ class AgentChatWidget:
 
         if view_data is None:
             project_id, workflow_id, input_ids = ctx._init_combined_tools_workflow(
-                input_tables, execution_mode.name
+                input_tables, execution_mode.name, not self.keep_failed_tools
             )
             data_registry = DataRegistry.create_with_input_tables(
                 input_tables,
@@ -1009,7 +1017,7 @@ class AgentChatWidget:
             )
         else:
             project_id, workflow_id, input_ids = ctx._init_combined_tools_workflow(
-                [], execution_mode.name
+                [], execution_mode.name, not self.keep_failed_tools
             )
             data_registry = DataRegistry.load(
                 view_data["data"]["data_registry"], view_data["ports_for_ids"]

@@ -62,6 +62,7 @@ from knime.types.message import from_langchain_message
 
 import pandas as pd
 
+
 class AgentChatWidgetDataService:
     def __init__(
         self,
@@ -94,7 +95,7 @@ class AgentChatWidgetDataService:
         self._thread = None
 
         self._is_canceled = False
-        
+
     @property
     def _config(self):
         return {
@@ -177,36 +178,54 @@ class AgentChatWidgetDataService:
 
     def _post_user_message(self, user_message: str):
         from langgraph.errors import GraphRecursionError
+        from langchain_core.messages.ai import AIMessage
 
         try:
-            state_stream = self._agent_graph.stream(
-                {"messages": [HumanMessage(content=user_message)]},
-                self._config,
-                stream_mode="updates",  # streams state by state incrementally
-            )
-
+            input = {"messages": [HumanMessage(content=user_message)]}
+            continue_loop = True
             final_state = None
-            # TODO have interrupts and check self.is_canceled
-            # TODO keep messages or revert to older snapshot
-            # TODO handle if tool messages are missing for tool id
-            for state in state_stream:
-                final_state = state["agent"] if "agent" in state else state["tools"]
-                new_messages = final_state["messages"]
 
-                for new_message in new_messages:
-                    # already added
-                    if isinstance(new_message, HumanMessage):
-                        continue
+            while continue_loop:
+                continue_loop = False
+                state_stream = self._agent_graph.stream(
+                    input,
+                    self._config,
+                    stream_mode="updates",
+                )
 
-                    if new_message.content != LANGGRAPH_RECURSION_MESSAGE:
-                        fe_messages = self._to_frontend_messages(new_message)
-                        for fe_msg in fe_messages:
-                            self._message_queue.put(fe_msg)
-                    else:
-                        raise RecursionError("Recursion limit was reached.")
+                for state in state_stream:
+                    if "__interrupt__" in state:
+                        if not self._is_canceled:
+                            continue_loop = True
+                            input = None
+                        break
+
+                    final_state = state["agent"] if "agent" in state else state["tools"]
+                    new_messages = final_state["messages"]
+
+                    for new_message in new_messages:
+                        # already added
+                        if isinstance(new_message, HumanMessage):
+                            continue
+
+                        if new_message.content != LANGGRAPH_RECURSION_MESSAGE:
+                            fe_messages = self._to_frontend_messages(new_message)
+                            for fe_msg in fe_messages:
+                                self._message_queue.put(fe_msg)
+                        else:
+                            raise RecursionError("Recursion limit was reached.")
 
             if final_state and final_state["messages"]:
-                validate_ai_message(self._messages[-1])
+                msg = self._messages[-1]
+                if isinstance(msg, AIMessage):
+                    validate_ai_message(self._messages[-1])
+
+            if self._is_canceled:
+                cancel_message = {
+                    "type": "error",
+                    "content": "The execution was canceled.",
+                }
+                self._message_queue.put(cancel_message)
 
         except (GraphRecursionError, RecursionError):
             self._handle_recursion_limit_error()
@@ -215,6 +234,8 @@ class AgentChatWidgetDataService:
             error_message = {"type": "error", "content": content}
             self._message_queue.put(error_message)
             self._append_ai_message_to_memory(content)
+        finally:
+            self._is_canceled = False
 
     def _to_frontend_messages(self, message):
         # split the node-view-ids out into a separate message

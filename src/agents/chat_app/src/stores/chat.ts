@@ -182,6 +182,7 @@ export const useChatStore = defineStore("chat", () => {
   const lastMessage = shallowRef<Message | undefined>();
   const config = ref<Config | null>(null); // node settings that affect rendering
   const isLoading = ref(false); // true if agent is currently responding to user message
+  const isInterrupted = ref(false); // true if agent is currently responding to cancellation
   const chatItems = ref<ChatItem[]>([]);
   const lastUserMessage = ref("");
   const jsonDataService = ref<JsonDataService | null>(null);
@@ -359,6 +360,7 @@ export const useChatStore = defineStore("chat", () => {
 
   async function cancelAgent() {
     try {
+      isInterrupted.value = true;
       await jsonDataService.value?.data({
         method: "cancel_agent",
       });
@@ -484,6 +486,7 @@ export const useChatStore = defineStore("chat", () => {
 
   function finishLoading(shallApplyViewData: boolean) {
     isLoading.value = false;
+    isInterrupted.value = false;
     const viewData: ViewData = {
       conversation: messagesToPersist,
       config: toRaw(config.value!),
@@ -507,6 +510,7 @@ export const useChatStore = defineStore("chat", () => {
     config.value = null;
     chatItems.value = [];
     isLoading.value = false;
+    isInterrupted.value = false;
     lastUserMessage.value = "";
     jsonDataService.value = null;
     initState.value = "idle";
@@ -519,6 +523,7 @@ export const useChatStore = defineStore("chat", () => {
     chatItems,
     lastMessage,
     isLoading,
+    isInterrupted,
     lastUserMessage,
     jsonDataService,
     initState,

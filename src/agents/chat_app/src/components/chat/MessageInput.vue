@@ -14,8 +14,7 @@ const { textarea, input } = useTextareaAutosize();
 const characterLimit = 5000;
 
 const isInputValid = computed(() => input.value?.trim().length > 0);
-const isCanceled = ref(false); // would need to be reset
-const isDisabled = computed(() => (!isInputValid.value && !chatStore.isLoading) || isCanceled.value);
+const isDisabled = computed(() => (!isInputValid.value && !chatStore.isLoading) || chatStore.isInterrupted);
 const isProcessing = computed(() => chatStore.isLoading);
 
 
@@ -27,7 +26,6 @@ const handleClick = (event: MouseEvent) => {
 
 const handleSubmit = () => {
   if (isProcessing.value) {
-    isCanceled.value = true;
     chatStore.cancelAgent();
   } else {
     chatStore.sendUserMessage(input.value);
@@ -37,7 +35,7 @@ const handleSubmit = () => {
 
 const handleKeyDown = (event: KeyboardEvent) => {
   // enter: send message
-  if (event.key === "Enter" && !event.shiftKey && !isDisabled.value) {
+  if (event.key === "Enter" && !isProcessing.value && !event.shiftKey && !isDisabled.value) {
     event.preventDefault();
     handleSubmit();
   }

@@ -74,9 +74,6 @@ from ._parameters import recursion_limit_mode_param_for_view
 from ._agent import RecursionError
 
 import os
-import logging
-
-_logger = logging.getLogger(__name__)
 
 
 agent_icon = "icons/generic/agent.png"
@@ -1026,7 +1023,11 @@ class AgentChatWidget:
 
         memory = MemorySaver()
         agent = create_react_agent(
-            chat_model, tools=tools, prompt=self.developer_message, checkpointer=memory
+            chat_model,
+            tools=tools,
+            prompt=self.developer_message,
+            checkpointer=memory,
+            interrupt_before=["agent"],
         )
 
         self._fill_memory_with_messages(agent, view_data, data_registry, tool_converter)

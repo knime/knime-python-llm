@@ -368,15 +368,18 @@ class TestStructuredResponsesToTable(unittest.TestCase):
         
         settings.output_fields = [field1]
         
-        # Create wrapper model
-        model = structured_output.create_pydantic_model(settings)
+        # In Many mode, create_pydantic_model returns a wrapper model with an 'items' field
+        # that contains a list of the actual item models
+        wrapper_model = structured_output.create_pydantic_model(settings)
         
-        # Create mock responses with items
+        # Create the base item model that matches the output fields
+        # This simulates what the LLM would return
         ItemModel = create_model("Item", item=(str, Field(description="item")))
         
+        # Create responses where each response has a list of items
         responses = [
-            model(items=[ItemModel(item="apple"), ItemModel(item="banana")]),
-            model(items=[ItemModel(item="carrot")]),
+            wrapper_model(items=[ItemModel(item="apple"), ItemModel(item="banana")]),
+            wrapper_model(items=[ItemModel(item="carrot")]),
         ]
         
         result = structured_output.structured_responses_to_table(responses, settings)

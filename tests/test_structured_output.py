@@ -49,7 +49,7 @@ Tests for the structured_output module.
 import unittest
 import pyarrow as pa
 import knime.extension as knext
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, create_model
 from typing import List
 
 from src.models import structured_output
@@ -372,7 +372,6 @@ class TestStructuredResponsesToTable(unittest.TestCase):
         model = structured_output.create_pydantic_model(settings)
         
         # Create mock responses with items
-        from pydantic import Field, create_model
         ItemModel = create_model("Item", item=(str, Field(description="item")))
         
         responses = [

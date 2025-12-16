@@ -803,7 +803,7 @@ state that the tool could not be executed due to reaching the recursion limit.""
                 inputs,
                 config=config,
             )
-            recursion_counter = 1
+            recursion_counter = 0
             while True:
                 snap = graph.get_state(config)
                 if not snap.next:  # agent finished

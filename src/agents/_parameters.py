@@ -46,6 +46,31 @@
 import knime_extension as knext
 
 
+class RecursionLimitMode(knext.EnumParameterOptions):
+    FAIL = (
+        "Fail",
+        "Execution fails if the recursion limit is reached.",
+    )
+    FINAL_RESPONSE = (
+        "Final response",
+        "A user message is appended to the conversation that prompts the LLM to generate a final response "
+        "based on all previously generated messages.",
+    )
+
+
+class ErrorHandlingMode(knext.EnumParameterOptions):
+    FAIL = (
+        "Fail",
+        "Execution fails if there is an error.",
+    )
+    COLUMN = (
+        "Error column",
+        "Execution is stopped if there is an error. The output table will contain an additional string "
+        "column containing error messages. If there was an error, the corresponding row will contain a "
+        "missing value in the conversation column.",
+    )
+
+
 class RecursionLimitModeForView(knext.EnumParameterOptions):
     FAIL = (
         "Fail",
@@ -60,7 +85,7 @@ class RecursionLimitModeForView(knext.EnumParameterOptions):
 
 def recursion_limit_mode_param_for_view():
     return knext.EnumParameter(
-        "Recursion limit handling",
+        "If recursion limit is reached",
         "Specify how the agent should behave when the recursion limit is reached.",
         RecursionLimitModeForView.FAIL.name,
         RecursionLimitModeForView,

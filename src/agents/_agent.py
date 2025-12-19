@@ -42,7 +42,10 @@
 #  when such Node is propagated with or for interoperation with KNIME.
 # ------------------------------------------------------------------------
 
-from langchain_core.messages import AIMessage
+from dataclasses import dataclass
+from typing import Protocol, Sequence
+from langchain_core.messages import BaseMessage, AIMessage, ToolMessage
+from langchain_core.language_models.chat_models import BaseChatModel
 
 LANGGRAPH_RECURSION_MESSAGE = "Sorry, need more steps to process this request."
 RECURSION_CONTINUE_PROMPT = (
@@ -87,3 +90,79 @@ def validate_ai_message(msg: AIMessage):
 
 class RecursionError(RuntimeError):
     pass
+
+
+class Conversation(Protocol):
+    def append_messages(self, messages): ...
+
+    def append_error(self, error): ...
+
+    def get_messages(self): ...
+
+
+class Toolset(Protocol):
+    # need to be openai compatible
+    @property
+    def tools(self): ...
+
+    def execute(self, tool_calls) -> list[ToolMessage]: ...
+
+
+class Context(Protocol):
+    def is_cancelled(self) -> bool: ...
+
+
+@dataclass
+class AgentConfig:
+    iteration_limit: int = 10
+
+
+class IterationLimitError(RuntimeError):
+    pass
+
+
+class Agent:
+    def __init__(
+        self,
+        conversation: Conversation,
+        llm: BaseChatModel,
+        toolset: Toolset,
+        config: AgentConfig,
+    ):
+        tools = toolset.tools
+        if tools:
+            self._agent = llm.bind_tools(toolset.tools)
+        else:
+            self._agent = llm
+        self._conversation = conversation
+        self._config = config
+        self._toolset = toolset
+
+    def run(self, ctx: Context):
+        """Run the agents turn in the conversation."""
+        for _ in range(self._config.iteration_limit):
+            # TODO return if canceled (with message?)
+            try:
+                response = self._agent.invoke(self._conversation.get_messages())
+                self._append_messages(response)
+            except Exception as error:
+                self._conversation.append_error(error)
+                continue
+            if response.tool_calls:  # TODO adapt syntax
+                try:
+                    results = self._toolset.execute(response.tool_calls)
+                    self._append_messages(results)
+                except Exception as error:
+                    self._conversation.append_error(error)
+                    continue
+            else:
+                return
+        # TODO dedicated exception
+        raise IterationLimitError("Reached iteration limit")
+
+    def _append_messages(self, messages: Sequence[BaseMessage] | BaseMessage):
+        if not isinstance(
+            messages, Sequence
+        ):  # TODO double check that's done correctly
+            messages = [messages]
+        self._conversation.append_messages(messages)

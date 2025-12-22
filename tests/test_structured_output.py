@@ -49,10 +49,26 @@ Tests for the structured_output module.
 import unittest
 import pyarrow as pa
 import knime.extension as knext
-from pydantic import BaseModel, Field, create_model
-from typing import List
-
 from models import structured_output
+
+
+# Mock classes to work around ParameterGroupHolder issues when setting parameter arrays directly
+class MockOutputField:
+    """Mock for OutputField parameter group."""
+    def __init__(self, name="", field_type="String", description=""):
+        self.name = name
+        self.field_type = field_type
+        self.description = description
+
+
+class MockStructuredOutputSettings:
+    """Mock for StructuredOutputSettings parameter group."""
+    def __init__(self):
+        self.structure_name = "ExtractedData"
+        self.structure_description = ""
+        self.output_fields = []
+        self.output_rows_per_input_row = structured_output.OutputRowsPerInputRow.One.name
+        self.input_row_id_column_name = "Input Row ID"
 
 
 class TestOutputFieldType(unittest.TestCase):
@@ -92,7 +108,7 @@ class TestValidateOutputFields(unittest.TestCase):
         self.assertIn("At least one output column", str(cm.exception))
 
     def test_field_without_name_raises_error(self):
-        field = structured_output.OutputField()
+        field = MockOutputField()
         field.name = ""
         field.field_type = structured_output.OutputFieldType.String.name
         
@@ -101,7 +117,7 @@ class TestValidateOutputFields(unittest.TestCase):
         self.assertIn("must have a name", str(cm.exception))
 
     def test_field_with_invalid_characters_raises_error(self):
-        field = structured_output.OutputField()
+        field = MockOutputField()
         field.name = "invalid@name"
         field.field_type = structured_output.OutputFieldType.String.name
         
@@ -110,11 +126,11 @@ class TestValidateOutputFields(unittest.TestCase):
         self.assertIn("must contain only letters, numbers, underscores, and spaces", str(cm.exception))
 
     def test_duplicate_field_names_raises_error(self):
-        field1 = structured_output.OutputField()
+        field1 = MockOutputField()
         field1.name = "same_name"
         field1.field_type = structured_output.OutputFieldType.String.name
         
-        field2 = structured_output.OutputField()
+        field2 = MockOutputField()
         field2.name = "same_name"
         field2.field_type = structured_output.OutputFieldType.Integer.name
         
@@ -123,11 +139,11 @@ class TestValidateOutputFields(unittest.TestCase):
         self.assertIn("Duplicate output column name", str(cm.exception))
 
     def test_valid_fields_pass(self):
-        field1 = structured_output.OutputField()
+        field1 = MockOutputField()
         field1.name = "field_one"
         field1.field_type = structured_output.OutputFieldType.String.name
         
-        field2 = structured_output.OutputField()
+        field2 = MockOutputField()
         field2.name = "field two"
         field2.field_type = structured_output.OutputFieldType.Integer.name
         
@@ -139,12 +155,12 @@ class TestCreatePydanticModel(unittest.TestCase):
     """Test create_pydantic_model function."""
 
     def test_create_simple_model_one_row(self):
-        settings = structured_output.StructuredOutputSettings()
+        settings = MockStructuredOutputSettings()
         settings.structure_name = "TestModel"
         settings.structure_description = "Test description"
         settings.output_rows_per_input_row = structured_output.OutputRowsPerInputRow.One.name
         
-        field = structured_output.OutputField()
+        field = MockOutputField()
         field.name = "text_field"
         field.field_type = structured_output.OutputFieldType.String.name
         field.description = "A text field"
@@ -160,11 +176,11 @@ class TestCreatePydanticModel(unittest.TestCase):
         self.assertIn("text_field", model.model_fields)
 
     def test_create_model_with_many_rows(self):
-        settings = structured_output.StructuredOutputSettings()
+        settings = MockStructuredOutputSettings()
         settings.structure_name = "ItemModel"
         settings.output_rows_per_input_row = structured_output.OutputRowsPerInputRow.Many.name
         
-        field = structured_output.OutputField()
+        field = MockOutputField()
         field.name = "item_name"
         field.field_type = structured_output.OutputFieldType.String.name
         
@@ -179,19 +195,19 @@ class TestCreatePydanticModel(unittest.TestCase):
         self.assertIn("items", model.model_fields)
 
     def test_create_model_with_multiple_field_types(self):
-        settings = structured_output.StructuredOutputSettings()
+        settings = MockStructuredOutputSettings()
         settings.structure_name = "MixedModel"
         settings.output_rows_per_input_row = structured_output.OutputRowsPerInputRow.One.name
         
-        field1 = structured_output.OutputField()
+        field1 = MockOutputField()
         field1.name = "text"
         field1.field_type = structured_output.OutputFieldType.String.name
         
-        field2 = structured_output.OutputField()
+        field2 = MockOutputField()
         field2.name = "number"
         field2.field_type = structured_output.OutputFieldType.Integer.name
         
-        field3 = structured_output.OutputField()
+        field3 = MockOutputField()
         field3.name = "flag"
         field3.field_type = structured_output.OutputFieldType.Boolean.name
         
@@ -306,13 +322,13 @@ class TestCreateEmpty(unittest.TestCase):
     """Test create_empty function."""
 
     def test_create_empty_table(self):
-        settings = structured_output.StructuredOutputSettings()
+        settings = MockStructuredOutputSettings()
         
-        field1 = structured_output.OutputField()
+        field1 = MockOutputField()
         field1.name = "field1"
         field1.field_type = structured_output.OutputFieldType.String.name
         
-        field2 = structured_output.OutputField()
+        field2 = MockOutputField()
         field2.name = "field2"
         field2.field_type = structured_output.OutputFieldType.Integer.name
         
@@ -331,14 +347,14 @@ class TestStructuredResponsesToTable(unittest.TestCase):
     """Test structured_responses_to_table function."""
 
     def test_convert_single_responses(self):
-        settings = structured_output.StructuredOutputSettings()
+        settings = MockStructuredOutputSettings()
         settings.output_rows_per_input_row = structured_output.OutputRowsPerInputRow.One.name
         
-        field1 = structured_output.OutputField()
+        field1 = MockOutputField()
         field1.name = "name"
         field1.field_type = structured_output.OutputFieldType.String.name
         
-        field2 = structured_output.OutputField()
+        field2 = MockOutputField()
         field2.name = "age"
         field2.field_type = structured_output.OutputFieldType.Integer.name
         
@@ -358,11 +374,11 @@ class TestStructuredResponsesToTable(unittest.TestCase):
         self.assertEqual(result["age"].to_pylist(), [30, 25])
 
     def test_convert_many_responses(self):
-        settings = structured_output.StructuredOutputSettings()
+        settings = MockStructuredOutputSettings()
         settings.structure_name = "Item"
         settings.output_rows_per_input_row = structured_output.OutputRowsPerInputRow.Many.name
         
-        field1 = structured_output.OutputField()
+        field1 = MockOutputField()
         field1.name = "item"
         field1.field_type = structured_output.OutputFieldType.String.name
         
@@ -372,9 +388,9 @@ class TestStructuredResponsesToTable(unittest.TestCase):
         # that contains a list of the actual item models
         wrapper_model = structured_output.create_pydantic_model(settings)
         
-        # Create the base item model that matches the output fields
-        # This simulates what the LLM would return
-        ItemModel = create_model("Item", item=(str, Field(description="item")))
+        # Extract the item type from the wrapper model to ensure we use the correct model
+        items_field = wrapper_model.model_fields['items']
+        ItemModel = items_field.annotation.__args__[0]  # Get the List[ItemModel] inner type
         
         # Create responses where each response has a list of items
         responses = [
@@ -393,10 +409,10 @@ class TestExplodeLists(unittest.TestCase):
     """Test explode_lists function."""
 
     def test_explode_simple_lists(self):
-        settings = structured_output.StructuredOutputSettings()
+        settings = MockStructuredOutputSettings()
         settings.input_row_id_column_name = "Input Row ID"
         
-        field1 = structured_output.OutputField()
+        field1 = MockOutputField()
         field1.name = "items"
         field1.field_type = structured_output.OutputFieldType.StringList.name
         
@@ -428,10 +444,10 @@ class TestPostprocessTable(unittest.TestCase):
     """Test postprocess_table function."""
 
     def test_postprocess_one_row_per_input(self):
-        settings = structured_output.StructuredOutputSettings()
+        settings = MockStructuredOutputSettings()
         settings.output_rows_per_input_row = structured_output.OutputRowsPerInputRow.One.name
         
-        field = structured_output.OutputField()
+        field = MockOutputField()
         field.name = "output"
         field.field_type = structured_output.OutputFieldType.String.name
         settings.output_fields = [field]
@@ -451,11 +467,11 @@ class TestPostprocessTable(unittest.TestCase):
         self.assertIn("output", result.column_names)
 
     def test_postprocess_many_rows_per_input(self):
-        settings = structured_output.StructuredOutputSettings()
+        settings = MockStructuredOutputSettings()
         settings.output_rows_per_input_row = structured_output.OutputRowsPerInputRow.Many.name
         settings.input_row_id_column_name = "Input Row ID"
         
-        field = structured_output.OutputField()
+        field = MockOutputField()
         field.name = "output"
         field.field_type = structured_output.OutputFieldType.StringList.name
         settings.output_fields = [field]
@@ -479,13 +495,14 @@ class TestAddStructuredOutputColumns(unittest.TestCase):
     """Test add_structured_output_columns function."""
 
     def test_add_columns_one_row(self):
-        settings = structured_output.StructuredOutputSettings()
+        settings = MockStructuredOutputSettings()
         settings.output_rows_per_input_row = structured_output.OutputRowsPerInputRow.One.name
         
-        field = structured_output.OutputField()
+        field = MockOutputField()
         field.name = "new_col"
         field.field_type = structured_output.OutputFieldType.String.name
         settings.output_fields = [field]
+
         
         input_schema = knext.Schema.from_columns([
             knext.Column(knext.int64(), "existing_col")
@@ -493,15 +510,15 @@ class TestAddStructuredOutputColumns(unittest.TestCase):
         
         result = structured_output.add_structured_output_columns(input_schema, settings)
         
-        self.assertEqual(len(result), 2)
+        self.assertEqual(len(list(result)), 2)
         self.assertIn("new_col", result.column_names)
 
     def test_add_columns_many_rows(self):
-        settings = structured_output.StructuredOutputSettings()
+        settings = MockStructuredOutputSettings()
         settings.output_rows_per_input_row = structured_output.OutputRowsPerInputRow.Many.name
         settings.input_row_id_column_name = "Input Row ID"
         
-        field = structured_output.OutputField()
+        field = MockOutputField()
         field.name = "new_col"
         field.field_type = structured_output.OutputFieldType.String.name
         settings.output_fields = [field]
@@ -513,7 +530,7 @@ class TestAddStructuredOutputColumns(unittest.TestCase):
         result = structured_output.add_structured_output_columns(input_schema, settings)
         
         # Should add Input Row ID column and new_col
-        self.assertEqual(len(result), 3)
+        self.assertEqual(len(list(result)), 3)
         self.assertIn("Input Row ID", result.column_names)
         self.assertIn("new_col", result.column_names)
 

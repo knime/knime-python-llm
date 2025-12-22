@@ -45,6 +45,7 @@
 
 # KNIME / own imports
 import knime.extension as knext
+import knime.extension.nodes as kn
 from .base import model_category, CredentialsSettings, OutputFormatOptions
 
 from models.openai import (
@@ -62,6 +63,7 @@ from models.openai import (
 
 # Other imports
 import logging
+from typing import Optional
 
 
 azure_icon = "icons/azure/azure_logo.png"
@@ -75,6 +77,8 @@ azure_openai_category = knext.category(
 
 LOGGER = logging.getLogger(__name__)
 
+credentials_port_type_id = "org.knime.credentials.base.CredentialPortObject"
+
 # == Port Objects ==
 
 
@@ -85,8 +89,9 @@ class AzureOpenAIAuthenticationPortObjectSpec(OpenAIAuthenticationPortObjectSpec
         base_url: str,
         api_version: str,
         api_type: str,
+        credential_spec: Optional[knext.CredentialPortObjectSpec] = None,
     ) -> None:
-        super().__init__(credentials, base_url)
+        super().__init__(credentials, base_url, credential_spec)
         self._api_version = api_version
         self._api_type = api_type
 
@@ -108,7 +113,19 @@ class AzureOpenAIAuthenticationPortObjectSpec(OpenAIAuthenticationPortObjectSpec
     @classmethod
     def deserialize(cls, data: dict):
         base_url = data["base_url"] if "base_url" in data else data["api_base"]
-        return cls(data["credentials"], base_url, data["api_version"], data["api_type"])
+        serialized_credential_spec = data.get("credential_spec")
+        credential_spec = (
+            None
+            if serialized_credential_spec is None
+            else knext.CredentialPortObjectSpec.deserialize(serialized_credential_spec)
+        )
+        return cls(
+            data["credentials"],
+            base_url,
+            data["api_version"],
+            data["api_type"],
+            credential_spec,
+        )
 
 
 class AzureOpenAIAuthenticationPortObject(OpenAIAuthenticationPortObject):
@@ -394,6 +411,14 @@ class AzureDeploymentSettings:
     )
 
 
+credentials_port_type = kn.get_port_type_for_id(credentials_port_type_id)
+
+
+def _has_auth_port(ctx: knext.DialogCreationContext) -> bool:
+    specs = ctx.get_input_specs()
+    return len(specs) == 1 and specs[0] is not None
+
+
 # region Authenticator
 @knext.node(
     "Azure OpenAI Authenticator",
@@ -401,6 +426,12 @@ class AzureDeploymentSettings:
     azure_icon,
     category=azure_openai_category,
     keywords=["GenAI", "Gen AI", "Generative AI", "OpenAI"],
+)
+@knext.input_port(
+    "Credentials",
+    "Credentials for connecting to the Azure OpenAI API.",
+    port_type=credentials_port_type,
+    optional=True,
 )
 @knext.output_port(
     "Azure OpenAI Authentication",
@@ -418,6 +449,9 @@ class AzureOpenAIAuthenticator:
     [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)
     and fed into this node via flow variable.
 
+    Alternatively, you can access an Azure OpenAI API via OAuth authentication by connecting a credential
+    port object to the dynamic input port.
+
     To find your Azure OpenAI API key, navigate to your Azure OpenAI Resource on the [Azure Portal](https://portal.azure.com/) and copy one of the keys from
     'Resource Management - Keys and Endpoints'.
 
@@ -430,8 +464,9 @@ class AzureOpenAIAuthenticator:
         label="Azure OpenAI API Key",
         description="""
         The credentials containing the OpenAI API key in its *password* field (the *username* is ignored).
+        Only shown if the optional credential port is not connected.
         """,
-    )
+    ).rule(knext.DialogContextCondition(_has_auth_port), knext.Effect.HIDE)
 
     azure_connection = AzureSettings()
 
@@ -444,13 +479,16 @@ class AzureOpenAIAuthenticator:
     )
 
     def configure(
-        self, ctx: knext.ConfigurationContext
+        self,
+        ctx: knext.ConfigurationContext,
+        credential: Optional[knext.CredentialPortObjectSpec],
     ) -> AzureOpenAIAuthenticationPortObjectSpec:
-        if not ctx.get_credential_names():
-            raise knext.InvalidParametersError("Credentials not provided.")
+        if credential is None:
+            if not ctx.get_credential_names():
+                raise knext.InvalidParametersError("Credentials not provided.")
 
-        if not self.credentials_settings.credentials_param:
-            raise knext.InvalidParametersError("Credentials not selected.")
+            if not self.credentials_settings.credentials_param:
+                raise knext.InvalidParametersError("Credentials not selected.")
 
         if not self.azure_connection.api_base:
             raise knext.InvalidParametersError("API endpoint not provided.")
@@ -458,26 +496,44 @@ class AzureOpenAIAuthenticator:
         if not self.azure_connection.api_version:
             raise knext.InvalidParametersError("API version not provided.")
 
-        spec = self.create_spec()
+        spec = self.create_spec(credential)
         spec.validate_context(ctx)
         return spec
 
     def execute(
-        self, ctx: knext.ExecutionContext
+        self, ctx: knext.ExecutionContext, credential: Optional[knext.PortObject]
     ) -> AzureOpenAIAuthenticationPortObject:
         if self.verify_settings:
-            self._verify_settings(ctx)
+            self._verify_settings(ctx, None if credential is None else credential.spec)
 
-        return AzureOpenAIAuthenticationPortObject(self.create_spec())
+        return AzureOpenAIAuthenticationPortObject(
+            self.create_spec(None if credential is None else credential.spec)
+        )
 
-    def _verify_settings(self, ctx):
+    def _verify_settings(
+        self,
+        ctx: knext.ExecutionContext,
+        credential_spec: Optional[knext.CredentialPortObjectSpec],
+    ):
         import openai
+
+        # Get API key from credential spec or credential settings
+        if credential_spec is not None:
+            try:
+                api_key = credential_spec.auth_parameters
+            except ValueError:
+                raise knext.InvalidParametersError(
+                    """The Azure OpenAI API key is not available. Make sure that the node you are using to pass the
+                    credential port object is still passing the valid API key to the downstream nodes."""
+                )
+        else:
+            api_key = ctx.get_credentials(
+                self.credentials_settings.credentials_param,
+            ).password
 
         try:
             openai.AzureOpenAI(
-                api_key=ctx.get_credentials(
-                    self.credentials_settings.credentials_param,
-                ).password,
+                api_key=api_key,
                 api_version=self.azure_connection.api_version,
                 azure_endpoint=self.azure_connection.api_base,
             ).models.list()
@@ -496,12 +552,16 @@ class AzureOpenAIAuthenticator:
         except openai.AuthenticationError:
             raise knext.InvalidParametersError("Invalid API key provided.")
 
-    def create_spec(self) -> AzureOpenAIAuthenticationPortObjectSpec:
+    def create_spec(
+        self,
+        credential: Optional[knext.CredentialPortObjectSpec],
+    ) -> AzureOpenAIAuthenticationPortObjectSpec:
         return AzureOpenAIAuthenticationPortObjectSpec(
             self.credentials_settings.credentials_param,
             self.azure_connection.api_base,
             self.azure_connection.api_version,
             "azure",
+            credential,
         )
 
 

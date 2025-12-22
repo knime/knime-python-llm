@@ -52,7 +52,7 @@ import knime.extension as knext
 from pydantic import BaseModel, Field, create_model
 from typing import List
 
-from src.models import structured_output
+from models import structured_output
 
 
 class TestOutputFieldType(unittest.TestCase):

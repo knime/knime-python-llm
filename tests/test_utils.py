@@ -1,5 +1,5 @@
 import unittest
-from src.util import handle_column_name_collision
+from util import handle_column_name_collision
 
 # TODO run tests during every build
 

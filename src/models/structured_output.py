@@ -169,7 +169,7 @@ class StructuredOutputSettings:
     input_row_id_column_name = knext.StringParameter(
         label="Input row ID column name",
         description="Name of the column that will store the original input row ID when multiple output rows are created per input row.",
-        default_value="Input Row ID",
+        default_value="Input RowID",
     ).rule(
         knext.OneOf(output_rows_per_input_row, [OutputRowsPerInputRow.Many.name]),
         knext.Effect.SHOW,

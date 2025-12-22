@@ -134,9 +134,10 @@ class StructuredOutputSettings:
     
     structure_name = knext.StringParameter(
         label="Structure name",
-        description="""The name of the output structure. This helps the model understand what it is extracting.
+        description="""The name of the output structure. This helps the model understand what it is extracting. 
+        Invalid characters will be automatically converted to underscores.
         
-        Example: 'PersonInfo', 'ProductDetails', 'SentimentAnalysis'""",
+        Example: 'Person Info', 'Product Details', 'Sentiment Analysis'""",
         default_value="ExtractedData",
     )
 
@@ -245,7 +246,11 @@ def create_pydantic_model(settings):
         )
 
     # Use structure_name as the model name (default: "ExtractedData")
+    # Sanitize to comply with OpenAI's naming requirements (^[a-zA-Z0-9_-]+$)
+    # Replace invalid characters with underscores
+    import re
     model_name = settings.structure_name if settings.structure_name else "ExtractedData"
+    model_name = re.sub(r'[^a-zA-Z0-9_-]', '_', model_name)
     
     # Use structure_description as the model docstring if provided
     if settings.structure_description:

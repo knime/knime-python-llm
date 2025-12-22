@@ -220,6 +220,74 @@ class TestCreatePydanticModel(unittest.TestCase):
         self.assertIn("number", model.model_fields)
         self.assertIn("flag", model.model_fields)
 
+    def test_structure_name_with_spaces(self):
+        """Test that spaces in structure_name are converted to underscores."""
+        settings = MockStructuredOutputSettings()
+        settings.structure_name = "Person Info"
+        settings.output_rows_per_input_row = structured_output.OutputRowsPerInputRow.One.name
+        
+        field = MockOutputColumn()
+        field.name = "name"
+        field.column_type = structured_output.OutputColumnType.String.name
+        
+        settings.output_columns = [field]
+        
+        model = structured_output.create_pydantic_model(settings)
+        
+        # Check that model name has underscores instead of spaces
+        self.assertEqual(model.__name__, "Person_Info")
+
+    def test_structure_name_with_multiple_spaces(self):
+        """Test that multiple spaces are all converted to underscores."""
+        settings = MockStructuredOutputSettings()
+        settings.structure_name = "Product Detail Summary"
+        settings.output_rows_per_input_row = structured_output.OutputRowsPerInputRow.One.name
+        
+        field = MockOutputColumn()
+        field.name = "product"
+        field.column_type = structured_output.OutputColumnType.String.name
+        
+        settings.output_columns = [field]
+        
+        model = structured_output.create_pydantic_model(settings)
+        
+        # Check that all spaces are converted to underscores
+        self.assertEqual(model.__name__, "Product_Detail_Summary")
+
+    def test_structure_name_with_special_characters(self):
+        """Test that special characters are converted to underscores."""
+        settings = MockStructuredOutputSettings()
+        settings.structure_name = "Person@Info#123"
+        settings.output_rows_per_input_row = structured_output.OutputRowsPerInputRow.One.name
+        
+        field = MockOutputColumn()
+        field.name = "name"
+        field.column_type = structured_output.OutputColumnType.String.name
+        
+        settings.output_columns = [field]
+        
+        model = structured_output.create_pydantic_model(settings)
+        
+        # Check that special characters are converted to underscores
+        self.assertEqual(model.__name__, "Person_Info_123")
+
+    def test_structure_name_with_allowed_characters(self):
+        """Test that allowed characters (letters, numbers, underscores, hyphens) are preserved."""
+        settings = MockStructuredOutputSettings()
+        settings.structure_name = "Person-Info_123"
+        settings.output_rows_per_input_row = structured_output.OutputRowsPerInputRow.One.name
+        
+        field = MockOutputColumn()
+        field.name = "name"
+        field.column_type = structured_output.OutputColumnType.String.name
+        
+        settings.output_columns = [field]
+        
+        model = structured_output.create_pydantic_model(settings)
+        
+        # Check that allowed characters are preserved
+        self.assertEqual(model.__name__, "Person-Info_123")
+
 
 class TestGetOutputColumnKnimeType(unittest.TestCase):
     """Test get_output_column_knime_type function."""

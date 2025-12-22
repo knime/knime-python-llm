@@ -404,6 +404,78 @@ class TestStructuredResponsesToTable(unittest.TestCase):
         # Each row should have a list
         self.assertEqual(result["item"].to_pylist(), [["apple", "banana"], ["carrot"]])
 
+    def test_missing_values_in_responses(self):
+        """Test that missing values are properly handled when information cannot be extracted."""
+        settings = MockStructuredOutputSettings()
+        settings.output_rows_per_input_row = structured_output.OutputRowsPerInputRow.One.name
+        
+        field1 = MockOutputColumn()
+        field1.name = "name"
+        field1.column_type = structured_output.OutputColumnType.String.name
+        
+        field2 = MockOutputColumn()
+        field2.name = "age"
+        field2.column_type = structured_output.OutputColumnType.Integer.name
+        
+        field3 = MockOutputColumn()
+        field3.name = "city"
+        field3.column_type = structured_output.OutputColumnType.String.name
+        
+        settings.output_columns = [field1, field2, field3]
+        
+        # Create mock Pydantic model instances with some missing values
+        model = structured_output.create_pydantic_model(settings)
+        responses = [
+            model(name="Alice", age=30, city="NYC"),  # All fields present
+            model(name="Bob", age=None, city="LA"),   # Age missing
+            model(name=None, age=25, city=None),      # Name and city missing
+        ]
+        
+        result = structured_output.structured_responses_to_table(responses, settings)
+        
+        self.assertEqual(len(result), 3)
+        self.assertEqual(result["name"].to_pylist(), ["Alice", "Bob", None])
+        self.assertEqual(result["age"].to_pylist(), [30, None, 25])
+        self.assertEqual(result["city"].to_pylist(), ["NYC", "LA", None])
+
+    def test_missing_values_in_many_mode(self):
+        """Test that missing values work correctly in Many mode."""
+        settings = MockStructuredOutputSettings()
+        settings.structure_name = "Person"
+        settings.output_rows_per_input_row = structured_output.OutputRowsPerInputRow.Many.name
+        
+        field1 = MockOutputColumn()
+        field1.name = "name"
+        field1.column_type = structured_output.OutputColumnType.String.name
+        
+        field2 = MockOutputColumn()
+        field2.name = "age"
+        field2.column_type = structured_output.OutputColumnType.Integer.name
+        
+        settings.output_columns = [field1, field2]
+        
+        wrapper_model = structured_output.create_pydantic_model(settings)
+        items_field = wrapper_model.model_fields['items']
+        PersonModel = items_field.annotation.__args__[0]
+        
+        # Create responses with some missing values
+        responses = [
+            wrapper_model(items=[
+                PersonModel(name="Alice", age=30),
+                PersonModel(name="Bob", age=None),  # Age missing
+            ]),
+            wrapper_model(items=[
+                PersonModel(name=None, age=25),  # Name missing
+            ]),
+        ]
+        
+        result = structured_output.structured_responses_to_table(responses, settings)
+        
+        self.assertEqual(len(result), 2)
+        # Check that None values are preserved in lists
+        self.assertEqual(result["name"].to_pylist(), [["Alice", "Bob"], [None]])
+        self.assertEqual(result["age"].to_pylist(), [[30, None], [25]])
+
 
 class TestExplodeLists(unittest.TestCase):
     """Test explode_lists function."""

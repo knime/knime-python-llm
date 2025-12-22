@@ -222,7 +222,7 @@ def create_pydantic_model(settings):
         Pydantic model class for structured output
     """
     from pydantic import Field, create_model
-    from typing import List as TypingList
+    from typing import List as TypingList, Optional
 
     # Map OutputColumnType to Python types
     type_mapping = {
@@ -237,13 +237,14 @@ def create_pydantic_model(settings):
     }
 
     # Build field definitions for Pydantic
+    # All fields are optional to allow the LLM to omit values when information is missing
     field_definitions = {}
     for column in settings.output_columns:
         python_type = type_mapping[column.column_type]
         field_description = column.description if column.description else column.name
         field_definitions[column.name] = (
-            python_type,
-            Field(description=field_description),
+            Optional[python_type],
+            Field(default=None, description=field_description),
         )
 
     # Use structure_name as the model name (default: "ExtractedData")

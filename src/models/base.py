@@ -829,7 +829,7 @@ class LLMPrompter:
 
         # Validate structured output settings if selected
         if self.output_format == OutputFormatOptions.Structured.name:
-            so.validate_output_fields(self.structured_output_settings.output_fields)
+            so.validate_output_columns(self.structured_output_settings.output_columns)
             # Create output schema with structured output columns
             return so.add_structured_output_columns(
                 input_table_spec, 

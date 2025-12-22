@@ -55,7 +55,7 @@ import knime.extension as knext
 ROW_ID_COLUMN = "Row ID"
 
 
-class OutputFieldType(knext.EnumParameterOptions):
+class OutputColumnType(knext.EnumParameterOptions):
     """Types of columns that can be extracted from LLM responses."""
     
     String = (
@@ -93,7 +93,7 @@ class OutputFieldType(knext.EnumParameterOptions):
 
 
 @knext.parameter_group(label="Output column")
-class OutputField:
+class OutputColumn:
     """Definition of a single column to extract from LLM responses."""
     
     name = knext.StringParameter(
@@ -102,11 +102,11 @@ class OutputField:
         default_value="",
     )
 
-    field_type = knext.EnumParameter(
+    column_type = knext.EnumParameter(
         label="Data type",
         description="The data type of this column. List types can contain multiple values per row.",
-        default_value=OutputFieldType.String.name,
-        enum=OutputFieldType,
+        default_value=OutputColumnType.String.name,
+        enum=OutputColumnType,
         style=knext.EnumParameter.Style.DROPDOWN,
     )
 
@@ -152,8 +152,8 @@ class StructuredOutputSettings:
         default_value="",
     )
 
-    output_fields = knext.ParameterArray(
-        parameters=OutputField(),
+    output_columns = knext.ParameterArray(
+        parameters=OutputColumn(),
         label="Output columns",
         description="""Define the columns to extract from each prompt. Each column will be added to the output table. 
         The model will be instructed to extract these columns from the input text.""",
@@ -179,36 +179,36 @@ class StructuredOutputSettings:
     )
 
 
-def validate_output_fields(output_fields):
+def validate_output_columns(output_columns):
     """
     Validate that output columns are properly configured.
     
     Args:
-        output_fields: List of OutputField parameter groups
+        output_columns: List of OutputColumn parameter groups
         
     Raises:
         knext.InvalidParametersError: If validation fails
     """
-    if not output_fields:
+    if not output_columns:
         raise knext.InvalidParametersError(
             "At least one output column must be defined when using structured output format."
         )
 
-    field_names = set()
-    for i, field in enumerate(output_fields):
-        if not field.name:
+    column_names = set()
+    for i, column in enumerate(output_columns):
+        if not column.name:
             raise knext.InvalidParametersError(
                 f"Output column {i + 1} must have a name."
             )
-        if not field.name.replace("_", "").replace(" ", "").isalnum():
+        if not column.name.replace("_", "").replace(" ", "").isalnum():
             raise knext.InvalidParametersError(
-                f"Output column name '{field.name}' must contain only letters, numbers, underscores, and spaces."
+                f"Output column name '{column.name}' must contain only letters, numbers, underscores, and spaces."
             )
-        if field.name in field_names:
+        if column.name in column_names:
             raise knext.InvalidParametersError(
-                f"Duplicate output column name: '{field.name}'. Each column must have a unique name."
+                f"Duplicate output column name: '{column.name}'. Each column must have a unique name."
             )
-        field_names.add(field.name)
+        column_names.add(column.name)
 
 
 def create_pydantic_model(settings):
@@ -224,24 +224,24 @@ def create_pydantic_model(settings):
     from pydantic import Field, create_model
     from typing import List as TypingList
 
-    # Map OutputFieldType to Python types
+    # Map OutputColumnType to Python types
     type_mapping = {
-        OutputFieldType.String.name: str,
-        OutputFieldType.Integer.name: int,
-        OutputFieldType.Double.name: float,
-        OutputFieldType.Boolean.name: bool,
-        OutputFieldType.StringList.name: TypingList[str],
-        OutputFieldType.IntegerList.name: TypingList[int],
-        OutputFieldType.DoubleList.name: TypingList[float],
-        OutputFieldType.BooleanList.name: TypingList[bool],
+        OutputColumnType.String.name: str,
+        OutputColumnType.Integer.name: int,
+        OutputColumnType.Double.name: float,
+        OutputColumnType.Boolean.name: bool,
+        OutputColumnType.StringList.name: TypingList[str],
+        OutputColumnType.IntegerList.name: TypingList[int],
+        OutputColumnType.DoubleList.name: TypingList[float],
+        OutputColumnType.BooleanList.name: TypingList[bool],
     }
 
     # Build field definitions for Pydantic
     field_definitions = {}
-    for field in settings.output_fields:
-        python_type = type_mapping[field.field_type]
-        field_description = field.description if field.description else field.name
-        field_definitions[field.name] = (
+    for column in settings.output_columns:
+        python_type = type_mapping[column.column_type]
+        field_description = column.description if column.description else column.name
+        field_definitions[column.name] = (
             python_type,
             Field(description=field_description),
         )
@@ -268,35 +268,35 @@ def create_pydantic_model(settings):
     return base_model
 
 
-def get_output_field_knime_type(field_type: str):
+def get_output_column_knime_type(column_type: str):
     """
-    Map OutputFieldType to KNIME column type.
+    Map OutputColumnType to KNIME column type.
     
     Args:
-        field_type: String name of OutputFieldType enum value
+        column_type: String name of OutputColumnType enum value
         
     Returns:
         KNIME column type
     """
     type_mapping = {
-        OutputFieldType.String.name: knext.string(),
-        OutputFieldType.Integer.name: knext.int64(),
-        OutputFieldType.Double.name: knext.double(),
-        OutputFieldType.Boolean.name: knext.bool_(),
-        OutputFieldType.StringList.name: knext.list_(knext.string()),
-        OutputFieldType.IntegerList.name: knext.list_(knext.int64()),
-        OutputFieldType.DoubleList.name: knext.list_(knext.double()),
-        OutputFieldType.BooleanList.name: knext.list_(knext.bool_()),
+        OutputColumnType.String.name: knext.string(),
+        OutputColumnType.Integer.name: knext.int64(),
+        OutputColumnType.Double.name: knext.double(),
+        OutputColumnType.Boolean.name: knext.bool_(),
+        OutputColumnType.StringList.name: knext.list_(knext.string()),
+        OutputColumnType.IntegerList.name: knext.list_(knext.int64()),
+        OutputColumnType.DoubleList.name: knext.list_(knext.double()),
+        OutputColumnType.BooleanList.name: knext.list_(knext.bool_()),
     }
-    return type_mapping[field_type]
+    return type_mapping[column_type]
 
 
-def get_output_field_pyarrow_type(field_type: str):
+def get_output_column_pyarrow_type(column_type: str):
     """
-    Map OutputFieldType to PyArrow type.
+    Map OutputColumnType to PyArrow type.
     
     Args:
-        field_type: String name of OutputFieldType enum value
+        column_type: String name of OutputColumnType enum value
         
     Returns:
         PyArrow type
@@ -304,16 +304,16 @@ def get_output_field_pyarrow_type(field_type: str):
     import pyarrow as pa
 
     type_mapping = {
-        OutputFieldType.String.name: pa.string(),
-        OutputFieldType.Integer.name: pa.int64(),
-        OutputFieldType.Double.name: pa.float64(),
-        OutputFieldType.Boolean.name: pa.bool_(),
-        OutputFieldType.StringList.name: pa.list_(pa.string()),
-        OutputFieldType.IntegerList.name: pa.list_(pa.int64()),
-        OutputFieldType.DoubleList.name: pa.list_(pa.float64()),
-        OutputFieldType.BooleanList.name: pa.list_(pa.bool_()),
+        OutputColumnType.String.name: pa.string(),
+        OutputColumnType.Integer.name: pa.int64(),
+        OutputColumnType.Double.name: pa.float64(),
+        OutputColumnType.Boolean.name: pa.bool_(),
+        OutputColumnType.StringList.name: pa.list_(pa.string()),
+        OutputColumnType.IntegerList.name: pa.list_(pa.int64()),
+        OutputColumnType.DoubleList.name: pa.list_(pa.float64()),
+        OutputColumnType.BooleanList.name: pa.list_(pa.bool_()),
     }
-    return type_mapping[field_type]
+    return type_mapping[column_type]
 
 
 def _make_row_ids_unique(duplicated_row_ids, list_column):
@@ -371,12 +371,12 @@ def explode_lists(table, settings: StructuredOutputSettings):
     
     # Pick one of the list columns to derive the parent index mapping
     # Use the first output column
-    first_list_col_name = settings.output_fields[0].name
+    first_list_col_name = settings.output_columns[0].name
     first_list_col = table[first_list_col_name]
     parent_indices = pc.list_parent_indices(first_list_col)
     
     # Flatten all list columns (the output columns)
-    list_column_names = {field.name for field in settings.output_fields}
+    list_column_names = {column.name for column in settings.output_columns}
     flattened_list_cols = {
         name: pc.list_flatten(table[name])
         for name in table.column_names
@@ -401,7 +401,7 @@ def explode_lists(table, settings: StructuredOutputSettings):
 def create_empty(settings: StructuredOutputSettings, num_messages: int):
     import pyarrow as pa
     empty_data = {
-        field.name: [None] * num_messages for field in settings.output_fields
+        column.name: [None] * num_messages for column in settings.output_columns
     }
     return pa.table(empty_data)
 
@@ -424,7 +424,7 @@ def structured_responses_to_table(responses, settings):
     if settings.output_rows_per_input_row == OutputRowsPerInputRow.Many.name:
         # When Many is selected, each response is a wrapper model with an 'items' field
         # Create columns with lists (one list per input row)
-        column_data = {field.name: [] for field in settings.output_fields}
+        column_data = {column.name: [] for column in settings.output_columns}
         
         for idx, response in enumerate(responses):
             # Get the list of items from the wrapper model
@@ -432,46 +432,46 @@ def structured_responses_to_table(responses, settings):
             
             # If no items extracted, add lists with single None value
             if not items:
-                for field in settings.output_fields:
-                    column_data[field.name].append([None])
+                for column in settings.output_columns:
+                    column_data[column.name].append([None])
             else:
                 # Create a list of values for each column
-                for field in settings.output_fields:
-                    field_values = [getattr(item, field.name, None) for item in items]
-                    column_data[field.name].append(field_values)
+                for column in settings.output_columns:
+                    column_values = [getattr(item, column.name, None) for item in items]
+                    column_data[column.name].append(column_values)
         
         # Create PyArrow table with list columns
         arrays = []
         schema_fields = []
         
-        for field in settings.output_fields:
-            inner_type = get_output_field_pyarrow_type(field.field_type)
-            schema_fields.append(pa.field(field.name, pa.list_(inner_type)))
-            arrays.append(pa.array(column_data[field.name]))
+        for column in settings.output_columns:
+            inner_type = get_output_column_pyarrow_type(column.column_type)
+            schema_fields.append(pa.field(column.name, pa.list_(inner_type)))
+            arrays.append(pa.array(column_data[column.name]))
         
         schema = pa.schema(schema_fields)
         column_names = [f.name for f in schema_fields]
         return pa.table(dict(zip(column_names, arrays)), schema=schema)
     else:
         # Single item per input row - original behavior
-        column_data = {field.name: [] for field in settings.output_fields}
+        column_data = {column.name: [] for column in settings.output_columns}
 
         for response in responses:
             # response is a Pydantic model instance
-            for field in settings.output_fields:
-                value = getattr(response, field.name, None)
-                column_data[field.name].append(value)
+            for column in settings.output_columns:
+                value = getattr(response, column.name, None)
+                column_data[column.name].append(value)
 
         # Create PyArrow table with appropriate types
         arrays = []
         schema_fields = []
-        for field in settings.output_fields:
-            pa_type = get_output_field_pyarrow_type(field.field_type)
-            schema_fields.append(pa.field(field.name, pa_type))
-            arrays.append(pa.array(column_data[field.name], type=pa_type))
+        for column in settings.output_columns:
+            pa_type = get_output_column_pyarrow_type(column.column_type)
+            schema_fields.append(pa.field(column.name, pa_type))
+            arrays.append(pa.array(column_data[column.name], type=pa_type))
 
         schema = pa.schema(schema_fields)
-        return pa.table(dict(zip([f.name for f in settings.output_fields], arrays)), schema=schema)
+        return pa.table(dict(zip([f.name for f in settings.output_columns], arrays)), schema=schema)
 
 
 def postprocess_table(input_table, result_table, settings):
@@ -538,11 +538,11 @@ def add_structured_output_columns(input_schema, settings):
         )
     
     # Add output columns
-    for field in settings.output_fields:
+    for column in settings.output_columns:
         column_name = util.handle_column_name_collision(
-            output_schema.column_names, field.name
+            output_schema.column_names, column.name
         )
-        knime_type = get_output_field_knime_type(field.field_type)
+        knime_type = get_output_column_knime_type(column.column_type)
         output_schema = output_schema.append(
             knext.Column(ktype=knime_type, name=column_name)
         )

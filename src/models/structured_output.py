@@ -51,9 +51,6 @@ including parameter definitions, Pydantic model creation, and table conversion u
 
 import knime.extension as knext
 
-# Column name for tracking original row IDs when creating multiple output rows
-ROW_ID_COLUMN = "Row ID"
-
 
 class OutputColumnType(knext.EnumParameterOptions):
     """Types of columns that can be extracted from LLM responses."""
@@ -480,7 +477,7 @@ def postprocess_table(input_table, result_table, settings):
     Postprocess structured output by adding row IDs and optionally exploding list columns.
     
     Args:
-        input_table: PyArrow table with input columns
+        input_table: PyArrow table with input columns (including row IDs as first column)
         result_table: PyArrow table with structured output columns (from LLM)
         settings: StructuredOutputSettings parameter group
         
@@ -488,16 +485,6 @@ def postprocess_table(input_table, result_table, settings):
         PyArrow table with combined input and output columns, optionally exploded into multiple rows
     """
     import pyarrow as pa
-    import util
-    
-    # Add row ID column for structured output with output_rows_per_input_row
-    if settings.output_rows_per_input_row == OutputRowsPerInputRow.Many.name:
-        row_id_col_name = util.handle_column_name_collision(
-            input_table.column_names, ROW_ID_COLUMN
-        )
-        # Create row IDs as strings (batch row indices)
-        row_ids = pa.array([str(i) for i in range(len(input_table))], type=pa.string())
-        input_table = input_table.append_column(row_id_col_name, row_ids)
     
     # Combine input and result columns
     combined_table = pa.Table.from_arrays(

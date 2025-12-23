@@ -45,6 +45,7 @@
 
 import knime.extension as knext
 import io
+import logging
 from typing import List, Tuple, Optional
 from PIL import Image
 
@@ -55,6 +56,8 @@ from ._port_types import (
     GoogleAiStudioAuthenticationPortObjectSpec,
     GoogleAiStudioAuthenticationPortObject,
 )
+
+LOGGER = logging.getLogger(__name__)
 
 GEMINI_IMAGE_MODELS = [
     "gemini-2.5-flash-image-preview",
@@ -356,12 +359,14 @@ class GeminiImageGenerator:
                 )
 
                 # Extract the generated image bytes
-                if response and response.generated_images:
-                    for generated_image in response.generated_images:
-                        return generated_image.image.image_bytes
-
-                raise RuntimeError("No image was generated in the response. Please try with a more descriptive prompt or check if your prompt complies with"
-                " Google policy guidelines.")
+                try:
+                    if response and response.generated_images:
+                        for generated_image in response.generated_images:
+                            return generated_image.image.image_bytes
+                except Exception as e:
+                    LOGGER.warning(f"Failed to extract image bytes from Imagen response: {type(e).__name__}: {e}")
+                raise RuntimeError("No image was generated in the response. This may be due to copyright concerns, safety policies, or other content restrictions. "
+                "Please try with a more descriptive prompt or adjust your request to comply with Google's policy guidelines.")
 
             else:
                 contents = [self.prompt]
@@ -378,17 +383,20 @@ class GeminiImageGenerator:
                 )
 
                 # Extract the generated image bytes
-                if response and response.candidates:
-                    for part in response.parts:
-                        if part.inline_data is not None:
-                            image_pil = part.as_image()
-                            if not image_pil.mime_type.startswith("image/png"):
-                                png_bytes = self._to_png_bytes(image_pil.image_bytes)
-                                return png_bytes
-                            else:
-                                return image_pil.image_bytes
-                raise RuntimeError("No image was generated in the response. Please try with a more descriptive prompt or check if your prompt complies with"
-                " Google policy guidelines.")
+                try:
+                    if response and response.candidates:
+                        for part in response.parts:
+                            if part.inline_data is not None:
+                                image_pil = part.as_image()
+                                if not image_pil.mime_type.startswith("image/png"):
+                                    png_bytes = self._to_png_bytes(image_pil.image_bytes)
+                                    return png_bytes
+                                else:
+                                    return image_pil.image_bytes
+                except Exception as e:
+                    LOGGER.warning(f"Failed to extract image bytes from Gemini response: {type(e).__name__}: {e}")
+                raise RuntimeError("No image was generated in the response. This may be due to copyright concerns, safety policies, or other content restrictions. "
+                "Please try with a more descriptive prompt or adjust your request to comply with Google's policy guidelines.")
 
         except Exception as e:
             error_message = str(e)

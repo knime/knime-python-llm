@@ -398,6 +398,9 @@ class AzureDeploymentSettings:
         description="""The name of the deployed model to use. Find the deployed models on the [Azure AI Studio](https://oai.azure.com).""",
         default_value="",
     )
+
+class AzureLLMDeploymentSettings(AzureDeploymentSettings):
+    deployment_name = AzureDeploymentSettings.deployment_name
     is_reasoning_model = knext.BoolParameter(
         label="The model is a reasoning model",
         description="""
@@ -609,7 +612,7 @@ class AzureOpenAILLMConnector:
     flow variable was not saved and will therefore not be available to downstream nodes.
     """
 
-    deployment = AzureDeploymentSettings()
+    deployment = AzureLLMDeploymentSettings()
     model_settings = OpenAIGeneralSettings()
 
     def configure(
@@ -693,7 +696,7 @@ class AzureOpenAIChatModelConnector:
     flow variable was not saved and will therefore not be available to downstream nodes.
     """
 
-    deployment = AzureDeploymentSettings()
+    deployment = AzureLLMDeploymentSettings()
     model_settings = OpenAIGeneralSettings()
 
     def configure(

@@ -53,7 +53,6 @@ from ._base import (
     create_authorization_headers,
     extract_api_base,
     create_model_choice_provider,
-    list_model_ids,
     is_available_model,
     validate_auth_spec,
 )
@@ -94,6 +93,13 @@ class KnimeHubChatModelPortObjectSpec(ChatModelPortObjectSpec):
     @property
     def n_requests(self) -> int:
         return self._n_requests
+    
+    @property
+    def supported_output_formats(self) -> list[OutputFormatOptions]:
+        return [
+            OutputFormatOptions.Text,
+            OutputFormatOptions.Structured,
+        ]
 
     def serialize(self) -> dict:
         return {
@@ -142,8 +148,12 @@ class KnimeHubChatModelPortObject(ChatModelPortObject):
     ):
         from langchain_openai import ChatOpenAI
 
+        class KnimeChatOpenAI(ChatOpenAI):
+            def with_structured_output(self, *args, method="function_calling", **kwargs):
+                return super().with_structured_output(*args, method=method, **kwargs)
+
         auth_spec = self.spec.auth_spec
-        return ChatOpenAI(
+        return KnimeChatOpenAI(
             model=self.spec.model_name,
             default_headers=create_authorization_headers(auth_spec),
             openai_api_base=extract_api_base(auth_spec),

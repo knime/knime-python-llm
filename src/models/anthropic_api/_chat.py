@@ -86,6 +86,13 @@ class AnthropicChatModelPortObjectSpec(ChatModelPortObjectSpec):
     @property
     def auth(self) -> AnthropicAuthenticationPortObjectSpec:
         return self._auth
+    
+    @property
+    def supported_output_formats(self) -> list[OutputFormatOptions]:
+        return [
+            OutputFormatOptions.Text,
+            OutputFormatOptions.Structured
+        ]
 
     def validate_context(self, ctx):
         self.auth.validate_context(ctx)

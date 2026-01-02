@@ -1,7 +1,3 @@
-import sys
-
-sys.path.append("../src")
-
 import unittest
 from util import handle_column_name_collision
 

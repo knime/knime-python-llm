@@ -50,15 +50,15 @@ class _AzureChatOpenAI(AzureChatOpenAI):
     AzureChatOpenAI subclass that provides custom error handling.
     """
 
-    async def abatch(self, messages, **kwargs):
+    async def abatch(self, *args, **kwargs):
         try:
-            return await super().abatch(messages, **kwargs)
+            return await super().abatch(*args, **kwargs)
         except Exception as e:
             self._raise_if_reasoning_model_error(e)
         
-    def invoke(self, input, config=None, **kwargs):
+    def invoke(self, *args, **kwargs):
         try:
-            return super().invoke(input, config=config, **kwargs)
+            return super().invoke(*args, **kwargs)
         except Exception as e:
             self._raise_if_reasoning_model_error(e)
 

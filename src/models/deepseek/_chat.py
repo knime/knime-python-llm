@@ -85,6 +85,13 @@ class DeepSeekChatModelPortObjectSpec(ChatModelPortObjectSpec):
     @property
     def auth(self) -> DeepSeekAuthenticationPortObjectSpec:
         return self._auth
+    
+    @property
+    def supported_output_formats(self) -> list[OutputFormatOptions]:
+        return [
+            OutputFormatOptions.Text,
+            OutputFormatOptions.Structured
+        ]
 
     def validate_context(self, ctx):
         self.auth.validate_context(ctx)
@@ -122,8 +129,12 @@ class DeepSeekChatModelPortObject(ChatModelPortObject):
     ):
         from langchain_openai import ChatOpenAI
 
+        class ChatDeepseek(ChatOpenAI):
+            def with_structured_output(self, *args, method="function_calling", **kwargs):
+                return super().with_structured_output(*args, method=method, **kwargs)
+
         if "reasoner" in self.spec.model:
-            return ChatOpenAI(
+            return ChatDeepseek(
                 openai_api_key=ctx.get_credentials(self.spec.auth.credentials).password,
                 base_url=self.spec.auth.base_url,
                 model=self.spec.model,
@@ -131,7 +142,7 @@ class DeepSeekChatModelPortObject(ChatModelPortObject):
                 max_completion_tokens=self.spec.max_tokens,
             )
 
-        return ChatOpenAI(
+        return ChatDeepseek(
             openai_api_key=ctx.get_credentials(self.spec.auth.credentials).password,
             base_url=self.spec.auth.base_url,
             model=self.spec.model,

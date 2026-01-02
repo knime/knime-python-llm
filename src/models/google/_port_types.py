@@ -706,6 +706,13 @@ class GeminiChatModelPortObjectSpec(ChatModelPortObjectSpec):
     @property
     def n_requests(self) -> int:
         return self._n_requests
+    
+    @property
+    def supported_output_formats(self) -> list[OutputFormatOptions]:
+        return [
+            OutputFormatOptions.Text,
+            OutputFormatOptions.Structured
+        ]
 
     def serialize(self):
         return {

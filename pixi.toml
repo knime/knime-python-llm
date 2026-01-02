@@ -7,6 +7,7 @@ conda-pypi-map = { "knime" = "conda-pypi-map-ibm.json" }
 no-build = true
 
 [tasks]
+test = { cmd = "pytest" }
 
 [dependencies]
 knime-extension = "5.8.*"
@@ -56,6 +57,7 @@ pyyaml = ">=6.0.2,<7"
 onnxruntime = "1.21.1.*"
 charset-normalizer = ">=3.4.2,<4.13.6"
 posthog = ">=2.4.0,<6.0.0"
+pytest = "*"
 
 
 [pypi-dependencies]

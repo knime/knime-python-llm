@@ -139,22 +139,15 @@ class Agent:
         self._config = config
         self._toolset = toolset
 
-    def run(self, ctx: Context):
+    def run(self):
         """Run the agents turn in the conversation."""
         for _ in range(self._config.iteration_limit):
-            if ctx.is_cancelled():
-                raise CancelError(
-                    "Execution canceled."
-                )  # TODO change? Option: move cancel into conversation (append messages would raise)
-
             try:
                 response = self._agent.invoke(self._conversation.get_messages())
             except Exception as error:
                 self._conversation.append_error(error)
                 return
             self._append_messages(response)
-
-            # if ctx.is_cancelled() ...
 
             if response.tool_calls:
                 try:

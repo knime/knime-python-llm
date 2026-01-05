@@ -57,12 +57,7 @@ import queue
 import threading
 import knime.extension as knext
 from .base import AgentPrompterConversation  # TODO bad dependency?
-
 from langchain_core.messages.human import HumanMessage
-
-from knime.types.message import from_langchain_message
-
-import pandas as pd
 from typing import Sequence
 
 
@@ -88,7 +83,9 @@ class AgentChatWidgetDataService:
         self._ctx = ctx
 
         self._chat_model = chat_model
-        self._conversation = FrontendConversation(conversation, tool_converter)
+        self._conversation = FrontendConversation(
+            conversation, tool_converter, AgentWidgetContext(self._check_canceled)
+        )
         self._toolset = toolset
         self._config = config
         self._agent = Agent(
@@ -184,20 +181,20 @@ class AgentChatWidgetDataService:
     def _post_user_message(self, user_message: str):
         from langchain_core.messages import AIMessage
 
-        ctx = AgentWidgetContext(self._check_canceled)
         self._conversation.append_messages_to_backend(
             HumanMessage(content=user_message)
         )
 
         try:
-            self._agent.run(ctx)
+            self._agent.run()
 
             messages = self._conversation.get_messages()
             if messages and isinstance(messages[-1], AIMessage):
                 validate_ai_message(messages[-1])
 
         except CancelError as e:
-            self._conversation.append_error_to_frontend(e)
+            raise e
+            # self._conversation.append_error_to_frontend(e)
         except IterationLimitError:
             self._handle_recursion_limit_error()
         except Exception as e:
@@ -227,26 +224,51 @@ class AgentWidgetContext:
 
 
 class FrontendConversation:
-    def __init__(self, backend: AgentPrompterConversation, tool_converter):
-        self._frontend = queue.Queue()  # TODO additional frontend class?
+    def __init__(
+        self,
+        backend: AgentPrompterConversation,
+        tool_converter,
+        ctx: AgentWidgetContext,
+    ):
+        self._frontend = queue.Queue()
         self._backend_messages = backend
         self._tool_converter = tool_converter
+        self._ctx = ctx
 
     @property
     def frontend(self):
         return self._frontend
 
     def append_messages(self, messages):
-        from langchain_core.messages import HumanMessage
+        """Raises a CancelError if the context was cancelled."""
+        from langchain_core.messages import AIMessage
 
-        if not isinstance(
-            messages, Sequence
-        ):  # TODO double check that's done correctly
+        # TODO double check that's done correctly
+        if not isinstance(messages, Sequence):
             messages = [messages]
+
+        if self._ctx and self._ctx.is_cancelled():
+            self._append_messages(messages[:-1])
+
+            # sanitize last message
+            final_message = messages[-1]
+            if isinstance(final_message, AIMessage) and final_message.tool_calls:
+                # final message is not added to conversation
+                pass
+            else:
+                self._append_messages([final_message])
+
+            error = CancelError("Execution canceled.")
+            self.append_error_to_frontend(error)
+            raise error
+        else:
+            self._append_messages(messages)
+
+    def _append_messages(self, messages):
+        from langchain_core.messages import HumanMessage
 
         self._backend_messages.append_messages(messages)
 
-        # already added
         for new_message in messages:
             if isinstance(new_message, HumanMessage):
                 continue

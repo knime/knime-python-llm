@@ -71,6 +71,7 @@ from knime.extension.nodes import (
 )
 from base import AIPortObjectSpec
 from ._parameters import recursion_limit_mode_param_for_view
+from ._agent import CancelError
 
 import os
 import logging
@@ -752,7 +753,8 @@ state that the tool could not be executed due to reaching the recursion limit.""
         if history_table is not None:
             self._check_for_columns(history_table)
 
-        conversation = self._get_conversation(history_table, tool_converter)
+        agent_ctx = AgentPrompterContext(ctx)
+        conversation = self._get_conversation(agent_ctx, history_table, tool_converter)
 
         if data_registry.has_data or tool_converter.has_data_tools:
             conversation.append_messages(data_registry.create_data_message())
@@ -763,10 +765,11 @@ state that the tool could not be executed due to reaching the recursion limit.""
 
         config = AgentConfig(self.recursion_limit)
         agent = Agent(conversation, chat_model, toolset, config)
-        agent_context = AgentPrompterContext(ctx)
 
         try:
-            agent.run(agent_context)
+            agent.run()
+        except CancelError as e:
+            raise e
         except IterationLimitError:
             if self.recursion_limit_handling == RecursionLimitMode.FINAL_RESPONSE.name:
                 self._generate_final_response(conversation, chat_model)
@@ -835,6 +838,7 @@ state that the tool could not be executed due to reaching the recursion limit.""
 
     def _get_conversation(
         self,
+        agent_ctx: "AgentPrompterContext",
         history_table: Optional[knext.Table],
         tool_converter,
     ) -> "AgentPrompterConversation":
@@ -847,7 +851,7 @@ state that the tool could not be executed due to reaching the recursion limit.""
             lc_msg = tool_converter.sanitize_tool_names(lc_msg)
             conversation.append_messages(lc_msg)
 
-        conversation = AgentPrompterConversation(self.errors.error_handling)
+        conversation = AgentPrompterConversation(self.errors.error_handling, agent_ctx)
 
         if self.developer_message:
             conversation.append_messages(SystemMessage(self.developer_message))
@@ -924,18 +928,35 @@ class AgentPrompterContext:
 
 
 class AgentPrompterConversation:
-    def __init__(self, error_handling):
+    def __init__(self, error_handling, ctx: AgentPrompterContext = None):
         self._error_handling = error_handling
         self._message_and_errors = []  # TODO errors can be string and Exception?
         self._is_message = []
+        self._ctx = ctx
 
     def append_messages(self, messages):
+        """Raises a CancelError if the context was cancelled."""
+
         if not isinstance(
             messages, Sequence
         ):  # TODO double check that's done correctly
             messages = [messages]
-        for msg in messages:  # TODO improve
-            self._append(msg)
+
+        if self._ctx and self._ctx.is_cancelled():
+            # for msg in messages[:-1]:
+            #     self._append(msg)
+
+            # # sanitize last message
+            # final_message = messages[-1]
+            # if isinstance(final_message, AIMessage) and final_message.tool_calls:
+            #     # final message is not added to conversation
+            #     pass
+            # else:
+            #     self._append(final_message)
+            raise CancelError("Execution canceled.")
+        else:
+            for msg in messages:
+                self._append(msg)
 
     def append_error(self, error):
         if not isinstance(error, Exception):

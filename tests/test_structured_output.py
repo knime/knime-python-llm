@@ -68,7 +68,7 @@ class MockStructuredOutputSettings:
         self.structure_description = ""
         self.output_columns = []
         self.output_rows_per_input_row = structured_output.OutputRowsPerInputRow.One.name
-        self.input_row_id_column_name = "Input Row ID"
+        self.input_row_id_column_name = "Input RowID"
 
 
 class TestOutputColumnType(unittest.TestCase):
@@ -550,7 +550,7 @@ class TestExplodeLists(unittest.TestCase):
 
     def test_explode_simple_lists(self):
         settings = MockStructuredOutputSettings()
-        settings.input_row_id_column_name = "Input Row ID"
+        settings.input_row_id_column_name = "Input RowID"
         
         field1 = MockOutputColumn()
         field1.name = "items"
@@ -576,8 +576,8 @@ class TestExplodeLists(unittest.TestCase):
         self.assertEqual(result["input_col"].to_pylist(), ["a", "a", "b"])
         # Check items are flattened
         self.assertEqual(result["items"].to_pylist(), ["x", "y", "z"])
-        # Check Input Row ID column exists
-        self.assertIn("Input Row ID", result.column_names)
+        # Check Input RowID column exists
+        self.assertIn("Input RowID", result.column_names)
 
 
 class TestPostprocessTable(unittest.TestCase):
@@ -609,7 +609,7 @@ class TestPostprocessTable(unittest.TestCase):
     def test_postprocess_many_rows_per_input(self):
         settings = MockStructuredOutputSettings()
         settings.output_rows_per_input_row = structured_output.OutputRowsPerInputRow.Many.name
-        settings.input_row_id_column_name = "Input Row ID"
+        settings.input_row_id_column_name = "Input RowID"
         
         field = MockOutputColumn()
         field.name = "output"
@@ -628,7 +628,7 @@ class TestPostprocessTable(unittest.TestCase):
         
         # Should be exploded to 3 rows
         self.assertEqual(len(result), 3)
-        self.assertIn("Input Row ID", result.column_names)
+        self.assertIn("Input RowID", result.column_names)
 
 
 class TestAddStructuredOutputColumns(unittest.TestCase):
@@ -656,7 +656,7 @@ class TestAddStructuredOutputColumns(unittest.TestCase):
     def test_add_columns_many_rows(self):
         settings = MockStructuredOutputSettings()
         settings.output_rows_per_input_row = structured_output.OutputRowsPerInputRow.Many.name
-        settings.input_row_id_column_name = "Input Row ID"
+        settings.input_row_id_column_name = "Input RowID"
         
         field = MockOutputColumn()
         field.name = "new_col"
@@ -669,9 +669,9 @@ class TestAddStructuredOutputColumns(unittest.TestCase):
         
         result = structured_output.add_structured_output_columns(input_schema, settings)
         
-        # Should add Input Row ID column and new_col
+        # Should add Input RowID column and new_col
         self.assertEqual(len(list(result)), 3)
-        self.assertIn("Input Row ID", result.column_names)
+        self.assertIn("Input RowID", result.column_names)
         self.assertIn("new_col", result.column_names)
 
 

@@ -60,7 +60,7 @@ class RecursionLimitModeForView(knext.EnumParameterOptions):
 
 def recursion_limit_mode_param_for_view():
     return knext.EnumParameter(
-        "Recursion limit handling",
+        "If recursion limit is reached",
         "Specify how the agent should behave when the recursion limit is reached.",
         RecursionLimitModeForView.FAIL.name,
         RecursionLimitModeForView,

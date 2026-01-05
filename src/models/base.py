@@ -923,12 +923,15 @@ class LLMPrompter:
 
             # Check if all prompts are empty/missing
             if not messages:
+                # Use the original number of rows from the prompt table to create
+                # the correct number of empty output rows.
+                num_prompt_rows = prompt_table.num_rows
                 if is_structured:
-                    return so.create_empty(self.structured_output_settings, len(messages))
+                    return so.create_empty(self.structured_output_settings, num_prompt_rows)
                 else:
                     output_schema = pa.schema([(self.response_column_name, pa.string())])
                     missing_values_table = pa.table(
-                        {self.response_column_name: [None] * len(messages)},
+                        {self.response_column_name: [None] * num_prompt_rows},
                         schema=output_schema,
                     )
                     return missing_values_table

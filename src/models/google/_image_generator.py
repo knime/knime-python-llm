@@ -45,7 +45,6 @@
 
 import knime.extension as knext
 import io
-import logging
 from typing import List, Tuple, Optional
 from PIL import Image
 
@@ -57,7 +56,6 @@ from ._port_types import (
     GoogleAiStudioAuthenticationPortObject,
 )
 
-LOGGER = logging.getLogger(__name__)
 
 GEMINI_IMAGE_MODELS = [
     "gemini-2.5-flash-image-preview",
@@ -336,78 +334,149 @@ class GeminiImageGenerator:
         authentication_spec: GoogleAiStudioAuthenticationPortObjectSpec,
         input_images: List[Tuple[str, bytes, str]],
     ) -> bytes:
-        from google.genai import Client, types
+        from google.genai import Client
 
         api_key = ctx.get_credentials(authentication_spec.credentials).password
         client = Client(api_key=api_key)
 
         try:
-            is_imagen = self.model == ImageModels.IMAGEN.name
-            
-            if is_imagen:
-                # Map parameter values to API values
-                config = types.GenerateImagesConfig(
-                    aspect_ratio=ImagenSettings.AspectRatioOptions.to_api_value(self.imagen_settings.aspect_ratio),
-                    person_generation=ImagenSettings.PersonGenerationOptions.to_api_value(self.imagen_settings.person_generation),
-                    number_of_images=1
-                )
-
-                response = client.models.generate_images(
-                    model=self.imagen_model_name,
-                    prompt=self.prompt,
-                    config=config,
-                )
-
-                # Extract the generated image bytes
-                try:
-                    if response and response.generated_images:
-                        for generated_image in response.generated_images:
-                            return generated_image.image.image_bytes
-                except Exception as e:
-                    LOGGER.warning(f"Failed to extract image bytes from Imagen response: {type(e).__name__}: {e}")
-                raise RuntimeError("No image was generated in the response. This may be due to copyright concerns, safety policies, or other content restrictions. "
-                "Please try with a more descriptive prompt or adjust your request to comply with Google's policy guidelines.")
-
+            if self.model == ImageModels.IMAGEN.name:
+                return self._generate_with_imagen(client)
             else:
-                contents = [self.prompt]
-                
-                if input_images:
-                    for _, image_bytes, _ in input_images:
-                        # generate_content expects PIL Image that's why we convert the bytes to image object
-                        pil_image = Image.open(io.BytesIO(image_bytes))
-                        contents.append(pil_image)
-
-                response = client.models.generate_content(
-                    model=self.gemini_model_name,
-                    contents=contents,
-                )
-
-                # Extract the generated image bytes
-                try:
-                    if response and response.candidates:
-                        for part in response.parts:
-                            if part.inline_data is not None:
-                                image_pil = part.as_image()
-                                if not image_pil.mime_type.startswith("image/png"):
-                                    png_bytes = self._to_png_bytes(image_pil.image_bytes)
-                                    return png_bytes
-                                else:
-                                    return image_pil.image_bytes
-                except Exception as e:
-                    LOGGER.warning(f"Failed to extract image bytes from Gemini response: {type(e).__name__}: {e}")
-                raise RuntimeError("No image was generated in the response. This may be due to copyright concerns, safety policies, or other content restrictions. "
-                "Please try with a more descriptive prompt or adjust your request to comply with Google's policy guidelines.")
-
+                return self._generate_with_gemini(client, input_images)
         except Exception as e:
+            # If the error is a RuntimeError, raise it directly without wrapping it inside another RuntimeError.
+            if isinstance(e, RuntimeError):
+                raise
             error_message = str(e)
-            
             if "get_media" in error_message.lower():
                 raise RuntimeError(
                     "The model couldn't generate an image based on your prompt. "
-                    "Please try with a more descriptive and detailed prompt, or check if your prompt complies with Google's policy guidelines."
+                    "Please try with a more descriptive and detailed prompt, "
+                    "or check if your prompt complies with Google's policy guidelines."
                 )
-            
             raise RuntimeError(f"Failed to generate image: {error_message}")
+
+    def _generate_with_imagen(self, client) -> bytes:
+        """Generate an image using the Imagen API."""
+        from google.genai import types
+
+        config = types.GenerateImagesConfig(
+            aspect_ratio=ImagenSettings.AspectRatioOptions.to_api_value(
+                self.imagen_settings.aspect_ratio
+            ),
+            person_generation=ImagenSettings.PersonGenerationOptions.to_api_value(
+                self.imagen_settings.person_generation
+            ),
+            number_of_images=1,
+            include_rai_reason=True, # include RAI (Responsible AI) reasons if the content was blocked.
+        )
+
+        response = client.models.generate_images(
+            model=self.imagen_model_name,
+            prompt=self.prompt,
+            config=config,
+        )
+
+        if response and response.generated_images:
+            for generated_image in response.generated_images:
+                if generated_image.rai_filtered_reason:
+                    raise RuntimeError(
+                        f"Image generation was blocked. Reason: {generated_image.rai_filtered_reason}"
+                    )
+                if generated_image.image:
+                    return generated_image.image.image_bytes
+
+        self._raise_no_image_error()
+
+    def _generate_with_gemini(
+        self, client, input_images: List[Tuple[str, bytes, str]]
+    ) -> bytes:
+        """Generate an image using the Gemini API."""
+        contents = [self.prompt]
+
+        if input_images:
+            for _, image_bytes, _ in input_images:
+                # generate_content expects PIL Image that's why we convert the bytes to image object
+                pil_image = Image.open(io.BytesIO(image_bytes))
+                contents.append(pil_image)
+
+        response = client.models.generate_content(
+            model=self.gemini_model_name,
+            contents=contents,
+        )
+
+        # Check for blocking at the prompt level.
+        if response and response.prompt_feedback and response.prompt_feedback.block_reason:
+            raise RuntimeError(
+                f"Image generation was blocked. Reason: {response.prompt_feedback.block_reason}"
+            )
+
+        if not response or not response.candidates:
+            self._raise_no_image_error()
+
+        # Check all candidates for non-standard finish reasons.
+        for candidate in response.candidates:
+            if candidate.finish_reason and candidate.finish_reason != "STOP":
+                if candidate.finish_reason == "RECITATION":
+                    raise RuntimeError(
+                        "Image generation was blocked. Reason: "
+                        "The generated image too closely resembles copyrighted material."
+                    )
+                raise RuntimeError(
+                    f"Image generation was blocked. Reason: {candidate.finish_reason}"
+                )
+
+        # Extract parts from the first candidate with content.
+        parts = None
+        for candidate in response.candidates:
+            if candidate.content and candidate.content.parts:
+                parts = candidate.content.parts
+                break
+
+        image_bytes = self._extract_image_from_parts(parts)
+        if image_bytes:
+            return image_bytes
+
+        # No image found - check if model provided text explanation.
+        refusal_text = self._extract_text_from_parts(parts)
+        if refusal_text:
+            raise RuntimeError(f"Model refused to generate image. Reason: {refusal_text}")
+
+        self._raise_no_image_error()
+
+    def _extract_image_from_parts(self, parts: List) -> Optional[bytes]:
+        """Extract image bytes from Gemini candidate parts."""
+        if not parts:
+            return None
+
+        for part in parts:
+            if part.inline_data is not None:
+                image_pil = part.as_image()
+                if image_pil.mime_type.startswith("image/png"):
+                    return image_pil.image_bytes
+                return self._to_png_bytes(image_pil.image_bytes)
+        return None
+
+    def _extract_text_from_parts(self, parts: List) -> Optional[str]:
+        """Extract text from Gemini candidate parts."""
+        if not parts:
+            return None
+
+        text_parts = []
+        for part in parts:
+            if hasattr(part, "text") and part.text:
+                text_parts.append(part.text)
+
+        return " ".join(text_parts) if text_parts else None
+
+    def _raise_no_image_error(self):
+        """Raise a standardized error when no image was generated."""
+        raise RuntimeError(
+            "No image was generated in the response. This may be due to copyright concerns, "
+            "safety policies, or other content restrictions. Please try with a more descriptive "
+            "prompt or adjust your request to comply with Google's policy guidelines."
+        )
 
     def _to_png_bytes(self, raw_bytes: bytes) -> bytes:
         """

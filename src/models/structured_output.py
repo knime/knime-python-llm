@@ -120,17 +120,17 @@ class OutputColumn:
     )
 
 
-class OutputRowsPerInputRow(knext.EnumParameterOptions):
-    """Number of output rows to create per input row."""
+class TargetObjectsPerInputRow(knext.EnumParameterOptions):
+    """Number of target objects to extract per input row."""
     
     One = (
         "One",
-        "Extract exactly one output row with the defined columns per input row.",
+        "Extract exactly one target object with the defined columns per input row.",
     )
-    Many = (
-        "Many",
-        "Allow the model to extract one or more output rows with the defined structure per input row. "
-        "The input columns will be duplicated for each extracted row.",
+    Multiple = (
+        "Multiple",
+        "Allow the model to extract one or more target objects with the defined structure per input row. "
+        "The input columns will be duplicated for each extracted object.",
     )
 
 
@@ -138,38 +138,38 @@ class OutputRowsPerInputRow(knext.EnumParameterOptions):
 class StructuredOutputSettings:
     """Settings for structured output extraction."""
     
-    structure_name = knext.StringParameter(
-        label="Structure name",
-        description="""The name of the output structure. This helps the model understand what it is extracting. 
+    target_object_name = knext.StringParameter(
+        label="Target object name",
+        description="""The name of the target object. This helps the model understand what it is extracting. 
         Invalid characters will be automatically converted to underscores.
         
         Example: 'Person Info', 'Product Details', 'Sentiment Analysis'""",
         default_value="ExtractedData",
     )
 
-    structure_description = knext.StringParameter(
-        label="Structure description",
-        description="""A description of what the output structure represents. This provides context to the model 
+    target_object_description = knext.StringParameter(
+        label="Target object description",
+        description="""A description of what the target object represents. This provides context to the model 
         about the overall extraction task.
         
         Example: 'Information about a person including their name and age', 'Key details about a product'""",
         default_value="",
     )
 
-    output_rows_per_input_row = knext.EnumParameter(
-        label="Output rows per input row",
-        description="Determines how many output rows are created for each input row.",
-        default_value=OutputRowsPerInputRow.One.name,
-        enum=OutputRowsPerInputRow,
+    target_objects_per_input_row = knext.EnumParameter(
+        label="Target objects per input row",
+        description="Determines how many target objects are extracted for each input row.",
+        default_value=TargetObjectsPerInputRow.One.name,
+        enum=TargetObjectsPerInputRow,
         style=knext.EnumParameter.Style.VALUE_SWITCH,
     )
 
     input_row_id_column_name = knext.StringParameter(
         label="Input row ID column name",
-        description="Name of the column that will store the original input row ID when multiple output rows are created per input row.",
+        description="Name of the column that will store the original input row ID when multiple target objects are extracted per input row.",
         default_value="Input RowID",
     ).rule(
-        knext.OneOf(output_rows_per_input_row, [OutputRowsPerInputRow.Many.name]),
+        knext.OneOf(target_objects_per_input_row, [TargetObjectsPerInputRow.Multiple.name]),
         knext.Effect.SHOW,
     )
     
@@ -251,23 +251,23 @@ def create_pydantic_model(settings):
             Field(default=None, description=field_description),
         )
 
-    # Use structure_name as the model name (default: "ExtractedData")
+    # Use target_object_name as the model name (default: "ExtractedData")
     # Sanitize to comply with OpenAI's naming requirements (^[a-zA-Z0-9_-]+$)
     # Replace invalid characters with underscores
     import re
-    model_name = settings.structure_name if settings.structure_name else "ExtractedData"
+    model_name = settings.target_object_name if settings.target_object_name else "ExtractedData"
     model_name = re.sub(r'[^a-zA-Z0-9_-]', '_', model_name)
     
-    # Use structure_description as the model docstring if provided
-    if settings.structure_description:
+    # Use target_object_description as the model docstring if provided
+    if settings.target_object_description:
         # The __doc__ attribute can be set via __config__ in Pydantic v2
-        field_definitions["__doc__"] = settings.structure_description
+        field_definitions["__doc__"] = settings.target_object_description
 
     # Create the Pydantic model dynamically
     base_model = create_model(model_name, **field_definitions)
     
-    # If output_rows_per_input_row is Many, wrap it in a list model
-    if settings.output_rows_per_input_row == OutputRowsPerInputRow.Many.name:
+    # If target_objects_per_input_row is Multiple, wrap it in a list model
+    if settings.target_objects_per_input_row == TargetObjectsPerInputRow.Multiple.name:
         list_model_name = f"{model_name}List"
         return create_model(
             list_model_name,
@@ -422,18 +422,18 @@ def structured_responses_to_table(responses, settings):
     Convert a list of Pydantic model instances to a PyArrow table.
     
     Args:
-        responses: List of Pydantic model instances (or list wrapper models if output_rows_per_input_row=Many)
+        responses: List of Pydantic model instances (or list wrapper models if target_objects_per_input_row=Multiple)
         settings: StructuredOutputSettings parameter group
     
     Returns:
         PyArrow table where:
-        - If output_rows_per_input_row=One: each row has scalar values
-        - If output_rows_per_input_row=Many: each row has list values (one list per input row containing extracted items)
+        - If target_objects_per_input_row=One: each row has scalar values
+        - If target_objects_per_input_row=Multiple: each row has list values (one list per input row containing extracted items)
     """
     import pyarrow as pa
 
-    if settings.output_rows_per_input_row == OutputRowsPerInputRow.Many.name:
-        # When Many is selected, each response is a wrapper model with an 'items' field
+    if settings.target_objects_per_input_row == TargetObjectsPerInputRow.Multiple.name:
+        # When Multiple is selected, each response is a wrapper model with an 'items' field
         # Create columns with lists (one list per input row)
         column_data = {column.name: [] for column in settings.output_columns}
         
@@ -505,8 +505,8 @@ def postprocess_table(input_table, result_table, settings):
         input_table.column_names + result_table.column_names,
     )
     
-    # Handle row expansion for structured output with output_rows_per_input_row
-    if settings.output_rows_per_input_row == OutputRowsPerInputRow.Many.name:
+    # Handle row expansion for structured output with target_objects_per_input_row
+    if settings.target_objects_per_input_row == TargetObjectsPerInputRow.Multiple.name:
         # Explode list columns into separate rows
         return explode_lists(combined_table, settings)
     else:
@@ -528,9 +528,9 @@ def add_structured_output_columns(input_schema, settings):
     
     output_schema = input_schema
     
-    # Add input row ID column when output_rows_per_input_row is Many
+    # Add input row ID column when target_objects_per_input_row is Multiple
     # This column stores the original input row ID before explosion
-    if settings.output_rows_per_input_row == OutputRowsPerInputRow.Many.name:
+    if settings.target_objects_per_input_row == TargetObjectsPerInputRow.Multiple.name:
         input_row_id_col_name = util.handle_column_name_collision(
             output_schema.column_names, settings.input_row_id_column_name
         )

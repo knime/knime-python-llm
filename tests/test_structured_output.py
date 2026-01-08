@@ -65,10 +65,10 @@ class MockOutputColumn:
 class MockStructuredOutputSettings:
     """Mock for StructuredOutputSettings parameter group."""
     def __init__(self):
-        self.structure_name = "ExtractedData"
-        self.structure_description = ""
+        self.target_object_name = "ExtractedData"
+        self.target_object_description = ""
         self.output_columns = []
-        self.output_rows_per_input_row = structured_output.OutputRowsPerInputRow.One.name
+        self.target_objects_per_input_row = structured_output.TargetObjectsPerInputRow.One.name
         self.input_row_id_column_name = "Input Row ID"
 
 
@@ -155,9 +155,9 @@ class TestCreatePydanticModel(unittest.TestCase):
 
     def test_create_simple_model_one_row(self):
         settings = MockStructuredOutputSettings()
-        settings.structure_name = "TestModel"
-        settings.structure_description = "Test description"
-        settings.output_rows_per_input_row = structured_output.OutputRowsPerInputRow.One.name
+        settings.target_object_name = "TestModel"
+        settings.target_object_description = "Test description"
+        settings.target_objects_per_input_row = structured_output.TargetObjectsPerInputRow.One.name
         
         field = MockOutputColumn()
         field.name = "text_field"
@@ -174,10 +174,10 @@ class TestCreatePydanticModel(unittest.TestCase):
         # Check fields exist
         self.assertIn("text_field", model.model_fields)
 
-    def test_create_model_with_many_rows(self):
+    def test_create_model_with_multiple_rows(self):
         settings = MockStructuredOutputSettings()
-        settings.structure_name = "ItemModel"
-        settings.output_rows_per_input_row = structured_output.OutputRowsPerInputRow.Many.name
+        settings.target_object_name = "ItemModel"
+        settings.target_objects_per_input_row = structured_output.TargetObjectsPerInputRow.Multiple.name
         
         field = MockOutputColumn()
         field.name = "item_name"
@@ -195,8 +195,8 @@ class TestCreatePydanticModel(unittest.TestCase):
 
     def test_create_model_with_multiple_field_types(self):
         settings = MockStructuredOutputSettings()
-        settings.structure_name = "MixedModel"
-        settings.output_rows_per_input_row = structured_output.OutputRowsPerInputRow.One.name
+        settings.target_object_name = "MixedModel"
+        settings.target_objects_per_input_row = structured_output.TargetObjectsPerInputRow.One.name
         
         field1 = MockOutputColumn()
         field1.name = "text"
@@ -219,11 +219,11 @@ class TestCreatePydanticModel(unittest.TestCase):
         self.assertIn("number", model.model_fields)
         self.assertIn("flag", model.model_fields)
 
-    def test_structure_name_with_spaces(self):
-        """Test that spaces in structure_name are converted to underscores."""
+    def test_target_object_name_with_spaces(self):
+        """Test that spaces in target_object_name are converted to underscores."""
         settings = MockStructuredOutputSettings()
-        settings.structure_name = "Person Info"
-        settings.output_rows_per_input_row = structured_output.OutputRowsPerInputRow.One.name
+        settings.target_object_name = "Person Info"
+        settings.target_objects_per_input_row = structured_output.TargetObjectsPerInputRow.One.name
         
         field = MockOutputColumn()
         field.name = "name"
@@ -236,11 +236,11 @@ class TestCreatePydanticModel(unittest.TestCase):
         # Check that model name has underscores instead of spaces
         self.assertEqual(model.__name__, "Person_Info")
 
-    def test_structure_name_with_multiple_spaces(self):
+    def test_target_object_name_with_multiple_spaces(self):
         """Test that multiple spaces are all converted to underscores."""
         settings = MockStructuredOutputSettings()
-        settings.structure_name = "Product Detail Summary"
-        settings.output_rows_per_input_row = structured_output.OutputRowsPerInputRow.One.name
+        settings.target_object_name = "Product Detail Summary"
+        settings.target_objects_per_input_row = structured_output.TargetObjectsPerInputRow.One.name
         
         field = MockOutputColumn()
         field.name = "product"
@@ -253,11 +253,11 @@ class TestCreatePydanticModel(unittest.TestCase):
         # Check that all spaces are converted to underscores
         self.assertEqual(model.__name__, "Product_Detail_Summary")
 
-    def test_structure_name_with_special_characters(self):
+    def test_target_object_name_with_special_characters(self):
         """Test that special characters are converted to underscores."""
         settings = MockStructuredOutputSettings()
-        settings.structure_name = "Person@Info#123"
-        settings.output_rows_per_input_row = structured_output.OutputRowsPerInputRow.One.name
+        settings.target_object_name = "Person@Info#123"
+        settings.target_objects_per_input_row = structured_output.TargetObjectsPerInputRow.One.name
         
         field = MockOutputColumn()
         field.name = "name"
@@ -270,11 +270,11 @@ class TestCreatePydanticModel(unittest.TestCase):
         # Check that special characters are converted to underscores
         self.assertEqual(model.__name__, "Person_Info_123")
 
-    def test_structure_name_with_allowed_characters(self):
+    def test_target_object_name_with_allowed_characters(self):
         """Test that allowed characters (letters, numbers, underscores, hyphens) are preserved."""
         settings = MockStructuredOutputSettings()
-        settings.structure_name = "Person-Info_123"
-        settings.output_rows_per_input_row = structured_output.OutputRowsPerInputRow.One.name
+        settings.target_object_name = "Person-Info_123"
+        settings.target_objects_per_input_row = structured_output.TargetObjectsPerInputRow.One.name
         
         field = MockOutputColumn()
         field.name = "name"
@@ -418,7 +418,7 @@ class TestStructuredResponsesToTable(unittest.TestCase):
 
     def test_convert_single_responses(self):
         settings = MockStructuredOutputSettings()
-        settings.output_rows_per_input_row = structured_output.OutputRowsPerInputRow.One.name
+        settings.target_objects_per_input_row = structured_output.TargetObjectsPerInputRow.One.name
         
         field1 = MockOutputColumn()
         field1.name = "name"
@@ -443,10 +443,10 @@ class TestStructuredResponsesToTable(unittest.TestCase):
         self.assertEqual(result["name"].to_pylist(), ["Alice", "Bob"])
         self.assertEqual(result["age"].to_pylist(), [30, 25])
 
-    def test_convert_many_responses(self):
+    def test_convert_multiple_responses(self):
         settings = MockStructuredOutputSettings()
-        settings.structure_name = "Item"
-        settings.output_rows_per_input_row = structured_output.OutputRowsPerInputRow.Many.name
+        settings.target_object_name = "Item"
+        settings.target_objects_per_input_row = structured_output.TargetObjectsPerInputRow.Multiple.name
         
         field1 = MockOutputColumn()
         field1.name = "item"
@@ -454,7 +454,7 @@ class TestStructuredResponsesToTable(unittest.TestCase):
         
         settings.output_columns = [field1]
         
-        # In Many mode, create_pydantic_model returns a wrapper model with an 'items' field
+        # In Multiple mode, create_pydantic_model returns a wrapper model with an 'items' field
         # that contains a list of the actual item models
         wrapper_model = structured_output.create_pydantic_model(settings)
         
@@ -477,7 +477,7 @@ class TestStructuredResponsesToTable(unittest.TestCase):
     def test_missing_values_in_responses(self):
         """Test that missing values are properly handled when information cannot be extracted."""
         settings = MockStructuredOutputSettings()
-        settings.output_rows_per_input_row = structured_output.OutputRowsPerInputRow.One.name
+        settings.target_objects_per_input_row = structured_output.TargetObjectsPerInputRow.One.name
         
         field1 = MockOutputColumn()
         field1.name = "name"
@@ -508,11 +508,11 @@ class TestStructuredResponsesToTable(unittest.TestCase):
         self.assertEqual(result["age"].to_pylist(), [30, None, 25])
         self.assertEqual(result["city"].to_pylist(), ["NYC", "LA", None])
 
-    def test_missing_values_in_many_mode(self):
-        """Test that missing values work correctly in Many mode."""
+    def test_missing_values_in_multiple_mode(self):
+        """Test that missing values work correctly in Multiple mode."""
         settings = MockStructuredOutputSettings()
-        settings.structure_name = "Person"
-        settings.output_rows_per_input_row = structured_output.OutputRowsPerInputRow.Many.name
+        settings.target_object_name = "Person"
+        settings.target_objects_per_input_row = structured_output.TargetObjectsPerInputRow.Multiple.name
         
         field1 = MockOutputColumn()
         field1.name = "name"
@@ -588,7 +588,7 @@ class TestPostprocessTable(unittest.TestCase):
 
     def test_postprocess_one_row_per_input(self):
         settings = MockStructuredOutputSettings()
-        settings.output_rows_per_input_row = structured_output.OutputRowsPerInputRow.One.name
+        settings.target_objects_per_input_row = structured_output.TargetObjectsPerInputRow.One.name
         
         field = MockOutputColumn()
         field.name = "output"
@@ -609,9 +609,9 @@ class TestPostprocessTable(unittest.TestCase):
         self.assertIn("input_col", result.column_names)
         self.assertIn("output", result.column_names)
 
-    def test_postprocess_many_rows_per_input(self):
+    def test_postprocess_multiple_rows_per_input(self):
         settings = MockStructuredOutputSettings()
-        settings.output_rows_per_input_row = structured_output.OutputRowsPerInputRow.Many.name
+        settings.target_objects_per_input_row = structured_output.TargetObjectsPerInputRow.Multiple.name
         settings.input_row_id_column_name = "Input Row ID"
         
         field = MockOutputColumn()
@@ -640,7 +640,7 @@ class TestAddStructuredOutputColumns(unittest.TestCase):
 
     def test_add_columns_one_row(self):
         settings = MockStructuredOutputSettings()
-        settings.output_rows_per_input_row = structured_output.OutputRowsPerInputRow.One.name
+        settings.target_objects_per_input_row = structured_output.TargetObjectsPerInputRow.One.name
         
         field = MockOutputColumn()
         field.name = "new_col"
@@ -657,9 +657,9 @@ class TestAddStructuredOutputColumns(unittest.TestCase):
         self.assertEqual(len(list(result)), 2)
         self.assertIn("new_col", result.column_names)
 
-    def test_add_columns_many_rows(self):
+    def test_add_columns_multiple_rows(self):
         settings = MockStructuredOutputSettings()
-        settings.output_rows_per_input_row = structured_output.OutputRowsPerInputRow.Many.name
+        settings.target_objects_per_input_row = structured_output.TargetObjectsPerInputRow.Multiple.name
         settings.input_row_id_column_name = "Input Row ID"
         
         field = MockOutputColumn()

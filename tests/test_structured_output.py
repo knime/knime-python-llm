@@ -55,9 +55,10 @@ from models import structured_output
 # Mock classes to work around ParameterGroupHolder issues when setting parameter arrays directly
 class MockOutputColumn:
     """Mock for OutputColumn parameter group."""
-    def __init__(self, name="", column_type="String", description=""):
+    def __init__(self, name="", column_type="String", quantity="Single", description=""):
         self.name = name
         self.column_type = column_type
+        self.quantity = quantity
         self.description = description
 
 
@@ -85,18 +86,16 @@ class TestOutputColumnType(unittest.TestCase):
         
     def test_boolean_type(self):
         self.assertEqual(structured_output.OutputColumnType.Boolean.name, "Boolean")
-        
-    def test_string_list_type(self):
-        self.assertEqual(structured_output.OutputColumnType.StringList.name, "StringList")
-        
-    def test_integer_list_type(self):
-        self.assertEqual(structured_output.OutputColumnType.IntegerList.name, "IntegerList")
-        
-    def test_double_list_type(self):
-        self.assertEqual(structured_output.OutputColumnType.DoubleList.name, "DoubleList")
-        
-    def test_boolean_list_type(self):
-        self.assertEqual(structured_output.OutputColumnType.BooleanList.name, "BooleanList")
+
+
+class TestOutputColumnQuantity(unittest.TestCase):
+    """Test OutputColumnQuantity enum values."""
+
+    def test_single_quantity(self):
+        self.assertEqual(structured_output.OutputColumnQuantity.Single.name, "Single")
+
+    def test_multiple_quantity(self):
+        self.assertEqual(structured_output.OutputColumnQuantity.Multiple.name, "Multiple")
 
 
 class TestValidateOutputColumns(unittest.TestCase):
@@ -318,13 +317,15 @@ class TestGetOutputColumnKnimeType(unittest.TestCase):
 
     def test_string_list_type(self):
         result = structured_output.get_output_column_knime_type(
-            structured_output.OutputColumnType.StringList.name
+            structured_output.OutputColumnType.String.name,
+            structured_output.OutputColumnQuantity.Multiple.name
         )
         self.assertEqual(result, knext.list_(knext.string()))
 
     def test_integer_list_type(self):
         result = structured_output.get_output_column_knime_type(
-            structured_output.OutputColumnType.IntegerList.name
+            structured_output.OutputColumnType.Integer.name,
+            structured_output.OutputColumnQuantity.Multiple.name
         )
         self.assertEqual(result, knext.list_(knext.int64()))
 
@@ -358,7 +359,8 @@ class TestGetOutputColumnPyArrowType(unittest.TestCase):
 
     def test_string_list_type(self):
         result = structured_output.get_output_column_pyarrow_type(
-            structured_output.OutputColumnType.StringList.name
+            structured_output.OutputColumnType.String.name,
+            structured_output.OutputColumnQuantity.Multiple.name
         )
         self.assertEqual(result, pa.list_(pa.string()))
 
@@ -554,7 +556,8 @@ class TestExplodeLists(unittest.TestCase):
         
         field1 = MockOutputColumn()
         field1.name = "items"
-        field1.column_type = structured_output.OutputColumnType.StringList.name
+        field1.column_type = structured_output.OutputColumnType.String.name
+        field1.quantity = structured_output.OutputColumnQuantity.Multiple.name
         
         settings.output_columns = [field1]
         
@@ -613,7 +616,8 @@ class TestPostprocessTable(unittest.TestCase):
         
         field = MockOutputColumn()
         field.name = "output"
-        field.column_type = structured_output.OutputColumnType.StringList.name
+        field.column_type = structured_output.OutputColumnType.String.name
+        field.quantity = structured_output.OutputColumnQuantity.Multiple.name
         settings.output_columns = [field]
         
         input_table = pa.table({

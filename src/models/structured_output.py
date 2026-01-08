@@ -71,21 +71,18 @@ class OutputColumnType(knext.EnumParameterOptions):
         "Boolean",
         "True/False column.",
     )
-    StringList = (
-        "String List",
-        "List of text values.",
+
+
+class OutputColumnQuantity(knext.EnumParameterOptions):
+    """Quantity of values to extract for a single output column."""
+
+    Single = (
+        "Single",
+        "Extract exactly one value of the defined type.",
     )
-    IntegerList = (
-        "Integer List",
-        "List of whole numbers.",
-    )
-    DoubleList = (
-        "Double List",
-        "List of floating point numbers.",
-    )
-    BooleanList = (
-        "Boolean List",
-        "List of True/False values.",
+    Multiple = (
+        "Multiple",
+        "Extract multiple values (as a list) of the defined type.",
     )
 
 
@@ -101,10 +98,19 @@ class OutputColumn:
 
     column_type = knext.EnumParameter(
         label="Data type",
-        description="The data type of this column. List types can contain multiple values per row.",
+        description="The base data type of this column.",
         default_value=OutputColumnType.String.name,
         enum=OutputColumnType,
         style=knext.EnumParameter.Style.DROPDOWN,
+    )
+
+    quantity = knext.EnumParameter(
+        label="Quantity",
+        description="""Determines if this column should contain a single value 
+        or multiple values (list) for each extracted item.""",
+        default_value=OutputColumnQuantity.Single.name,
+        enum=OutputColumnQuantity,
+        style=knext.EnumParameter.Style.VALUE_SWITCH,
     )
 
     description = knext.StringParameter(
@@ -229,10 +235,6 @@ def create_pydantic_model(settings):
         OutputColumnType.Integer.name: int,
         OutputColumnType.Double.name: float,
         OutputColumnType.Boolean.name: bool,
-        OutputColumnType.StringList.name: TypingList[str],
-        OutputColumnType.IntegerList.name: TypingList[int],
-        OutputColumnType.DoubleList.name: TypingList[float],
-        OutputColumnType.BooleanList.name: TypingList[bool],
     }
 
     # Build field definitions for Pydantic
@@ -240,6 +242,9 @@ def create_pydantic_model(settings):
     field_definitions = {}
     for column in settings.output_columns:
         python_type = type_mapping[column.column_type]
+        if column.quantity == OutputColumnQuantity.Multiple.name:
+            python_type = TypingList[python_type]
+            
         field_description = column.description if column.description else column.name
         field_definitions[column.name] = (
             Optional[python_type],
@@ -272,12 +277,13 @@ def create_pydantic_model(settings):
     return base_model
 
 
-def get_output_column_knime_type(column_type: str):
+def get_output_column_knime_type(column_type: str, quantity: str = OutputColumnQuantity.Single.name):
     """
     Map OutputColumnType to KNIME column type.
     
     Args:
         column_type: String name of OutputColumnType enum value
+        quantity: String name of OutputColumnQuantity enum value
         
     Returns:
         KNIME column type
@@ -287,20 +293,21 @@ def get_output_column_knime_type(column_type: str):
         OutputColumnType.Integer.name: knext.int64(),
         OutputColumnType.Double.name: knext.double(),
         OutputColumnType.Boolean.name: knext.bool_(),
-        OutputColumnType.StringList.name: knext.list_(knext.string()),
-        OutputColumnType.IntegerList.name: knext.list_(knext.int64()),
-        OutputColumnType.DoubleList.name: knext.list_(knext.double()),
-        OutputColumnType.BooleanList.name: knext.list_(knext.bool_()),
     }
-    return type_mapping[column_type]
+    
+    knime_type = type_mapping[column_type]
+    if quantity == OutputColumnQuantity.Multiple.name:
+        return knext.list_(knime_type)
+    return knime_type
 
 
-def get_output_column_pyarrow_type(column_type: str):
+def get_output_column_pyarrow_type(column_type: str, quantity: str = OutputColumnQuantity.Single.name):
     """
     Map OutputColumnType to PyArrow type.
     
     Args:
         column_type: String name of OutputColumnType enum value
+        quantity: String name of OutputColumnQuantity enum value
         
     Returns:
         PyArrow type
@@ -312,12 +319,12 @@ def get_output_column_pyarrow_type(column_type: str):
         OutputColumnType.Integer.name: pa.int64(),
         OutputColumnType.Double.name: pa.float64(),
         OutputColumnType.Boolean.name: pa.bool_(),
-        OutputColumnType.StringList.name: pa.list_(pa.string()),
-        OutputColumnType.IntegerList.name: pa.list_(pa.int64()),
-        OutputColumnType.DoubleList.name: pa.list_(pa.float64()),
-        OutputColumnType.BooleanList.name: pa.list_(pa.bool_()),
     }
-    return type_mapping[column_type]
+    
+    pa_type = type_mapping[column_type]
+    if quantity == OutputColumnQuantity.Multiple.name:
+        return pa.list_(pa_type)
+    return pa_type
 
 
 def _make_row_ids_unique(duplicated_row_ids, list_column):
@@ -449,7 +456,7 @@ def structured_responses_to_table(responses, settings):
         schema_fields = []
         
         for column in settings.output_columns:
-            inner_type = get_output_column_pyarrow_type(column.column_type)
+            inner_type = get_output_column_pyarrow_type(column.column_type, column.quantity)
             schema_fields.append(pa.field(column.name, pa.list_(inner_type)))
             arrays.append(pa.array(column_data[column.name]))
         
@@ -470,7 +477,7 @@ def structured_responses_to_table(responses, settings):
         arrays = []
         schema_fields = []
         for column in settings.output_columns:
-            pa_type = get_output_column_pyarrow_type(column.column_type)
+            pa_type = get_output_column_pyarrow_type(column.column_type, column.quantity)
             schema_fields.append(pa.field(column.name, pa_type))
             arrays.append(pa.array(column_data[column.name], type=pa_type))
 
@@ -536,7 +543,7 @@ def add_structured_output_columns(input_schema, settings):
         column_name = util.handle_column_name_collision(
             output_schema.column_names, column.name
         )
-        knime_type = get_output_column_knime_type(column.column_type)
+        knime_type = get_output_column_knime_type(column.column_type, column.quantity)
         output_schema = output_schema.append(
             knext.Column(ktype=knime_type, name=column_name)
         )

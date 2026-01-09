@@ -251,7 +251,15 @@ class TestCreatePydanticModel(unittest.TestCase):
         field3.name = "flag"
         field3.column_type = structured_output.OutputColumnType.Boolean.name
         
-        settings.output_columns = [field1, field2, field3]
+        field4 = MockOutputColumn()
+        field4.name = "ratio"
+        field4.column_type = structured_output.OutputColumnType.Double.name
+
+        field5 = MockOutputColumn()
+        field5.name = "big_id"
+        field5.column_type = structured_output.OutputColumnType.Long.name
+
+        settings.output_columns = [field1, field2, field3, field4, field5]
         
         model = structured_output.create_pydantic_model(settings)
         
@@ -259,6 +267,8 @@ class TestCreatePydanticModel(unittest.TestCase):
         self.assertIn("text", model.model_fields)
         self.assertIn("number", model.model_fields)
         self.assertIn("flag", model.model_fields)
+        self.assertIn("ratio", model.model_fields)
+        self.assertIn("big_id", model.model_fields)
 
     def test_target_object_name_with_spaces(self):
         """Test that spaces in target_object_name are converted to underscores."""
@@ -407,6 +417,20 @@ class TestGetOutputColumnKnimeType(unittest.TestCase):
         )
         self.assertEqual(result, knext.list_(knext.int64()))
 
+    def test_double_list_type(self):
+        result = structured_output.get_output_column_knime_type(
+            structured_output.OutputColumnType.Double.name,
+            structured_output.OutputColumnQuantity.Multiple.name
+        )
+        self.assertEqual(result, knext.list_(knext.double()))
+
+    def test_boolean_list_type(self):
+        result = structured_output.get_output_column_knime_type(
+            structured_output.OutputColumnType.Boolean.name,
+            structured_output.OutputColumnQuantity.Multiple.name
+        )
+        self.assertEqual(result, knext.list_(knext.bool_()))
+
 
 class TestGetOutputColumnPyArrowType(unittest.TestCase):
     """Test get_output_column_pyarrow_type function."""
@@ -461,6 +485,20 @@ class TestGetOutputColumnPyArrowType(unittest.TestCase):
             structured_output.OutputColumnQuantity.Multiple.name
         )
         self.assertEqual(result, pa.list_(pa.int64()))
+
+    def test_double_list_type(self):
+        result = structured_output.get_output_column_pyarrow_type(
+            structured_output.OutputColumnType.Double.name,
+            structured_output.OutputColumnQuantity.Multiple.name
+        )
+        self.assertEqual(result, pa.list_(pa.float64()))
+
+    def test_boolean_list_type(self):
+        result = structured_output.get_output_column_pyarrow_type(
+            structured_output.OutputColumnType.Boolean.name,
+            structured_output.OutputColumnQuantity.Multiple.name
+        )
+        self.assertEqual(result, pa.list_(pa.bool_()))
 
 
 class TestMakeRowIdsUnique(unittest.TestCase):
@@ -541,6 +579,36 @@ class TestStructuredResponsesToTable(unittest.TestCase):
         self.assertEqual(result["name"].to_pylist(), ["Alice", "Bob"])
         self.assertEqual(result["age"].to_pylist(), [30, 25])
 
+    def test_convert_single_responses_all_types(self):
+        """Test conversion of single responses with all column types."""
+        settings = MockStructuredOutputSettings()
+        settings.target_objects_per_input_row = structured_output.TargetObjectsPerInputRow.One.name
+        
+        columns = [
+            MockOutputColumn("str", structured_output.OutputColumnType.String.name),
+            MockOutputColumn("int", structured_output.OutputColumnType.Integer.name),
+            MockOutputColumn("long", structured_output.OutputColumnType.Long.name),
+            MockOutputColumn("double", structured_output.OutputColumnType.Double.name),
+            MockOutputColumn("bool", structured_output.OutputColumnType.Boolean.name),
+        ]
+        settings.output_columns = columns
+        resolved_names = [c.name for c in columns]
+        
+        model = structured_output.create_pydantic_model(settings)
+        responses = [
+            model(**{"str": "A", "int": 1, "long": 10**12, "double": 1.5, "bool": True}),
+            model(**{"str": "B", "int": 2, "long": 20**12, "double": 2.5, "bool": False}),
+        ]
+        
+        result = structured_output.structured_responses_to_table(responses, settings, resolved_names)
+        
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result["str"].to_pylist(), ["A", "B"])
+        self.assertEqual(result["int"].to_pylist(), [1, 2])
+        self.assertEqual(result["long"].to_pylist(), [10**12, 20**12])
+        self.assertEqual(result["double"].to_pylist(), [1.5, 2.5])
+        self.assertEqual(result["bool"].to_pylist(), [True, False])
+
     def test_convert_multiple_responses(self):
         settings = MockStructuredOutputSettings()
         settings.target_object_name = "Item"
@@ -571,6 +639,44 @@ class TestStructuredResponsesToTable(unittest.TestCase):
         self.assertEqual(len(result), 2)
         # Each row should have a list
         self.assertEqual(result["item"].to_pylist(), [["apple", "banana"], ["carrot"]])
+
+    def test_convert_multiple_responses_all_types(self):
+        """Test conversion of multiple responses per row with all column types."""
+        settings = MockStructuredOutputSettings()
+        settings.target_objects_per_input_row = structured_output.TargetObjectsPerInputRow.Multiple.name
+        
+        columns = [
+            MockOutputColumn("str", structured_output.OutputColumnType.String.name),
+            MockOutputColumn("int", structured_output.OutputColumnType.Integer.name),
+            MockOutputColumn("long", structured_output.OutputColumnType.Long.name),
+            MockOutputColumn("double", structured_output.OutputColumnType.Double.name),
+            MockOutputColumn("bool", structured_output.OutputColumnType.Boolean.name),
+        ]
+        settings.output_columns = columns
+        resolved_names = [c.name for c in columns]
+        
+        wrapper_model = structured_output.create_pydantic_model(settings)
+        items_field = wrapper_model.model_fields['items']
+        ItemModel = items_field.annotation.__args__[0]
+        
+        responses = [
+            wrapper_model(items=[
+                ItemModel(**{"str": "A1", "int": 1, "long": 10**12, "double": 1.1, "bool": True}),
+                ItemModel(**{"str": "A2", "int": 2, "long": 20**12, "double": 1.2, "bool": False}),
+            ]),
+            wrapper_model(items=[
+                ItemModel(**{"str": "B1", "int": 3, "long": 30**12, "double": 2.1, "bool": True}),
+            ]),
+        ]
+        
+        result = structured_output.structured_responses_to_table(responses, settings, resolved_names)
+        
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result["str"].to_pylist(), [["A1", "A2"], ["B1"]])
+        self.assertEqual(result["int"].to_pylist(), [[1, 2], [3]])
+        self.assertEqual(result["long"].to_pylist(), [[10**12, 20**12], [30**12]])
+        self.assertEqual(result["double"].to_pylist(), [[1.1, 1.2], [2.1]])
+        self.assertEqual(result["bool"].to_pylist(), [[True, False], [True]])
 
     def test_missing_values_in_responses(self):
         """Test that missing values are properly handled when information cannot be extracted."""
@@ -756,6 +862,35 @@ class TestAddStructuredOutputColumns(unittest.TestCase):
         
         self.assertEqual(len(list(result)), 2)
         self.assertIn("new_col", result.column_names)
+
+    def test_add_columns_all_types(self):
+        """Test that all column types are correctly added to the schema."""
+        settings = MockStructuredOutputSettings()
+        settings.target_objects_per_input_row = structured_output.TargetObjectsPerInputRow.One.name
+        
+        columns = [
+            MockOutputColumn("c1", structured_output.OutputColumnType.String.name),
+            MockOutputColumn("c2", structured_output.OutputColumnType.Integer.name),
+            MockOutputColumn("c3", structured_output.OutputColumnType.Long.name),
+            MockOutputColumn("c4", structured_output.OutputColumnType.Double.name),
+            MockOutputColumn("c5", structured_output.OutputColumnType.Boolean.name),
+            MockOutputColumn("c6", structured_output.OutputColumnType.String.name, structured_output.OutputColumnQuantity.Multiple.name),
+        ]
+        settings.output_columns = columns
+        
+        input_schema = knext.Schema.from_columns([
+            knext.Column(knext.int64(), "existing")
+        ])
+        
+        result = structured_output.add_structured_output_columns(input_schema, settings)
+        
+        self.assertEqual(len(list(result)), 7) # 1 input + 6 output
+        self.assertEqual(result["c1"].ktype, knext.string())
+        self.assertEqual(result["c2"].ktype, knext.int32())
+        self.assertEqual(result["c3"].ktype, knext.int64())
+        self.assertEqual(result["c4"].ktype, knext.double())
+        self.assertEqual(result["c5"].ktype, knext.bool_())
+        self.assertEqual(result["c6"].ktype, knext.list_(knext.string()))
 
     def test_add_columns_multiple_rows(self):
         settings = MockStructuredOutputSettings()

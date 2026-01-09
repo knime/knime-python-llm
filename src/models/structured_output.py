@@ -49,7 +49,6 @@ This module provides functionality for extracting structured data from LLM respo
 including parameter definitions, Pydantic model creation, and table conversion utilities.
 """
 
-from typing import List
 import knime.extension as knext
 
 
@@ -189,7 +188,7 @@ class StructuredOutputSettings:
 
 
 
-def get_resolved_column_names(input_column_names, settings):
+def get_resolved_column_names(input_column_names: list[str], settings: StructuredOutputSettings):
     """
     Get the resolved column names for structured output, handling collisions with input columns.
     
@@ -219,7 +218,7 @@ def get_resolved_column_names(input_column_names, settings):
     return resolved_input_row_id_name, resolved_output_column_names
 
 
-def validate_output_columns(output_columns):
+def validate_output_columns(output_columns: list[OutputColumn]):
     """
     Validate that output columns are properly configured.
     
@@ -261,7 +260,7 @@ def _sanitize_field_name(name: str) -> str:
     return sanitized[:64]
 
 
-def _get_llm_field_names(settings):
+def _get_llm_field_names(settings: StructuredOutputSettings):
     """Get unique sanitized field names for the LLM schema."""
     names = []
     seen = set()
@@ -278,7 +277,7 @@ def _get_llm_field_names(settings):
     return names
 
 
-def create_pydantic_model(settings):
+def create_pydantic_model(settings: StructuredOutputSettings):
     """
     Create a Pydantic model from the structured output settings.
     
@@ -445,7 +444,7 @@ def _make_row_ids_unique(duplicated_row_ids, list_column):
     return pa.array(unique_row_ids, type=pa.string())
 
 
-def explode_lists(table, input_row_id_name: str, output_col_names: List[str]):
+def explode_lists(table, input_row_id_name: str, output_col_names: list[str]):
     """
     Explode list columns into multiple rows.
     
@@ -494,7 +493,7 @@ def explode_lists(table, input_row_id_name: str, output_col_names: List[str]):
     # Build final exploded table (preserve original column order)
     return pa.table({row_id_col_name: new_row_id_col, **scalar_cols, input_row_id_name: row_id_col, **flattened_list_cols})
 
-def create_empty(num_messages: int, output_column_names: List[str]):
+def create_empty(num_messages: int, output_column_names: list[str]):
     import pyarrow as pa
     empty_data = {
         name: [None] * num_messages for name in output_column_names
@@ -502,7 +501,7 @@ def create_empty(num_messages: int, output_column_names: List[str]):
     return pa.table(empty_data)
 
 
-def structured_responses_to_table(responses, settings, output_column_names):
+def structured_responses_to_table(responses, settings: StructuredOutputSettings, output_column_names: list[str]):
     """
     Convert a list of Pydantic model instances to a PyArrow table.
     
@@ -571,7 +570,7 @@ def structured_responses_to_table(responses, settings, output_column_names):
         return pa.table(dict(zip(output_column_names, arrays)), schema=schema)
 
 
-def postprocess_table(input_table, result_table, settings, input_row_id_name: str, output_col_names: List[str]):
+def postprocess_table(input_table, result_table, settings: StructuredOutputSettings, input_row_id_name: str, output_col_names: list[str]):
     """
     Postprocess structured output by adding row IDs and optionally exploding list columns.
     
@@ -601,7 +600,7 @@ def postprocess_table(input_table, result_table, settings, input_row_id_name: st
         return combined_table
 
 
-def add_structured_output_columns(input_schema, settings):
+def add_structured_output_columns(input_schema: knext.Schema, settings: StructuredOutputSettings):
     """
     Add structured output columns to an input schema.
     
@@ -612,7 +611,6 @@ def add_structured_output_columns(input_schema, settings):
     Returns:
         Schema with added structured output columns
     """
-    import util
     
     output_schema = input_schema
     

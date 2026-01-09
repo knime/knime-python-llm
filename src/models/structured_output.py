@@ -60,11 +60,15 @@ class OutputColumnType(knext.EnumParameterOptions):
         "Text column.",
     )
     Integer = (
-        "Integer",
-        "Whole number column.",
+        "Number (Integer)",
+        "Integer column.",
+    )
+    Long = (
+        "Number (Long Integer)",
+        "Long integer column.",
     )
     Double = (
-        "Double",
+        "Number (Float)",
         "Floating point number column.",
     )
     Boolean = (
@@ -233,6 +237,7 @@ def create_pydantic_model(settings):
     type_mapping = {
         OutputColumnType.String.name: str,
         OutputColumnType.Integer.name: int,
+        OutputColumnType.Long.name: int,
         OutputColumnType.Double.name: float,
         OutputColumnType.Boolean.name: bool,
     }
@@ -290,7 +295,8 @@ def get_output_column_knime_type(column_type: str, quantity: str = OutputColumnQ
     """
     type_mapping = {
         OutputColumnType.String.name: knext.string(),
-        OutputColumnType.Integer.name: knext.int64(),
+        OutputColumnType.Integer.name: knext.int32(),
+        OutputColumnType.Long.name: knext.int64(),
         OutputColumnType.Double.name: knext.double(),
         OutputColumnType.Boolean.name: knext.bool_(),
     }
@@ -316,7 +322,8 @@ def get_output_column_pyarrow_type(column_type: str, quantity: str = OutputColum
 
     type_mapping = {
         OutputColumnType.String.name: pa.string(),
-        OutputColumnType.Integer.name: pa.int64(),
+        OutputColumnType.Integer.name: pa.int32(),
+        OutputColumnType.Long.name: pa.int64(),
         OutputColumnType.Double.name: pa.float64(),
         OutputColumnType.Boolean.name: pa.bool_(),
     }

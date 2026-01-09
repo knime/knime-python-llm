@@ -80,6 +80,9 @@ class TestOutputColumnType(unittest.TestCase):
         
     def test_integer_type(self):
         self.assertEqual(structured_output.OutputColumnType.Integer.name, "Integer")
+
+    def test_long_type(self):
+        self.assertEqual(structured_output.OutputColumnType.Long.name, "Long")
         
     def test_double_type(self):
         self.assertEqual(structured_output.OutputColumnType.Double.name, "Double")
@@ -301,6 +304,12 @@ class TestGetOutputColumnKnimeType(unittest.TestCase):
         result = structured_output.get_output_column_knime_type(
             structured_output.OutputColumnType.Integer.name
         )
+        self.assertEqual(result, knext.int32())
+
+    def test_long_type(self):
+        result = structured_output.get_output_column_knime_type(
+            structured_output.OutputColumnType.Long.name
+        )
         self.assertEqual(result, knext.int64())
 
     def test_double_type(self):
@@ -327,6 +336,13 @@ class TestGetOutputColumnKnimeType(unittest.TestCase):
             structured_output.OutputColumnType.Integer.name,
             structured_output.OutputColumnQuantity.Multiple.name
         )
+        self.assertEqual(result, knext.list_(knext.int32()))
+
+    def test_long_list_type(self):
+        result = structured_output.get_output_column_knime_type(
+            structured_output.OutputColumnType.Long.name,
+            structured_output.OutputColumnQuantity.Multiple.name
+        )
         self.assertEqual(result, knext.list_(knext.int64()))
 
 
@@ -342,6 +358,12 @@ class TestGetOutputColumnPyArrowType(unittest.TestCase):
     def test_integer_type(self):
         result = structured_output.get_output_column_pyarrow_type(
             structured_output.OutputColumnType.Integer.name
+        )
+        self.assertEqual(result, pa.int32())
+
+    def test_long_type(self):
+        result = structured_output.get_output_column_pyarrow_type(
+            structured_output.OutputColumnType.Long.name
         )
         self.assertEqual(result, pa.int64())
 
@@ -363,6 +385,20 @@ class TestGetOutputColumnPyArrowType(unittest.TestCase):
             structured_output.OutputColumnQuantity.Multiple.name
         )
         self.assertEqual(result, pa.list_(pa.string()))
+
+    def test_integer_list_type(self):
+        result = structured_output.get_output_column_pyarrow_type(
+            structured_output.OutputColumnType.Integer.name,
+            structured_output.OutputColumnQuantity.Multiple.name
+        )
+        self.assertEqual(result, pa.list_(pa.int32()))
+
+    def test_long_list_type(self):
+        result = structured_output.get_output_column_pyarrow_type(
+            structured_output.OutputColumnType.Long.name,
+            structured_output.OutputColumnQuantity.Multiple.name
+        )
+        self.assertEqual(result, pa.list_(pa.int64()))
 
 
 class TestMakeRowIdsUnique(unittest.TestCase):

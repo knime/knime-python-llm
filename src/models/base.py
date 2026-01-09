@@ -902,6 +902,9 @@ class LLMPrompter:
         is_chat_model = not llm_port.spec.is_instruct_model
 
         if is_structured:
+            input_row_id_name, output_col_names = so.get_resolved_column_names(
+                input_table.schema.column_names, self.structured_output_settings
+            )
             pydantic_model = so.create_pydantic_model(self.structured_output_settings)
             llm = llm.with_structured_output(pydantic_model)
 
@@ -924,7 +927,10 @@ class LLMPrompter:
             # Check if all prompts are empty/missing
             if not messages:
                 if is_structured:
-                    return so.create_empty(self.structured_output_settings, len(messages))
+                    return so.create_empty(
+                        len(messages),
+                        output_col_names,
+                    )
                 else:
                     output_schema = pa.schema([(self.response_column_name, pa.string())])
                     missing_values_table = pa.table(
@@ -939,7 +945,9 @@ class LLMPrompter:
 
             if is_structured:
                 # Convert Pydantic model responses to table columns
-                return so.structured_responses_to_table(responses, self.structured_output_settings)
+                return so.structured_responses_to_table(
+                    responses, self.structured_output_settings, output_col_names
+                )
             else:
                 return pa.table({output_column_name: responses})
 
@@ -954,7 +962,13 @@ class LLMPrompter:
             
             # Postprocess structured output (add row IDs, explode lists if needed)
             if is_structured:
-                final_table = so.postprocess_table(pa_table, result_table, self.structured_output_settings)
+                final_table = so.postprocess_table(
+                    pa_table,
+                    result_table,
+                    self.structured_output_settings,
+                    input_row_id_name,
+                    output_col_names,
+                )
             else:
                 # Combine input and result columns for non-structured output
                 final_table = pa.Table.from_arrays(

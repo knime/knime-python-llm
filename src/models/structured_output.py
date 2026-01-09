@@ -251,6 +251,33 @@ def validate_output_columns(output_columns):
         column_names.add(column.name)
 
 
+def _sanitize_field_name(name: str) -> str:
+    """Sanitize field name to match '^[a-zA-Z0-9_.-]{1,64}$'."""
+    import re
+    # Replace anything not a-z, A-Z, 0-9, _, . or - with _
+    sanitized = re.sub(r'[^a-zA-Z0-9_.-]', '_', name)
+    if not sanitized:
+        sanitized = "field"
+    return sanitized[:64]
+
+
+def _get_llm_field_names(settings):
+    """Get unique sanitized field names for the LLM schema."""
+    names = []
+    seen = set()
+    for column in settings.output_columns:
+        base = _sanitize_field_name(column.name)
+        candidate = base
+        count = 1
+        while candidate in seen:
+            suffix = f"_{count}"
+            candidate = base[:64 - len(suffix)] + suffix
+            count += 1
+        names.append(candidate)
+        seen.add(candidate)
+    return names
+
+
 def create_pydantic_model(settings):
     """
     Create a Pydantic model from the structured output settings.
@@ -300,13 +327,14 @@ def create_pydantic_model(settings):
     # Build field definitions for Pydantic
     # All fields are optional to allow the LLM to omit values when information is missing
     field_definitions = {}
-    for column in settings.output_columns:
+    llm_field_names = _get_llm_field_names(settings)
+    for column, sanitized_name in zip(settings.output_columns, llm_field_names):
         python_type = type_mapping[column.column_type]
         if column.quantity == OutputColumnQuantity.Multiple.name:
             python_type = TypingList[python_type]
             
         field_description = column.description if column.description else column.name
-        field_definitions[column.name] = (
+        field_definitions[sanitized_name] = (
             Optional[python_type],
             Field(default=None, description=field_description),
         )
@@ -489,11 +517,12 @@ def structured_responses_to_table(responses, settings, output_column_names):
         - If target_objects_per_input_row=Multiple: each row has list values (one list per input row containing extracted items)
     """
     import pyarrow as pa
+    llm_field_names = _get_llm_field_names(settings)
 
     if settings.target_objects_per_input_row == TargetObjectsPerInputRow.Multiple.name:
         # When Multiple is selected, each response is a wrapper model with an 'items' field
         # Create columns with lists (one list per input row)
-        column_data = {column.name: [] for column in settings.output_columns}
+        column_data = {sanitized_name: [] for sanitized_name in llm_field_names}
         
         for idx, response in enumerate(responses):
             # Get the list of items from the wrapper model
@@ -501,42 +530,42 @@ def structured_responses_to_table(responses, settings, output_column_names):
             
             # If no items extracted, add lists with single None value
             if not items:
-                for column in settings.output_columns:
-                    column_data[column.name].append([None])
+                for sanitized_name in llm_field_names:
+                    column_data[sanitized_name].append([None])
             else:
                 # Create a list of values for each column
-                for column in settings.output_columns:
-                    column_values = [getattr(item, column.name, None) for item in items]
-                    column_data[column.name].append(column_values)
+                for sanitized_name in llm_field_names:
+                    column_values = [getattr(item, sanitized_name, None) for item in items]
+                    column_data[sanitized_name].append(column_values)
         
         # Create PyArrow table with list columns
         arrays = []
         schema_fields = []
         
-        for column, column_name in zip(settings.output_columns, output_column_names):
+        for column, column_name, sanitized_name in zip(settings.output_columns, output_column_names, llm_field_names):
             inner_type = get_output_column_pyarrow_type(column.column_type, column.quantity)
             schema_fields.append(pa.field(column_name, pa.list_(inner_type)))
-            arrays.append(pa.array(column_data[column.name]))
+            arrays.append(pa.array(column_data[sanitized_name]))
         
         schema = pa.schema(schema_fields)
         return pa.table(dict(zip(output_column_names, arrays)), schema=schema)
     else:
         # Single item per input row - original behavior
-        column_data = {column.name: [] for column in settings.output_columns}
+        column_data = {sanitized_name: [] for sanitized_name in llm_field_names}
 
         for response in responses:
             # response is a Pydantic model instance
-            for column in settings.output_columns:
-                value = getattr(response, column.name, None)
-                column_data[column.name].append(value)
+            for sanitized_name in llm_field_names:
+                value = getattr(response, sanitized_name, None)
+                column_data[sanitized_name].append(value)
 
         # Create PyArrow table with appropriate types
         arrays = []
         schema_fields = []
-        for column, column_name in zip(settings.output_columns, output_column_names):
+        for column, column_name, sanitized_name in zip(settings.output_columns, output_column_names, llm_field_names):
             pa_type = get_output_column_pyarrow_type(column.column_type, column.quantity)
             schema_fields.append(pa.field(column_name, pa_type))
-            arrays.append(pa.array(column_data[column.name], type=pa_type))
+            arrays.append(pa.array(column_data[sanitized_name], type=pa_type))
 
         schema = pa.schema(schema_fields)
         return pa.table(dict(zip(output_column_names, arrays)), schema=schema)

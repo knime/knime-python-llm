@@ -440,7 +440,7 @@ class TestCreateEmpty(unittest.TestCase):
         
         settings.output_columns = [field1, field2]
         
-        result = structured_output.create_empty(settings, 3)
+        result = structured_output.create_empty(3, ["field1", "field2"])
         
         self.assertEqual(len(result), 3)
         self.assertEqual(result.column_names, ["field1", "field2"])
@@ -473,7 +473,7 @@ class TestStructuredResponsesToTable(unittest.TestCase):
             model(name="Bob", age=25),
         ]
         
-        result = structured_output.structured_responses_to_table(responses, settings)
+        result = structured_output.structured_responses_to_table(responses, settings, ["name", "age"])
         
         self.assertEqual(len(result), 2)
         self.assertEqual(result["name"].to_pylist(), ["Alice", "Bob"])
@@ -504,7 +504,7 @@ class TestStructuredResponsesToTable(unittest.TestCase):
             wrapper_model(items=[ItemModel(item="carrot")]),
         ]
         
-        result = structured_output.structured_responses_to_table(responses, settings)
+        result = structured_output.structured_responses_to_table(responses, settings, ["item"])
         
         self.assertEqual(len(result), 2)
         # Each row should have a list
@@ -537,7 +537,7 @@ class TestStructuredResponsesToTable(unittest.TestCase):
             model(name=None, age=25, city=None),      # Name and city missing
         ]
         
-        result = structured_output.structured_responses_to_table(responses, settings)
+        result = structured_output.structured_responses_to_table(responses, settings, ["name", "age", "city"])
         
         self.assertEqual(len(result), 3)
         self.assertEqual(result["name"].to_pylist(), ["Alice", "Bob", None])
@@ -575,7 +575,7 @@ class TestStructuredResponsesToTable(unittest.TestCase):
             ]),
         ]
         
-        result = structured_output.structured_responses_to_table(responses, settings)
+        result = structured_output.structured_responses_to_table(responses, settings, ["name", "age"])
         
         self.assertEqual(len(result), 2)
         # Check that None values are preserved in lists
@@ -604,7 +604,7 @@ class TestExplodeLists(unittest.TestCase):
             "items": [["x", "y"], ["z"]],
         })
         
-        result = structured_output.explode_lists(table, settings)
+        result = structured_output.explode_lists(table, "Input Row ID", ["items"])
         
         # Should have 3 rows (2 from first, 1 from second)
         self.assertEqual(len(result), 3)
@@ -639,7 +639,7 @@ class TestPostprocessTable(unittest.TestCase):
             "output": ["a", "b"],
         })
         
-        result = structured_output.postprocess_table(input_table, result_table, settings)
+        result = structured_output.postprocess_table(input_table, result_table, settings, None, ["output"])
         
         self.assertEqual(len(result), 2)
         self.assertIn("input_col", result.column_names)
@@ -656,7 +656,9 @@ class TestPostprocessTable(unittest.TestCase):
         field.quantity = structured_output.OutputColumnQuantity.Multiple.name
         settings.output_columns = [field]
         
+        # First column must be Row ID as per explode_lists logic
         input_table = pa.table({
+            "Row ID": ["0", "1"],
             "input_col": [1, 2],
         })
         
@@ -664,7 +666,7 @@ class TestPostprocessTable(unittest.TestCase):
             "output": [["a", "b"], ["c"]],
         })
         
-        result = structured_output.postprocess_table(input_table, result_table, settings)
+        result = structured_output.postprocess_table(input_table, result_table, settings, "Input Row ID", ["output"])
         
         # Should be exploded to 3 rows
         self.assertEqual(len(result), 3)

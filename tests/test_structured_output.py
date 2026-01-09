@@ -329,6 +329,30 @@ class TestCreatePydanticModel(unittest.TestCase):
         self.assertEqual(model.__name__, "Person-Info_123")
 
 
+class TestFieldSanitization(unittest.TestCase):
+    """Test field name sanitization for LLM compatibility."""
+
+    def test_sanitize_field_name(self):
+        self.assertEqual(structured_output._sanitize_field_name("Full ID"), "Full_ID")
+        self.assertEqual(structured_output._sanitize_field_name("Invalid@Char#"), "Invalid_Char_")
+        self.assertEqual(structured_output._sanitize_field_name("dots.and-dashes_work"), "dots.and-dashes_work")
+        self.assertEqual(structured_output._sanitize_field_name(""), "field")
+        # Test length limit
+        long_name = "a" * 100
+        self.assertEqual(len(structured_output._sanitize_field_name(long_name)), 64)
+
+    def test_get_llm_field_names_uniqueness(self):
+        settings = MockStructuredOutputSettings()
+        col1 = MockOutputColumn(name="Full ID")
+        col2 = MockOutputColumn(name="Full!ID")
+        col3 = MockOutputColumn(name="Other")
+        settings.output_columns = [col1, col2, col3]
+
+        names = structured_output._get_llm_field_names(settings)
+        self.assertEqual(names, ["Full_ID", "Full_ID_1", "Other"])
+        self.assertEqual(len(set(names)), 3)
+
+
 class TestGetOutputColumnKnimeType(unittest.TestCase):
     """Test get_output_column_knime_type function."""
 

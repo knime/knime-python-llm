@@ -49,6 +49,7 @@ This module provides functionality for extracting structured data from LLM respo
 including parameter definitions, Pydantic model creation, and table conversion utilities.
 """
 
+from typing import List
 import knime.extension as knext
 
 
@@ -186,6 +187,36 @@ class StructuredOutputSettings:
         array_title="Output columns"
     )
 
+
+
+def get_resolved_column_names(input_column_names, settings):
+    """
+    Get the resolved column names for structured output, handling collisions with input columns.
+    
+    Args:
+        input_column_names: List of existing column names in the input table
+        settings: StructuredOutputSettings parameter group
+        
+    Returns:
+        Tuple of (resolved_input_row_id_name, resolved_output_column_names)
+    """
+    import util
+    current_names = list(input_column_names)
+    
+    resolved_input_row_id_name = None
+    if settings.target_objects_per_input_row == TargetObjectsPerInputRow.Multiple.name:
+        resolved_input_row_id_name = util.handle_column_name_collision(
+            current_names, settings.input_row_id_column_name
+        )
+        current_names.append(resolved_input_row_id_name)
+        
+    resolved_output_column_names = []
+    for column in settings.output_columns:
+        name = util.handle_column_name_collision(current_names, column.name)
+        resolved_output_column_names.append(name)
+        current_names.append(name)
+        
+    return resolved_input_row_id_name, resolved_output_column_names
 
 
 def validate_output_columns(output_columns):
@@ -362,7 +393,7 @@ def _make_row_ids_unique(duplicated_row_ids, list_column):
     return pa.array(unique_row_ids, type=pa.string())
 
 
-def explode_lists(table, settings: StructuredOutputSettings):
+def explode_lists(table, input_row_id_name: str, output_col_names: List[str]):
     """
     Explode list columns into multiple rows.
     
@@ -373,28 +404,23 @@ def explode_lists(table, settings: StructuredOutputSettings):
     
     Args:
         table: PyArrow table with list columns to explode
-        settings: StructuredOutputSettings parameter group
+        input_row_id_name: Resolved name of the input row ID column
+        output_col_names: List of resolved output column names
         
     Returns:
         PyArrow table with exploded rows
     """
     import pyarrow as pa
     import pyarrow.compute as pc
-    import util
-    
-    # Get the input row ID column name from settings
-    input_row_id_column_name = util.handle_column_name_collision(
-        table.column_names, settings.input_row_id_column_name
-    )
     
     # Pick one of the list columns to derive the parent index mapping
     # Use the first output column
-    first_list_col_name = settings.output_columns[0].name
+    first_list_col_name = output_col_names[0]
     first_list_col = table[first_list_col_name]
     parent_indices = pc.list_parent_indices(first_list_col)
     
     # Flatten all list columns (the output columns)
-    list_column_names = {column.name for column in settings.output_columns}
+    list_column_names = set(output_col_names)
     flattened_list_cols = {
         name: pc.list_flatten(table[name])
         for name in table.column_names
@@ -414,23 +440,24 @@ def explode_lists(table, settings: StructuredOutputSettings):
     new_row_id_col = _make_row_ids_unique(row_id_col, first_list_col)
     
     # Build final exploded table (preserve original column order)
-    return pa.table({row_id_col_name: new_row_id_col, **scalar_cols, input_row_id_column_name: row_id_col, **flattened_list_cols})
+    return pa.table({row_id_col_name: new_row_id_col, **scalar_cols, input_row_id_name: row_id_col, **flattened_list_cols})
 
-def create_empty(settings: StructuredOutputSettings, num_messages: int):
+def create_empty(num_messages: int, output_column_names: List[str]):
     import pyarrow as pa
     empty_data = {
-        column.name: [None] * num_messages for column in settings.output_columns
+        name: [None] * num_messages for name in output_column_names
     }
     return pa.table(empty_data)
 
 
-def structured_responses_to_table(responses, settings):
+def structured_responses_to_table(responses, settings, output_column_names):
     """
     Convert a list of Pydantic model instances to a PyArrow table.
     
     Args:
         responses: List of Pydantic model instances (or list wrapper models if target_objects_per_input_row=Multiple)
         settings: StructuredOutputSettings parameter group
+        output_column_names: List of resolved output column names
     
     Returns:
         PyArrow table where:
@@ -462,14 +489,13 @@ def structured_responses_to_table(responses, settings):
         arrays = []
         schema_fields = []
         
-        for column in settings.output_columns:
+        for column, column_name in zip(settings.output_columns, output_column_names):
             inner_type = get_output_column_pyarrow_type(column.column_type, column.quantity)
-            schema_fields.append(pa.field(column.name, pa.list_(inner_type)))
+            schema_fields.append(pa.field(column_name, pa.list_(inner_type)))
             arrays.append(pa.array(column_data[column.name]))
         
         schema = pa.schema(schema_fields)
-        column_names = [f.name for f in schema_fields]
-        return pa.table(dict(zip(column_names, arrays)), schema=schema)
+        return pa.table(dict(zip(output_column_names, arrays)), schema=schema)
     else:
         # Single item per input row - original behavior
         column_data = {column.name: [] for column in settings.output_columns}
@@ -483,16 +509,16 @@ def structured_responses_to_table(responses, settings):
         # Create PyArrow table with appropriate types
         arrays = []
         schema_fields = []
-        for column in settings.output_columns:
+        for column, column_name in zip(settings.output_columns, output_column_names):
             pa_type = get_output_column_pyarrow_type(column.column_type, column.quantity)
-            schema_fields.append(pa.field(column.name, pa_type))
+            schema_fields.append(pa.field(column_name, pa_type))
             arrays.append(pa.array(column_data[column.name], type=pa_type))
 
         schema = pa.schema(schema_fields)
-        return pa.table(dict(zip([f.name for f in settings.output_columns], arrays)), schema=schema)
+        return pa.table(dict(zip(output_column_names, arrays)), schema=schema)
 
 
-def postprocess_table(input_table, result_table, settings):
+def postprocess_table(input_table, result_table, settings, input_row_id_name: str, output_col_names: List[str]):
     """
     Postprocess structured output by adding row IDs and optionally exploding list columns.
     
@@ -500,6 +526,8 @@ def postprocess_table(input_table, result_table, settings):
         input_table: PyArrow table with input columns (including row IDs as first column)
         result_table: PyArrow table with structured output columns (from LLM)
         settings: StructuredOutputSettings parameter group
+        input_row_id_name: Resolved name of the input row ID column
+        output_col_names: List of resolved output column names
         
     Returns:
         PyArrow table with combined input and output columns, optionally exploded into multiple rows
@@ -515,7 +543,7 @@ def postprocess_table(input_table, result_table, settings):
     # Handle row expansion for structured output with target_objects_per_input_row
     if settings.target_objects_per_input_row == TargetObjectsPerInputRow.Multiple.name:
         # Explode list columns into separate rows
-        return explode_lists(combined_table, settings)
+        return explode_lists(combined_table, input_row_id_name, output_col_names)
     else:
         return combined_table
 
@@ -535,21 +563,18 @@ def add_structured_output_columns(input_schema, settings):
     
     output_schema = input_schema
     
+    input_row_id_name, output_col_names = get_resolved_column_names(
+        input_schema.column_names, settings
+    )
+    
     # Add input row ID column when target_objects_per_input_row is Multiple
-    # This column stores the original input row ID before explosion
-    if settings.target_objects_per_input_row == TargetObjectsPerInputRow.Multiple.name:
-        input_row_id_col_name = util.handle_column_name_collision(
-            output_schema.column_names, settings.input_row_id_column_name
-        )
+    if input_row_id_name:
         output_schema = output_schema.append(
-            knext.Column(ktype=knext.string(), name=input_row_id_col_name)
+            knext.Column(ktype=knext.string(), name=input_row_id_name)
         )
     
     # Add output columns
-    for column in settings.output_columns:
-        column_name = util.handle_column_name_collision(
-            output_schema.column_names, column.name
-        )
+    for column, column_name in zip(settings.output_columns, output_col_names):
         knime_type = get_output_column_knime_type(column.column_type, column.quantity)
         output_schema = output_schema.append(
             knext.Column(ktype=knime_type, name=column_name)

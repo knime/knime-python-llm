@@ -261,14 +261,38 @@ def create_pydantic_model(settings):
     Returns:
         Pydantic model class for structured output
     """
-    from pydantic import Field, create_model
-    from typing import List as TypingList, Optional
+    from pydantic import Field, create_model, BeforeValidator
+    from typing import List as TypingList, Optional, Annotated
+
+    def _coerce_to_int(v, min_val=None, max_val=None):
+        """Coerce float or scientific notation string to integer and clip if necessary."""
+        if v is None:
+            return v
+        res = v
+        if isinstance(v, float):
+            res = int(v)
+        elif isinstance(v, str):
+            try:
+                # Handle scientific notation in strings
+                res = int(float(v))
+            except (ValueError, TypeError):
+                pass
+        
+        if isinstance(res, int):
+            if min_val is not None and res < min_val:
+                return min_val
+            if max_val is not None and res > max_val:
+                return max_val
+        return res
+
+    Int32Type = Annotated[int, BeforeValidator(lambda v: _coerce_to_int(v, -2147483648, 2147483647))]
+    Int64Type = Annotated[int, BeforeValidator(lambda v: _coerce_to_int(v, -9223372036854775808, 9223372036854775807))]
 
     # Map OutputColumnType to Python types
     type_mapping = {
         OutputColumnType.String.name: str,
-        OutputColumnType.Integer.name: int,
-        OutputColumnType.Long.name: int,
+        OutputColumnType.Integer.name: Int32Type,
+        OutputColumnType.Long.name: Int64Type,
         OutputColumnType.Double.name: float,
         OutputColumnType.Boolean.name: bool,
     }

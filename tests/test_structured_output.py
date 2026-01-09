@@ -196,6 +196,44 @@ class TestCreatePydanticModel(unittest.TestCase):
         # Check it has an items field
         self.assertIn("items", model.model_fields)
 
+    def test_int_coercion(self):
+        """Test that large numbers in scientific notation (float or string) are coerced to int and clipped to limits."""
+        settings = MockStructuredOutputSettings()
+        settings.target_objects_per_input_row = structured_output.TargetObjectsPerInputRow.One.name
+        
+        field = MockOutputColumn()
+        field.name = "large_id"
+        field.column_type = structured_output.OutputColumnType.Long.name
+        
+        settings.output_columns = [field]
+        
+        model = structured_output.create_pydantic_model(settings)
+        
+        # Test float input within range
+        val_in_range = 1.0e15
+        m1 = model(large_id=val_in_range)
+        self.assertEqual(m1.large_id, int(val_in_range))
+        
+        # Test float input out of range (greater than max int64)
+        # 9.223372036854776e+18 is > 2^63 - 1
+        large_val = 9.223372036854776e+18
+        m2 = model(large_id=large_val)
+        self.assertEqual(m2.large_id, 9223372036854775807)
+        
+        # Test string input with scientific notation out of range
+        m3 = model(large_id="1e30")
+        self.assertEqual(m3.large_id, 9223372036854775807)
+
+        # Test small out of range
+        m4 = model(large_id="-1e30")
+        self.assertEqual(m4.large_id, -9223372036854775808)
+
+        # Test Integer (32-bit) clipping
+        field.column_type = structured_output.OutputColumnType.Integer.name
+        model_int32 = structured_output.create_pydantic_model(settings)
+        m5 = model_int32(large_id=1e12)
+        self.assertEqual(m5.large_id, 2147483647)
+
     def test_create_model_with_multiple_field_types(self):
         settings = MockStructuredOutputSettings()
         settings.target_object_name = "MixedModel"

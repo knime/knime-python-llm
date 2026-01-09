@@ -135,7 +135,7 @@ class OutputFormatOptions(knext.EnumParameterOptions):
         """
         When Structured is selected, the model is constrained to output data matching 
         the defined structure. Each defined field will be extracted and added as a 
-        separate column in the output table.
+        separate column in the output table. Not all models support structured outputs.
         """,
     )
 

@@ -418,14 +418,14 @@ def get_output_column_pyarrow_type(column_type: str, quantity: str = OutputColum
 
 def _make_row_ids_unique(duplicated_row_ids, list_column):
     """
-    Make Row IDs unique by appending an index for each exploded row.
+    Make RowIDs unique by appending an index for each exploded row.
     
     Args:
-        duplicated_row_ids: PyArrow array of duplicated Row IDs after explosion
+        duplicated_row_ids: PyArrow array of duplicated RowIDs after explosion
         list_column: PyArrow list column used to determine list lengths
         
     Returns:
-        PyArrow array of unique Row IDs with appended indices (e.g., "Row0_0", "Row0_1")
+        PyArrow array of unique RowIDs with appended indices (e.g., "Row0_0", "Row0_1")
     """
     import pyarrow as pa
     import pyarrow.compute as pc
@@ -438,7 +438,7 @@ def _make_row_ids_unique(duplicated_row_ids, list_column):
     for length in list_lengths.to_pylist():
         indices_within_group.extend(range(length))
     
-    # Append index to each Row ID
+    # Append index to each RowID
     row_ids = duplicated_row_ids.to_pylist()
     unique_row_ids = [f"{row_id}_{idx}" for row_id, idx in zip(row_ids, indices_within_group)]
     return pa.array(unique_row_ids, type=pa.string())
@@ -478,14 +478,14 @@ def explode_lists(table, input_row_id_name: str, output_col_names: list[str]):
         if name in list_column_names
     }
     
-    # Duplicate scalar columns (input columns + Row ID) using parent indices
+    # Duplicate scalar columns (input columns + RowID) using parent indices
     scalar_cols = {
         name: pc.take(table[name], parent_indices)
         for name in table.column_names
         if name not in list_column_names
     }
     
-    # Make Row IDs unique by appending index (first column is assumed to be Row ID)
+    # Make RowIDs unique by appending index (first column is assumed to be RowID)
     row_id_col_name = table.column_names[0]
     row_id_col = scalar_cols.pop(row_id_col_name)
     new_row_id_col = _make_row_ids_unique(row_id_col, first_list_col)

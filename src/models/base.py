@@ -723,12 +723,6 @@ class LLMPrompter:
         column_filter=_message_cell_col_filter,
     )
 
-    response_column_name = knext.StringParameter(
-        "Response column name",
-        "Name for the column holding the LLM's responses.",
-        default_value="Response",
-    )
-
     missing_value_handling = knext.EnumParameter(
         "If there are missing values",
         """Define whether missing or empty values in the prompt column and system message
@@ -751,6 +745,15 @@ class LLMPrompter:
         since_version="5.10.0"
     ).rule(
         knext.OneOf(output_format, [OutputFormatOptions.Structured.name]),
+        knext.Effect.SHOW,
+    )
+
+    response_column_name = knext.StringParameter(
+        "Response column name",
+        "Name for the column holding the LLM's responses.",
+        default_value="Response",
+    ).rule(
+        knext.OneOf(output_format, [OutputFormatOptions.Text.name, OutputFormatOptions.JSON.name]),
         knext.Effect.SHOW,
     )
 

@@ -543,8 +543,9 @@ def structured_responses_to_table(responses, settings: StructuredOutputSettings,
         
         for column, column_name, sanitized_name in zip(settings.output_columns, output_column_names, llm_field_names):
             inner_type = get_output_column_pyarrow_type(column.column_type, column.quantity)
-            schema_fields.append(pa.field(column_name, pa.list_(inner_type)))
-            arrays.append(pa.array(column_data[sanitized_name]))
+            pa_type = pa.list_(inner_type)
+            schema_fields.append(pa.field(column_name, pa_type))
+            arrays.append(pa.array(column_data[sanitized_name], type=pa_type))
         
         schema = pa.schema(schema_fields)
         return pa.table(dict(zip(output_column_names, arrays)), schema=schema)

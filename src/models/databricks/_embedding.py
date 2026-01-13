@@ -103,12 +103,18 @@ class DatabricksEmbeddingPortObject(EmbeddingsPortObject):
     def create_model(self, ctx):
         from ..knime._embeddings_model import OpenAIEmbeddings
         from ._utils import get_user_agent_header
+        from .._credential_auth import CredentialPortTokenProvider, create_http_client
+
+        token_provider = CredentialPortTokenProvider(
+            self.spec.databricks_workspace_spec
+        )
 
         return OpenAIEmbeddings(
-            api_key=get_api_key(self.spec.databricks_workspace_spec),
+            api_key="placeholder",
             base_url=get_base_url(self.spec.databricks_workspace_spec),
             model=self.spec.endpoint,
             extra_headers=get_user_agent_header(),
+            http_client=create_http_client(token_provider),
         )
 
 

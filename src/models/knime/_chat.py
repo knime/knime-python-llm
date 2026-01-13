@@ -141,15 +141,22 @@ class KnimeHubChatModelPortObject(ChatModelPortObject):
         self, ctx: knext.ExecutionContext, output_format: OutputFormatOptions
     ):
         from langchain_openai import ChatOpenAI
+        from .._credential_auth import (
+            CredentialPortTokenProvider,
+            create_http_client,
+            create_async_http_client,
+        )
 
         auth_spec = self.spec.auth_spec
+        token_provider = CredentialPortTokenProvider(auth_spec)
         return ChatOpenAI(
             model=self.spec.model_name,
-            default_headers=create_authorization_headers(auth_spec),
             openai_api_base=extract_api_base(auth_spec),
             openai_api_key="placeholder",
             temperature=self.spec.temperature,
             max_tokens=self.spec.max_tokens,
+            http_client=create_http_client(token_provider),
+            http_async_client=create_async_http_client(token_provider),
         )
 
 

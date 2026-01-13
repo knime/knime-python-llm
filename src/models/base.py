@@ -161,22 +161,23 @@ def _get_output_format_value_switch() -> knext.EnumParameter:
         OutputFormatOptions,
         style=knext.EnumParameter.Style.VALUE_SWITCH,
         since_version="5.4.1",
-        visible_choices=_output_formats,
+        hidden_choices=_hidden_output_formats,
     )
 
-def _output_formats(
+def _hidden_output_formats(
     ctx: knext.DialogCreationContext,
 ) -> List[OutputFormatOptions]:
     if ctx is None:
-        return list(OutputFormatOptions)
+        return []
     
     input_specs = ctx.get_input_specs()
     
     if not input_specs or input_specs[0] is None:
-        return list(OutputFormatOptions)
+        return []
 
     input_spec: ChatModelPortObjectSpec = input_specs[0]
-    return input_spec.supported_output_formats
+    supported = input_spec.supported_output_formats
+    return [opt for opt in OutputFormatOptions if opt not in supported]
 
 
 def _tool_definition_table_present(ctx: knext.DialogCreationContext) -> bool:

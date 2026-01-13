@@ -106,13 +106,15 @@ class KnimeHubEmbeddingsPortObject(EmbeddingsPortObject):
 
     def create_model(self, ctx: ExecutionContext):
         from ._embeddings_model import OpenAIEmbeddings
+        from .._credential_auth import CredentialPortTokenProvider, create_http_client
 
         auth_spec = self.spec.auth_spec
+        token_provider = CredentialPortTokenProvider(auth_spec)
         return OpenAIEmbeddings(
             model=self.spec.model_name,
             base_url=extract_api_base(auth_spec),
             api_key="placeholder",
-            extra_headers=create_authorization_headers(auth_spec),
+            http_client=create_http_client(token_provider),
         )
 
 

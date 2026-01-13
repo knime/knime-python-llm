@@ -46,6 +46,7 @@
 from typing import List, Optional
 from langchain_core.embeddings import Embeddings
 from openai import OpenAI
+import httpx
 import knime.api.schema as ks
 
 
@@ -56,10 +57,14 @@ class OpenAIEmbeddings(Embeddings):
         base_url: str,
         api_key: str,
         extra_headers: Optional[dict[str, str]] = None,
+        http_client: Optional[httpx.Client] = None,
     ) -> None:
         self._model = model
         self._client = OpenAI(
-            base_url=base_url, api_key=api_key, default_headers=extra_headers
+            base_url=base_url,
+            api_key=api_key,
+            default_headers=extra_headers,
+            http_client=http_client,
         )
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:

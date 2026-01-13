@@ -150,19 +150,28 @@ class DatabricksChatModelPortObject(ChatModelPortObject):
     ):
         from ._custom_chat import DatabricksChatOpenAI
         from ._utils import get_user_agent_header
+        from .._credential_auth import (
+            CredentialPortTokenProvider,
+            create_http_client,
+            create_async_http_client,
+        )
 
         base_url = get_base_url(self.spec.databricks_workspace_spec)
 
-        api_key = get_api_key(self.spec.databricks_workspace_spec)
+        token_provider = CredentialPortTokenProvider(
+            self.spec.databricks_workspace_spec
+        )
 
         return DatabricksChatOpenAI(
             model=self.spec.endpoint,
             base_url=base_url,
-            api_key=api_key,
+            api_key="placeholder",
             temperature=self.spec.temperature,
             top_p=self.spec.top_p,
             max_tokens=self.spec.max_tokens,
             default_headers=get_user_agent_header(),
+            http_client=create_http_client(token_provider),
+            http_async_client=create_async_http_client(token_provider),
         )
 
 

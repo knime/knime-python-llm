@@ -941,14 +941,38 @@ class OpenAIAuthenticationPortObjectSpec(AIPortObjectSpec):
             return self._credential_spec.auth_parameters
         return ctx.get_credentials(self.credentials).password
 
+    def _get_token_provider(self, ctx: knext.ConfigurationContext):
+        """Get a TokenProvider for either credential port or static credentials."""
+        from ._credential_auth import CredentialPortTokenProvider, StaticTokenProvider
+
+        if self._credential_spec is not None:
+            return CredentialPortTokenProvider(self._credential_spec)
+        return StaticTokenProvider(ctx.get_credentials(self.credentials).password)
+
+    def get_http_client(self, ctx: knext.ConfigurationContext):
+        """Get an httpx.Client with authentication.
+
+        Uses dynamic auth for credential ports (fetches fresh tokens on each request)
+        or static auth for API keys from credentials flow variables.
+        """
+        from ._credential_auth import create_http_client
+
+        return create_http_client(self._get_token_provider(ctx))
+
+    def get_async_http_client(self, ctx: knext.ConfigurationContext):
+        """Get an httpx.AsyncClient with authentication."""
+        from ._credential_auth import create_async_http_client
+
+        return create_async_http_client(self._get_token_provider(ctx))
+
     def get_openai_client(self, ctx: knext.ConfigurationContext):
         from openai import Client as OpenAIClient
 
-        key = self.get_api_key(ctx)
         return OpenAIClient(
-            api_key=key,
+            api_key="placeholder",  # Auth handled by http_client
             base_url=self.base_url,
             default_headers=self.normalized_custom_headers,
+            http_client=self.get_http_client(ctx),
         )
 
     def get_model_list(self, ctx: knext.ConfigurationContext) -> list[str]:
@@ -1121,16 +1145,18 @@ def _create_instruct_model(
 ):
     from langchain_openai import OpenAI
 
-    key = po_instance.spec.auth_spec.get_api_key(ctx)
+    auth_spec = po_instance.spec.auth_spec
     return OpenAI(
-        openai_api_key=key,
+        openai_api_key="placeholder",  # Auth handled by http_client
         base_url=po_instance.spec.base_url,
         model=po_instance.spec.model,
         temperature=po_instance.spec.temperature,
         top_p=po_instance.spec.top_p,
         max_tokens=po_instance.spec.max_tokens,
         seed=po_instance.spec.seed,
-        default_headers=po_instance.spec.auth_spec.normalized_custom_headers,
+        default_headers=auth_spec.normalized_custom_headers,
+        http_client=auth_spec.get_http_client(ctx),
+        http_async_client=auth_spec.get_async_http_client(ctx),
     )
 
 
@@ -1150,9 +1176,9 @@ def _create_model(
         is_gpt_5 = bool(re.match(r"^gpt-5", model))
         return is_o_series or is_gpt_5
 
-    key = po_instance.spec.auth_spec.get_api_key(ctx)
+    auth_spec = po_instance.spec.auth_spec
     return _ChatOpenAI(
-        openai_api_key=key,
+        openai_api_key="placeholder",  # Auth handled by http_client
         base_url=po_instance.spec.base_url,
         model=po_instance.spec.model,
         temperature=1.0
@@ -1161,7 +1187,9 @@ def _create_model(
         max_tokens=po_instance.spec.max_tokens,
         seed=po_instance.spec.seed,
         model_kwargs=model_kwargs,
-        default_headers=po_instance.spec.auth_spec.normalized_custom_headers,
+        default_headers=auth_spec.normalized_custom_headers,
+        http_client=auth_spec.get_http_client(ctx),
+        http_async_client=auth_spec.get_async_http_client(ctx),
         ctx=ctx,
     )
 
@@ -1259,13 +1287,15 @@ class OpenAIEmbeddingsPortObject(EmbeddingsPortObject):
     def create_model(self, ctx):
         from langchain_openai import OpenAIEmbeddings
 
-        key = self.spec.auth_spec.get_api_key(ctx)
+        auth_spec = self.spec.auth_spec
         return OpenAIEmbeddings(
-            openai_api_key=key,
+            openai_api_key="placeholder",  # Auth handled by http_client
             base_url=self.spec.base_url,
             model=self.spec.model,
             dimensions=self.spec.dimensions,
-            default_headers=self.spec.auth_spec.normalized_custom_headers,
+            default_headers=auth_spec.normalized_custom_headers,
+            http_client=auth_spec.get_http_client(ctx),
+            http_async_client=auth_spec.get_async_http_client(ctx),
         )
 
 

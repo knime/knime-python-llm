@@ -217,8 +217,9 @@ def _create_instruct_model(
 ):
     from langchain_openai import AzureOpenAI
 
+    auth_spec = po_instance.spec.auth_spec
     return AzureOpenAI(
-        openai_api_key=po_instance.spec.auth_spec.get_api_key(ctx),
+        openai_api_key="placeholder",  # Auth handled by http_client
         api_version=po_instance.spec.api_version,
         azure_endpoint=po_instance.spec.base_url,
         openai_api_type=po_instance.spec.api_type,
@@ -227,6 +228,8 @@ def _create_instruct_model(
         top_p=po_instance.spec.top_p,
         max_tokens=po_instance.spec.max_tokens,
         seed=po_instance.spec.seed,
+        http_client=auth_spec.get_http_client(ctx),
+        http_async_client=auth_spec.get_async_http_client(ctx),
     )
 
 
@@ -250,8 +253,9 @@ def _create_model(
     if output_format == OutputFormatOptions.JSON:
         model_kwargs["response_format"] = {"type": "json_object"}
 
+    auth_spec = po_instance.spec.auth_spec
     return _AzureChatOpenAI(
-        openai_api_key=po_instance.spec.auth_spec.get_api_key(ctx),
+        openai_api_key="placeholder",  # Auth handled by http_client
         openai_api_version=po_instance.spec.api_version,
         azure_endpoint=po_instance.spec.base_url,
         openai_api_type=po_instance.spec.api_type,
@@ -266,6 +270,8 @@ def _create_model(
         else po_instance.spec.max_tokens,
         model_kwargs=model_kwargs,
         seed=po_instance.spec.seed,
+        http_client=auth_spec.get_http_client(ctx),
+        http_async_client=auth_spec.get_async_http_client(ctx),
     )
 
 
@@ -357,13 +363,16 @@ class AzureOpenAIEmbeddingsPortObject(OpenAIEmbeddingsPortObject):
     def create_model(self, ctx: knext.ExecutionContext):
         from langchain_openai import AzureOpenAIEmbeddings
 
+        auth_spec = self.spec.auth_spec
         return AzureOpenAIEmbeddings(
-            openai_api_key=self.spec.auth_spec.get_api_key(ctx),
+            openai_api_key="placeholder",  # Auth handled by http_client
             azure_endpoint=self.spec.base_url,
             api_version=self.spec.api_version,
             openai_api_type=self.spec.api_type,
             deployment=self.spec.model,
             chunk_size=16,  # Azure only supports 16 docs per request
+            http_client=auth_spec.get_http_client(ctx),
+            http_async_client=auth_spec.get_async_http_client(ctx),
         )
 
 

@@ -810,7 +810,7 @@ def _extract_tools_from_table(tools_table: knext.Table, tool_column: str):
 )
 @knext.output_port(
     "Combined tools workflow",
-    "TODO",
+    "The combined workflow of all tools used by the agent.",
     knext.PortType.WORKFLOW,
 )
 @knext.output_table(

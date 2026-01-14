@@ -888,7 +888,7 @@ class AgentPrompterConversation:
     def append_messages(self, messages):
         """Raises a CancelError if the context was canceled."""
         from langchain_core.messages import AIMessage
-        
+
         if isinstance(messages, BaseMessage):
             messages = [messages]
 

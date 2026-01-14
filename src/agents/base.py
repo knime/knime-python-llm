@@ -80,6 +80,7 @@ from ._error_handler import AgentPrompterErrorHandler
 
 import os
 import logging
+from langchain_core.messages import BaseMessage
 
 _logger = logging.getLogger(__name__)
 
@@ -789,15 +790,7 @@ state that the tool could not be executed due to reaching the recursion limit.""
         tool_converter,
         data_registry,
     ) -> "AgentPrompterConversation":
-        from knime.types.message import to_langchain_message
         from langchain_core.messages import SystemMessage, HumanMessage
-        import pandas as pd
-
-        def append_msg(conversation, msg, tool_converter):
-            lc_msg = to_langchain_message(msg)
-            # Sanitize tool names so they match the current sanitized mapping
-            lc_msg = tool_converter.sanitize_tool_names(lc_msg)
-            conversation.append_messages(lc_msg)
 
         conversation = AgentPrompterConversation(self.errors.error_handling, ctx)
 
@@ -816,6 +809,17 @@ state that the tool could not be executed due to reaching the recursion limit.""
 
         return conversation
 
+    def _append_sanitized_message(
+        self, conversation: "AgentPrompterConversation", msg, tool_converter
+    ):
+        """Helper to append a message after sanitizing tool names."""
+        from knime.types.message import to_langchain_message
+
+        lc_msg = to_langchain_message(msg)
+        # Sanitize tool names so they match the current sanitized mapping
+        lc_msg = tool_converter.sanitize_tool_names(lc_msg)
+        conversation.append_messages(lc_msg)
+
     def _load_history_into_conversation(
         self,
         conversation: "AgentPrompterConversation",
@@ -823,14 +827,7 @@ state that the tool could not be executed due to reaching the recursion limit.""
         tool_converter,
     ):
         """Extract history table processing into dedicated method."""
-        from knime.types.message import to_langchain_message
         import pandas as pd
-
-        def append_msg(conversation, msg, tool_converter):
-            lc_msg = to_langchain_message(msg)
-            # Sanitize tool names so they match the current sanitized mapping
-            lc_msg = tool_converter.sanitize_tool_names(lc_msg)
-            conversation.append_messages(lc_msg)
 
         if (
             self.errors.error_handling == ErrorHandlingMode.COLUMN.name
@@ -854,7 +851,7 @@ state that the tool could not be executed due to reaching the recursion limit.""
                         f"Conversation table contains row with both message and error. Row ID: {row_id}"
                     )
                 if has_msg:
-                    append_msg(conversation, msg, tool_converter)
+                    self._append_sanitized_message(conversation, msg, tool_converter)
                 elif has_err:
                     conversation.append_error(Exception(err))
                 else:
@@ -866,7 +863,7 @@ state that the tool could not be executed due to reaching the recursion limit.""
             history_df = history_table[self.conversation_column].to_pandas()
             for msg in history_df[self.conversation_column]:
                 if pd.notna(msg):
-                    append_msg(conversation, msg, tool_converter)
+                    self._append_sanitized_message(conversation, msg, tool_converter)
 
 
 def _extract_tools_from_table(tools_table: knext.Table, tool_column: str):
@@ -886,8 +883,6 @@ class AgentPrompterConversation:
 
     def append_messages(self, messages):
         """Raises a CancelError if the context was canceled."""
-        from langchain_core.messages import BaseMessage
-
         if isinstance(messages, BaseMessage):
             messages = [messages]
 
@@ -917,7 +912,7 @@ class AgentPrompterConversation:
     def validate_final_message(self, validate_ai_message, ctx):
         """Validate the final AI message and handle validation errors appropriately."""
         from langchain_core.messages import AIMessage
-        
+
         messages = self.get_messages()
         if messages and isinstance(messages[-1], AIMessage):
             try:
@@ -929,8 +924,6 @@ class AgentPrompterConversation:
                     self.append_error(e)
 
     def _append(self, message_or_error):
-        from langchain_core.messages import BaseMessage
-        
         self._message_and_errors.append(message_or_error)
         self._is_message.append(isinstance(message_or_error, BaseMessage))
 

@@ -846,7 +846,7 @@ state that the tool could not be executed due to reaching the recursion limit.""
                 has_err = pd.notna(err)
 
                 if has_msg and has_err:
-                    row_id = history_df.iloc[idx].name
+                    row_id = history_df.index[idx]
                     raise RuntimeError(
                         f"Conversation table contains row with both message and error. Row ID: {row_id}"
                     )
@@ -855,7 +855,7 @@ state that the tool could not be executed due to reaching the recursion limit.""
                 elif has_err:
                     conversation.append_error(Exception(err))
                 else:
-                    row_id = history_df.iloc[idx].name
+                    row_id = history_df.index[idx]
                     raise RuntimeError(
                         f"Conversation table contains empty row. Row ID: {row_id}"
                     )

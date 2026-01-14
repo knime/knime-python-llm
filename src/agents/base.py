@@ -740,10 +740,8 @@ state that the tool could not be executed due to reaching the recursion limit.""
             agent.run()
         except CancelError as e:
             raise e
-        except IterationLimitError:
-            error_handler.handle_iteration_limit_error()
         except Exception as e:
-            error_handler.handle_general_error(e)
+            error_handler.handle_error(e)
 
         conversation.validate_final_message(validate_ai_message, ctx)
 

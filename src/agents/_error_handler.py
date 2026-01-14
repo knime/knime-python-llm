@@ -86,7 +86,21 @@ class AgentPrompterErrorHandler:
         self._chat_model = chat_model
         self._recursion_limit_prompt = recursion_limit_prompt
 
-    def handle_iteration_limit_error(self) -> None:
+    def handle_error(self, exception: Exception) -> None:
+        """
+        Handle an exception based on its type and configured modes.
+
+        Args:
+            exception: The exception that was caught
+        """
+        from ._agent import IterationLimitError
+        
+        if isinstance(exception, IterationLimitError):
+            self._handle_iteration_limit_error()
+        else:
+            self._handle_general_error(exception)
+
+    def _handle_iteration_limit_error(self) -> None:
         """
         Handle an IterationLimitError based on the configured recursion limit mode.
 
@@ -100,7 +114,7 @@ class AgentPrompterErrorHandler:
                 You can increase the limit by setting the `recursion_limit` parameter to a higher value."""
             self._handle_error_by_mode(error_message)
 
-    def handle_general_error(self, exception: Exception) -> None:
+    def _handle_general_error(self, exception: Exception) -> None:
         """
         Handle a general exception based on the configured error handling mode.
 

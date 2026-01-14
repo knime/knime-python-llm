@@ -722,7 +722,7 @@ state that the tool could not be executed due to reaching the recursion limit.""
         toolset = AgentPrompterToolset(tools)
 
         conversation = self._get_conversation(
-            ctx, history_table, tool_converter, data_registry, validate_ai_message
+            ctx, history_table, tool_converter, data_registry
         )
 
         num_data_outputs = ctx.get_connected_output_port_numbers()[1]
@@ -789,12 +789,11 @@ state that the tool could not be executed due to reaching the recursion limit.""
         history_table: Optional[knext.Table],
         tool_converter,
         data_registry,
-        validate_ai_message,
     ) -> "AgentPrompterConversation":
         from langchain_core.messages import SystemMessage, HumanMessage
 
         conversation = AgentPrompterConversation(
-            self.errors.error_handling, ctx, validate_ai_message
+            self.errors.error_handling, ctx
         )
 
         if self.developer_message:
@@ -878,16 +877,16 @@ def _extract_tools_from_table(tools_table: knext.Table, tool_column: str):
 
 
 class AgentPrompterConversation:
-    def __init__(self, error_handling, ctx: knext.ExecutionContext = None, validate_ai_message=None):
+    def __init__(self, error_handling, ctx: knext.ExecutionContext = None):
         self._error_handling = error_handling
         self._message_and_errors = []
         self._is_message = []
         self._ctx = ctx
-        self._validate_ai_message = validate_ai_message
 
     def append_messages(self, messages):
         """Raises a CancelError if the context was canceled."""
         from langchain_core.messages import AIMessage
+        from ._agent import validate_ai_message
 
         if isinstance(messages, BaseMessage):
             messages = [messages]
@@ -897,9 +896,9 @@ class AgentPrompterConversation:
 
         for msg in messages:
             # Validate AI messages as they are added
-            if self._validate_ai_message and isinstance(msg, AIMessage):
+            if isinstance(msg, AIMessage):
                 try:
-                    self._validate_ai_message(msg)
+                    validate_ai_message(msg)
                 except Exception as e:
                     if self._error_handling == ErrorHandlingMode.FAIL.name:
                         # For FAIL mode, set warning and don't add the message

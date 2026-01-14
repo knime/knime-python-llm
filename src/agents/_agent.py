@@ -147,7 +147,8 @@ class Agent:
             except Exception as error:
                 self._conversation.append_error(error)
                 return
-            self._append_messages(response)
+            
+            self._conversation.append_messages(response)
 
             if response.tool_calls:
                 try:
@@ -155,13 +156,9 @@ class Agent:
                 except Exception as error:
                     self._conversation.append_error(error)
                     return
-                self._append_messages(results)
+                
+                self._conversation.append_messages(results)
             else:
                 return
 
         raise IterationLimitError("Reached iteration limit")
-
-    def _append_messages(self, messages: Sequence[BaseMessage] | BaseMessage):
-        if isinstance(messages, BaseMessage):
-            messages = [messages]
-        self._conversation.append_messages(messages)

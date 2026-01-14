@@ -81,8 +81,6 @@ from ._error_handler import AgentPrompterErrorHandler
 import os
 import logging
 
-from langchain_core.messages import BaseMessage
-
 _logger = logging.getLogger(__name__)
 
 
@@ -722,16 +720,7 @@ state that the tool could not be executed due to reaching the recursion limit.""
         tools = [tool_converter.to_langchain_tool(tool) for tool in tool_cells]
         toolset = AgentPrompterToolset(tools)
 
-        if history_table is not None:
-            self._check_for_columns(history_table)
-
-        agent_ctx = AgentPrompterContext(ctx)
-        conversation = self._get_conversation(agent_ctx, history_table, tool_converter)
-
-        if data_registry.has_data or tool_converter.has_data_tools:
-            conversation.append_messages(data_registry.create_data_message())
-        if self.user_message:
-            conversation.append_messages(lcm.HumanMessage(self.user_message))
+        conversation = self._get_conversation(ctx, history_table, tool_converter, data_registry)
 
         num_data_outputs = ctx.get_connected_output_port_numbers()[1]
 
@@ -756,16 +745,7 @@ state that the tool could not be executed due to reaching the recursion limit.""
         except Exception as e:
             error_handler.handle_general_error(e)
 
-        messages = conversation.get_messages()
-
-        if messages and isinstance(messages[-1], lcm.AIMessage):
-            try:
-                validate_ai_message(messages[-1])
-            except Exception as e:
-                if self.errors.error_handling == ErrorHandlingMode.FAIL.name:
-                    ctx.set_warning(str(e))
-                else:
-                    conversation.append_error(e)
+        conversation.validate_final_message(validate_ai_message, ctx)
 
         output_column_name = (
             self.conversation_column_name
@@ -773,8 +753,7 @@ state that the tool could not be executed due to reaching the recursion limit.""
             else self.conversation_column
         )
         error_column_name = None
-        with_error_column = self.errors.error_handling == ErrorHandlingMode.COLUMN.name
-        if with_error_column:
+        if self.errors.error_handling == ErrorHandlingMode.COLUMN.name:
             error_column_name = (
                 self.errors.error_column
                 if self.errors.use_existing_error_column and history_table is not None
@@ -782,7 +761,7 @@ state that the tool could not be executed due to reaching the recursion limit.""
             )
 
         conversation_table = conversation.create_output_table(
-            tool_converter, with_error_column, output_column_name, error_column_name
+            tool_converter, output_column_name, error_column_name
         )
 
         if num_data_outputs == 0:
@@ -807,12 +786,13 @@ state that the tool could not be executed due to reaching the recursion limit.""
 
     def _get_conversation(
         self,
-        agent_ctx: "AgentPrompterContext",
+        ctx: knext.ExecutionContext,
         history_table: Optional[knext.Table],
         tool_converter,
+        data_registry,
     ) -> "AgentPrompterConversation":
         from knime.types.message import to_langchain_message
-        from langchain_core.messages import SystemMessage
+        from langchain_core.messages import SystemMessage, HumanMessage
         import pandas as pd
 
         def append_msg(conversation, msg, tool_converter):
@@ -821,43 +801,74 @@ state that the tool could not be executed due to reaching the recursion limit.""
             lc_msg = tool_converter.sanitize_tool_names(lc_msg)
             conversation.append_messages(lc_msg)
 
-        conversation = AgentPrompterConversation(self.errors.error_handling, agent_ctx)
+        conversation = AgentPrompterConversation(self.errors.error_handling, ctx)
 
         if self.developer_message:
             conversation.append_messages(SystemMessage(self.developer_message))
 
         if history_table is not None:
-            if (
-                self.errors.error_handling == ErrorHandlingMode.COLUMN.name
-                and self.errors.use_existing_error_column
-            ):
-                history_df = history_table[
-                    [self.conversation_column, self.errors.error_column]
-                ].to_pandas()
+            self._load_history_into_conversation(
+                conversation, history_table, tool_converter
+            )
 
-                for msg, err in history_df[
-                    [self.conversation_column, self.errors.error_column]
-                ].itertuples(index=False, name=None):
-                    has_msg = pd.notna(msg)
-                    has_err = pd.notna(err)
-
-                    if has_msg and has_err:
-                        raise RuntimeError(
-                            "Conversation table contains row with both message and error."
-                        )
-                    if has_msg:
-                        append_msg(conversation, msg, tool_converter)
-                    elif has_err:
-                        conversation.append_error(Exception(err))
-                    else:
-                        raise RuntimeError("Conversation table contains empty row.")
-            else:
-                history_df = history_table[self.conversation_column].to_pandas()
-                for msg in history_df[self.conversation_column]:
-                    if pd.notna(msg):
-                        append_msg(conversation, msg, tool_converter)
+        if data_registry.has_data or tool_converter.has_data_tools:
+            conversation.append_messages(data_registry.create_data_message())
+        if self.user_message:
+            conversation.append_messages(HumanMessage(self.user_message))
 
         return conversation
+
+    def _load_history_into_conversation(
+        self,
+        conversation: "AgentPrompterConversation",
+        history_table: knext.Table,
+        tool_converter,
+    ):
+        """Extract history table processing into dedicated method."""
+        from knime.types.message import to_langchain_message
+        import pandas as pd
+
+        def append_msg(conversation, msg, tool_converter):
+            lc_msg = to_langchain_message(msg)
+            # Sanitize tool names so they match the current sanitized mapping
+            lc_msg = tool_converter.sanitize_tool_names(lc_msg)
+            conversation.append_messages(lc_msg)
+
+        if (
+            self.errors.error_handling == ErrorHandlingMode.COLUMN.name
+            and self.errors.use_existing_error_column
+        ):
+            history_df = history_table[
+                [self.conversation_column, self.errors.error_column]
+            ].to_pandas()
+
+            for idx, (msg, err) in enumerate(
+                history_df[
+                    [self.conversation_column, self.errors.error_column]
+                ].itertuples(index=False, name=None)
+            ):
+                has_msg = pd.notna(msg)
+                has_err = pd.notna(err)
+
+                if has_msg and has_err:
+                    row_id = history_df.index[idx]
+                    raise RuntimeError(
+                        f"Conversation table contains row with both message and error. Row ID: {row_id}"
+                    )
+                if has_msg:
+                    append_msg(conversation, msg, tool_converter)
+                elif has_err:
+                    conversation.append_error(Exception(err))
+                else:
+                    row_id = history_df.index[idx]
+                    raise RuntimeError(
+                        f"Conversation table contains empty row. Row ID: {row_id}"
+                    )
+        else:
+            history_df = history_table[self.conversation_column].to_pandas()
+            for msg in history_df[self.conversation_column]:
+                if pd.notna(msg):
+                    append_msg(conversation, msg, tool_converter)
 
 
 def _extract_tools_from_table(tools_table: knext.Table, tool_column: str):
@@ -868,16 +879,8 @@ def _extract_tools_from_table(tools_table: knext.Table, tool_column: str):
     return filtered_tools.to_pylist()
 
 
-class AgentPrompterContext:
-    def __init__(self, ctx: knext.ExecutionContext):
-        self._ctx = ctx
-
-    def is_canceled(self) -> bool:
-        return self._ctx.is_canceled()
-
-
 class AgentPrompterConversation:
-    def __init__(self, error_handling, ctx: AgentPrompterContext = None):
+    def __init__(self, error_handling, ctx: knext.ExecutionContext = None):
         self._error_handling = error_handling
         self._message_and_errors = []
         self._is_message = []
@@ -885,6 +888,7 @@ class AgentPrompterConversation:
 
     def append_messages(self, messages):
         """Raises a CancelError if the context was canceled."""
+        from langchain_core.messages import BaseMessage
 
         if isinstance(messages, BaseMessage):
             messages = [messages]
@@ -912,7 +916,23 @@ class AgentPrompterConversation:
         ]
         return messages
 
+    def validate_final_message(self, validate_ai_message, ctx):
+        """Validate the final AI message and handle validation errors appropriately."""
+        from langchain_core.messages import AIMessage
+        
+        messages = self.get_messages()
+        if messages and isinstance(messages[-1], AIMessage):
+            try:
+                validate_ai_message(messages[-1])
+            except Exception as e:
+                if self._error_handling == ErrorHandlingMode.FAIL.name:
+                    ctx.set_warning(str(e))
+                else:
+                    self.append_error(e)
+
     def _append(self, message_or_error):
+        from langchain_core.messages import BaseMessage
+        
         self._message_and_errors.append(message_or_error)
         self._is_message.append(isinstance(message_or_error, BaseMessage))
 
@@ -928,7 +948,6 @@ class AgentPrompterConversation:
     def create_output_table(
         self,
         tool_converter,
-        with_error_column: bool,
         output_column_name: str,
         error_column_name: str = None,
     ) -> knext.Table:
@@ -936,7 +955,7 @@ class AgentPrompterConversation:
         from knime.types.message import from_langchain_message
         from langchain_core.messages import SystemMessage
 
-        if not with_error_column:
+        if error_column_name is None:
             messages = self.get_messages()
             if messages and isinstance(messages[0], SystemMessage):
                 messages = messages[1:]
@@ -956,19 +975,24 @@ class AgentPrompterConversation:
                 for moe in self._construct_output()
                 if not isinstance(moe["message"], SystemMessage)
             ]
-            desanitized_messages = [
-                tool_converter.desanitize_tool_names(moe["message"])
-                if moe["message"] is not None
-                else None
+            desanitized_messages_and_errors = [
+                {
+                    "message": tool_converter.desanitize_tool_names(moe["message"])
+                    if moe["message"] is not None
+                    else None,
+                    "error": moe["error"],
+                }
                 for moe in messages_and_errors
             ]
             messages = [
-                from_langchain_message(msg) if msg is not None else None
-                for msg in desanitized_messages
+                from_langchain_message(moe["message"])
+                if moe["message"] is not None
+                else None
+                for moe in desanitized_messages_and_errors
             ]
             errors = [
                 str(moe["error"]) if moe["error"] is not None else None
-                for moe in messages_and_errors
+                for moe in desanitized_messages_and_errors
             ]
             result_df = pd.DataFrame(
                 {output_column_name: messages, error_column_name: errors}

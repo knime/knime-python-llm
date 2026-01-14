@@ -87,13 +87,12 @@ class AgentChatWidgetDataService:
 
         self._chat_model = chat_model
         self._conversation = FrontendConversation(
-            conversation, tool_converter, AgentWidgetContext(self._check_canceled)
+            conversation, tool_converter, self._check_canceled
         )
         self._config = config
         self._agent = Agent(self._conversation, self._chat_model, toolset, self._config)
 
         self._data_registry = data_registry
-        self._tool_converter = tool_converter
         self._conversation_column_name = conversation_column_name
         self._initial_message = initial_message
         self._recursion_limit_handling = recursion_limit_handling
@@ -159,11 +158,10 @@ class AgentChatWidgetDataService:
 
     # called by java, not the frontend
     def get_view_data(self):
+        error_column_name = self._error_column_name if self._has_error_column else None
         conversation_table = self._conversation.create_output_table(
-            self._tool_converter,
-            self._has_error_column,
             self._conversation_column_name,
-            self._error_column_name,
+            error_column_name,
         )
 
         meta_data, tables = self._data_registry.dump()
@@ -209,25 +207,17 @@ class AgentChatWidgetDataService:
         return self._is_canceled
 
 
-class AgentWidgetContext:
-    def __init__(self, check_canceled):
-        self._check_canceled = check_canceled
-
-    def is_canceled(self) -> bool:
-        return self._check_canceled()
-
-
 class FrontendConversation:
     def __init__(
         self,
         backend: "AgentPrompterConversation",
         tool_converter,
-        ctx: AgentWidgetContext,
+        check_canceled,
     ):
         self._frontend = queue.Queue()
         self._backend_messages = backend
         self._tool_converter = tool_converter
-        self._ctx = ctx
+        self._check_canceled = check_canceled
 
     @property
     def frontend(self):
@@ -241,7 +231,7 @@ class FrontendConversation:
         if isinstance(messages, BaseMessage):
             messages = [messages]
 
-        if self._ctx and self._ctx.is_canceled():
+        if self._check_canceled and self._check_canceled():
             self._append_messages(messages[:-1])
 
             # sanitize last message
@@ -295,13 +285,11 @@ class FrontendConversation:
 
     def create_output_table(
         self,
-        tool_converter,
-        with_error_column: bool,
         output_column_name: str,
         error_column_name: str = None,
     ) -> knext.Table:
         return self._backend_messages.create_output_table(
-            tool_converter, with_error_column, output_column_name, error_column_name
+            self._tool_converter, output_column_name, error_column_name
         )
 
     def _to_frontend_messages(self, message):

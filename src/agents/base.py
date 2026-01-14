@@ -583,7 +583,7 @@ class AgentPrompter2:
     recursion_limit = _recursion_limit_parameter()
 
     recursion_limit_handling = knext.EnumParameter(
-        "If recursion limit is reached",
+        "When recursion limit is reached",
         "Specify the behavior of the agent when the recursion limit is reached.",
         RecursionLimitMode.FAIL.name,
         RecursionLimitMode,

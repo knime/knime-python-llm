@@ -140,7 +140,7 @@ class Agent:
         self._toolset = toolset
 
     def run(self):
-        """Run the agents turn in the conversation."""
+        """Run the agent's turn in the conversation."""
         for _ in range(self._config.iteration_limit):
             try:
                 response = self._agent.invoke(self._conversation.get_messages())

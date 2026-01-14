@@ -147,7 +147,7 @@ class Agent:
             except Exception as error:
                 self._conversation.append_error(error)
                 return
-            
+
             self._conversation.append_messages(response)
 
             if response.tool_calls:
@@ -156,7 +156,7 @@ class Agent:
                 except Exception as error:
                     self._conversation.append_error(error)
                     return
-                
+
                 self._conversation.append_messages(results)
             else:
                 return

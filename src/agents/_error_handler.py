@@ -48,6 +48,7 @@ Error handling logic for Agent Prompter node execution.
 
 import knime.extension as knext
 from ._parameters import RecursionLimitMode, ErrorHandlingMode
+from ._agent import IterationLimitError
 
 
 class AgentPrompterErrorHandler:
@@ -93,8 +94,6 @@ class AgentPrompterErrorHandler:
         Args:
             exception: The exception that was caught
         """
-        from ._agent import IterationLimitError
-        
         if isinstance(exception, IterationLimitError):
             self._handle_iteration_limit_error()
         else:

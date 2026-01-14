@@ -721,7 +721,9 @@ state that the tool could not be executed due to reaching the recursion limit.""
         tools = [tool_converter.to_langchain_tool(tool) for tool in tool_cells]
         toolset = AgentPrompterToolset(tools)
 
-        conversation = self._get_conversation(ctx, history_table, tool_converter, data_registry)
+        conversation = self._get_conversation(
+            ctx, history_table, tool_converter, data_registry, validate_ai_message
+        )
 
         num_data_outputs = ctx.get_connected_output_port_numbers()[1]
 
@@ -743,8 +745,6 @@ state that the tool could not be executed due to reaching the recursion limit.""
             raise e
         except Exception as e:
             error_handler.handle_error(e)
-
-        conversation.validate_final_message(validate_ai_message, ctx)
 
         output_column_name = (
             self.conversation_column_name
@@ -789,10 +789,13 @@ state that the tool could not be executed due to reaching the recursion limit.""
         history_table: Optional[knext.Table],
         tool_converter,
         data_registry,
+        validate_ai_message,
     ) -> "AgentPrompterConversation":
         from langchain_core.messages import SystemMessage, HumanMessage
 
-        conversation = AgentPrompterConversation(self.errors.error_handling, ctx)
+        conversation = AgentPrompterConversation(
+            self.errors.error_handling, ctx, validate_ai_message
+        )
 
         if self.developer_message:
             conversation.append_messages(SystemMessage(self.developer_message))
@@ -875,14 +878,17 @@ def _extract_tools_from_table(tools_table: knext.Table, tool_column: str):
 
 
 class AgentPrompterConversation:
-    def __init__(self, error_handling, ctx: knext.ExecutionContext = None):
+    def __init__(self, error_handling, ctx: knext.ExecutionContext = None, validate_ai_message=None):
         self._error_handling = error_handling
         self._message_and_errors = []
         self._is_message = []
         self._ctx = ctx
+        self._validate_ai_message = validate_ai_message
 
     def append_messages(self, messages):
         """Raises a CancelError if the context was canceled."""
+        from langchain_core.messages import AIMessage
+        
         if isinstance(messages, BaseMessage):
             messages = [messages]
 
@@ -890,6 +896,20 @@ class AgentPrompterConversation:
             raise CancelError("Execution canceled.")
 
         for msg in messages:
+            # Validate AI messages as they are added
+            if self._validate_ai_message and isinstance(msg, AIMessage):
+                try:
+                    self._validate_ai_message(msg)
+                except Exception as e:
+                    if self._error_handling == ErrorHandlingMode.FAIL.name:
+                        # For FAIL mode, set warning and don't add the message
+                        if self._ctx:
+                            self._ctx.set_warning(str(e))
+                        continue
+                    else:
+                        # For COLUMN mode, append the error and skip the message
+                        self._append(e)
+                        continue
             self._append(msg)
 
     def append_error(self, error):
@@ -908,20 +928,6 @@ class AgentPrompterConversation:
             if is_msg
         ]
         return messages
-
-    def validate_final_message(self, validate_ai_message, ctx):
-        """Validate the final AI message and handle validation errors appropriately."""
-        from langchain_core.messages import AIMessage
-
-        messages = self.get_messages()
-        if messages and isinstance(messages[-1], AIMessage):
-            try:
-                validate_ai_message(messages[-1])
-            except Exception as e:
-                if self._error_handling == ErrorHandlingMode.FAIL.name:
-                    ctx.set_warning(str(e))
-                else:
-                    self.append_error(e)
 
     def _append(self, message_or_error):
         self._message_and_errors.append(message_or_error)
@@ -946,17 +952,21 @@ class AgentPrompterConversation:
         from knime.types.message import from_langchain_message
         from langchain_core.messages import SystemMessage
 
+        def to_knime_message_or_none(msg, tool_converter):
+            """Convert a message to KNIME format, or return None if input is None."""
+            if msg is None:
+                return None
+            desanitized = tool_converter.desanitize_tool_names(msg)
+            return from_langchain_message(desanitized)
+
         if error_column_name is None:
             messages = self.get_messages()
             if messages and isinstance(messages[0], SystemMessage):
                 messages = messages[1:]
-            desanitized_messages = [
-                tool_converter.desanitize_tool_names(msg) for msg in messages
-            ]
             result_df = pd.DataFrame(
                 {
                     output_column_name: [
-                        from_langchain_message(msg) for msg in desanitized_messages
+                        to_knime_message_or_none(msg, tool_converter) for msg in messages
                     ]
                 }
             )
@@ -966,24 +976,13 @@ class AgentPrompterConversation:
                 for moe in self._construct_output()
                 if not isinstance(moe["message"], SystemMessage)
             ]
-            desanitized_messages_and_errors = [
-                {
-                    "message": tool_converter.desanitize_tool_names(moe["message"])
-                    if moe["message"] is not None
-                    else None,
-                    "error": moe["error"],
-                }
-                for moe in messages_and_errors
-            ]
             messages = [
-                from_langchain_message(moe["message"])
-                if moe["message"] is not None
-                else None
-                for moe in desanitized_messages_and_errors
+                to_knime_message_or_none(moe["message"], tool_converter)
+                for moe in messages_and_errors
             ]
             errors = [
                 str(moe["error"]) if moe["error"] is not None else None
-                for moe in desanitized_messages_and_errors
+                for moe in messages_and_errors
             ]
             result_df = pd.DataFrame(
                 {output_column_name: messages, error_column_name: errors}

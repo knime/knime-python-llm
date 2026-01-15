@@ -56,6 +56,52 @@ from ._port_types import (
     GoogleAiStudioAuthenticationPortObject,
 )
 
+_POLICY_GUIDELINES_URL = "https://policies.google.com/terms/generative-ai/use-policy"
+
+_BLOCKING_REASON_DESCRIPTIONS = {
+    # FinishReason values
+    "IMAGE_SAFETY": "The generated image was blocked due to safety policy violations.",
+    "IMAGE_PROHIBITED_CONTENT": "The generated image was blocked because it contains prohibited content.",
+    "IMAGE_OTHER": "The image generation was blocked for unspecified reasons.",
+    "NO_IMAGE": "The model was unable to generate an image.",
+    "SAFETY": "Content was blocked due to safety policy violations.",
+    "RECITATION": "The generated content too closely resembles copyrighted material.",
+    "PROHIBITED_CONTENT": "Content was blocked because it contains prohibited material.",
+    "BLOCKLIST": "Content was blocked because it contains forbidden terms.",
+    "SPII": "Content was blocked because it potentially contains Sensitive Personally Identifiable Information (SPII).",
+    "MALFORMED_FUNCTION_CALL": "The request was malformed.",
+    "OTHER": "Content was blocked for unspecified reasons.",
+    # BlockedReason values (for prompt blocking).
+    "MODEL_ARMOR": "The prompt was blocked by content filtering.",
+    "JAILBREAK": "The prompt was blocked as a potential policy violation attempt.",
+}
+
+
+def _get_blocking_reason_description(reason) -> str:
+    """
+    Convert a blocking reason enum to a user-friendly description.
+
+    Args:
+        reason: A FinishReason or BlockedReason enum value.
+
+    Returns:
+        A user-friendly description of why the content was blocked,
+        including a link to Google's policy guidelines.
+    """
+    reason_str = str(reason)
+    # Extract just the value (e.g., "IMAGE_SAFETY" from "FinishReason.IMAGE_SAFETY").
+    if "." in reason_str:
+        reason_str = reason_str.split(".")[-1]
+
+    description = _BLOCKING_REASON_DESCRIPTIONS.get(
+        reason_str,
+        f"Reason:({reason_str})."
+    )
+
+    description += f" For more information, see: {_POLICY_GUIDELINES_URL}."
+
+    return description
+
 
 GEMINI_IMAGE_MODELS = [
     "gemini-2.5-flash-image-preview",
@@ -381,8 +427,10 @@ class GeminiImageGenerator:
         if response and response.generated_images:
             for generated_image in response.generated_images:
                 if generated_image.rai_filtered_reason:
+                    # rai_filtered_reason is already a human-readable message from the API.
                     raise RuntimeError(
-                        f"Image generation was blocked. Reason: {generated_image.rai_filtered_reason}"
+                        f"Image generation was blocked. {generated_image.rai_filtered_reason} "
+                        f"For more information, see: {_POLICY_GUIDELINES_URL}."
                     )
                 if generated_image.image:
                     return generated_image.image.image_bytes
@@ -408,9 +456,8 @@ class GeminiImageGenerator:
 
         # Check for blocking at the prompt level.
         if response and response.prompt_feedback and response.prompt_feedback.block_reason:
-            raise RuntimeError(
-                f"Image generation was blocked. Reason: {response.prompt_feedback.block_reason}"
-            )
+            description = _get_blocking_reason_description(response.prompt_feedback.block_reason)
+            raise RuntimeError(f"Image generation was blocked. {description}")
 
         if not response or not response.candidates:
             self._raise_no_image_error()
@@ -418,14 +465,8 @@ class GeminiImageGenerator:
         # Check all candidates for non-standard finish reasons.
         for candidate in response.candidates:
             if candidate.finish_reason and candidate.finish_reason != "STOP":
-                if candidate.finish_reason == "RECITATION":
-                    raise RuntimeError(
-                        "Image generation was blocked. Reason: "
-                        "The generated image too closely resembles copyrighted material."
-                    )
-                raise RuntimeError(
-                    f"Image generation was blocked. Reason: {candidate.finish_reason}"
-                )
+                description = _get_blocking_reason_description(candidate.finish_reason)
+                raise RuntimeError(f"Image generation was blocked. {description}")
 
         # Extract parts from the first candidate with content.
         parts = None

@@ -777,20 +777,6 @@ state that the tool could not be executed due to reaching the recursion limit.""
             # allow the model to pick which output tables to return
             return conversation_table, data_registry.get_last_tables(num_data_outputs)
 
-    def _check_for_columns(self, history_table):
-        if self.conversation_column not in history_table.column_names:
-            raise knext.InvalidParametersError(
-                f"Column {self.conversation_column} not found in the conversation history table."
-            )
-        if (
-            self.errors.error_handling == ErrorHandlingMode.COLUMN.name
-            and self.errors.use_existing_error_column
-        ):
-            if self.errors.error_column not in history_table.column_names:
-                raise knext.InvalidParametersError(
-                    f"Column {self.errors.error_column} not found in the conversation history table."
-                )
-
     def _get_conversation(
         self,
         ctx: knext.ExecutionContext,

@@ -724,8 +724,6 @@ state that the tool could not be executed due to reaching the recursion limit.""
             ctx, history_table, tool_converter, data_registry
         )
 
-        num_data_outputs = ctx.get_connected_output_port_numbers()[1]
-
         config = AgentConfig(self.recursion_limit)
         agent = Agent(conversation, chat_model, toolset, config)
 
@@ -745,6 +743,18 @@ state that the tool could not be executed due to reaching the recursion limit.""
         except Exception as e:
             error_handler.handle_error(e)
 
+        return self._construct_outputs(
+            history_table, conversation, tool_converter, data_registry, ctx
+        )
+
+    def _construct_outputs(
+        self,
+        history_table,
+        conversation,
+        tool_converter,
+        data_registry,
+        ctx,
+    ):
         output_column_name = (
             self.conversation_column_name
             if history_table is None
@@ -762,6 +772,7 @@ state that the tool could not be executed due to reaching the recursion limit.""
             tool_converter, output_column_name, error_column_name
         )
 
+        num_data_outputs = ctx.get_connected_output_port_numbers()[1]
         if num_data_outputs == 0:
             return conversation_table
         else:

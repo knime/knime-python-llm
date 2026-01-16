@@ -95,7 +95,7 @@ def _get_blocking_reason_description(reason) -> str:
 
     description = _BLOCKING_REASON_DESCRIPTIONS.get(
         reason_str,
-        f"Reason:({reason_str})."
+        f"Reason: {reason_str}."
     )
 
     description += f" For more information, see: {_POLICY_GUIDELINES_URL}."
@@ -104,16 +104,13 @@ def _get_blocking_reason_description(reason) -> str:
 
 
 GEMINI_IMAGE_MODELS = [
-    "gemini-2.5-flash-image-preview",
+    "gemini-2.5-flash-image",
     "gemini-3-pro-image-preview",
 ]
 
 IMAGEN_MODELS = [
-    "imagen-3.0-generate-002", 
     "imagen-4.0-generate-001",
-    "imagen-4.0-generate-preview-06-06",
     "imagen-4.0-ultra-generate-001",
-    "imagen-4.0-ultra-generate-preview-06-06",
     "imagen-4.0-fast-generate-001",
 ]
 

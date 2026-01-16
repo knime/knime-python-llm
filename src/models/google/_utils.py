@@ -72,9 +72,9 @@ KNOWN_DEPRECATED_MODELS = [
 # - https://ai.google.dev/gemini-api/docs/models
 # - https://cloud.google.com/vertex-ai/generative-ai/docs/embeddings/get-text-embeddings#supported-models
 GEMINI_CHAT_MODELS_FALLBACK = [
-    "gemini-2.5-pro-preview-03-25",
-    "gemini-2.0-flash-lite",
-    "gemini-2.0-flash",
+    "gemini-2.5-pro",
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
 ]
 VERTEX_AI_GEMINI_EMBEDDING_MODELS_FALLBACK = [
     "text-embedding-large-exp-03-07",
@@ -85,7 +85,7 @@ GOOGLE_AI_STUDIO_GEMINI_EMBEDDING_MODELS_FALLBACK = [
     "text-embedding-005",
 ]
 GOOGLE_AI_STUDIO_GEMINI_IMAGE_MODELS_FALLBACK = [
-    "gemini-2.5-flash-image-preview",
+    "gemini-2.5-flash-image",
     "imagen-4.0-generate-001",
 ]
 

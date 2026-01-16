@@ -738,8 +738,6 @@ state that the tool could not be executed due to reaching the recursion limit.""
 
         try:
             agent.run()
-        except CancelError as e:
-            raise e
         except Exception as e:
             error_handler.handle_error(e)
 
@@ -802,9 +800,7 @@ state that the tool could not be executed due to reaching the recursion limit.""
     ) -> "AgentPrompterConversation":
         from langchain_core.messages import SystemMessage, HumanMessage
 
-        conversation = AgentPrompterConversation(
-            self.errors.error_handling, ctx
-        )
+        conversation = AgentPrompterConversation(self.errors.error_handling, ctx)
 
         if self.developer_message:
             conversation.append_messages(SystemMessage(self.developer_message))
@@ -975,7 +971,8 @@ class AgentPrompterConversation:
             result_df = pd.DataFrame(
                 {
                     output_column_name: [
-                        to_knime_message_or_none(msg, tool_converter) for msg in messages
+                        to_knime_message_or_none(msg, tool_converter)
+                        for msg in messages
                     ]
                 }
             )

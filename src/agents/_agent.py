@@ -43,8 +43,8 @@
 # ------------------------------------------------------------------------
 
 from dataclasses import dataclass
-from typing import Protocol, Sequence
-from langchain_core.messages import BaseMessage, AIMessage, ToolMessage
+from typing import Protocol
+from langchain_core.messages import AIMessage, ToolMessage
 from langchain_core.language_models.chat_models import BaseChatModel
 
 

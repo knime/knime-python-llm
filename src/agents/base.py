@@ -701,8 +701,7 @@ state that the tool could not be executed due to reaching the recursion limit.""
             LangchainToolConverter,
         )
         from ._tool import ExecutionMode
-        from ._agent import validate_ai_message, Agent, AgentConfig, IterationLimitError
-        import langchain_core.messages as lcm
+        from ._agent import Agent, AgentConfig
 
         data_registry = DataRegistry.create_with_input_tables(
             input_tables, data_message_prefix=self.data_message_prefix

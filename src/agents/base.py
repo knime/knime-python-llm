@@ -1261,6 +1261,7 @@ class AgentChatWidget:
             DataRegistry,
             LangchainToolConverter,
             AgentChatWidgetDataService,
+            AgentChatWidgetConfig,
         )
         from ._tool import ExecutionMode
 
@@ -1303,27 +1304,31 @@ class AgentChatWidget:
         )
 
         toolset = AgentPrompterToolset(tools)
-        config = AgentConfig(self.recursion_limit)
+        agent_config = AgentConfig(self.recursion_limit)
+
+        widget_config = AgentChatWidgetConfig(
+            self.initial_message,
+            self.conversation_column_name,
+            self.recursion_limit_handling,
+            self.show_tool_calls_and_results,
+            self.reexecution_trigger,
+            self.has_error_column,
+            self.error_column_name,
+        )
 
         return AgentChatWidgetDataService(
             ctx,
             chat_model,
             conversation,
             toolset,
-            config,
+            agent_config,
             data_registry,
-            self.initial_message,
-            self.conversation_column_name,
-            self.recursion_limit_handling,
-            self.show_tool_calls_and_results,
-            self.reexecution_trigger,
+            widget_config,
             tool_converter,
             {
                 "project_id": project_id,
                 "workflow_id": workflow_id,
             },
-            self.has_error_column,
-            self.error_column_name,
         )
 
     def _create_conversation_history(self, view_data, data_registry, tool_converter):

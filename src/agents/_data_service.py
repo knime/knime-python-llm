@@ -52,6 +52,7 @@ from ._agent import (
     Agent,
 )
 from ._parameters import RecursionLimitModeForView
+from dataclasses import dataclass
 import yaml
 import queue
 import threading
@@ -64,6 +65,17 @@ if TYPE_CHECKING:
     from .base import AgentPrompterConversation
 
 
+@dataclass
+class AgentChatWidgetConfig:
+    initial_message: str
+    conversation_column_name: str
+    recursion_limit_handling: str
+    show_tool_calls_and_results: bool
+    reexecution_trigger: str
+    has_error_column: bool
+    error_column_name: str
+
+
 class AgentChatWidgetDataService:
     def __init__(
         self,
@@ -71,17 +83,11 @@ class AgentChatWidgetDataService:
         chat_model,
         conversation: "AgentPrompterConversation",
         toolset,
-        config,
+        agent_config,
         data_registry: DataRegistry,
-        initial_message: str,
-        conversation_column_name: str,
-        recursion_limit_handling: str,
-        show_tool_calls_and_results: bool,
-        reexecution_trigger: str,
+        widget_config: AgentChatWidgetConfig,
         tool_converter: LangchainToolConverter,
         combined_tools_workflow_info: dict,
-        has_error_column: bool,
-        error_column_name: str,
     ):
         self._ctx = ctx
 
@@ -89,18 +95,13 @@ class AgentChatWidgetDataService:
         self._conversation = FrontendConversation(
             conversation, tool_converter, self._check_canceled
         )
-        self._config = config
-        self._agent = Agent(self._conversation, self._chat_model, toolset, self._config)
+        self._agent_config = agent_config
+        self._agent = Agent(
+            self._conversation, self._chat_model, toolset, self._agent_config
+        )
 
         self._data_registry = data_registry
-        self._conversation_column_name = conversation_column_name
-        self._initial_message = initial_message
-        self._recursion_limit_handling = recursion_limit_handling
-        self._show_tool_calls_and_results = show_tool_calls_and_results
-        self._reexecution_trigger = reexecution_trigger
-
-        self._has_error_column = has_error_column
-        self._error_column_name = error_column_name
+        self._widget_config = widget_config
 
         self._get_combined_tools_workflow_info = combined_tools_workflow_info
 
@@ -109,10 +110,10 @@ class AgentChatWidgetDataService:
         self._is_canceled = False  # TODO modified by frontend
 
     def get_initial_message(self):
-        if self._initial_message:
+        if self._widget_config.initial_message:
             return {
                 "type": "ai",
-                "content": self._initial_message,
+                "content": self._widget_config.initial_message,
             }
 
     def post_user_message(self, user_message: str):
@@ -149,8 +150,8 @@ class AgentChatWidgetDataService:
 
     def get_configuration(self):
         return {
-            "show_tool_calls_and_results": self._show_tool_calls_and_results,
-            "reexecution_trigger": self._reexecution_trigger,
+            "show_tool_calls_and_results": self._widget_config.show_tool_calls_and_results,
+            "reexecution_trigger": self._widget_config.reexecution_trigger,
         }
 
     def get_combined_tools_workflow_info(self):
@@ -158,9 +159,13 @@ class AgentChatWidgetDataService:
 
     # called by java, not the frontend
     def get_view_data(self):
-        error_column_name = self._error_column_name if self._has_error_column else None
+        error_column_name = (
+            self._widget_config.error_column_name
+            if self._widget_config.has_error_column
+            else None
+        )
         conversation_table = self._conversation.create_output_table(
-            self._conversation_column_name,
+            self._widget_config.conversation_column_name,
             error_column_name,
         )
 
@@ -196,11 +201,16 @@ class AgentChatWidgetDataService:
     def _handle_recursion_limit_error(self):
         from langchain_core.messages import AIMessage
 
-        if self._recursion_limit_handling == RecursionLimitModeForView.CONFIRM.name:
+        if (
+            self._widget_config.recursion_limit_handling
+            == RecursionLimitModeForView.CONFIRM.name
+        ):
             messages = [AIMessage(RECURSION_CONTINUE_PROMPT)]
             self._conversation._append_messages(messages)
         else:
-            content = f"Recursion limit of {self._config.iteration_limit} reached."
+            content = (
+                f"Recursion limit of {self._agent_config.iteration_limit} reached."
+            )
             self._conversation.append_error(Exception(content))
 
     def _check_canceled(self):

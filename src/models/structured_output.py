@@ -148,7 +148,7 @@ class StructuredOutputSettings:
         Invalid characters will be automatically converted to underscores.
         
         Example: 'Person Info', 'Product Details', 'Sentiment Analysis'""",
-        default_value="ExtractedData",
+        default_value="Target object",
     )
 
     target_object_description = knext.StringParameter(
@@ -338,11 +338,11 @@ def create_pydantic_model(settings: StructuredOutputSettings):
             Field(default=None, description=field_description),
         )
 
-    # Use target_object_name as the model name (default: "ExtractedData")
+    # Use target_object_name as the model name (default: "Target object")
     # Sanitize to comply with OpenAI's naming requirements (^[a-zA-Z0-9_-]+$)
     # Replace invalid characters with underscores
     import re
-    model_name = settings.target_object_name if settings.target_object_name else "ExtractedData"
+    model_name = settings.target_object_name if settings.target_object_name else "Target object"
     model_name = re.sub(r'[^a-zA-Z0-9_-]', '_', model_name)
     
     # Use target_object_description as the model docstring if provided

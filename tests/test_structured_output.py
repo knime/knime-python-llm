@@ -65,7 +65,7 @@ class MockOutputColumn:
 class MockStructuredOutputSettings:
     """Mock for StructuredOutputSettings parameter group."""
     def __init__(self):
-        self.target_object_name = "ExtractedData"
+        self.target_object_name = "Target object"
         self.target_object_description = ""
         self.output_columns = []
         self.target_objects_per_input_row = structured_output.TargetObjectsPerInputRow.One.name

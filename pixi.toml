@@ -12,6 +12,7 @@ no-build = true
 knime-python-base = "*"
 python = "3.11.*"
 langchain = "0.3.23.*"
+langchain-core = "0.3.81.*"
 langchain-community = "0.3.21.*"
 langchain-openai = "0.3.14.*"
 langchain-chroma = "0.2.3.*"

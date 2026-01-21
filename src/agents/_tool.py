@@ -47,7 +47,7 @@ import re
 from ._data import Port, DataRegistry, port_to_dict
 from ._common import render_structured
 from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
-from langchain.tools import StructuredTool
+from langchain_core.tools import StructuredTool
 import knime.extension as knext
 import logging
 

@@ -47,7 +47,6 @@ from typing import Optional
 import knime.extension as knext
 import util
 
-
 from ._parameters import (
     iteration_limit_mode_param_for_view,
     IterationLimitModeForView,
@@ -55,6 +54,7 @@ from ._parameters import (
 import yaml
 import queue
 import threading
+
 
 
 from models.base import (
@@ -437,8 +437,8 @@ class AgentChatViewDataService:
         from langgraph.errors import GraphRecursionError
         from langchain_core.messages import HumanMessage, AIMessage
         from ._agent import (
-            validate_ai_message,
-            LANGGRAPH_RECURSION_MESSAGE,
+        validate_ai_message,
+        LANGGRAPH_RECURSION_MESSAGE,
         )
 
         try:
@@ -539,9 +539,8 @@ class AgentChatViewDataService:
         }
 
     def _handle_recursion_limit_error(self):
-        from ._agent import ITERATION_CONTINUE_PROMPT
-
-        if self._recursion_limit_handling == IterationLimitModeForView.CONFIRM.name:
+        from ._agent import RECURSION_CONTINUE_PROMPT
+        if self._recursion_limit_handling == RecursionLimitModeForView.CONFIRM.name:
             message = {
                 "type": "ai",
                 "content": ITERATION_CONTINUE_PROMPT,

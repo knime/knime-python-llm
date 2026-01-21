@@ -266,17 +266,14 @@ class AgentPrompter:
 
         # TODO return messages might depend on the type of model (i.e. chat needs it llm doesn't)?
 
-        import langchain
-        import langchain.agents
-
-        langchain.debug = self.enable_debug_output
+        from langchain_classic.agents import AgentExecutor
 
         messages = self.conversation_settings.create_messages(chat_history_df)
 
         tools = tools_obj.create_tools(ctx)
         agent = agent_obj.create_agent(ctx, tools)
 
-        agent_exec = langchain.agents.AgentExecutor(
+        agent_exec = AgentExecutor(
             agent=agent,
             tools=tools,
         )

@@ -131,8 +131,8 @@ class VectorToolPortObject(ToolPortObject):
         """
         This method creates a function based on the given context and retrieval sources flag.
         """
-        from langchain.chains.retrieval import create_retrieval_chain
-        from langchain.chains.combine_documents import create_stuff_documents_chain
+        from langchain_classic.chains.retrieval import create_retrieval_chain
+        from langchain_classic.chains.combine_documents import create_stuff_documents_chain
         from langchain_core.prompts import ChatPromptTemplate
 
         llm = self._llm.create_model(ctx, OutputFormatOptions.Text)

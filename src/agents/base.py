@@ -612,7 +612,7 @@ state that the tool could not be executed due to reaching the recursion limit.""
         )
         from ._tool import ExecutionMode
         from ._agent import validate_ai_message
-        from langgraph.prebuilt import create_react_agent
+        from langgraph.prebuilt import create_react_agent, ToolNode
         from knime.types.message import to_langchain_message, from_langchain_message
         from langgraph.checkpoint.memory import InMemorySaver
         from util import check_canceled
@@ -662,10 +662,11 @@ state that the tool could not be executed due to reaching the recursion limit.""
         if tools:
             interrupted_nodes.append("tools")
 
+        tool_node = ToolNode(tools, handle_tool_errors=True)
         memory = InMemorySaver()
         graph = create_react_agent(
             chat_model,
-            tools=tools,
+            tools=tool_node,
             prompt=self.developer_message,
             checkpointer=memory,
             interrupt_before=interrupted_nodes,
@@ -986,7 +987,7 @@ class AgentChatWidget:
         tools_table: Optional[knext.Table],
         input_tables: list[knext.Table],
     ):
-        from langgraph.prebuilt import create_react_agent
+        from langgraph.prebuilt import create_react_agent, ToolNode
         from langgraph.checkpoint.memory import MemorySaver
         from ._data_service import (
             DataRegistry,
@@ -1029,9 +1030,10 @@ class AgentChatWidget:
         else:
             tools = []
 
+        tool_node = ToolNode(tools, handle_tool_errors=True)
         memory = MemorySaver()
         agent = create_react_agent(
-            chat_model, tools=tools, prompt=self.developer_message, checkpointer=memory
+            chat_model, tools=tool_node, prompt=self.developer_message, checkpointer=memory
         )
 
         self._fill_memory_with_messages(agent, view_data, data_registry, tool_converter)

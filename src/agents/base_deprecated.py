@@ -304,7 +304,7 @@ class AgentChatView:
         tools_table: Optional[knext.Table],
         input_tables: list[knext.Table],
     ):
-        from langgraph.prebuilt import create_react_agent
+        from langgraph.prebuilt import create_react_agent, ToolNode
         from langgraph.checkpoint.memory import MemorySaver
         from ._data_service import (
             DataRegistry,
@@ -331,8 +331,9 @@ class AgentChatView:
             tools = []
 
         memory = MemorySaver()
+        tool_node = ToolNode(tools, handle_tool_errors=True)
         agent = create_react_agent(
-            chat_model, tools=tools, prompt=self.developer_message, checkpointer=memory
+            chat_model, tools=tool_node, prompt=self.developer_message, checkpointer=memory
         )
 
         return AgentChatViewDataService(

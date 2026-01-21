@@ -693,8 +693,12 @@ state that the tool could not be executed due to reaching the iteration limit.""
             LangchainToolConverter,
         )
         from ._tool import ExecutionMode
-        from ._agent import Agent, AgentConfig
-        from ._error_handler import AgentPrompterErrorHandler
+        from ._agent import validate_ai_message
+        from langgraph.prebuilt import create_react_agent, ToolNode
+        from knime.types.message import to_langchain_message, from_langchain_message
+        from langgraph.checkpoint.memory import InMemorySaver
+        from util import check_canceled
+        import langchain_core.messages as lcm
 
         data_registry = DataRegistry.create_with_input_tables(
             input_tables, data_message_prefix=self.data_message_prefix
@@ -713,8 +717,41 @@ state that the tool could not be executed due to reaching the iteration limit.""
         tools = [tool_converter.to_langchain_tool(tool) for tool in tool_cells]
         toolset = AgentPrompterToolset(tools)
 
-        conversation = self._create_conversation_history(
-            ctx, data_registry, tool_converter, history_table
+        messages = []
+
+        if history_table is not None:
+            if self.conversation_column not in history_table.column_names:
+                raise knext.InvalidParametersError(
+                    f"Column {self.conversation_column} not found in the conversation history table."
+                )
+            history_df = history_table[self.conversation_column].to_pandas()
+            messages = []
+            for msg in history_df[self.conversation_column]:
+                lc_msg = to_langchain_message(msg)
+                # Sanitize tool names so they match the current sanitized mapping
+                lc_msg = tool_converter.sanitize_tool_names(lc_msg)
+                messages.append(lc_msg)
+
+        if data_registry.has_data or tool_converter.has_data_tools:
+            messages.append(data_registry.create_data_message())
+
+        if self.user_message:
+            messages.append({"role": "user", "content": self.user_message})
+
+        num_data_outputs = ctx.get_connected_output_port_numbers()[1]
+
+        interrupted_nodes = ["agent"]
+        if tools:
+            interrupted_nodes.append("tools")
+
+        tool_node = ToolNode(tools, handle_tool_errors=True)
+        memory = InMemorySaver()
+        graph = create_react_agent(
+            chat_model,
+            tools=tool_node,
+            prompt=self.developer_message,
+            checkpointer=memory,
+            interrupt_before=interrupted_nodes,
         )
 
         config = AgentConfig(self.recursion_limit)
@@ -1314,7 +1351,8 @@ class AgentChatWidget:
         tools_table: Optional[knext.Table],
         input_tables: list[knext.Table],
     ):
-        from ._agent import AgentConfig
+        from langgraph.prebuilt import create_react_agent, ToolNode
+        from langgraph.checkpoint.memory import MemorySaver
         from ._data_service import (
             DataRegistry,
             LangchainToolConverter,
@@ -1357,8 +1395,10 @@ class AgentChatWidget:
         else:
             tools = []
 
-        conversation = self._create_conversation_history(
-            view_data, data_registry, tool_converter
+        tool_node = ToolNode(tools, handle_tool_errors=True)
+        memory = MemorySaver()
+        agent = create_react_agent(
+            chat_model, tools=tool_node, prompt=self.developer_message, checkpointer=memory
         )
 
         toolset = AgentPrompterToolset(tools)

@@ -209,7 +209,7 @@ class VertexAiConnectionPortObjectSpec(GenericGeminiConnectionPortObjectSpec):
 
     @property
     def base_api_url(self) -> str:
-        return f"{self.location}-aiplatform.googleapis.com"
+        return f"https://{self.location}-aiplatform.googleapis.com"
 
     def serialize(self):
         return {
@@ -415,12 +415,12 @@ class VertexAiConnectionPortObjectSpec(GenericGeminiConnectionPortObjectSpec):
         max_tokens: int,
         temperature: float,
     ):
-        from langchain_google_vertexai import ChatVertexAI
+        from langchain_google_genai import ChatGoogleGenerativeAI
 
         google_credentials = self._construct_google_credentials()
 
-        return ChatVertexAI(
-            model_name=model_name,
+        return ChatGoogleGenerativeAI(
+            model=model_name,
             project=self.project_id,
             location=self.location,
             credentials=google_credentials,
@@ -428,20 +428,22 @@ class VertexAiConnectionPortObjectSpec(GenericGeminiConnectionPortObjectSpec):
             temperature=temperature,
             max_retries=2,  # default is 6, instead we just try twice before failing
             base_url=self.custom_base_api_url or self.base_api_url,
+            vertexai=True,
         )
 
     def create_embedding_model(self, execution_ctx, model_name):
-        from langchain_google_vertexai import VertexAIEmbeddings
+        from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
         google_credentials = self._construct_google_credentials()
 
-        return VertexAIEmbeddings(
-            model_name=model_name,
+        return GoogleGenerativeAIEmbeddings(
+            model=model_name,
             project=self.project_id,
             location=self.location,
             max_retries=2,  # default is 6, instead we just try twice before failing
             base_url=self.custom_base_api_url or self.base_api_url,
             credentials=google_credentials,
+            vertexai=True,
         )
 
 

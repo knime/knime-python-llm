@@ -443,6 +443,7 @@ class VertexAiConnectionPortObjectSpec(GenericGeminiConnectionPortObjectSpec):
             max_retries=2,  # default is 6, instead we just try twice before failing
             base_url=self.custom_base_api_url or self.base_api_url,
             credentials=google_credentials,
+            task_type="RETRIEVAL_QUERY", # for backwards compatibility with old VertexAIEmbeddings
             vertexai=True,
         )
 

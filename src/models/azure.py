@@ -462,8 +462,8 @@ class AzureOpenAIAuthenticator:
     and fed into this node via flow variable.
 
     Alternatively, you can access an Azure OpenAI API via OAuth authentication by connecting a credential
-    port object to the dynamic input port. For OAuth authentication, the `Azure OpenAI` scope is required.
-    The scope can be defined either in the Microsoft Authenticator or the secret store.
+    port object to the dynamic input port. For OAuth authentication, the `https://cognitiveservices.azure.com/.default` scope is required.
+    The scope can be defined either in the Microsoft Authenticator or the secret store, which also provide it under the `Azure OpenAI` standard scope.
 
     To find your Azure OpenAI API key, navigate to your Azure OpenAI Resource on the [Azure Portal](https://portal.azure.com/) and copy one of the keys from
     'Resource Management - Keys and Endpoints'.

@@ -127,8 +127,8 @@ class OutputColumn:
 class TargetObjectsPerInputRow(knext.EnumParameterOptions):
     """Number of target objects to extract per input row."""
     
-    One = (
-        "One",
+    Single = (
+        "Single",
         "Extract exactly one target object with the defined columns per input row.",
     )
     Multiple = (
@@ -163,7 +163,7 @@ class StructuredOutputSettings:
     target_objects_per_input_row = knext.EnumParameter(
         label="Target objects per input row",
         description="Determines how many target objects are extracted for each input row.",
-        default_value=TargetObjectsPerInputRow.One.name,
+        default_value=TargetObjectsPerInputRow.Single.name,
         enum=TargetObjectsPerInputRow,
         style=knext.EnumParameter.Style.VALUE_SWITCH,
     )

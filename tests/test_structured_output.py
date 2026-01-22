@@ -68,7 +68,7 @@ class MockStructuredOutputSettings:
         self.target_object_name = "Target object"
         self.target_object_description = ""
         self.output_columns = []
-        self.target_objects_per_input_row = structured_output.TargetObjectsPerInputRow.One.name
+        self.target_objects_per_input_row = structured_output.TargetObjectsPerInputRow.Single.name
         self.input_row_id_column_name = "Input Row ID"
 
 
@@ -160,7 +160,7 @@ class TestCreatePydanticModel(unittest.TestCase):
         settings = MockStructuredOutputSettings()
         settings.target_object_name = "TestModel"
         settings.target_object_description = "Test description"
-        settings.target_objects_per_input_row = structured_output.TargetObjectsPerInputRow.One.name
+        settings.target_objects_per_input_row = structured_output.TargetObjectsPerInputRow.Single.name
         
         field = MockOutputColumn()
         field.name = "text_field"
@@ -199,7 +199,7 @@ class TestCreatePydanticModel(unittest.TestCase):
     def test_int_coercion(self):
         """Test that large numbers in scientific notation (float or string) are coerced to int and clipped to limits."""
         settings = MockStructuredOutputSettings()
-        settings.target_objects_per_input_row = structured_output.TargetObjectsPerInputRow.One.name
+        settings.target_objects_per_input_row = structured_output.TargetObjectsPerInputRow.Single.name
         
         field = MockOutputColumn()
         field.name = "large_id"
@@ -237,7 +237,7 @@ class TestCreatePydanticModel(unittest.TestCase):
     def test_create_model_with_multiple_field_types(self):
         settings = MockStructuredOutputSettings()
         settings.target_object_name = "MixedModel"
-        settings.target_objects_per_input_row = structured_output.TargetObjectsPerInputRow.One.name
+        settings.target_objects_per_input_row = structured_output.TargetObjectsPerInputRow.Single.name
         
         field1 = MockOutputColumn()
         field1.name = "text"
@@ -274,7 +274,7 @@ class TestCreatePydanticModel(unittest.TestCase):
         """Test that spaces in target_object_name are converted to underscores."""
         settings = MockStructuredOutputSettings()
         settings.target_object_name = "Person Info"
-        settings.target_objects_per_input_row = structured_output.TargetObjectsPerInputRow.One.name
+        settings.target_objects_per_input_row = structured_output.TargetObjectsPerInputRow.Single.name
         
         field = MockOutputColumn()
         field.name = "name"
@@ -291,7 +291,7 @@ class TestCreatePydanticModel(unittest.TestCase):
         """Test that multiple spaces are all converted to underscores."""
         settings = MockStructuredOutputSettings()
         settings.target_object_name = "Product Detail Summary"
-        settings.target_objects_per_input_row = structured_output.TargetObjectsPerInputRow.One.name
+        settings.target_objects_per_input_row = structured_output.TargetObjectsPerInputRow.Single.name
         
         field = MockOutputColumn()
         field.name = "product"
@@ -308,7 +308,7 @@ class TestCreatePydanticModel(unittest.TestCase):
         """Test that special characters are converted to underscores."""
         settings = MockStructuredOutputSettings()
         settings.target_object_name = "Person@Info#123"
-        settings.target_objects_per_input_row = structured_output.TargetObjectsPerInputRow.One.name
+        settings.target_objects_per_input_row = structured_output.TargetObjectsPerInputRow.Single.name
         
         field = MockOutputColumn()
         field.name = "name"
@@ -325,7 +325,7 @@ class TestCreatePydanticModel(unittest.TestCase):
         """Test that allowed characters (letters, numbers, underscores, hyphens) are preserved."""
         settings = MockStructuredOutputSettings()
         settings.target_object_name = "Person-Info_123"
-        settings.target_objects_per_input_row = structured_output.TargetObjectsPerInputRow.One.name
+        settings.target_objects_per_input_row = structured_output.TargetObjectsPerInputRow.Single.name
         
         field = MockOutputColumn()
         field.name = "name"
@@ -554,7 +554,7 @@ class TestStructuredResponsesToTable(unittest.TestCase):
 
     def test_convert_single_responses(self):
         settings = MockStructuredOutputSettings()
-        settings.target_objects_per_input_row = structured_output.TargetObjectsPerInputRow.One.name
+        settings.target_objects_per_input_row = structured_output.TargetObjectsPerInputRow.Single.name
         
         field1 = MockOutputColumn()
         field1.name = "name"
@@ -582,7 +582,7 @@ class TestStructuredResponsesToTable(unittest.TestCase):
     def test_convert_single_responses_all_types(self):
         """Test conversion of single responses with all column types."""
         settings = MockStructuredOutputSettings()
-        settings.target_objects_per_input_row = structured_output.TargetObjectsPerInputRow.One.name
+        settings.target_objects_per_input_row = structured_output.TargetObjectsPerInputRow.Single.name
         
         columns = [
             MockOutputColumn("str", structured_output.OutputColumnType.String.name),
@@ -681,7 +681,7 @@ class TestStructuredResponsesToTable(unittest.TestCase):
     def test_missing_values_in_responses(self):
         """Test that missing values are properly handled when information cannot be extracted."""
         settings = MockStructuredOutputSettings()
-        settings.target_objects_per_input_row = structured_output.TargetObjectsPerInputRow.One.name
+        settings.target_objects_per_input_row = structured_output.TargetObjectsPerInputRow.Single.name
         
         field1 = MockOutputColumn()
         field1.name = "name"
@@ -792,7 +792,7 @@ class TestPostprocessTable(unittest.TestCase):
 
     def test_postprocess_one_row_per_input(self):
         settings = MockStructuredOutputSettings()
-        settings.target_objects_per_input_row = structured_output.TargetObjectsPerInputRow.One.name
+        settings.target_objects_per_input_row = structured_output.TargetObjectsPerInputRow.Single.name
         
         field = MockOutputColumn()
         field.name = "output"
@@ -846,7 +846,7 @@ class TestAddStructuredOutputColumns(unittest.TestCase):
 
     def test_add_columns_one_row(self):
         settings = MockStructuredOutputSettings()
-        settings.target_objects_per_input_row = structured_output.TargetObjectsPerInputRow.One.name
+        settings.target_objects_per_input_row = structured_output.TargetObjectsPerInputRow.Single.name
         
         field = MockOutputColumn()
         field.name = "new_col"
@@ -866,7 +866,7 @@ class TestAddStructuredOutputColumns(unittest.TestCase):
     def test_add_columns_all_types(self):
         """Test that all column types are correctly added to the schema."""
         settings = MockStructuredOutputSettings()
-        settings.target_objects_per_input_row = structured_output.TargetObjectsPerInputRow.One.name
+        settings.target_objects_per_input_row = structured_output.TargetObjectsPerInputRow.Single.name
         
         columns = [
             MockOutputColumn("c1", structured_output.OutputColumnType.String.name),

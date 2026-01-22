@@ -61,3 +61,4 @@ test-results
 
 local-update-site/
 render-dir/
+.envs/

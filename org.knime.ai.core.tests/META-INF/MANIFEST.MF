@@ -5,7 +5,7 @@ Bundle-SymbolicName: org.knime.ai.core.tests;singleton:=true
 Bundle-Version: 5.5.0.qualifier
 Bundle-Vendor: KNIME AG, Zurich, Switzerland
 Fragment-Host: org.knime.ai.core;bundle-version="[5.5.0,6.0.0)"
-Bundle-RequiredExecutionEnvironment: JavaSE-17
+Bundle-RequiredExecutionEnvironment: JavaSE-21
 Automatic-Module-Name: org.knime.ai.core.tests
 Bundle-ClassPath: .,
  lib/Java-WebSocket-1.5.2.jar

@@ -155,7 +155,7 @@ class LLMChatModelAdapter(BaseChatModel):
             _stop = None
         else:
             _stop = list(stop)
-        content = self.llm(text, stop=_stop, **kwargs)
+        content = self.llm.invoke(text, stop=_stop, **kwargs)
         return AIMessage(content=content)
 
     async def _apredict_messages(

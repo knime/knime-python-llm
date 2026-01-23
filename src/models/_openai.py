@@ -48,17 +48,37 @@ import logging
 
 _logger = logging.getLogger(__name__)
 
+_DEFAULT_MISTRAL_API_BASE = "https://api.mistral.ai/v1"
+
+def _is_mistral_api(base_url: str) -> bool:
+    """
+    Check if the base URL points to Mistral's API.
+
+    Mistral's API doesn't support max_completion_tokens, so we need to use max_tokens instead.
+    """
+    return base_url == _DEFAULT_MISTRAL_API_BASE
 
 class _ChatOpenAI(ChatOpenAI):
     """
-    ChatOpenAI subclass that sets a warning if the response content is empty due to reasoning tokens.
+    ChatOpenAI subclass that:
+    - Sets a warning if the response content is empty due to reasoning tokens.
+    - Reverts max_completion_tokens to max_tokens for APIs that don't support it (e.g. Mistral).
     """
 
     _ctx = PrivateAttr(default=None)
+    _use_max_tokens = PrivateAttr(default=False)
 
     def __init__(self, *, ctx=None, **kwargs):
         super().__init__(**kwargs)
         self._ctx = ctx
+        self._use_max_tokens = _is_mistral_api(kwargs.get("base_url"))
+
+    def _get_request_payload(self, input_, *, stop=None, **kwargs):
+        payload = super()._get_request_payload(input_, stop=stop, **kwargs)
+        # Mistral's API doesn't support max_completion_tokens, revert to max_tokens
+        if self._use_max_tokens and "max_completion_tokens" in payload:
+            payload["max_tokens"] = payload.pop("max_completion_tokens")
+        return payload
 
     def _warn_if_reasoning_exhausted(self, msg) -> None:
         def get_reasoning_tokens(msg):

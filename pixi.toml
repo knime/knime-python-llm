@@ -3,74 +3,123 @@ channels = ["knime/label/nightly", "knime", "conda-forge"]
 platforms = ["win-64", "linux-64", "osx-64", "osx-arm64"]
 
 [pypi-options]
-# no-build = true
+no-build = true
 
 [tasks]
 test = { cmd = "pytest" }
 
 [dependencies]
-knime-extension = "5.8.*"
+# --- Framework & Runtime ---
+python = "3.13.*" # Runtime: Python 3.13
+knime-extension = "5.8.*" # Framework: KNIME Python integration
+knime-python-base = "*" # Framework: KNIME base libraries
 # knime-python-versions = "5.8.*"
-knime-python-base = "*"
-python = "3.13.*"
-pandas = "<2.3.0"
-# langchain = ">=1"
-langchain-openai = "*"
-langchain-anthropic = "*"
-langchain-core = "*"
-langchain-google-genai = ">=4"
-# langchain-text-splitters= ">=1"
-langsmith = "*"
-packaging = "*"
-pydantic = "*"
-shapely = "*"
-httpx = "*"
-urllib3 = "*"
-requests = ">=2.32.5"
-pypika = "*"
-docopt = "*"
-griffe = "*"
-bokeh = "*"
-scipy = "*"
-umap-learn = "*"
-matplotlib = "*"
-ipython = "*"
-langdetect = "*"
-chardet = "*"
-cloudpickle = "*"
-gitdb = "*"
-gitpython = "*"
-mixpanel = "*"
-smmap = "*"
-sqlparse = "*"
-xxhash = "*"
-google-genai = "*"
-beautifulsoup4 = "*"
-huggingface_hub = "*"
-openai = "*"
-pip = "*"
-# ibm_cos_sdk_core = "*"
-# ibm_cos_sdk_s3transfer = "*"
-# ibm_cos_sdk = "*"
-# langgraph = "*"
-pyyaml = ">=6.0.2,<7"
-# onnxruntime = "*"
-charset-normalizer = ">=3.4.2,<4.13.6"
-posthog = ">=2.4.0,<6.0.0"
-pytest = "*"
+pip = "*" # Tooling: Python package installer
+
+# --- Core Data & Validation ---
+pandas = "2.3.3.*" # Direct: used for DataFrames throughout the code
+pydantic = "~=2.10.2" # Direct: used for data validation and models
+pyyaml = "~=6.0.3" # Direct: used for configuration in agents/
+packaging = "~=25.0" # Transitive: multiple packages (langchain-core, giskard, etc.)
+charset-normalizer = ">=3.4.3" # Direct: used in message encoding detection
+jsonschema = "~=4.26.0" # Forced to Conda: transitive req. by multiple packages
+marshmallow = "~=3.26.1" # Forced to Conda: transitive req. by multiple packages
+cachetools = "~=6.2.4" # Forced to Conda: transitive req. by multiple packages
+dataclasses-json = "~=0.6.7" # Forced to Conda: transitive req. by langchain-community
+typing_inspect = "~=0.9.0" # Forced to Conda: transitive req. by dataclasses-json
+mypy_extensions = "~=1.1.0" # Forced to Conda: transitive req. by multiple packages
+
+# --- LangChain Ecosystem & LLMs ---
+langchain-core = "~=1.2.7" # Direct: used for LLM abstractions and message types
+langchain-openai = "~=1.1.7" # Direct: used in models/openai.py, models/azure.py
+langchain-anthropic = "~=1.3.1" # Direct: used in models/anthropic_api/_custom_chat.py
+langchain-google-genai = "~=4.2.0" # Direct: used in models/google/_port_types.py
+langsmith = "~=0.3.45" # Transitive: required by langchain-core
+openai = "~=2.15.0" # Direct: used in models/openai.py, models/azure.py
+google-genai = "~=1.59.0" # Direct: used in models/google/
+huggingface_hub = "~=0.34.4" # Direct: used in models/huggingface/
+databricks-sdk = "~=0.78.0" # Forced to Conda: transitive req. by various integrations
+# chromadb = ">=1.3.5,<2.0.0" # Forced to Conda: transitive req. by langchain-chroma (Note: missing on osx-arm64)
+
+# --- Networking ---
+httpx = "~=0.28.1" # Direct: used in models/_credential_auth.py and tests
+requests = "~=2.32.5" # Direct: used in models/openai.py and some evaluations
+urllib3 = "~=2.5.0" # Transitive: required by requests, openai, etc.
+fastapi = "~=0.128.0" # Forced to Conda: transitive req. by chromadb/others
+uvicorn = "~=0.40.0" # Forced to Conda: transitive req. by chromadb/others
+starlette = "~=0.50.0" # Forced to Conda: transitive req. by fastapi
+grpcio = "~=1.73.1" # Forced to Conda: transitive req. by multiple packages
+protobuf = "~=6.31.1" # Forced to Conda: transitive req. by multiple packages
+opentelemetry-api = "~=1.39.1" # Forced to Conda: transitive req. by multiple packages
+opentelemetry-sdk = "~=1.39.1" # Forced to Conda: transitive req. by multiple packages
+httpx-sse = "~=0.4.3" # Forced to Conda: transitive req. by multiple packages
+
+# --- IBM Integration ---
+ibm_cos_sdk_core = "2.14.3.*" # Transitive: required by langchain-ibm
+ibm_cos_sdk_s3transfer = "2.14.3.*" # Transitive: required by langchain-ibm
+ibm_cos_sdk = "2.14.3.*" # Transitive: required by langchain-ibm
+
+# --- Evaluation (Giskard & related) ---
+beautifulsoup4 = "~=4.14.2" # Direct: used in eval/giskard/_raget.py
+scipy = "~=1.15.2" # Direct: used in eval/giskard/giskard_patch.py
+scikit-learn = "~=1.8.0" # Transitive: required by giskard and umap-learn
+griffe = "~=0.49.0" # Transitive: required by giskard
+langdetect = "~=1.0.9" # Transitive: required by giskard
+chardet = "~=5.2.0" # Transitive: required by giskard
+cloudpickle = "~=3.1.1" # Transitive: required by giskard
+sqlparse = "~=0.5.3" # Transitive: required by giskard
+posthog = "~=5.4.0" # Transitive: required by giskard
+mixpanel = "~=4.10.1" # Transitive: required by giskard
+shapely = "~=2.1.2" # Transitive: required by giskard
+docopt = "~=0.6.2" # Transitive: required by giskard
+bokeh = "~=3.8.1" # Optional: for giskard visualizations
+umap-learn = "~=0.5.11" # Optional: for giskard embeddings analysis
+matplotlib = "~=3.10.8" # Likely Transitive: for visualizations (e.g. giskard)
+ipython = "~=9.6.0" # Likely Transitive: for interactive features
+sqlalchemy = "~=2.0.46" # Forced to Conda: transitive req. by giskard
+sympy = "~=1.14.0" # Forced to Conda: transitive req. by giskard
+mpmath = "~=1.3.0" # Forced to Conda: transitive req. by sympy
+mlflow-skinny = "~=3.8.1" # Forced to Conda: transitive req. by giskard
+sentry-sdk = "~=2.50.0" # Forced to Conda: transitive req. by giskard
+num2words = "~=0.5.14" # Forced to Conda: transitive req. by multiple packages
+# ormsgpack = "*" # Forced to Conda: transitive req. by multiple packages (Note: missing on osx-arm64)
+
+# --- Git & Utilities ---
+gitpython = "~=3.1.44" # Transitive: used by giskard (via mlflow)
+gitdb = "~=4.0.12" # Transitive: required by gitpython
+smmap = "~=5.0.2" # Transitive: required by gitdb
+rich = "~=14.3.1" # Forced to Conda: utilities for CLI/logging
+typer = "~=0.21.1" # Forced to Conda: transitive req. by chromadb
+click = "~=8.3.1" # Forced to Conda: transitive req. by multiple packages
+python-dotenv = "~=1.2.1" # Forced to Conda: transitive req. by multiple packages
+watchfiles = "~=1.1.1" # Forced to Conda: transitive req. by multiple packages
+tabulate = "~=0.9.0" # Forced to Conda: transitive req. by multiple packages
+bcrypt = "~=5.0.0" # Forced to Conda: transitive req. by chromadb
+
+# --- Testing ---
+pytest = "*" # Tooling: testing framework
 
 
 [pypi-dependencies]
-gpt4all = "*"
-giskard = "*"
-# lomond = "==0.3.3.*"
-langchain-ibm = "==1.0.2"
-langchain-community = "==0.4.1"
-langchain = ">=1"
-langchain-classic = "*"
-langchain-chroma = "*"
-faiss-cpu = "*"
-langgraph = "*"
+# --- LLMs & Frameworks ---
+langchain = "~=1.2.6" # Ecosystem: meta-package for LangChain
+langchain-classic = "~=1.0.1" # Direct: used for AgentExecutor and legacy chains
+langchain-community = "==0.4.1" # Direct: used for various community integrations (e.g. FAISS)
+langchain-ibm = "==1.0.2" # Direct: used in models/ibm/
+langgraph = "~=1.0.6" # Direct: used for agent state machines in agents/
+gpt4all = "~=2.8.2" # Direct: used in models/gpt4all/
+
+# --- Vector Stores & Indexes ---
+faiss-cpu = "*" # Direct: used in indexes/faiss.py
+langchain-chroma = "==1.1.0" # Direct: used in indexes/chroma.py installed via pypi because conda packages don't support python 3.13
+
+# --- Evaluation ---
+giskard = "~=2.14.3" # Direct: used for model evaluation in eval/
+
+[pypi-options.dependency-overrides]
+scipy = ">=1.14.1" # overwrites giskard version bound
+numpy = ">=2.0.0"
+pandas = ">=2.3.3" # overwrites ibm version bound
 
 
 [feature.build.dependencies]

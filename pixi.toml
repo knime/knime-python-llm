@@ -4,7 +4,7 @@ platforms = ["win-64", "linux-64", "osx-64", "osx-arm64"]
 conda-pypi-map = { "knime" = "conda-pypi-map-ibm.json" }
 
 [pypi-options]
-# no-build = true
+no-build = true
 
 [tasks]
 test = { cmd = "pytest" }
@@ -50,9 +50,9 @@ beautifulsoup4 = "*"
 huggingface_hub = "*"
 openai = "*"
 pip = "*"
-# ibm_cos_sdk_core = "*"
-# ibm_cos_sdk_s3transfer = "*"
-# ibm_cos_sdk = "*"
+ibm_cos_sdk_core = "2.14.3.*"
+ibm_cos_sdk_s3transfer = "2.14.3.*"
+ibm_cos_sdk = "2.14.3.*"
 # langgraph = "*"
 pyyaml = ">=6.0.2,<7"
 # onnxruntime = "*"
@@ -65,7 +65,7 @@ pytest = "*"
 gpt4all = "*"
 giskard = "*"
 # lomond = "==0.3.3.*"
-# langchain-ibm = "==1.0.2"
+langchain-ibm = "==1.0.2"
 langchain-community = "==0.4.1"
 langchain = ">=1"
 langchain-classic = "*"

@@ -1045,9 +1045,9 @@ class OpenAIAuthenticationPortObjectSpec(AIPortObjectSpec):
     def get_model_list(self, ctx: knext.ConfigurationContext) -> list[str]:
         try:
             client = self.get_openai_client(ctx)
-            model_list = [
+            model_list = list(dict.fromkeys(
                 model.id for model in client.models.list().data if model.id is not None
-            ]
+                ))
         except Exception:
             # TODO Add warning to user once possible
             LOGGER.warning(

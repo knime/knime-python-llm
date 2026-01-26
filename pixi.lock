@@ -7992,7 +7992,7 @@ packages:
   license: GPLv3
   size: 100454
   timestamp: 1759329320424
-- conda: https://conda.anaconda.org/knime/label/nightly/noarch/knime-extension-bundling-5.9.0-202511141512.conda
+- conda: https://conda.anaconda.org/knime/label/nightly/noarch/knime-extension-bundling-5.10.0-202601261555.conda
   build_number: 0
   noarch: python
   sha256: abc31377cdbd17cf6659dcf218ed922c674b3b24110cbc953aba0dc1c4a163e3

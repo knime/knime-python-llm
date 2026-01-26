@@ -75,14 +75,9 @@ from ._parameters import (
     RecursionLimitMode,
     ErrorHandlingMode,
 )
-from ._agent import CancelError
-from ._error_handler import AgentPrompterErrorHandler
 
 import os
-import logging
-from langchain_core.messages import BaseMessage
 
-_logger = logging.getLogger(__name__)
 
 
 agent_icon = "icons/generic/agent.png"
@@ -702,6 +697,7 @@ state that the tool could not be executed due to reaching the recursion limit.""
         )
         from ._tool import ExecutionMode
         from ._agent import Agent, AgentConfig
+        from ._error_handler import AgentPrompterErrorHandler
 
         data_registry = DataRegistry.create_with_input_tables(
             input_tables, data_message_prefix=self.data_message_prefix
@@ -920,8 +916,8 @@ class AgentPrompterConversation:
 
     def append_messages(self, messages):
         """Raises a CancelError if the context was canceled."""
-        from langchain_core.messages import AIMessage
-        from ._agent import validate_ai_message
+        from langchain_core.messages import AIMessage, BaseMessage
+        from ._agent import validate_ai_message, CancelError
 
         if isinstance(messages, BaseMessage):
             messages = [messages]
@@ -964,6 +960,7 @@ class AgentPrompterConversation:
         return messages
 
     def _append(self, message_or_error):
+        from langchain_core.messages import BaseMessage
         self._message_and_errors.append(message_or_error)
         self._is_message.append(isinstance(message_or_error, BaseMessage))
 

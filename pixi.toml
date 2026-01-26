@@ -11,9 +11,9 @@ test = { cmd = "pytest" }
 [dependencies]
 # --- Framework & Runtime ---
 python = "3.13.*" # Runtime: Python 3.13
-knime-extension = "5.8.*" # Framework: KNIME Python integration
+knime-extension = "5.10.*" # Framework: KNIME Python integration
 knime-python-base = "*" # Framework: KNIME base libraries
-# knime-python-versions = "5.8.*"
+knime-python-versions = "5.10.*"
 pip = "*" # Tooling: Python package installer
 
 # --- Core Data & Validation ---
@@ -131,7 +131,7 @@ jake = "*"
 debugpy = "*"
 
 [feature.build.tasks]
-build = { args = [{ "arg" = "dest", "default" = "./local-update-site" }], cmd = "build-python-extension . {{ dest }} --render-folder ./render-dir --force"}
+build = { args = [{ "arg" = "dest", "default" = "./local-update-site" }], cmd = "build-python-extension . {{ dest }} --render-folder ./render-dir --force --disable-strict-enforcement --update-sites-version nightly"}
 
 [environments]
 build = {features = ["build"], no-default-feature = true}

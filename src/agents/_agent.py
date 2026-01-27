@@ -141,7 +141,7 @@ class Agent:
 
     def run(self):
         """Run the agent's turn in the conversation."""
-        for _ in range(self._config.iteration_limit):
+        for _ in range(self._config.iteration_limit + 1):
             try:
                 response = self._agent.invoke(self._conversation.get_messages())
             except Exception as error:

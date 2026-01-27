@@ -59,7 +59,7 @@ import threading
 import knime.extension as knext
 from langchain_core.messages.human import HumanMessage
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from .base import AgentPrompterConversation
@@ -72,8 +72,7 @@ class AgentChatWidgetConfig:
     recursion_limit_handling: str
     show_tool_calls_and_results: bool
     reexecution_trigger: str
-    has_error_column: bool
-    error_column_name: str
+    error_column_name: Optional[str]
 
 
 class AgentChatWidgetDataService:
@@ -159,14 +158,10 @@ class AgentChatWidgetDataService:
 
     # called by java, not the frontend
     def get_view_data(self):
-        error_column_name = (
-            self._widget_config.error_column_name
-            if self._widget_config.has_error_column
-            else None
-        )
+        
         conversation_table = self._conversation.create_output_table(
             self._widget_config.conversation_column_name,
-            error_column_name,
+            self._widget_config.error_column_name,
         )
 
         meta_data, tables = self._data_registry.dump()

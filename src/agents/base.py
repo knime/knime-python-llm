@@ -1378,8 +1378,7 @@ class AgentChatWidget:
             self.recursion_limit_handling,
             self.show_tool_calls_and_results,
             self.reexecution_trigger,
-            self.errors.has_error_column,
-            self.errors.error_column_name,
+            self.errors.error_column_name if self.errors.has_error_column else None
         )
 
         return AgentChatWidgetDataService(

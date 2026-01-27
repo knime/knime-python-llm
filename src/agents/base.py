@@ -367,7 +367,7 @@ def _iteration_limit_parameter():
         avoid getting stuck in an endless loop.
         """,
         default_value=25,
-        min_value=1,
+        min_value=0,
         is_advanced=True,
     )
 

@@ -47,13 +47,7 @@ from typing import Optional
 import knime.extension as knext
 import util
 
-from ._data import DataRegistry
-from ._tool import LangchainToolConverter
-from ._agent import (
-    validate_ai_message,
-    ITERATION_CONTINUE_PROMPT,
-    LANGGRAPH_RECURSION_MESSAGE,
-)
+
 from ._parameters import (
     iteration_limit_mode_param_for_view,
     IterationLimitModeForView,
@@ -61,9 +55,6 @@ from ._parameters import (
 import yaml
 import queue
 import threading
-
-from langchain_core.messages.human import HumanMessage
-from langchain_core.messages.ai import AIMessage
 
 
 from models.base import (
@@ -359,12 +350,12 @@ class AgentChatViewDataService:
     def __init__(
         self,
         agent_graph,
-        data_registry: DataRegistry,
+        data_registry,
         initial_message: str,
         recursion_limit: int,
         recursion_limit_handling: str,
         show_tool_calls_and_results: bool,
-        tool_converter: LangchainToolConverter,
+        tool_converter,
     ):
         self._agent_graph = agent_graph
         self._data_registry = data_registry
@@ -444,6 +435,11 @@ class AgentChatViewDataService:
 
     def _post_user_message(self, user_message: str):
         from langgraph.errors import GraphRecursionError
+        from langchain_core.messages import HumanMessage, AIMessage
+        from ._agent import (
+            validate_ai_message,
+            LANGGRAPH_RECURSION_MESSAGE,
+        )
 
         try:
             state_stream = self._agent_graph.stream(
@@ -543,6 +539,8 @@ class AgentChatViewDataService:
         }
 
     def _handle_recursion_limit_error(self):
+        from ._agent import ITERATION_CONTINUE_PROMPT
+
         if self._recursion_limit_handling == IterationLimitModeForView.CONFIRM.name:
             message = {
                 "type": "ai",

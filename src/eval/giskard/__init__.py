@@ -45,6 +45,9 @@
 
 import os
 
+# AP-25545: Monkey-patch scipy.stats.stats to fix Giskard import error with newer scipy versions
+from . import giskard_patch
+
 # on some systems anyio.abc has issues
 os.environ["GSK_DISABLE_SENTRY"] = "True"
 # mlflow logging causes stack overflow in combination ""with the knime python framework

@@ -202,43 +202,39 @@ class LocalChromaVectorstorePortObject(
         from langchain_chroma import Chroma
 
         vectorstore: Chroma = vectorstore
-        if (
-            vectorstore._persist_directory is None
-            or not vectorstore._persist_directory == vectorstore_folder
-        ):
-            # HACK because Chroma doesn't allow to add or change a persist directory after the fact
-            import chromadb
-            import chromadb.config
+        # HACK because Chroma doesn't provide information about where it stores the vector store
+        import chromadb
+        import chromadb.config
 
-            settings = chromadb.config.Settings(
-                is_persistent=True, persist_directory=vectorstore_folder
-            )
-            existing_collection = vectorstore._collection
-            client = chromadb.Client(settings)
-            new_collection = client.get_or_create_collection(
-                name=existing_collection.name,
-                metadata=existing_collection.metadata,
-                embedding_function=existing_collection._embedding_function,
-            )
-            existing_entries = existing_collection.get(
-                include=["embeddings", "documents", "metadatas"]
-            )
-            if "data" in existing_entries.keys():
-                del existing_entries["data"]
-            if "included" in existing_entries.keys():
-                del existing_entries["included"]
+        settings = chromadb.config.Settings(
+            is_persistent=True, persist_directory=vectorstore_folder
+        )
+        existing_collection = vectorstore._collection
+        client = chromadb.Client(settings)
+        new_collection = client.get_or_create_collection(
+            name=existing_collection.name,
+            metadata=existing_collection.metadata,
+            embedding_function=existing_collection._embedding_function,
+        )
+        existing_entries = existing_collection.get(
+            include=["embeddings", "documents", "metadatas"]
+        )
+        if "data" in existing_entries.keys():
+            del existing_entries["data"]
+        if "included" in existing_entries.keys():
+            del existing_entries["included"]
 
-            try:
-                new_collection.add(**existing_entries)
-            except ValueError:  # Collection.add raises an Error for empty lists
-                raise knext.InvalidParametersError("The vector store is empty.")
-            vectorstore = Chroma(
-                embedding_function=vectorstore._embedding_function,
-                persist_directory=vectorstore_folder,
-                client_settings=settings,
-                collection_metadata=existing_collection.metadata,
-                client=client,
-            )
+        try:
+            new_collection.add(**existing_entries)
+        except ValueError:  # Collection.add raises an Error for empty lists
+            raise knext.InvalidParametersError("The vector store is empty.")
+        vectorstore = Chroma(
+            embedding_function=vectorstore._embedding_function,
+            persist_directory=vectorstore_folder,
+            client_settings=settings,
+            collection_metadata=existing_collection.metadata,
+            client=client,
+        )
 
     def load_vectorstore(self, embeddings, vectorstore_path, ctx):
         from langchain_chroma import Chroma

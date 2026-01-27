@@ -104,7 +104,7 @@ class OpenAiFunctionsAgentPortObject(AgentPortObject):
     def create_agent(self, ctx, tools):
         from langchain_core.prompts import MessagesPlaceholder
         from langchain_core.prompts import ChatPromptTemplate
-        from langchain.agents import create_openai_functions_agent
+        from langchain_classic.agents import create_openai_functions_agent
 
         llm = self.llm.create_model(ctx, OutputFormatOptions.Text)
         tools = self.validate_tools(tools)

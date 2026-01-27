@@ -48,10 +48,10 @@ from ._agent import (
     CancelError,
     IterationLimitError,
     validate_ai_message,
-    RECURSION_CONTINUE_PROMPT,
+    ITERATION_CONTINUE_PROMPT,
     Agent,
 )
-from ._parameters import RecursionLimitModeForView
+from ._parameters import IterationLimitModeForView
 from dataclasses import dataclass
 import yaml
 import queue
@@ -69,7 +69,7 @@ if TYPE_CHECKING:
 class AgentChatWidgetConfig:
     initial_message: str
     conversation_column_name: str
-    recursion_limit_handling: str
+    iteration_limit_handling: str
     show_tool_calls_and_results: bool
     reexecution_trigger: str
     error_column_name: Optional[str]
@@ -189,22 +189,22 @@ class AgentChatWidgetDataService:
         except CancelError as e:
             raise e
         except IterationLimitError:
-            self._handle_recursion_limit_error()
+            self._handle_iteration_limit_error()
         except Exception as e:
             self._conversation.append_error(e)
 
-    def _handle_recursion_limit_error(self):
+    def _handle_iteration_limit_error(self):
         from langchain_core.messages import AIMessage
 
         if (
-            self._widget_config.recursion_limit_handling
-            == RecursionLimitModeForView.CONFIRM.name
+            self._widget_config.iteration_limit_handling
+            == IterationLimitModeForView.CONFIRM.name
         ):
-            messages = [AIMessage(RECURSION_CONTINUE_PROMPT)]
+            messages = [AIMessage(ITERATION_CONTINUE_PROMPT)]
             self._conversation._append_messages(messages)
         else:
             content = (
-                f"Recursion limit of {self._agent_config.iteration_limit} reached."
+                f"Iteration limit of {self._agent_config.iteration_limit} reached."
             )
             self._conversation.append_error(Exception(content))
 

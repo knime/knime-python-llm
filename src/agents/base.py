@@ -71,8 +71,8 @@ from knime.extension.nodes import (
 )
 from base import AIPortObjectSpec
 from ._parameters import (
-    recursion_limit_mode_param_for_view,
-    RecursionLimitMode,
+    iteration_limit_mode_param_for_view,
+    IterationLimitMode,
     ErrorHandlingMode,
 )
 
@@ -359,11 +359,11 @@ ability to solve the problem and think insightfully.""",
     )
 
 
-def _recursion_limit_parameter():
+def _iteration_limit_parameter():
     return knext.IntParameter(
-        "Recursion limit",
+        "Iteration limit",
         """
-        The maximum number of times the agent can repeat its steps to
+        Limits the maximum number of steps the agent can take to
         avoid getting stuck in an endless loop.
         """,
         default_value=25,
@@ -574,33 +574,33 @@ class AgentPrompter2:
         default_value="Conversation",
     ).rule(knext.DialogContextCondition(has_conversation_table), knext.Effect.HIDE)
 
-    recursion_limit = _recursion_limit_parameter()
+    recursion_limit = _iteration_limit_parameter()
 
     recursion_limit_handling = knext.EnumParameter(
-        "When recursion limit is reached",
-        "Specify the behavior of the agent when the recursion limit is reached.",
-        RecursionLimitMode.FAIL.name,
-        RecursionLimitMode,
+        "When iteration limit is reached",
+        "Specify the behavior of the agent when the iteration limit is reached.",
+        IterationLimitMode.FAIL.name,
+        IterationLimitMode,
         style=knext.EnumParameter.Style.VALUE_SWITCH,
         is_advanced=True,
         since_version="5.10.0",
     )
 
     recursion_limit_prompt = knext.MultilineStringParameter(
-        "Recursion limit prompt",
+        "Iteration limit prompt",
         "This message guides the chat model when generating the final response based on all previously "
         "generated messages. It can be used to specify how the LLM should behave if information is missing "
         "because the agent stopped before executing tools.",
         default_value="""Please finalize the conversation using all previous messages.
 Tools are not available in this step. 
 If essential information is missing because tool calls in the previous message were deleted,
-state that the tool could not be executed due to reaching the recursion limit.""",
+state that the tool could not be executed due to reaching the iteration limit.""",
         is_advanced=True,
         since_version="5.10.0",
     ).rule(
         knext.OneOf(
             recursion_limit_handling,
-            [RecursionLimitMode.FINAL_RESPONSE.name],
+            [IterationLimitMode.FINAL_RESPONSE.name],
         ),
         knext.Effect.SHOW,
     )
@@ -725,11 +725,11 @@ state that the tool could not be executed due to reaching the recursion limit.""
 
         error_handler = AgentPrompterErrorHandler(
             conversation=conversation,
-            recursion_limit=self.recursion_limit,
-            recursion_limit_handling=RecursionLimitMode[self.recursion_limit_handling],
+            iteration_limit=self.recursion_limit,
+            iteration_limit_handling=IterationLimitMode[self.recursion_limit_handling],
             error_handling=ErrorHandlingMode[self.errors.error_handling],
             chat_model=chat_model,
-            recursion_limit_prompt=self.recursion_limit_prompt,
+            iteration_limit_prompt=self.recursion_limit_prompt,
         )
 
         try:
@@ -1208,9 +1208,9 @@ class AgentChatWidget:
         since_version="5.6.0",
     )
 
-    recursion_limit = _recursion_limit_parameter()
+    recursion_limit = _iteration_limit_parameter()
 
-    recursion_limit_handling = recursion_limit_mode_param_for_view()
+    recursion_limit_handling = iteration_limit_mode_param_for_view()
 
     keep_failed_tools = knext.BoolParameter(
         "Keep failed tools",

@@ -46,10 +46,10 @@
 import knime_extension as knext
 
 
-class RecursionLimitMode(knext.EnumParameterOptions):
+class IterationLimitMode(knext.EnumParameterOptions):
     FAIL = (
         "Fail",
-        "Execution fails if the recursion limit is reached.",
+        "Execution fails if the iteration limit is reached.",
     )
     FINAL_RESPONSE = (
         "Final response",
@@ -71,24 +71,24 @@ class ErrorHandlingMode(knext.EnumParameterOptions):
     )
 
 
-class RecursionLimitModeForView(knext.EnumParameterOptions):
+class IterationLimitModeForView(knext.EnumParameterOptions):
     FAIL = (
         "Fail",
-        "Execution fails if the recursion limit is reached.",
+        "Execution fails if the iteration limit is reached.",
     )
     CONFIRM = (
         "Confirm",
-        "Execution is stopped if the recursion limit is reached. The user is asked whether execution should "
+        "Execution is stopped if the iteration limit is reached. The user is asked whether execution should "
         "continue.",
     )
 
 
-def recursion_limit_mode_param_for_view():
+def iteration_limit_mode_param_for_view():
     return knext.EnumParameter(
-        "If recursion limit is reached",
-        "Specify how the agent should behave when the recursion limit is reached.",
-        RecursionLimitModeForView.FAIL.name,
-        RecursionLimitModeForView,
+        "If iteration limit is reached",
+        "Specify how the agent should behave when the iteration limit is reached.",
+        IterationLimitModeForView.FAIL.name,
+        IterationLimitModeForView,
         style=knext.EnumParameter.Style.VALUE_SWITCH,
         is_advanced=True,
         since_version="5.10.0",

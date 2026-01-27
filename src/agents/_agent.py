@@ -49,8 +49,8 @@ from langchain_core.language_models.chat_models import BaseChatModel
 
 
 LANGGRAPH_RECURSION_MESSAGE = "Sorry, need more steps to process this request."
-RECURSION_CONTINUE_PROMPT = (
-    "I stopped due to reaching the recursion limit. Do you want me to continue?"
+ITERATION_CONTINUE_PROMPT = (
+    "I stopped due to reaching the iteration limit. Do you want me to continue?"
 )
 
 

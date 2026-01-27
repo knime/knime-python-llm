@@ -1192,22 +1192,26 @@ class AgentChatWidget:
         since_version="5.6.0",
     )
 
-    has_error_column = knext.BoolParameter(
-        "Output errors",
-        "If checked, the output table will contain an additional column that contains error messages. "
-        "Each row that contains an error message will have a missing value in the conversation column.",
-        default_value=False,
-        since_version="5.10.0",
-        is_advanced=True,
+    @knext.parameter_group(
+        label="Error Handling Settings", is_advanced=True, since_version="5.10.0"
     )
+    class ErrorSettings:
+        has_error_column = knext.BoolParameter(
+            "Output errors",
+            "If checked, the output table will contain an additional column that contains error messages. "
+            "Each row that contains an error message will have a missing value in the conversation column.",
+            default_value=False,
+            since_version="5.10.0",
+            is_advanced=True,
+        )
 
-    error_column_name = knext.StringParameter(
-        "Error column name",
-        "Name of the error column in the output table.",
-        default_value="Errors",
-        since_version="5.10.0",
-        is_advanced=True,
-    ).rule(knext.OneOf(has_error_column, [True]), knext.Effect.SHOW)
+        error_column_name = knext.StringParameter(
+            "Error column name",
+            "Name of the error column in the output table.",
+            default_value="Errors",
+            since_version="5.10.0",
+            is_advanced=True,
+        ).rule(knext.OneOf(has_error_column, [True]), knext.Effect.SHOW)
 
     recursion_limit = _recursion_limit_parameter()
 
@@ -1224,6 +1228,8 @@ class AgentChatWidget:
     debug = _debug_mode_parameter()
 
     data_message_prefix = _data_message_prefix_parameter()
+
+    errors = ErrorSettings()
 
     def configure(
         self,
@@ -1242,12 +1248,14 @@ class AgentChatWidget:
                 )
 
         columns = [knext.Column(_message_type(), self.conversation_column_name)]
-        if self.has_error_column:
-            if self.conversation_column_name == self.error_column_name:
+        if self.errors.has_error_column:
+            if self.conversation_column_name == self.errors.error_column_name:
                 raise knext.InvalidParametersError(
                     "The conversation and error column names must not be equal."
                 )
-            columns.append(knext.Column(knext.string(), self.error_column_name))
+            columns.append(
+                knext.Column(knext.string(), self.errors.error_column_name)
+            )
 
         return (
             None,  # combined tools workflow
@@ -1289,10 +1297,10 @@ class AgentChatWidget:
                     message_type.to_pyarrow(),
                 )
             ]
-            if self.has_error_column:
+            if self.errors.has_error_column:
                 columns.append(
                     util.OutputColumn(
-                        self.error_column_name,
+                        self.errors.error_column_name,
                         knext.string(),
                         pa.string(),
                     )
@@ -1370,8 +1378,8 @@ class AgentChatWidget:
             self.recursion_limit_handling,
             self.show_tool_calls_and_results,
             self.reexecution_trigger,
-            self.has_error_column,
-            self.error_column_name,
+            self.errors.has_error_column,
+            self.errors.error_column_name,
         )
 
         return AgentChatWidgetDataService(
@@ -1391,7 +1399,9 @@ class AgentChatWidget:
 
     def _create_conversation_history(self, view_data, data_registry, tool_converter):
         history_table = view_data["ports"][0] if view_data is not None else None
-        error_column = self.error_column_name if self.has_error_column else None
+        error_column = (
+            self.errors.error_column_name if self.errors.has_error_column else None
+        )
 
         history_events = None
         if history_table is not None:

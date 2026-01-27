@@ -1088,6 +1088,22 @@ class AgentPrompterToolset:
 
 # region Agent Chat Widget
 
+@knext.parameter_group(
+    label="Error Handling Settings", is_advanced=True, since_version="5.10.0"
+)
+class AgentChatWidgetErrorSettings:
+    has_error_column = knext.BoolParameter(
+        "Output errors",
+        "If checked, the output table will contain an additional column that contains error messages. "
+        "Each row that contains an error message will have a missing value in the conversation column.",
+        default_value=False,
+    )
+
+    error_column_name = knext.StringParameter(
+        "Error column name",
+        "Name of the error column in the output table.",
+        default_value="Errors",
+    ).rule(knext.OneOf(has_error_column, [True]), knext.Effect.SHOW)
 
 @knext.node(
     "Agent Chat Widget (experimental)",
@@ -1192,27 +1208,6 @@ class AgentChatWidget:
         since_version="5.6.0",
     )
 
-    @knext.parameter_group(
-        label="Error Handling Settings", is_advanced=True, since_version="5.10.0"
-    )
-    class ErrorSettings:
-        has_error_column = knext.BoolParameter(
-            "Output errors",
-            "If checked, the output table will contain an additional column that contains error messages. "
-            "Each row that contains an error message will have a missing value in the conversation column.",
-            default_value=False,
-            since_version="5.10.0",
-            is_advanced=True,
-        )
-
-        error_column_name = knext.StringParameter(
-            "Error column name",
-            "Name of the error column in the output table.",
-            default_value="Errors",
-            since_version="5.10.0",
-            is_advanced=True,
-        ).rule(knext.OneOf(has_error_column, [True]), knext.Effect.SHOW)
-
     recursion_limit = _recursion_limit_parameter()
 
     recursion_limit_handling = recursion_limit_mode_param_for_view()
@@ -1229,7 +1224,7 @@ class AgentChatWidget:
 
     data_message_prefix = _data_message_prefix_parameter()
 
-    errors = ErrorSettings()
+    errors = AgentChatWidgetErrorSettings()
 
     def configure(
         self,

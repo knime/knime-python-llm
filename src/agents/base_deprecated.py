@@ -51,12 +51,12 @@ from ._data import DataRegistry
 from ._tool import LangchainToolConverter
 from ._agent import (
     validate_ai_message,
-    RECURSION_CONTINUE_PROMPT,
+    ITERATION_CONTINUE_PROMPT,
     LANGGRAPH_RECURSION_MESSAGE,
 )
 from ._parameters import (
-    recursion_limit_mode_param_for_view,
-    RecursionLimitModeForView,
+    iteration_limit_mode_param_for_view,
+    IterationLimitModeForView,
 )
 import yaml
 import queue
@@ -275,7 +275,7 @@ class AgentChatView:
 
     recursion_limit = _recursion_limit_parameter()
 
-    recursion_limit_handling = recursion_limit_mode_param_for_view()
+    recursion_limit_handling = iteration_limit_mode_param_for_view()
 
     debug = _debug_mode_parameter()
 
@@ -543,13 +543,13 @@ class AgentChatViewDataService:
         }
 
     def _handle_recursion_limit_error(self):
-        if self._recursion_limit_handling == RecursionLimitModeForView.CONFIRM.name:
+        if self._recursion_limit_handling == IterationLimitModeForView.CONFIRM.name:
             message = {
                 "type": "ai",
-                "content": RECURSION_CONTINUE_PROMPT,
+                "content": ITERATION_CONTINUE_PROMPT,
             }
             self._message_queue.put(message)
-            self._append_ai_message_to_memory(RECURSION_CONTINUE_PROMPT)
+            self._append_ai_message_to_memory(ITERATION_CONTINUE_PROMPT)
         else:
             content = f"Recursion limit of {self._recursion_limit} reached."
             error_message = {

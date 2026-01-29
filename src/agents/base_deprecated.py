@@ -130,9 +130,9 @@ def _has_tools_table(ctx: knext.DialogCreationContext):
 
 def _recursion_limit_parameter():
     return knext.IntParameter(
-        "Recursion limit",
+        "Iteration limit",
         """
-        The maximum number of times the agent can repeat its steps to
+        Limits the maximum number of steps the agent can take to
         avoid getting stuck in an endless loop.
         """,
         default_value=25,

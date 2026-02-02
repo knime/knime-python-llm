@@ -112,38 +112,32 @@ class IBMwatsonxAuthenticationPortObjectSpec(AIPortObjectSpec):
                 "Could not authenticate with the IBM watsonx.ai API."
             ) from e
 
+        # Also validate that the project/space name exists
+        # This will raise InvalidParametersError if not found
+        self._map_names_to_ids(ctx)
+
     def model_supports_tools(
         self, model: str, ctx: knext.ConfigurationContext | knext.ExecutionContext
     ) -> bool:
         """
         Check if the model supports tools.
-        This is a placeholder implementation and should be overridden by subclasses.
+
+        Note: This is a best-effort check. The watsonx.ai API doesn't have a direct
+        endpoint for this, so we check model capabilities where available.
         """
+        client = self._get_client(ctx)
+        tool_models = client.list_function_calling_models()
+        return model in tool_models
 
-        api_client = self._get_api_client(ctx)
-
-        chat_models = (
-            api_client.foundation_models.get_chat_function_calling_model_specs()
-        )
-
-        return any(
-            chat_model["model_id"] == model for chat_model in chat_models["resources"]
-        )
-
-    def _get_api_client(self, ctx: knext.ConfigurationContext | knext.ExecutionContext):
-        from ibm_watsonx_ai import APIClient
-        from ibm_watsonx_ai import Credentials
+    def _get_client(self, ctx: knext.ConfigurationContext | knext.ExecutionContext):
+        """Get a WatsonxClient instance for making API calls."""
+        from ._client import WatsonxClient
 
         api_key = ctx.get_credentials(self.credentials).password
-        base_url = self.base_url
-
-        credentials = Credentials(
-            url=base_url,
+        return WatsonxClient(
             api_key=api_key,
+            base_url=self.base_url,
         )
-
-        api_client = APIClient(credentials)
-        return api_client
 
     def get_chat_model_list(
         self,
@@ -152,12 +146,8 @@ class IBMwatsonxAuthenticationPortObjectSpec(AIPortObjectSpec):
         """
         Get the list of available chat models from the IBM watsonx.ai API.
         """
-
-        api_client = self._get_api_client(ctx)
-
-        chat_models = api_client.foundation_models.get_chat_model_specs()
-
-        return [model["model_id"] for model in chat_models["resources"]]
+        client = self._get_client(ctx)
+        return client.list_chat_models()
 
     def get_embedding_model_list(
         self,
@@ -166,12 +156,8 @@ class IBMwatsonxAuthenticationPortObjectSpec(AIPortObjectSpec):
         """
         Get the list of available embedding models from the IBM watsonx.ai API.
         """
-
-        api_client = self._get_api_client(ctx)
-
-        embedding_models = api_client.foundation_models.get_embeddings_model_specs()
-
-        return [model["model_id"] for model in embedding_models["resources"]]
+        client = self._get_client(ctx)
+        return client.list_embedding_models()
 
     def _map_names_to_ids(
         self,
@@ -181,22 +167,19 @@ class IBMwatsonxAuthenticationPortObjectSpec(AIPortObjectSpec):
         Get the ID for the given name from the list of available projects or spaces.
         The list of available projects or spaces is retrieved from the IBM watsonx.ai API.
         """
-
-        api_client = self._get_api_client(ctx)
+        client = self._get_client(ctx)
 
         name = self.project_or_space.name
         type = self.project_or_space.type
 
-        items = (
-            api_client.projects.list()
-            if type == ProjectOrSpaceSelection.PROJECT.name
-            else api_client.spaces.list()
-        )
+        if type == ProjectOrSpaceSelection.PROJECT.name:
+            item_id = client.get_project_id_by_name(name)
+        else:
+            item_id = client.get_space_id_by_name(name)
 
-        for item_name, item_id in zip(items["NAME"], items["ID"]):
-            if item_name == name:
-                # found the name, return the ID
-                return item_id
+        if item_id is not None:
+            return item_id
+
         # if the name is not found, raise an error
         raise knext.InvalidParametersError(
             f"'{name}' was not found in the list of available projects or spaces. "

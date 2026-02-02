@@ -145,7 +145,7 @@ class IBMwatsonxChatModelPortObject(ChatModelPortObject):
     def create_model(
         self, ctx: knext.ExecutionContext, output_format: OutputFormatOptions
     ):
-        from langchain_ibm import ChatWatsonx
+        from ._langchain_chat import ChatWatsonx
 
         # Retrieve the name-id map for projects or spaces
         # The map is used to convert the selected name to the corresponding ID

@@ -191,6 +191,99 @@ class TestDynamicAuth(unittest.TestCase):
         self.assertEqual(result.headers["X-API-Key"], "my_api_key")
         self.assertNotIn("Authorization", result.headers)
 
+    def test_headers_to_remove_removes_conflicting_headers(self):
+        """headers_to_remove should remove specified headers before setting auth."""
+        provider = StaticTokenProvider("real_token")
+        auth = DynamicAuth(
+            provider,
+            header_name="Authorization",
+            use_auth_schema=True,
+            headers_to_remove=["api-key", "X-Old-Auth"],
+        )
+
+        # Create request with pre-existing headers (simulating SDK behavior)
+        request = httpx.Request(
+            "GET",
+            "https://example.com/api",
+            headers={
+                "api-key": "placeholder",
+                "X-Old-Auth": "old_value",
+                "Content-Type": "application/json",
+            },
+        )
+        flow = auth.sync_auth_flow(request)
+        result = next(flow)
+
+        # Conflicting headers should be removed
+        self.assertNotIn("api-key", result.headers)
+        self.assertNotIn("X-Old-Auth", result.headers)
+        # Auth header should be set correctly
+        self.assertEqual(result.headers["Authorization"], "Bearer real_token")
+        # Unrelated headers should remain
+        self.assertEqual(result.headers["Content-Type"], "application/json")
+
+    def test_headers_to_remove_handles_missing_headers(self):
+        """headers_to_remove should not fail if headers don't exist."""
+        provider = StaticTokenProvider("token")
+        auth = DynamicAuth(
+            provider,
+            header_name="api-key",
+            use_auth_schema=False,
+            headers_to_remove=["api-key", "Authorization"],
+        )
+
+        # Request without the headers to remove
+        request = httpx.Request("GET", "https://example.com/api")
+        flow = auth.sync_auth_flow(request)
+        result = next(flow)
+
+        self.assertEqual(result.headers["api-key"], "token")
+        self.assertNotIn("Authorization", result.headers)
+
+    def test_azure_api_key_mode_removes_placeholder_and_sets_api_key(self):
+        """Azure API key mode should remove placeholder and set api-key header."""
+        provider = StaticTokenProvider("real_api_key")
+        auth = DynamicAuth(
+            provider,
+            header_name="api-key",
+            use_auth_schema=False,
+            headers_to_remove=["api-key", "Authorization"],
+        )
+
+        # Simulate SDK adding placeholder api-key header
+        request = httpx.Request(
+            "GET",
+            "https://myresource.openai.azure.com/openai/deployments/gpt-4",
+            headers={"api-key": "placeholder"},
+        )
+        flow = auth.sync_auth_flow(request)
+        result = next(flow)
+
+        self.assertEqual(result.headers["api-key"], "real_api_key")
+        self.assertNotIn("Authorization", result.headers)
+
+    def test_azure_entra_mode_removes_placeholder_and_sets_bearer(self):
+        """Azure Entra mode should remove placeholder and set Authorization header."""
+        provider = CountingTokenProvider(auth_schema="Bearer")
+        auth = DynamicAuth(
+            provider,
+            header_name="Authorization",
+            use_auth_schema=True,
+            headers_to_remove=["api-key", "Authorization"],
+        )
+
+        # Simulate SDK adding placeholder api-key header
+        request = httpx.Request(
+            "GET",
+            "https://myresource.openai.azure.com/openai/deployments/gpt-4",
+            headers={"api-key": "placeholder"},
+        )
+        flow = auth.sync_auth_flow(request)
+        result = next(flow)
+
+        self.assertNotIn("api-key", result.headers)
+        self.assertEqual(result.headers["Authorization"], "Bearer token_1")
+
 
 class TestHttpClientCreation(unittest.TestCase):
     """Tests for HTTP client factory functions."""
@@ -210,6 +303,130 @@ class TestHttpClientCreation(unittest.TestCase):
 
         self.assertIsInstance(client, httpx.AsyncClient)
         self.assertIsInstance(client.auth, DynamicAuth)
+
+
+class TestAzureHttpClientCreation(unittest.TestCase):
+    """Tests for Azure-specific HTTP client creation using headers_to_remove."""
+
+    # Azure uses mutually exclusive auth headers
+    AZURE_HEADERS_TO_REMOVE = ["api-key", "Authorization"]
+
+    def test_create_http_client_azure_api_key_mode(self):
+        """Azure client in API key mode should use api-key header."""
+        provider = StaticTokenProvider("my_azure_key")
+        client = create_http_client(
+            provider,
+            header_name="api-key",
+            use_auth_schema=False,
+            headers_to_remove=self.AZURE_HEADERS_TO_REMOVE,
+        )
+
+        self.assertIsInstance(client, httpx.Client)
+        self.assertIsInstance(client.auth, DynamicAuth)
+
+        # Verify the auth is configured correctly
+        auth: DynamicAuth = client.auth
+        self.assertEqual(auth._header_name, "api-key")
+        self.assertFalse(auth._use_auth_schema)
+        self.assertIn("api-key", auth._headers_to_remove)
+        self.assertIn("Authorization", auth._headers_to_remove)
+
+    def test_create_http_client_azure_entra_mode(self):
+        """Azure client in Entra mode should use Authorization header."""
+        provider = CountingTokenProvider()
+        client = create_http_client(
+            provider,
+            header_name="Authorization",
+            use_auth_schema=True,
+            headers_to_remove=self.AZURE_HEADERS_TO_REMOVE,
+        )
+
+        self.assertIsInstance(client, httpx.Client)
+        self.assertIsInstance(client.auth, DynamicAuth)
+
+        # Verify the auth is configured correctly
+        auth: DynamicAuth = client.auth
+        self.assertEqual(auth._header_name, "Authorization")
+        self.assertTrue(auth._use_auth_schema)
+        self.assertIn("api-key", auth._headers_to_remove)
+        self.assertIn("Authorization", auth._headers_to_remove)
+
+    def test_create_async_http_client_azure_api_key_mode(self):
+        """Azure async client in API key mode should use api-key header."""
+        provider = StaticTokenProvider("my_azure_key")
+        client = create_async_http_client(
+            provider,
+            header_name="api-key",
+            use_auth_schema=False,
+            headers_to_remove=self.AZURE_HEADERS_TO_REMOVE,
+        )
+
+        self.assertIsInstance(client, httpx.AsyncClient)
+        self.assertIsInstance(client.auth, DynamicAuth)
+        self.assertEqual(client.auth._header_name, "api-key")
+
+    def test_create_async_http_client_azure_entra_mode(self):
+        """Azure async client in Entra mode should use Authorization header."""
+        provider = CountingTokenProvider()
+        client = create_async_http_client(
+            provider,
+            header_name="Authorization",
+            use_auth_schema=True,
+            headers_to_remove=self.AZURE_HEADERS_TO_REMOVE,
+        )
+
+        self.assertIsInstance(client, httpx.AsyncClient)
+        self.assertIsInstance(client.auth, DynamicAuth)
+        self.assertEqual(client.auth._header_name, "Authorization")
+
+    def test_azure_api_key_mode_request_flow(self):
+        """End-to-end test: API key mode should set api-key header correctly."""
+        provider = StaticTokenProvider("real_azure_api_key")
+        client = create_http_client(
+            provider,
+            header_name="api-key",
+            use_auth_schema=False,
+            headers_to_remove=self.AZURE_HEADERS_TO_REMOVE,
+        )
+
+        # Simulate a request with placeholder header (as SDK would set)
+        request = httpx.Request(
+            "POST",
+            "https://myresource.openai.azure.com/openai/deployments/gpt-4/chat/completions",
+            headers={"api-key": "placeholder"},
+        )
+
+        flow = client.auth.sync_auth_flow(request)
+        result = next(flow)
+
+        # Should have real key, not placeholder
+        self.assertEqual(result.headers["api-key"], "real_azure_api_key")
+        self.assertNotIn("Authorization", result.headers)
+
+    def test_azure_entra_mode_request_flow(self):
+        """End-to-end test: Entra mode should set Authorization header correctly."""
+        mock_spec = MockCredentialPortSpec()
+        provider = CredentialPortTokenProvider(mock_spec)
+        client = create_http_client(
+            provider,
+            header_name="Authorization",
+            use_auth_schema=True,
+            headers_to_remove=self.AZURE_HEADERS_TO_REMOVE,
+        )
+
+        # Simulate a request with placeholder header (as SDK would set)
+        request = httpx.Request(
+            "POST",
+            "https://myresource.openai.azure.com/openai/deployments/gpt-4/chat/completions",
+            headers={"api-key": "placeholder"},
+        )
+
+        flow = client.auth.sync_auth_flow(request)
+        result = next(flow)
+
+        # Should have Bearer token, placeholder api-key should be removed
+        self.assertNotIn("api-key", result.headers)
+        self.assertEqual(result.headers["Authorization"], "Bearer jwt_token_1")
 
 
 class TestIntegrationWithMockCredentialSpec(unittest.TestCase):

@@ -51,7 +51,7 @@ expiring JWT tokens.
 """
 
 from abc import ABC, abstractmethod
-from typing import AsyncGenerator, Generator
+from typing import AsyncGenerator, Generator, List, Optional
 import httpx
 
 
@@ -144,6 +144,7 @@ class DynamicAuth(httpx.Auth):
         token_provider: TokenProvider,
         header_name: str = "Authorization",
         use_auth_schema: bool = True,
+        headers_to_remove: Optional[List[str]] = None,
     ):
         """Initialize the dynamic auth handler.
 
@@ -152,10 +153,14 @@ class DynamicAuth(httpx.Auth):
             header_name: HTTP header name for the auth token (default: 'Authorization').
             use_auth_schema: If True and header_name is 'Authorization', format as
                 '{schema} {token}'. If False, use token directly (default: True).
+            headers_to_remove: List of header names to remove before setting auth header.
+                This is useful for Azure OpenAI where we need to remove any placeholder
+                'api-key' headers set by the SDK before adding our auth header.
         """
         self._token_provider = token_provider
         self._header_name = header_name
         self._use_auth_schema = use_auth_schema
+        self._headers_to_remove = headers_to_remove or []
 
     def _get_header_value(self) -> str:
         """Get the formatted header value with a fresh token."""
@@ -164,18 +169,29 @@ class DynamicAuth(httpx.Auth):
             return f"{self._token_provider.auth_schema} {token}"
         return token
 
+    def _apply_auth(self, request: httpx.Request) -> None:
+        """Apply authentication to the request, removing conflicting headers first."""
+        # Remove any headers that might conflict (e.g., placeholder api-key from SDK)
+        for header in self._headers_to_remove:
+            if header in request.headers:
+                del request.headers[header]
+
+        # Set the auth header
+        header_value = self._get_header_value()
+        request.headers[self._header_name] = header_value
+
     def sync_auth_flow(
         self, request: httpx.Request
     ) -> Generator[httpx.Request, httpx.Response, None]:
         """Sync auth flow that adds fresh credentials to each request."""
-        request.headers[self._header_name] = self._get_header_value()
+        self._apply_auth(request)
         yield request
 
     async def async_auth_flow(
         self, request: httpx.Request
     ) -> AsyncGenerator[httpx.Request, httpx.Response]:
         """Async auth flow that adds fresh credentials to each request."""
-        request.headers[self._header_name] = self._get_header_value()
+        self._apply_auth(request)
         yield request
 
 
@@ -183,6 +199,7 @@ def create_http_client(
     token_provider: TokenProvider,
     header_name: str = "Authorization",
     use_auth_schema: bool = True,
+    headers_to_remove: Optional[List[str]] = None,
     **kwargs,
 ) -> httpx.Client:
     """Create a sync httpx client with dynamic authentication.
@@ -191,12 +208,14 @@ def create_http_client(
         token_provider: Provider that supplies fresh tokens on each request.
         header_name: HTTP header name for the auth token (default: 'Authorization').
         use_auth_schema: If True, format Authorization header as '{schema} {token}'.
+        headers_to_remove: List of header names to remove before setting auth header.
+            Useful for Azure OpenAI where placeholder headers need to be removed.
         **kwargs: Additional arguments passed to httpx.Client.
 
     Returns:
         An httpx.Client configured with dynamic authentication.
     """
-    auth = DynamicAuth(token_provider, header_name, use_auth_schema)
+    auth = DynamicAuth(token_provider, header_name, use_auth_schema, headers_to_remove)
     return httpx.Client(auth=auth, **kwargs)
 
 
@@ -204,6 +223,7 @@ def create_async_http_client(
     token_provider: TokenProvider,
     header_name: str = "Authorization",
     use_auth_schema: bool = True,
+    headers_to_remove: Optional[List[str]] = None,
     **kwargs,
 ) -> httpx.AsyncClient:
     """Create an async httpx client with dynamic authentication.
@@ -212,10 +232,12 @@ def create_async_http_client(
         token_provider: Provider that supplies fresh tokens on each request.
         header_name: HTTP header name for the auth token (default: 'Authorization').
         use_auth_schema: If True, format Authorization header as '{schema} {token}'.
+        headers_to_remove: List of header names to remove before setting auth header.
+            Useful for Azure OpenAI where placeholder headers need to be removed.
         **kwargs: Additional arguments passed to httpx.AsyncClient.
 
     Returns:
         An httpx.AsyncClient configured with dynamic authentication.
     """
-    auth = DynamicAuth(token_provider, header_name, use_auth_schema)
+    auth = DynamicAuth(token_provider, header_name, use_auth_schema, headers_to_remove)
     return httpx.AsyncClient(auth=auth, **kwargs)

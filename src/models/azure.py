@@ -228,8 +228,8 @@ def _create_instruct_model(
         top_p=po_instance.spec.top_p,
         max_tokens=po_instance.spec.max_tokens,
         seed=po_instance.spec.seed,
-        http_client=auth_spec.get_http_client(ctx),
-        http_async_client=auth_spec.get_async_http_client(ctx),
+        http_client=auth_spec.get_azure_http_client(ctx),
+        http_async_client=auth_spec.get_azure_async_http_client(ctx),
     )
 
 
@@ -270,8 +270,8 @@ def _create_model(
         else po_instance.spec.max_tokens,
         model_kwargs=model_kwargs,
         seed=po_instance.spec.seed,
-        http_client=auth_spec.get_http_client(ctx),
-        http_async_client=auth_spec.get_async_http_client(ctx),
+        http_client=auth_spec.get_azure_http_client(ctx),
+        http_async_client=auth_spec.get_azure_async_http_client(ctx),
     )
 
 
@@ -371,8 +371,8 @@ class AzureOpenAIEmbeddingsPortObject(OpenAIEmbeddingsPortObject):
             openai_api_type=self.spec.api_type,
             deployment=self.spec.model,
             chunk_size=16,  # Azure only supports 16 docs per request
-            http_client=auth_spec.get_http_client(ctx),
-            http_async_client=auth_spec.get_async_http_client(ctx),
+            http_client=auth_spec.get_azure_http_client(ctx),
+            http_async_client=auth_spec.get_azure_async_http_client(ctx),
         )
 
 

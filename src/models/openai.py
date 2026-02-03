@@ -965,6 +965,61 @@ class OpenAIAuthenticationPortObjectSpec(AIPortObjectSpec):
 
         return create_async_http_client(self._get_token_provider(ctx))
 
+    def get_azure_http_client(self, ctx: knext.ConfigurationContext):
+        """Get an httpx.Client with Azure OpenAI-specific authentication.
+
+        Azure OpenAI requires different auth headers depending on auth mode:
+        - API key mode (static credentials): uses 'api-key' header
+        - Entra/OAuth mode (credential port): uses 'Authorization: Bearer' header
+
+        This method ensures the correct header is used and removes any conflicting
+        placeholder headers that the SDK may have set.
+        """
+        from ._credential_auth import create_http_client
+
+        # Azure uses mutually exclusive auth headers - remove both before setting one
+        headers_to_remove = ["api-key", "Authorization"]
+        is_api_key_mode = self._credential_spec is None
+
+        if is_api_key_mode:
+            LOGGER.debug("Creating Azure HTTP client in API key mode")
+            return create_http_client(
+                self._get_token_provider(ctx),
+                header_name="api-key",
+                use_auth_schema=False,
+                headers_to_remove=headers_to_remove,
+            )
+        else:
+            LOGGER.debug("Creating Azure HTTP client in Entra/OAuth mode")
+            return create_http_client(
+                self._get_token_provider(ctx),
+                header_name="Authorization",
+                use_auth_schema=True,
+                headers_to_remove=headers_to_remove,
+            )
+
+    def get_azure_async_http_client(self, ctx: knext.ConfigurationContext):
+        """Get an httpx.AsyncClient with Azure OpenAI-specific authentication."""
+        from ._credential_auth import create_async_http_client
+
+        headers_to_remove = ["api-key", "Authorization"]
+        is_api_key_mode = self._credential_spec is None
+
+        if is_api_key_mode:
+            return create_async_http_client(
+                self._get_token_provider(ctx),
+                header_name="api-key",
+                use_auth_schema=False,
+                headers_to_remove=headers_to_remove,
+            )
+        else:
+            return create_async_http_client(
+                self._get_token_provider(ctx),
+                header_name="Authorization",
+                use_auth_schema=True,
+                headers_to_remove=headers_to_remove,
+            )
+
     def get_openai_client(self, ctx: knext.ConfigurationContext):
         from openai import Client as OpenAIClient
 

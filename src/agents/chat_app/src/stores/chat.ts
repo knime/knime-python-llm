@@ -364,8 +364,8 @@ export const useChatStore = defineStore("chat", () => {
       await jsonDataService.value?.data({
         method: "cancel_agent",
       });
-      return;
     } catch (error) {
+      isInterrupted.value = false;
       consola.error("Chat Store: Failed to cancel agent:", error);
       throw error;
     }

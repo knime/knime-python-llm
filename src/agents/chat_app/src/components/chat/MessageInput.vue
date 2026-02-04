@@ -14,8 +14,7 @@ const { textarea, input } = useTextareaAutosize();
 const characterLimit = 5000;
 
 const isInputValid = computed(() => input.value?.trim().length > 0);
-const isDisabled = computed(() => (!isInputValid.value && !chatStore.isLoading) || chatStore.isInterrupted);
-const isProcessing = computed(() => chatStore.isLoading);
+const isDisabled = computed(() => chatStore.isInterrupted || (!isInputValid.value && !chatStore.isLoading));
 
 
 const handleClick = (event: MouseEvent) => {
@@ -25,7 +24,7 @@ const handleClick = (event: MouseEvent) => {
 };
 
 const handleSubmit = () => {
-  if (isProcessing.value) {
+  if (chatStore.isLoading) {
     chatStore.cancelAgent();
   } else {
     chatStore.sendUserMessage(input.value);
@@ -35,7 +34,7 @@ const handleSubmit = () => {
 
 const handleKeyDown = (event: KeyboardEvent) => {
   // enter: send message
-  if (event.key === "Enter" && !isProcessing.value && !event.shiftKey && !isDisabled.value) {
+  if (event.key === "Enter" && !chatStore.isLoading && !event.shiftKey && !isDisabled.value) {
     event.preventDefault();
     handleSubmit();
   }
@@ -68,7 +67,7 @@ const handleKeyDown = (event: KeyboardEvent) => {
       @click="handleSubmit"
     >
       <AbortIcon
-        v-if="isProcessing"
+        v-if="chatStore.isLoading"
         class="abort-icon"
         aria-hidden="true"
         focusable="false"
@@ -120,7 +119,8 @@ const handleKeyDown = (event: KeyboardEvent) => {
     & svg {
       stroke: var(--knime-dove-gray);
 
-      & .send-icon .abort-icon {
+      & .send-icon, 
+      & .abort-icon {
         margin-left: -1px;
       }
     }

@@ -38,21 +38,32 @@ describe("MessageInput", () => {
     expect(textarea.element).toBe(document.activeElement);
   });
 
-  it("disables send button when empty or loading", async () => {
+  it("manages send button disabled state correctly", async () => {
     const wrapper = createWrapper();
     const chatStore = useChatStore();
     const sendButton = wrapper.find(".send-button");
 
-    // Initially empty -> disabled
+    // Initially empty and not loading -> disabled
     expect(sendButton.attributes("disabled")).toBeDefined();
 
-    // Set input value to non-empty
+    // Set store loading to true -> should be enabled even if empty (to allow aborting)
+    chatStore.isLoading = true;
+    await wrapper.vm.$nextTick();
+    expect(sendButton.attributes("disabled")).toBeUndefined();
+
+    // Set store loading to false -> disabled again
+    chatStore.isLoading = false;
+    await wrapper.vm.$nextTick();
+    expect(sendButton.attributes("disabled")).toBeDefined();
+
+    // Set input value to non-empty -> enabled
     await wrapper.find("textarea").setValue("Hello");
     await wrapper.vm.$nextTick();
     expect(sendButton.attributes("disabled")).toBeUndefined();
 
-    // Set store loading to true should disable button
+    // Set isLoading to true and isInterrupted to true -> disabled (abort in progress)
     chatStore.isLoading = true;
+    chatStore.isInterrupted = true;
     await wrapper.vm.$nextTick();
     expect(sendButton.attributes("disabled")).toBeDefined();
   });
@@ -70,20 +81,35 @@ describe("MessageInput", () => {
     expect(textarea.element.value).toBe("");
   });
 
-  it("does not call sendUserMessage when button is disabled due to loading", async () => {
+  it("calls store cancelAgent when send button is clicked while loading", async () => {
+    const wrapper = createWrapper();
+    const chatStore = useChatStore();
+    const cancelAgentSpy = vi.spyOn(chatStore, "cancelAgent").mockResolvedValue();
+
+    chatStore.isLoading = true;
+    await wrapper.vm.$nextTick();
+
+    await wrapper.find(".send-button").trigger("click");
+
+    expect(cancelAgentSpy).toHaveBeenCalled();
+  });
+
+  it("does not call handleSubmit on Enter while loading", async () => {
     const wrapper = createWrapper();
     const chatStore = useChatStore();
     const sendUserMessageSpy = vi.spyOn(chatStore, "sendUserMessage").mockResolvedValue();
-    
+    const cancelAgentSpy = vi.spyOn(chatStore, "cancelAgent").mockResolvedValue();
+
     chatStore.isLoading = true;
     await wrapper.vm.$nextTick();
-    
+
     const textarea = wrapper.find("textarea");
     await textarea.setValue("Message");
     await textarea.trigger("keydown", { key: "Enter", shiftKey: false });
 
     expect(sendUserMessageSpy).not.toHaveBeenCalled();
-    expect(textarea.element.value).toContain("Message");
+    expect(cancelAgentSpy).not.toHaveBeenCalled();
+    expect(textarea.element.value).toBe("Message");
   });
 
   it("calls store sendUserMessage and clears input on Enter key press without Shift", async () => {
@@ -125,10 +151,10 @@ describe("MessageInput", () => {
     const textarea = wrapper.find("textarea");
 
     chatStore.lastUserMessage = "Previous message";
-    
+
     // Ensure input is empty first
     await textarea.setValue("");
-    
+
     await textarea.trigger("keydown", { key: "ArrowUp" });
 
     expect(textarea.element.value).toBe("Previous message");
@@ -140,7 +166,7 @@ describe("MessageInput", () => {
     const textarea = wrapper.find("textarea");
 
     chatStore.lastUserMessage = "Previous message";
-    
+
     await textarea.setValue("Current message");
     await textarea.trigger("keydown", { key: "ArrowUp" });
 

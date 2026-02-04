@@ -71,6 +71,7 @@ describe("chat store", () => {
         config: null,
         chatItems: [],
         isLoading: false,
+        isInterrupted: false,
         lastUserMessage: "",
         jsonDataService: null,
         initState: "idle",
@@ -334,6 +335,31 @@ describe("chat store", () => {
         error,
       );
     });
+
+    it("cancelAgent sets isInterrupted and calls backend", async () => {
+      const { store } = setupStore();
+      store.jsonDataService = mockJsonDataService;
+      mockJsonDataService.data.mockResolvedValue({});
+
+      expect(store.isInterrupted).toBe(false);
+
+      await store.cancelAgent();
+
+      expect(store.isInterrupted).toBe(true);
+      expect(mockJsonDataService.data).toHaveBeenCalledWith({
+        method: "cancel_agent",
+      });
+    });
+
+    it("cancelAgent resets isInterrupted on failure", async () => {
+      const { store } = setupStore();
+      store.jsonDataService = mockJsonDataService;
+      const error = new Error("Network error");
+      mockJsonDataService.data.mockRejectedValue(error);
+
+      await expect(store.cancelAgent()).rejects.toThrow(error);
+      expect(store.isInterrupted).toBe(false);
+    });
   });
 
   describe("sendUserMessage", () => {
@@ -463,6 +489,20 @@ describe("chat store", () => {
       expect(store.isUsingTools).toBe(false);
       expect(timeline.status).toBe("completed");
       expect(timeline.label).toBe("Completed 1 tool call");
+    });
+
+    it("resets isInterrupted when loading completes with AI message", () => {
+      const { store } = setupStore();
+      store.isLoading = true;
+      store.isInterrupted = true;
+      store.initState = "ready";
+      store.config = createConfig(true);
+
+      // Receiving a final AI message should trigger finishLoading
+      store.addMessages([createAiMessage("Final response")], true);
+
+      expect(store.isLoading).toBe(false);
+      expect(store.isInterrupted).toBe(false);
     });
 
     it("handles multiple tool calls in timeline label", () => {
@@ -650,6 +690,7 @@ describe("chat store", () => {
       store.config = config;
       store.chatItems.push(userMessage);
       store.isLoading = true;
+      store.isInterrupted = true;
       store.lastUserMessage = "test";
       store.jsonDataService = mockJsonDataService;
 
@@ -660,6 +701,7 @@ describe("chat store", () => {
         config: null,
         chatItems: [],
         isLoading: false,
+        isInterrupted: false,
         isUsingTools: false,
         lastUserMessage: "",
         jsonDataService: null,

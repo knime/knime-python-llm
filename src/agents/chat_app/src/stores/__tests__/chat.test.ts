@@ -859,4 +859,54 @@ describe("chat store", () => {
       });
     });
   });
+
+  describe("terminal message handling", () => {
+    it("sets isLoading to false when a final AI message is added via addMessages", () => {
+      const { store } = setupStore();
+      store.isLoading = true;
+      store.initState = "ready";
+      store.config = createConfig();
+
+      const finalMessage = createAiMessage("This is final");
+      store.addMessages([finalMessage], true);
+
+      expect(store.isLoading).toBe(false);
+    });
+
+    it("sets isLoading to false when an error message is added via addMessages", () => {
+      const { store } = setupStore();
+      store.isLoading = true;
+      store.initState = "ready";
+      store.config = createConfig();
+
+      const errorMessage = createErrorMessage("Task failed successfully");
+      store.addMessages([errorMessage as any], true);
+
+      expect(store.isLoading).toBe(false);
+    });
+
+    it("stops polling immediately when an error message is received", async () => {
+      const { store } = setupStore();
+      const errorMessage = createErrorMessage("Backend error");
+      store.jsonDataService = mockJsonDataService;
+      store.isLoading = true;
+      store.config = createConfig();
+      store.initState = "ready";
+
+      // Mock polling: first call returns error message
+      mockJsonDataService.data.mockResolvedValueOnce([errorMessage]);
+
+      await store.pollForNewMessages();
+
+      expect(store.isLoading).toBe(false);
+      expect(store.chatItems).toContainEqual(errorMessage);
+
+      // Ensure checkIsProcessing was NOT called
+      const dataCalls = mockJsonDataService.data.mock.calls;
+      const isProcessingCalls = dataCalls.filter(
+        (call: any) => call[0].method === "is_processing",
+      );
+      expect(isProcessingCalls).toHaveLength(0);
+    });
+  });
 });

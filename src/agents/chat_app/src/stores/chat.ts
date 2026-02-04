@@ -450,7 +450,11 @@ export const useChatStore = defineStore("chat", () => {
     messagesToPersist.push(...msgs);
     lastMessage.value = msgs.at(-1);
 
-    if (isLoading.value && isAiMessageWithoutToolCalls(lastMessage.value)) {
+    const isTerminalMessage =
+      isAiMessageWithoutToolCalls(lastMessage.value) ||
+      lastMessage.value?.type === "error";
+
+    if (isLoading.value && isTerminalMessage) {
       finishLoading(initState.value !== "idle");
     }
 
@@ -458,8 +462,8 @@ export const useChatStore = defineStore("chat", () => {
     const lastMessagesToDisplay = showToolCallsResults
       ? msgs
       : msgs.filter(
-          (msg) => !isToolMessage(msg) && !isAiMessageWithToolCalls(msg),
-        );
+        (msg) => !isToolMessage(msg) && !isAiMessageWithToolCalls(msg),
+      );
     const activeTimeline = chatItems.value.findLast(
       (item) => item.type === "timeline" && item.status === "active",
     ) as Timeline | undefined;

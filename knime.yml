@@ -13,6 +13,6 @@ long_description:
   multiple vector stores and LLMs into agents that can dynamically decide which vector store to query for information given the
   user prompt.
 group_id: org.knime.python
-version: 5.3.2
+version: 5.3.0
 vendor: KNIME AG, Zurich, Switzerland
 license_file: LICENSE.txt

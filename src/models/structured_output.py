@@ -535,6 +535,13 @@ def structured_responses_to_table(responses, settings: StructuredOutputSettings,
                 # Create a list of values for each column
                 for sanitized_name in llm_field_names:
                     column_values = [getattr(item, sanitized_name, None) for item in items]
+                    # Normalize empty lists to None (missing value).
+                    # Some models return [] instead of null for list fields
+                    # when there is nothing to extract
+                    column_values = [
+                        None if isinstance(v, list) and len(v) == 0 else v
+                        for v in column_values
+                    ]
                     column_data[sanitized_name].append(column_values)
         
         # Create PyArrow table with list columns
@@ -557,6 +564,11 @@ def structured_responses_to_table(responses, settings: StructuredOutputSettings,
             # response is a Pydantic model instance
             for sanitized_name in llm_field_names:
                 value = getattr(response, sanitized_name, None)
+                # Normalize empty lists to None (missing value).
+                # Some models return [] instead of null for list fields
+                # when there is nothing to extract
+                if isinstance(value, list) and len(value) == 0:
+                    value = None
                 column_data[sanitized_name].append(value)
 
         # Create PyArrow table with appropriate types

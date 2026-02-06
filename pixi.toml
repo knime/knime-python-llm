@@ -14,7 +14,7 @@ test = { cmd = "pytest" }
 python = "3.13.*" # Runtime: Python 3.13
 knime-extension = "5.10.*" # Framework: KNIME Python integration
 knime-python-base = "*" # Framework: KNIME base libraries
-knime-python-versions = "5.10.*"
+knime-python-versions = "5.11.*"
 pip = "*" # Tooling: Python package installer
 
 # --- Core Data & Validation ---
@@ -125,7 +125,7 @@ pandas = ">=2.3.3" # overwrites ibm version bound
 
 [feature.build.dependencies]
 python = "3.9.*"
-knime-extension-bundling = "5.10.*"
+knime-extension-bundling = "5.11.*"
 jake = "*"
 
 [feature.dev.dependencies]

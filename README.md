@@ -4,7 +4,7 @@
 
 <!-- [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project= ENTER SONAR URL](https://sonarcloud.io/summary/new_code?id=KNIME_knime-python-web-interaction-nodes) -->
 
-This repository is maintained by the [KNIME Team Rakete](mailto:team-rakete@knime.com).
+This repository is maintained by the [KNIME Team spAIceship](mailto:team-spaiceship@knime.com).
 
 The KNIME AI Extension offers nodes for building LLM-powered no-code workflows, and supports interfacing with hosted services as well as locally-running models.
 

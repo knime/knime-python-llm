@@ -54,11 +54,6 @@ opentelemetry-api = "~=1.39.1" # Forced to Conda: transitive req. by multiple pa
 opentelemetry-sdk = "~=1.39.1" # Forced to Conda: transitive req. by multiple packages
 httpx-sse = "~=0.4.3" # Forced to Conda: transitive req. by multiple packages
 
-# --- IBM Integration ---
-ibm_cos_sdk_core = "2.14.3.*" # Transitive: required by langchain-ibm
-ibm_cos_sdk_s3transfer = "2.14.3.*" # Transitive: required by langchain-ibm
-ibm_cos_sdk = "2.14.3.*" # Transitive: required by langchain-ibm
-
 # --- Evaluation (Giskard & related) ---
 beautifulsoup4 = "~=4.14.2" # Direct: used in eval/giskard/_raget.py
 scipy = "~=1.15.2" # Direct: used in eval/giskard/giskard_patch.py
@@ -105,7 +100,6 @@ pytest = "*" # Tooling: testing framework
 langchain = "~=1.2.6" # Ecosystem: meta-package for LangChain
 langchain-classic = "~=1.0.1" # Direct: used for AgentExecutor and legacy chains
 langchain-community = "==0.4.1" # Direct: used for various community integrations (e.g. FAISS)
-langchain-ibm = "==1.0.2" # Direct: used in models/ibm/
 langgraph = "~=1.0.6" # Direct: used for agent state machines in agents/
 gpt4all = "~=2.8.2" # Direct: used in models/gpt4all/
 
@@ -123,7 +117,7 @@ pandas = ">=2.3.3" # overwrites ibm version bound
 
 
 [feature.build.dependencies]
-python = "3.9.*"
+python = "3.13.*"
 knime-extension-bundling = "5.11.*"
 jake = "*"
 

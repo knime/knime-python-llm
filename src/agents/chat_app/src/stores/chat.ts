@@ -162,6 +162,13 @@ function isToolMessage(msg?: Message): boolean {
   return msg.type === "tool";
 }
 
+function isErrorMessage(msg?: Message): boolean {
+  if (!msg) {
+    return false;
+  }
+  return msg.type === "error";
+}
+
 function isAiMessageWithToolCalls(msg?: Message): boolean {
   if (!msg) {
     return false;
@@ -221,8 +228,13 @@ export const useChatStore = defineStore("chat", () => {
       content: ERROR_MESSAGES[errorType],
     };
 
-    addMessages([errorMessage], true);
-    finishLoading(false);
+    const wasLoading = isLoading.value;
+    addMessages([errorMessage], true, false);
+
+    // addMessages calls finishLoading if isLoading is true
+    if (!wasLoading && config.value) {
+      finishLoading(false);
+    }
   }
 
   async function init() {
@@ -460,20 +472,28 @@ export const useChatStore = defineStore("chat", () => {
     }
   }
 
-  function addMessages(msgs: Message[], showToolCallsResults: boolean) {
+  function addMessages(
+    msgs: Message[],
+    showToolCallsResults: boolean,
+    shallApplyOnFinish: boolean = true,
+  ) {
     messagesToPersist.push(...msgs);
     lastMessage.value = msgs.at(-1);
 
-    if (isLoading.value && isAiMessageWithoutToolCalls(lastMessage.value)) {
-      finishLoading(initState.value !== "idle");
+    const isInteractionFinished =
+      isAiMessageWithoutToolCalls(lastMessage.value) ||
+      isErrorMessage(lastMessage.value);
+
+    if (isLoading.value && isInteractionFinished) {
+      finishLoading(shallApplyOnFinish && initState.value !== "idle"); // does not apply view data on initial load
     }
 
     // update chatItems
     const lastMessagesToDisplay = showToolCallsResults
       ? msgs
       : msgs.filter(
-        (msg) => !isToolMessage(msg) && !isAiMessageWithToolCalls(msg),
-      );
+          (msg) => !isToolMessage(msg) && !isAiMessageWithToolCalls(msg),
+        );
     const activeTimeline = chatItems.value.findLast(
       (item) => item.type === "timeline" && item.status === "active",
     ) as Timeline | undefined;

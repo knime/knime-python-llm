@@ -1,16 +1,26 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 
 import ArrowNextIcon from "@knime/styles/img/icons/arrow-next.svg";
 import WrenchIcon from "@knime/styles/img/icons/wrench.svg";
 
+import { useChatStore } from "@/stores/chat";
 import type { Timeline } from "@/types";
 import AnimatedEllipsis from "../AnimatedEllipsis.vue";
 
 import TimelineItem from "./TimelineItem.vue";
 
-defineProps<Timeline>();
+const props = defineProps<Timeline>();
 const isExpanded = ref(false);
+
+const chatStore = useChatStore();
+
+const displayLabel = computed(() => {
+  if (props.status === "active" && chatStore.isInterrupted) {
+    return "Cancelling";
+  }
+  return props.label;
+});
 </script>
 
 <template>
@@ -20,7 +30,9 @@ const isExpanded = ref(false);
       <!-- icon and label -->
       <div class="timeline-header">
         <div class="icon"><WrenchIcon /></div>
-        <span>{{ label }}<AnimatedEllipsis v-if="status === 'active'" /></span>
+        <span
+          >{{ displayLabel }}<AnimatedEllipsis v-if="status === 'active'"
+        /></span>
       </div>
 
       <!-- expansion chevron -->

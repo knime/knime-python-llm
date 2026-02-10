@@ -208,7 +208,7 @@ export const useChatStore = defineStore("chat", () => {
     );
   });
 
-  const shouldShowToolUseIndicator = computed(
+  const shouldShowStatusIndicator = computed(
     () => isLoading.value && isUsingTools.value && !shouldShowToolCalls.value,
   );
 
@@ -549,7 +549,7 @@ export const useChatStore = defineStore("chat", () => {
     initState,
 
     // getters
-    shouldShowToolUseIndicator,
+    shouldShowStatusIndicator,
     shouldShowGenericLoadingIndicator,
     shouldShowToolCalls,
     isUsingTools,

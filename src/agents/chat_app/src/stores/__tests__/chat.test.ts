@@ -80,23 +80,23 @@ describe("chat store", () => {
   });
 
   describe("getters", () => {
-    it("shouldShowToolUseIndicator returns true when loading with tools and not showing tool calls", () => {
+    it("shouldShowStatusIndicator returns true when loading with tools and not showing tool calls", () => {
       const { store } = setupStore();
       store.isLoading = true;
       store.lastMessage = createToolMessage("Tool response", "123");
       store.config = createConfig(false);
 
-      expect(store.shouldShowToolUseIndicator).toBe(true);
+      expect(store.shouldShowStatusIndicator).toBe(true);
     });
 
-    it("shouldShowToolUseIndicator returns false when showing tool calls", () => {
+    it("shouldShowStatusIndicator returns false when showing tool calls", () => {
       const { store } = setupStore();
       store.isLoading = true;
       store.lastMessage = createToolMessage("Tool response", "123");
 
       store.config = createConfig(true);
 
-      expect(store.shouldShowToolUseIndicator).toBe(false);
+      expect(store.shouldShowStatusIndicator).toBe(false);
     });
 
     it("shouldShowGenericLoadingIndicator returns true when loading without tools", () => {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 
 import { SkeletonItem } from "@knime/components";
 
@@ -7,7 +7,7 @@ import { useScrollToBottom } from "@/composables/useScrollToBottom";
 import { useChatStore } from "@/stores/chat";
 
 import MessageInput from "./MessageInput.vue";
-import ToolUseIndicator from "./ToolUseIndicator.vue";
+import StatusIndicator from "./StatusIndicator.vue";
 import AiMessage from "./message/AiMessage.vue";
 import ErrorMessage from "./message/ErrorMessage.vue";
 import HumanMessage from "./message/HumanMessage.vue";
@@ -19,6 +19,10 @@ const chatStore = useChatStore();
 
 const scrollableContainer = ref<HTMLElement | null>(null);
 const messagesList = ref<HTMLElement | null>(null);
+
+const statusIndicatorLabel = computed(() =>
+  chatStore.isInterrupted ? "Cancelling" : "Using tools",
+);
 
 const chatItemComponents = {
   ai: AiMessage,
@@ -39,7 +43,10 @@ useScrollToBottom(scrollableContainer, messagesList);
           <component :is="chatItemComponents[item.type]" v-bind="item" />
         </template>
 
-        <ToolUseIndicator v-if="chatStore.shouldShowToolUseIndicator" />
+        <StatusIndicator
+          v-if="chatStore.shouldShowStatusIndicator"
+          :label="statusIndicatorLabel"
+        />
 
         <MessageBox v-if="chatStore.shouldShowGenericLoadingIndicator">
           <SkeletonItem height="24px" width="200px" />

@@ -42,12 +42,67 @@
 #  when such Node is propagated with or for interoperation with KNIME.
 # ------------------------------------------------------------------------
 
+def apply_anthropic_pydantic_patch():
+    """
+    Monkey-patch for pydantic-core 2.27.x compatibility issue with anthropic SDK.
 
-# Apply compatibility patches before importing any anthropic libraries.
-import _compat_patches  # noqa: F401
+    The bug causes `by_alias` to be None instead of a boolean in model_dump(),
+    which raises: TypeError: argument 'by_alias': 'NoneType' object cannot be
+    converted to 'PyBool'
 
-from ._auth import AnthropicAuthenticator
-from ._chat import AnthropicChatModelConnector
+    This patch intercepts the anthropic SDK's model_dump wrapper and ensures
+    None values are converted to proper defaults before being passed to pydantic.
+
+    We need to patch in multiple places because the SDK uses `from ._compat import model_dump`
+    which binds the function as a local name at import time.
+
+    TODO: Remove this patch once the fix is merged and released.
+    See: https://github.com/anthropics/anthropic-sdk-python/issues/1160
+    """
+
+    try:
+        import anthropic._compat as compat
+
+        _original_model_dump = compat.model_dump
+
+        def _patched_model_dump(
+            model,
+            *,
+            exclude=None,
+            exclude_unset=False,
+            exclude_defaults=False,
+            warnings=True,
+            mode="python",
+            by_alias=None,
+        ):
+            # Fix None values that cause TypeError in pydantic-core 2.27.x
+            return _original_model_dump(
+                model,
+                exclude=exclude,
+                exclude_unset=exclude_unset if exclude_unset is not None else False,
+                exclude_defaults=exclude_defaults
+                if exclude_defaults is not None
+                else False,
+                warnings=warnings if warnings is not None else True,
+                mode=mode if mode is not None else "python",
+                by_alias=by_alias if by_alias is not None else True,
+            )
+
+        # Patch in the _compat module
+        compat.model_dump = _patched_model_dump
+
+        # Also patch in _base_client where it's imported as a local name
+        try:
+            import anthropic._base_client as base_client
+
+            base_client.model_dump = _patched_model_dump
+        except (ImportError, AttributeError):
+            pass
+
+    except (ImportError, AttributeError):
+        # anthropic not installed or API changed, skip patching
+        pass
 
 
-__all__ = ["AnthropicAuthenticator", "AnthropicChatModelConnector"]
+# Apply patches on module import
+apply_anthropic_pydantic_patch()

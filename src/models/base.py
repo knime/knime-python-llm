@@ -43,6 +43,9 @@
 # ------------------------------------------------------------------------
 
 
+# Apply compatibility patches before importing any LLM libraries.
+import _compat_patches  # noqa: F401
+
 # KNIME / own imports
 import knime.extension as knext
 from knime.extension import Schema

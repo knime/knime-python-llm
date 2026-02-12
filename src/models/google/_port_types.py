@@ -417,9 +417,13 @@ class VertexAiConnectionPortObjectSpec(GenericGeminiConnectionPortObjectSpec):
     ):
         from langchain_google_genai import ChatGoogleGenerativeAI
 
+        class ChatVertexAI(ChatGoogleGenerativeAI):
+            def with_structured_output(self, *args, method="function_calling", **kwargs):
+                return super().with_structured_output(*args, method=method, **kwargs)
+
         google_credentials = self._construct_google_credentials()
 
-        return ChatGoogleGenerativeAI(
+        return ChatVertexAI(
             model=model_name,
             project=self.project_id,
             location=self.location,

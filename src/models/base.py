@@ -847,10 +847,14 @@ class LLMPrompter:
         selected_format = OutputFormatOptions[self.output_format]
         if selected_format not in llm_spec.supported_output_formats:
             supported_names = [fmt.label for fmt in llm_spec.supported_output_formats]
-            raise knext.InvalidParametersError(
+            msg = (
                 f"The selected output format '{selected_format.label}' is not supported by the LLM. "
                 f"Supported formats: {', '.join(supported_names)}."
-            )
+                )
+            if selected_format == OutputFormatOptions.JSON:
+                ctx.set_warning(msg + " Falling back to text output.")
+            else:
+                raise knext.InvalidParametersError(msg)
 
         # Validate structured output settings if selected
         if self.output_format == OutputFormatOptions.Structured.name:

@@ -85,7 +85,7 @@ def apply_anthropic_pydantic_patch():
                 else False,
                 warnings=warnings if warnings is not None else True,
                 mode=mode if mode is not None else "python",
-                by_alias=by_alias if by_alias is not None else True,
+                by_alias=by_alias if by_alias is not None else False,
             )
 
         # Patch in the _compat module

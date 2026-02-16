@@ -1,13 +1,12 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import { createTestingPinia } from "@pinia/testing";
 import { setActivePinia } from "pinia";
 
+import { useChatStore } from "@/stores/chat";
 import type { ViewMessage } from "@/types";
 import MessageBox from "../chat/message/MessageBox.vue";
 import NodeViewMessage from "../chat/message/NodeViewMessage.vue";
-import { useChatStore } from "@/stores/chat";
-import { version } from "os";
 
 const mockCallKnimeUiApi = vi.fn(() =>
   Promise.resolve({

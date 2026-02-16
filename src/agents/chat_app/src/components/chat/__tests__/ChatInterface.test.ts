@@ -3,6 +3,12 @@ import { mount } from "@vue/test-utils";
 import { createTestingPinia } from "@pinia/testing";
 import { setActivePinia } from "pinia";
 
+import { useChatStore } from "@/stores/chat";
+import {
+  createAiMessage,
+  createToolMessage,
+  createUserMessage,
+} from "@/test/factories/messages";
 import type {
   AiMessage,
   ErrorMessage,
@@ -10,14 +16,7 @@ import type {
   Timeline,
   ToolMessage,
 } from "@/types";
-import { useChatStore } from "@/stores/chat";
 import ChatInterface from "../ChatInterface.vue";
-import {
-  createAiMessage,
-  createToolMessage,
-  createUserMessage,
-} from "@/test/factories/messages";
-import { nextTick } from "process";
 
 vi.mock("@/composables/useScrollToBottom", () => ({
   useScrollToBottom: vi.fn(),

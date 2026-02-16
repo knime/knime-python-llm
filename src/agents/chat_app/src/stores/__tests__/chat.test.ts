@@ -1,9 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { nextTick } from "vue";
 import { createTestingPinia } from "@pinia/testing";
 import { setActivePinia } from "pinia";
 
-import type { Timeline, ViewData } from "@/types";
-import { useChatStore } from "../chat";
 import {
   createAiMessage,
   createConfig,
@@ -15,7 +14,8 @@ import {
   createUserMessage,
   createViewMessage,
 } from "@/test/factories/messages";
-import { nextTick } from "vue";
+import type { Timeline, ViewData } from "@/types";
+import { useChatStore } from "../chat";
 
 const mockJsonDataService = {
   data: vi.fn(),

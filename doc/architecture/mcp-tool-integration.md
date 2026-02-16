@@ -10,9 +10,12 @@ Implement prototype support for Model Context Protocol (MCP) servers in KNIME ag
 
 **Location:** [org.knime.python3.arrow.types/src/main/python/knime/types/tool.py](../../org.knime.python3.arrow.types/src/main/python/knime/types/tool.py)
 
-- Add `MCPTool` dataclass with: `name`, `description`, `parameter_schema` (JSON schema), `server_uri`, `tool_name`, `input_schema`, `output_type`
+- Add `ToolType` IntEnum with values: `WORKFLOW = 0`, `MCP = 1` (matching Java enum indices)
+- Add `MCPTool` dataclass with: `name`, `description`, `parameter_schema` (JSON schema), `server_uri`, `tool_name`
+- Add `tool_type` property returning `ToolType.MCP`
 - Add `MCPToolValueFactory` class similar to `WorkflowToolValueFactory` for Arrow serialization
 - Keep simple types only (string/int/float) in parameter schema
+- Simplified from unified design: Fields removed (`input_schema`, `output_type`) since outputs are always strings for prototype
 
 ### 2. Create MCP client library
 
@@ -109,15 +112,15 @@ Create a single value factory that can represent both workflow and MCP tools, al
 
 #### Discriminator Pattern
 
-Use a **discriminator field** (tool type enum) to determine which tool variant is stored:
+Use a **byte-indexed enum** as discriminator to determine which tool variant is stored:
 
 ```
 ToolValue (interface/base)
-├── WorkflowToolValue (type="WORKFLOW")
+├── WorkflowToolValue (type=0)
 │   ├── workflow bytes (filestore)
 │   ├── parameter schema
 │   └── input/output ports
-└── MCPToolValue (type="MCP")
+└── MCPToolValue (type=1)
     ├── server URI
     ├── tool name
     └── parameter schema
@@ -127,34 +130,55 @@ ToolValue (interface/base)
 
 **Location:** `org.knime.core` (knime-core repository - not in our workspace)
 
-Create new unified value factory:
+Create tool type enum and unified value factory:
 
 ```java
+// Tool type enumeration
+public enum ToolType {
+    WORKFLOW((byte) 0),
+    MCP((byte) 1);
+    
+    private final byte index;
+    
+    ToolType(byte index) {
+        this.index = index;
+    }
+    
+    public byte getIndex() {
+        return index;
+    }
+    
+    public static ToolType fromIndex(byte index) {
+        for (ToolType type : values()) {
+            if (type.index == index) {
+                return type;
+            }
+        }
+        throw new IllegalArgumentException("Unknown tool type index: " + index);
+    }
+}
+
 // New unified factory
 public class ToolValueFactory implements ValueFactory<StructReadAccess, StructWriteAccess> {
     
     @Override
     public DataSpec getSpec() {
         return new StructDataSpec(
-            StringDataSpec.INSTANCE,        // 0: tool_type ("WORKFLOW" | "MCP")
+            ByteDataSpec.INSTANCE,          // 0: tool_type (enum index: 0=WORKFLOW, 1=MCP)
             StringDataSpec.INSTANCE,        // 1: name
             StringDataSpec.INSTANCE,        // 2: description
             StringDataSpec.INSTANCE,        // 3: parameter_schema (JSON)
-            // WorkflowTool-specific fields
-            FileStoreDataSpec.INSTANCE,     // 4: workflow_filestore (null for MCP)
-            StringDataSpec.INSTANCE,        // 5: input_ports (JSON, null for MCP)
-            StringDataSpec.INSTANCE,        // 6: output_ports (JSON, null for MCP)
-            IntDataSpec.INSTANCE,           // 7: message_output_port_index (-1 for MCP)
-            // MCPTool-specific fields
-            StringDataSpec.INSTANCE,        // 8: server_uri (null for Workflow)
-            StringDataSpec.INSTANCE,        // 9: tool_name (null for Workflow)
-            StringDataSpec.INSTANCE,        // 10: input_schema (JSON, null if not needed)
-            StringDataSpec.INSTANCE         // 11: output_type (null if not needed)
+            StringDataSpec.INSTANCE,        // 4: input_spec (JSON: ports for Workflow, null for MCP)
+            StringDataSpec.INSTANCE,        // 5: output_spec (JSON: ports for Workflow, null for MCP)
+            IntDataSpec.INSTANCE,           // 6: message_output_port_index (-1 for MCP)
+            // MCP-specific fields
+            FileStoreDataSpec.INSTANCE,     // 7: workflow_filestore (for Workflow) OR null (for MCP)
+            StringDataSpec.INSTANCE         // 8: server_uri (for MCP) OR null (for Workflow)
         );
     }
     
-    // ReadValue/WriteValue implementations check tool_type field
-    // and populate appropriate fields
+    // ReadValue/WriteValue implementations check tool_type byte
+    // and populate appropriate fields based on ToolType enum
 }
 
 // Shared interface
@@ -188,26 +212,28 @@ public class MCPToolValue implements ToolValue {
 
 **Location:** `org.knime.python3.arrow.types/src/main/python/knime/types/tool.py`
 
-Create unified Python value factory:
+Create unified Python value factory with enum:
 
 ```python
-from enum import Enum
+from enum import IntEnum
 from dataclasses import dataclass
 from typing import Optional, Union
+import warnings
 
-class ToolType(Enum):
-    WORKFLOW = "WORKFLOW"
-    MCP = "MCP"
+class ToolType(IntEnum):
+    """Tool type enumeration matching Java enum indices."""
+    WORKFLOW = 0
+    MCP = 1
 
 @dataclass
 class WorkflowTool:
-    """Workflow-based tool (unchanged)"""
+    """Workflow-based tool."""
     name: str
     description: str
-    parameter_schema: dict
+    parameter_schema: dict  # Configuration parameters (dropdowns, strings, etc.)
     _filestore_keys: bytes = None
-    input_ports: list[ToolPort] = None
-    output_ports: list[ToolPort] = None
+    input_ports: list[ToolPort] = None   # Data table input ports
+    output_ports: list[ToolPort] = None  # Data table output ports
     message_output_port_index: Optional[int] = -1
     
     @property
@@ -216,14 +242,12 @@ class WorkflowTool:
 
 @dataclass
 class MCPTool:
-    """MCP server tool (unchanged)"""
+    """MCP server tool."""
     name: str
     description: str
-    parameter_schema: dict
+    parameter_schema: dict  # JSON schema for tool parameters
     server_uri: str
-    tool_name: str
-    input_schema: Optional[dict] = None
-    output_type: Optional[str] = None
+    tool_name: str  # Name on MCP server (may differ from display name)
     
     @property
     def tool_type(self) -> ToolType:
@@ -236,7 +260,6 @@ class ToolValueFactory(kt.PythonValueFactory):
     """Unified value factory handling both workflow and MCP tools."""
     
     def __init__(self):
-        # Register for Union type (duck typing compatibility)
         kt.PythonValueFactory.__init__(self, Tool)
     
     def decode(self, storage):
@@ -245,32 +268,34 @@ class ToolValueFactory(kt.PythonValueFactory):
         if storage is None:
             return None
         
-        tool_type = storage.get("0")
+        tool_type_index = storage.get("0")
+        tool_type = ToolType(tool_type_index)
         
-        if tool_type == "WORKFLOW":
-            # Decode WorkflowTool fields (1-7)
+        if tool_type == ToolType.WORKFLOW:
+            # Decode WorkflowTool fields
+            input_spec_json = storage.get("4")
+            output_spec_json = storage.get("5")
+            
             return WorkflowTool(
                 name=storage["1"],
                 description=storage["2"],
                 parameter_schema=json.loads(storage["3"]) if storage["3"] else {},
-                _filestore_keys=storage["4"],  # filestore bytes
-                input_ports=[ToolPort._from_arrow_dict(p) for p in json.loads(storage["5"])] if storage["5"] else [],
-                output_ports=[ToolPort._from_arrow_dict(p) for p in json.loads(storage["6"])] if storage["6"] else [],
-                message_output_port_index=storage.get("7", -1),
+                _filestore_keys=storage["7"],  # filestore bytes
+                input_ports=[ToolPort._from_arrow_dict(p) for p in json.loads(input_spec_json)] if input_spec_json else [],
+                output_ports=[ToolPort._from_arrow_dict(p) for p in json.loads(output_spec_json)] if output_spec_json else [],
+                message_output_port_index=storage.get("6", -1),
             )
-        elif tool_type == "MCP":
-            # Decode MCPTool fields (1-3, 8-11)
+        elif tool_type == ToolType.MCP:
+            # Decode MCPTool fields
             return MCPTool(
                 name=storage["1"],
                 description=storage["2"],
                 parameter_schema=json.loads(storage["3"]) if storage["3"] else {},
                 server_uri=storage["8"],
-                tool_name=storage["9"],
-                input_schema=json.loads(storage["10"]) if storage["10"] else None,
-                output_type=storage.get("11"),
+                tool_name=storage["1"],  # Use name as tool_name (could be separate if needed)
             )
         else:
-            raise ValueError(f"Unknown tool type: {tool_type}")
+            raise ValueError(f"Unknown tool type index: {tool_type_index}")
     
     def encode(self, value: Tool):
         import json
@@ -280,7 +305,7 @@ class ToolValueFactory(kt.PythonValueFactory):
         
         # Common fields
         encoded = {
-            "0": value.tool_type.value,
+            "0": value.tool_type.value,  # Byte: enum index
             "1": value.name,
             "2": value.description,
             "3": json.dumps(value.parameter_schema),
@@ -289,25 +314,19 @@ class ToolValueFactory(kt.PythonValueFactory):
         # Type-specific fields
         if isinstance(value, WorkflowTool):
             encoded.update({
-                "4": value._filestore_keys,
-                "5": json.dumps([p._to_arrow_dict() for p in value.input_ports]) if value.input_ports else None,
-                "6": json.dumps([p._to_arrow_dict() for p in value.output_ports]) if value.output_ports else None,
-                "7": value.message_output_port_index,
-                "8": None,  # server_uri
-                "9": None,  # tool_name
-                "10": None, # input_schema
-                "11": None, # output_type
+                "4": json.dumps([p._to_arrow_dict() for p in value.input_ports]) if value.input_ports else None,  # input_spec
+                "5": json.dumps([p._to_arrow_dict() for p in value.output_ports]) if value.output_ports else None,  # output_spec
+                "6": value.message_output_port_index,
+                "7": value._filestore_keys,  # workflow filestore
+                "8": None,  # server_uri (MCP only)
             })
         elif isinstance(value, MCPTool):
             encoded.update({
-                "4": None,  # workflow_filestore
-                "5": None,  # input_ports
-                "6": None,  # output_ports
-                "7": -1,    # message_output_port_index
+                "4": None,  # input_spec (Workflow only)
+                "5": None,  # output_spec (Workflow only)
+                "6": -1,    # message_output_port_index
+                "7": None,  # workflow_filestore (Workflow only)
                 "8": value.server_uri,
-                "9": value.tool_name,
-                "10": json.dumps(value.input_schema) if value.input_schema else None,
-                "11": value.output_type,
             })
         else:
             raise TypeError(f"Unknown tool type: {type(value)}")
@@ -363,6 +382,39 @@ Update registration to use unified factory:
 ```
 
 ### Implementation Plan
+
+#### Arrow Schema Structure
+
+The unified value factory uses a 9-field struct representation:
+
+```
+Field 0: tool_type (BYTE)        - Enum index: 0=WORKFLOW, 1=MCP
+Field 1: name (STRING)           - Display name of the tool
+Field 2: description (STRING)    - Tool description for LLM
+Field 3: parameter_schema (STRING) - JSON configuration schema (both types)
+Field 4: input_spec (STRING)     - JSON of input ports (Workflow) or null (MCP)
+Field 5: output_spec (STRING)    - JSON of output ports (Workflow) or null (MCP)
+Field 6: message_output_port_index (INT) - Port index (Workflow) or -1 (MCP)
+Field 7: workflow_filestore (FILESTORE) - Workflow bytes (Workflow) or null (MCP)
+Field 8: server_uri (STRING)     - MCP server URI (MCP) or null (Workflow)
+```
+
+**Field Consolidation Rationale:**
+
+Original design had 12 fields with duplication:
+- `input_ports` (Workflow) + `input_schema` (MCP) → consolidated to `input_spec`
+- `output_ports` (Workflow) + `output_type` (MCP) → consolidated to `output_spec`
+
+Benefits of consolidation:
+- **Reduced redundancy**: `input_schema` was redundant with `parameter_schema` for MCP tools
+- **Clearer semantics**: `input_spec`/`output_spec` clearly indicate data port specifications
+- **Smaller schema**: 9 fields vs 12 fields (25% reduction)
+- **Type inference**: MCP output type always "string" for prototype, can be inferred
+
+Field usage by tool type:
+- **Common** (0-3): tool_type, name, description, parameter_schema
+- **Workflow-only** (4-7): input_spec, output_spec, message_output_port_index, workflow_filestore
+- **MCP-only** (8): server_uri
 
 #### Phase 1: Java Side (knime-core repository)
 **Owner:** KNIME Core team (requires coordination)
@@ -423,13 +475,13 @@ Update registration to use unified factory:
 - **Mitigation**: Implement Python side first as proof of concept, coordinate with core team
 
 **Risk**: Filestore handling for WorkflowTool in unified factory
-- **Mitigation**: Use nullable filestore field (field 4), only populated for workflow tools
+- **Mitigation**: Use nullable filestore field (field 7), only populated for workflow tools
 
 **Risk**: Breaking changes for existing Python extensions
 - **Mitigation**: Keep deprecated factories working, provide clear migration guide
 
 **Risk**: Arrow schema versioning complexity
-- **Mitigation**: Use struct fields with null values, schema version field if needed
+- **Mitigation**: Use struct fields with null values for type-specific data, byte-indexed enum for efficient type discrimination
 
 ### Open Questions
 

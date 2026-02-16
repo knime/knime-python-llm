@@ -274,8 +274,18 @@ class LangchainToolConverter:
         """
         sanitized_name = self._name_map.get_sanitized(tool.name)
 
-        # Use the parameter schema from the MCP tool
-        args_schema = tool.parameter_schema
+        # MCP parameter schema is already in JSON schema format
+        # Wrap it in an object schema if it's not already
+        if tool.parameter_schema.get("type") == "object":
+            args_schema = tool.parameter_schema
+        else:
+            # If it's not an object, wrap the properties
+            args_schema = {
+                "type": "object",
+                "description": "Parameters for the MCP tool.",
+                "properties": tool.parameter_schema.get("properties", {}),
+                "required": tool.parameter_schema.get("required", []),
+            }
 
         # Create tool function that calls the MCP server
         def mcp_tool_function(**params: dict) -> str:

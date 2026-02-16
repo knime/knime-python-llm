@@ -695,9 +695,12 @@ state that the tool could not be executed due to reaching the iteration limit.""
             DataRegistry,
             LangchainToolConverter,
         )
-        from ._tool import ExecutionMode
+        from ._tool import ExecutionMode, MCPTool
         from ._agent import Agent, AgentConfig
         from ._error_handler import AgentPrompterErrorHandler
+
+        # Add MCP tool execution method to ctx
+        ctx._execute_mcp_tool = _execute_mcp_tool
 
         data_registry = DataRegistry.create_with_input_tables(
             input_tables, data_message_prefix=self.data_message_prefix
@@ -713,7 +716,14 @@ state that the tool could not be executed due to reaching the iteration limit.""
         )
 
         tool_cells = _extract_tools_from_table(tools_table, self.tool_column)
-        tools = [tool_converter.to_langchain_tool(tool) for tool in tool_cells]
+        # Convert tools based on their type
+        tools = []
+        for tool in tool_cells:
+            if isinstance(tool, MCPTool):
+                tools.append(tool_converter.to_langchain_tool_from_mcp(tool))
+            else:
+                # Assume WorkflowTool
+                tools.append(tool_converter.to_langchain_tool(tool))
         toolset = AgentPrompterToolset(tools)
 
         conversation = self._create_conversation_history(
@@ -808,6 +818,49 @@ def _extract_tools_from_table(tools_table: knext.Table, tool_column: str):
     tools = tools_table[tool_column].to_pyarrow().column(tool_column)
     filtered_tools = pc.filter(tools, pc.is_valid(tools))
     return filtered_tools.to_pylist()
+
+
+def _execute_mcp_tool(tool, parameters: dict) -> str:
+    """
+    Execute an MCP tool by calling the MCP server.
+
+    Parameters
+    ----------
+    tool : MCPTool
+        The MCP tool to execute
+    parameters : dict
+        The parameters to pass to the tool
+
+    Returns
+    -------
+    str
+        The result from the tool execution
+
+    Raises
+    ------
+    RuntimeError
+        If tool execution fails
+    """
+    from tools.mcp_client import MCPClient, MCPToolExecutionError, MCPConnectionError
+    import logging
+
+    _logger = logging.getLogger(__name__)
+
+    try:
+        _logger.info(f"Executing MCP tool '{tool.name}' on server '{tool.server_uri}'")
+        client = MCPClient(tool.server_uri)
+        result = client.call_tool(tool.tool_name, parameters)
+        _logger.info(f"MCP tool '{tool.name}' succeeded")
+        return str(result)
+    except MCPToolExecutionError as e:
+        _logger.error(f"MCP tool execution failed: {e}")
+        raise RuntimeError(f"Failed to execute MCP tool '{tool.name}': {e}")
+    except MCPConnectionError as e:
+        _logger.error(f"MCP server connection failed: {e}")
+        raise RuntimeError(f"Failed to connect to MCP server '{tool.server_uri}': {e}")
+    except Exception as e:
+        _logger.error(f"Unexpected error executing MCP tool: {e}", exc_info=True)
+        raise RuntimeError(f"Unexpected error executing MCP tool '{tool.name}': {e}")
 
 
 def _iter_history_events_from_table(
@@ -1324,7 +1377,10 @@ class AgentChatWidget:
             AgentChatWidgetDataService,
             AgentChatWidgetConfig,
         )
-        from ._tool import ExecutionMode
+        from ._tool import ExecutionMode, MCPTool
+
+        # Add MCP tool execution method to ctx
+        ctx._execute_mcp_tool = _execute_mcp_tool
 
         execution_mode = ExecutionMode.DEBUG if self.debug else ExecutionMode.DETACHED
 
@@ -1356,7 +1412,14 @@ class AgentChatWidget:
         )
         if tools_table is not None:
             tool_cells = _extract_tools_from_table(tools_table, self.tool_column)
-            tools = [tool_converter.to_langchain_tool(tool) for tool in tool_cells]
+            # Convert tools based on their type
+            tools = []
+            for tool in tool_cells:
+                if isinstance(tool, MCPTool):
+                    tools.append(tool_converter.to_langchain_tool_from_mcp(tool))
+                else:
+                    # Assume WorkflowTool
+                    tools.append(tool_converter.to_langchain_tool(tool))
         else:
             tools = []
 

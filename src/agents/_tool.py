@@ -155,6 +155,8 @@ class MCPTool:
     tool_name: str
     input_schema: Optional[dict] = None
     output_type: Optional[str] = None
+    input_schema: Optional[dict] = None
+    output_type: Optional[str] = None
 
 
 class ExecutionMode(Enum):

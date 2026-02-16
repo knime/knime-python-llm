@@ -2,7 +2,12 @@ import DOMPurify from "dompurify";
 import markdownit from "markdown-it";
 import markdownItTable from "markdown-it-multimd-table";
 
-const md = markdownit({ html: true, linkify: true, typographer: true, breaks: true }).use(markdownItTable);
+const md = markdownit({
+  html: true,
+  linkify: true,
+  typographer: true,
+  breaks: true,
+}).use(markdownItTable);
 
 const sanitizationConfig = {
   ALLOWED_TAGS: [

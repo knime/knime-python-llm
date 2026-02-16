@@ -1,3 +1,4 @@
+import { computed, ref, shallowRef, toRaw, useId } from "vue";
 import { defineStore } from "pinia";
 
 import {
@@ -10,15 +11,14 @@ import type {
   ChatItem,
   Config,
   ErrorMessage,
+  InitializationState,
   Message,
   Timeline,
   ToolCallTimelineItem,
   ToolMessage,
-  InitializationState,
   ViewData,
   WorkflowInfo,
 } from "@/types";
-import { computed, ref, shallowRef, toRaw, useId, watch } from "vue";
 
 // static utilities
 const ERROR_MESSAGES = {
@@ -327,7 +327,7 @@ export const useChatStore = defineStore("chat", () => {
   }
 
   async function getInitialViewData(): Promise<ViewData | undefined> {
-    var initialData = await jsonDataService.value?.initialData();
+    let initialData = await jsonDataService.value?.initialData();
     if (initialData) {
       return initialData;
     }
@@ -538,7 +538,7 @@ export const useChatStore = defineStore("chat", () => {
   }
 
   return {
-    //state
+    // state
     config,
     chatItems,
     lastMessage,

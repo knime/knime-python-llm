@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed } from "vue";
 import { useTextareaAutosize } from "@vueuse/core";
 
 import { FunctionButton } from "@knime/components";
-import SendIcon from "@knime/styles/img/icons/paper-flier.svg";
 import AbortIcon from "@knime/styles/img/icons/close.svg";
+import SendIcon from "@knime/styles/img/icons/paper-flier.svg";
 
 import { useChatStore } from "@/stores/chat";
 
@@ -14,8 +14,10 @@ const { textarea, input } = useTextareaAutosize();
 const characterLimit = 5000;
 
 const isInputValid = computed(() => input.value?.trim().length > 0);
-const isDisabled = computed(() => chatStore.isInterrupted || (!isInputValid.value && !chatStore.isLoading));
-
+const isDisabled = computed(
+  () =>
+    chatStore.isInterrupted || (!isInputValid.value && !chatStore.isLoading),
+);
 
 const handleClick = (event: MouseEvent) => {
   if (event.target === event.currentTarget) {
@@ -34,7 +36,12 @@ const handleSubmit = () => {
 
 const handleKeyDown = (event: KeyboardEvent) => {
   // enter: send message
-  if (event.key === "Enter" && !chatStore.isLoading && !event.shiftKey && !isDisabled.value) {
+  if (
+    event.key === "Enter" &&
+    !chatStore.isLoading &&
+    !event.shiftKey &&
+    !isDisabled.value
+  ) {
     event.preventDefault();
     handleSubmit();
   }
@@ -72,12 +79,7 @@ const handleKeyDown = (event: KeyboardEvent) => {
         aria-hidden="true"
         focusable="false"
       />
-      <SendIcon
-        v-else
-        class="send-icon"
-        aria-hidden="true"
-        focusable="false"
-      />
+      <SendIcon v-else class="send-icon" aria-hidden="true" focusable="false" />
     </FunctionButton>
   </div>
 </template>
@@ -119,7 +121,7 @@ const handleKeyDown = (event: KeyboardEvent) => {
     & svg {
       stroke: var(--knime-dove-gray);
 
-      & .send-icon, 
+      & .send-icon,
       & .abort-icon {
         margin-left: -1px;
       }

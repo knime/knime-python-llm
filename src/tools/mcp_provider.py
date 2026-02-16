@@ -170,8 +170,6 @@ class MCPToolProvider:
                     parameter_schema=filtered_schema,
                     server_uri=self.server_url,
                     tool_name=tool_info.name,
-                    input_schema=tool_info.input_schema,
-                    output_type="string",  # Prototype: all outputs are strings
                 )
                 mcp_tools.append(mcp_tool)
 

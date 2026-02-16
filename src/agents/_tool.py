@@ -153,10 +153,11 @@ class MCPTool:
     parameter_schema: dict
     server_uri: str
     tool_name: str
-    input_schema: Optional[dict] = None
-    output_type: Optional[str] = None
-    input_schema: Optional[dict] = None
-    output_type: Optional[str] = None
+
+    @property
+    def tool_type(self):
+        \"\"\"Returns MCP tool type (1 in ToolType enum).\"\"\"
+        return 1  # ToolType.MCP
 
 
 class ExecutionMode(Enum):

@@ -44,6 +44,7 @@
 
 from dataclasses import dataclass
 import re
+from typing import Optional
 from ._data import Port, DataRegistry, port_to_dict
 from ._common import render_structured
 from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
@@ -141,6 +142,19 @@ class WorkflowTool:
     tool_bytes: bytes
     input_ports: list[Port]
     output_ports: list[Port]
+
+
+@dataclass
+class MCPTool:
+    """Mirrors the MCPTool class defined in knime.types.tool."""
+
+    name: str
+    description: str
+    parameter_schema: dict
+    server_uri: str
+    tool_name: str
+    input_schema: Optional[dict] = None
+    output_type: Optional[str] = None
 
 
 class ExecutionMode(Enum):
@@ -241,6 +255,41 @@ class LangchainToolConverter:
             func=tool_function,
             name=sanitized_name,
             description=render_structured(**description_parts),
+            args_schema=args_schema,
+        )
+
+    def to_langchain_tool_from_mcp(self, tool: MCPTool) -> StructuredTool:
+        """
+        Convert an MCPTool to a LangChain StructuredTool.
+
+        Parameters
+        ----------
+        tool : MCPTool
+            The MCP tool to convert
+
+        Returns
+        -------
+        StructuredTool
+            A LangChain tool that calls the MCP server
+        """
+        sanitized_name = self._name_map.get_sanitized(tool.name)
+
+        # Use the parameter schema from the MCP tool
+        args_schema = tool.parameter_schema
+
+        # Create tool function that calls the MCP server
+        def mcp_tool_function(**params: dict) -> str:
+            try:
+                result = self._ctx._execute_mcp_tool(tool, params)
+                return str(result)
+            except Exception as e:
+                _logger.exception(f"Error executing MCP tool {tool.name}: {e}")
+                raise
+
+        return StructuredTool.from_function(
+            func=mcp_tool_function,
+            name=sanitized_name,
+            description=tool.description,
             args_schema=args_schema,
         )
 

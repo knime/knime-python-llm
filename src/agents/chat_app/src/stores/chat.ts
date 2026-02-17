@@ -229,9 +229,13 @@ export const useChatStore = defineStore("chat", () => {
     };
 
     const wasLoading = isLoading.value;
-    addMessages([errorMessage], true, false);
+
+    const showToolCallsResults = true;
+    const shallApplyOnFinish = false;
+    addMessages([errorMessage], showToolCallsResults, shallApplyOnFinish);
 
     // addMessages calls finishLoading if isLoading is true
+    // finishLoading assumes config is defined
     if (!wasLoading && config.value) {
       finishLoading(false);
     }
@@ -327,7 +331,7 @@ export const useChatStore = defineStore("chat", () => {
   }
 
   async function getInitialViewData(): Promise<ViewData | undefined> {
-    let initialData = await jsonDataService.value?.initialData();
+    const initialData = await jsonDataService.value?.initialData();
     if (initialData) {
       return initialData;
     }

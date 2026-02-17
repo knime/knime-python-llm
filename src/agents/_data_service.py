@@ -250,9 +250,12 @@ class FrontendConversation:
             if not (isinstance(final_message, AIMessage) and final_message.tool_calls):
                 self._append_messages([final_message])
 
-            error = CancelError("Execution canceled.")
-            self.append_error_to_frontend(error)
-            raise error
+            if not (
+                isinstance(final_message, AIMessage) and not final_message.tool_calls
+            ):
+                error = CancelError("Execution canceled.")
+                self.append_error_to_frontend(error)
+                raise error
         else:
             self._append_messages(messages)
 

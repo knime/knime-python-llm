@@ -1,9 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { nextTick } from "vue";
 import { createTestingPinia } from "@pinia/testing";
 import { setActivePinia } from "pinia";
 
-import type { Timeline, ViewData } from "@/types";
-import { useChatStore } from "../chat";
 import {
   createAiMessage,
   createConfig,
@@ -15,7 +14,8 @@ import {
   createUserMessage,
   createViewMessage,
 } from "@/test/factories/messages";
-import { nextTick } from "vue";
+import type { Timeline, ViewData } from "@/types";
+import { useChatStore } from "../chat";
 
 const mockJsonDataService = {
   data: vi.fn(),
@@ -80,23 +80,23 @@ describe("chat store", () => {
   });
 
   describe("getters", () => {
-    it("shouldShowToolUseIndicator returns true when loading with tools and not showing tool calls", () => {
+    it("shouldShowStatusIndicator returns true when loading with tools and not showing tool calls", () => {
       const { store } = setupStore();
       store.isLoading = true;
       store.lastMessage = createToolMessage("Tool response", "123");
       store.config = createConfig(false);
 
-      expect(store.shouldShowToolUseIndicator).toBe(true);
+      expect(store.shouldShowStatusIndicator).toBe(true);
     });
 
-    it("shouldShowToolUseIndicator returns false when showing tool calls", () => {
+    it("shouldShowStatusIndicator returns false when showing tool calls", () => {
       const { store } = setupStore();
       store.isLoading = true;
       store.lastMessage = createToolMessage("Tool response", "123");
 
       store.config = createConfig(true);
 
-      expect(store.shouldShowToolUseIndicator).toBe(false);
+      expect(store.shouldShowStatusIndicator).toBe(false);
     });
 
     it("shouldShowGenericLoadingIndicator returns true when loading without tools", () => {
@@ -150,6 +150,142 @@ describe("chat store", () => {
       store.addErrorMessage("processing");
 
       expect(mockTimeline.status).toBe("completed");
+    });
+
+    it("calls shareData once when adding error during loading", async () => {
+      const { store } = setupStore();
+
+      // Initialize services
+      mockJsonDataService.data.mockResolvedValueOnce(createConfig());
+      mockJsonDataService.data.mockResolvedValueOnce(null);
+      await store.init();
+
+      store.isLoading = true;
+      mockSharedDataService.shareData.mockClear();
+
+      store.addErrorMessage("sending");
+
+      expect(store.isLoading).toBe(false);
+      expect(mockSharedDataService.shareData).toHaveBeenCalledTimes(1);
+    });
+
+    it("calls shareData once when adding error while not loading", async () => {
+      const { store } = setupStore();
+
+      // Initialize services
+      mockJsonDataService.data.mockResolvedValueOnce(createConfig());
+      mockJsonDataService.data.mockResolvedValueOnce(null);
+      await store.init();
+
+      store.isLoading = false;
+      mockSharedDataService.shareData.mockClear();
+
+      store.addErrorMessage("sending");
+
+      expect(store.isLoading).toBe(false);
+      expect(mockSharedDataService.shareData).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("addMessages terminal completion", () => {
+    const expectTerminalMessageStopsLoading = (message: any) => {
+      const { store } = setupStore();
+      store.isLoading = true;
+      store.initState = "ready";
+      store.config = createConfig();
+
+      store.addMessages([message], true);
+
+      expect(store.isLoading).toBe(false);
+    };
+
+    it("stops loading when a final AI message is added", () => {
+      expectTerminalMessageStopsLoading(
+        createAiMessage("This is final") as any,
+      );
+    });
+
+    it("stops loading when an error message is added", () => {
+      expectTerminalMessageStopsLoading(
+        createErrorMessage("Task failed successfully") as any,
+      );
+    });
+
+    it("finishes loading when last message is an error", async () => {
+      const { store } = setupStore();
+
+      // Initialize services
+      mockJsonDataService.data.mockResolvedValueOnce(createConfig());
+      mockJsonDataService.data.mockResolvedValueOnce(null);
+      await store.init();
+
+      store.isLoading = true;
+      mockSharedDataService.shareData.mockClear();
+
+      const errorMessage = createErrorMessage("Backend error");
+      store.addMessages([errorMessage as any], true);
+
+      expect(store.isLoading).toBe(false);
+      expect(mockSharedDataService.shareData).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not apply data when initState is idle", () => {
+      const { store } = setupStore();
+      store.isLoading = true;
+      store.initState = "idle";
+      store.config = createConfig(true, "INTERACTION");
+      store.jsonDataService = mockJsonDataService as any;
+      mockJsonDataService.applyData.mockClear();
+
+      const errorMessage = createErrorMessage("Init error");
+      store.addMessages([errorMessage as any], true);
+
+      expect(store.isLoading).toBe(false);
+      expect(mockJsonDataService.applyData).not.toHaveBeenCalled();
+    });
+
+    it("applies data when finishLoading is called with true and reexecution trigger is set", async () => {
+      const { store } = setupStore();
+
+      // Initialize services
+      mockJsonDataService.data.mockResolvedValueOnce(createConfig());
+      mockJsonDataService.data.mockResolvedValueOnce(null);
+      await store.init();
+
+      store.isLoading = true;
+      store.config = createConfig(true, "INTERACTION");
+      store.jsonDataService = mockJsonDataService as any;
+      mockJsonDataService.applyData.mockClear();
+
+      const errorMessage = createErrorMessage("Interaction error");
+      store.addMessages([errorMessage as any], true, true);
+
+      expect(store.isLoading).toBe(false);
+      expect(mockJsonDataService.applyData).toHaveBeenCalled();
+    });
+
+    it("stops polling immediately when an error message is received", async () => {
+      const { store } = setupStore();
+      const errorMessage = createErrorMessage("Backend error");
+      store.jsonDataService = mockJsonDataService;
+      store.isLoading = true;
+      store.config = createConfig();
+      store.initState = "ready";
+
+      // Mock polling: first call returns error message
+      mockJsonDataService.data.mockResolvedValueOnce([errorMessage]);
+
+      await store.pollForNewMessages();
+
+      expect(store.isLoading).toBe(false);
+      expect(store.chatItems).toContainEqual(errorMessage);
+
+      // Ensure checkIsProcessing was NOT called
+      const dataCalls = mockJsonDataService.data.mock.calls;
+      const isProcessingCalls = dataCalls.filter(
+        (call: any) => call[0].method === "is_processing",
+      );
+      expect(isProcessingCalls).toHaveLength(0);
     });
   });
 

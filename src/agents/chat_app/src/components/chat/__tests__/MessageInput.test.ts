@@ -71,7 +71,9 @@ describe("MessageInput", () => {
   it("calls store sendUserMessage and clears input on send button click", async () => {
     const wrapper = createWrapper();
     const chatStore = useChatStore();
-    const sendUserMessageSpy = vi.spyOn(chatStore, "sendUserMessage").mockResolvedValue();
+    const sendUserMessageSpy = vi
+      .spyOn(chatStore, "sendUserMessage")
+      .mockResolvedValue();
     const textarea = wrapper.find("textarea");
 
     await textarea.setValue("Test message");
@@ -84,7 +86,9 @@ describe("MessageInput", () => {
   it("calls store cancelAgent when send button is clicked while loading", async () => {
     const wrapper = createWrapper();
     const chatStore = useChatStore();
-    const cancelAgentSpy = vi.spyOn(chatStore, "cancelAgent").mockResolvedValue();
+    const cancelAgentSpy = vi
+      .spyOn(chatStore, "cancelAgent")
+      .mockResolvedValue();
 
     chatStore.isLoading = true;
     await wrapper.vm.$nextTick();
@@ -97,8 +101,12 @@ describe("MessageInput", () => {
   it("does not call handleSubmit on Enter while loading", async () => {
     const wrapper = createWrapper();
     const chatStore = useChatStore();
-    const sendUserMessageSpy = vi.spyOn(chatStore, "sendUserMessage").mockResolvedValue();
-    const cancelAgentSpy = vi.spyOn(chatStore, "cancelAgent").mockResolvedValue();
+    const sendUserMessageSpy = vi
+      .spyOn(chatStore, "sendUserMessage")
+      .mockResolvedValue();
+    const cancelAgentSpy = vi
+      .spyOn(chatStore, "cancelAgent")
+      .mockResolvedValue();
 
     chatStore.isLoading = true;
     await wrapper.vm.$nextTick();
@@ -115,7 +123,9 @@ describe("MessageInput", () => {
   it("calls store sendUserMessage and clears input on Enter key press without Shift", async () => {
     const wrapper = createWrapper();
     const chatStore = useChatStore();
-    const sendUserMessageSpy = vi.spyOn(chatStore, "sendUserMessage").mockResolvedValue();
+    const sendUserMessageSpy = vi
+      .spyOn(chatStore, "sendUserMessage")
+      .mockResolvedValue();
     const textarea = wrapper.find("textarea");
 
     await textarea.setValue("Enter message");
@@ -128,7 +138,9 @@ describe("MessageInput", () => {
   it("does not send message on Enter if shift key is pressed", async () => {
     const wrapper = createWrapper();
     const chatStore = useChatStore();
-    const sendUserMessageSpy = vi.spyOn(chatStore, "sendUserMessage").mockResolvedValue();
+    const sendUserMessageSpy = vi
+      .spyOn(chatStore, "sendUserMessage")
+      .mockResolvedValue();
     const textarea = wrapper.find("textarea");
 
     await textarea.setValue("Shift+Enter message");

@@ -3,6 +3,12 @@ import { mount } from "@vue/test-utils";
 import { createTestingPinia } from "@pinia/testing";
 import { setActivePinia } from "pinia";
 
+import { useChatStore } from "@/stores/chat";
+import {
+  createAiMessage,
+  createToolMessage,
+  createUserMessage,
+} from "@/test/factories/messages";
 import type {
   AiMessage,
   ErrorMessage,
@@ -10,14 +16,7 @@ import type {
   Timeline,
   ToolMessage,
 } from "@/types";
-import { useChatStore } from "@/stores/chat";
 import ChatInterface from "../ChatInterface.vue";
-import {
-  createAiMessage,
-  createToolMessage,
-  createUserMessage,
-} from "@/test/factories/messages";
-import { nextTick } from "process";
 
 vi.mock("@/composables/useScrollToBottom", () => ({
   useScrollToBottom: vi.fn(),
@@ -50,8 +49,9 @@ describe("ChatInterface", () => {
           ExpandableTimeline: {
             template: "<div class='timeline'>Timeline</div>",
           },
-          ToolUseIndicator: {
-            template: "<div class='tool-indicator'>Using tools...</div>",
+          StatusIndicator: {
+            props: ["label"],
+            template: "<div class='status-indicator'>{{ label }}</div>",
           },
           MessageInput: {
             template: "<div class='message-input'>Message Input</div>",
@@ -118,7 +118,7 @@ describe("ChatInterface", () => {
     expect(wrapper.find(".timeline").exists()).toBe(true);
   });
 
-  it("shows tool use indicator when store indicates tools are being used", async () => {
+  it("shows 'Using tools' indicator when store indicates tools are being used", async () => {
     const wrapper = createWrapper();
     const chatStore = useChatStore();
 
@@ -136,17 +136,42 @@ describe("ChatInterface", () => {
     };
     await wrapper.vm.$nextTick();
 
-    expect(wrapper.find(".tool-indicator").exists()).toBe(true);
+    const statusIndicator = wrapper.find(".status-indicator");
+    expect(statusIndicator.exists()).toBe(true);
+    expect(statusIndicator.text()).toBe("Using tools");
   });
 
-  it("does not show tool use indicator when store indicates tools are not being used", () => {
+  it("shows 'Cancelling' in status indicator when interrupted", async () => {
+    const wrapper = createWrapper();
+    const chatStore = useChatStore();
+
+    chatStore.isLoading = true;
+    chatStore.lastMessage = {
+      type: "tool",
+      content: "",
+      toolCallId: "123",
+      id: "tool1",
+    };
+    chatStore.config = {
+      show_tool_calls_and_results: false,
+      reexecution_trigger: "NONE",
+    };
+    chatStore.isInterrupted = true;
+    await wrapper.vm.$nextTick();
+
+    const statusIndicator = wrapper.find(".status-indicator");
+    expect(statusIndicator.exists()).toBe(true);
+    expect(statusIndicator.text()).toBe("Cancelling");
+  });
+
+  it("does not show status indicator when store indicates tools are not being used", () => {
     const wrapper = createWrapper();
     const chatStore = useChatStore();
 
     chatStore.isLoading = false;
     chatStore.lastMessage = createAiMessage("AI response");
 
-    expect(wrapper.find(".tool-indicator").exists()).toBe(false);
+    expect(wrapper.find(".status-indicator").exists()).toBe(false);
   });
 
   it("shows generic loading indicator when store indicates generic loading", async () => {
@@ -184,7 +209,7 @@ describe("ChatInterface", () => {
     // Should only contain MessageInput, no messages or indicators
     expect(wrapper.find(".ai-message").exists()).toBe(false);
     expect(wrapper.find(".human-message").exists()).toBe(false);
-    expect(wrapper.find(".tool-indicator").exists()).toBe(false);
+    expect(wrapper.find(".status-indicator").exists()).toBe(false);
     expect(wrapper.find(".skeleton-item").exists()).toBe(false);
   });
 
@@ -212,9 +237,9 @@ describe("ChatInterface", () => {
     };
     await wrapper.vm.$nextTick();
 
-    // Should show both the message and the tool indicator
+    // Should show both the message and the status indicator
     expect(wrapper.find(".human-message").exists()).toBe(true);
-    expect(wrapper.find(".tool-indicator").exists()).toBe(true);
+    expect(wrapper.find(".status-indicator").exists()).toBe(true);
     expect(wrapper.find(".skeleton-item").exists()).toBe(false);
   });
 

@@ -79,7 +79,6 @@ from ._parameters import (
 import os
 
 
-
 agent_icon = "icons/generic/agent.png"
 chat_agent_icon = "icons/agentic/chat_agent.png"
 agent_category = knext.category(
@@ -820,7 +819,9 @@ def _iter_history_events_from_table(
     from knime.types.message import to_langchain_message
     import pyarrow.compute as pc
 
-    msg_arr = history_table[conversation_column].to_pyarrow().column(conversation_column)
+    msg_arr = (
+        history_table[conversation_column].to_pyarrow().column(conversation_column)
+    )
 
     # Without an error column, missing messages are simply ignored (same behavior as before).
     if error_column is None:
@@ -843,9 +844,7 @@ def _iter_history_events_from_table(
         )
     if pc.any(neither).as_py():
         idx = pc.index(neither, True).as_py()
-        raise RuntimeError(
-            f"Conversation table contains empty row. Row index: {idx}"
-        )
+        raise RuntimeError(f"Conversation table contains empty row. Row index: {idx}")
 
     for msg, err in zip(msg_arr.to_pylist(), err_arr.to_pylist()):
         if msg is not None:
@@ -976,6 +975,7 @@ class AgentPrompterConversation:
 
     def _append(self, message_or_error):
         from langchain_core.messages import BaseMessage
+
         self._message_and_errors.append(message_or_error)
         self._is_message.append(isinstance(message_or_error, BaseMessage))
 
@@ -1085,6 +1085,7 @@ class AgentPrompterToolset:
 
 # region Agent Chat Widget
 
+
 @knext.parameter_group(
     label="Error Handling Settings", is_advanced=True, since_version="5.10.0"
 )
@@ -1101,6 +1102,7 @@ class AgentChatWidgetErrorSettings:
         "Name of the error column in the output table.",
         default_value="Errors",
     ).rule(knext.OneOf(has_error_column, [True]), knext.Effect.SHOW)
+
 
 @knext.node(
     "Agent Chat Widget (experimental)",
@@ -1245,9 +1247,7 @@ class AgentChatWidget:
                 raise knext.InvalidParametersError(
                     "The conversation and error column names must not be equal."
                 )
-            columns.append(
-                knext.Column(knext.string(), self.errors.error_column_name)
-            )
+            columns.append(knext.Column(knext.string(), self.errors.error_column_name))
 
         return (
             None,  # combined tools workflow
@@ -1352,6 +1352,8 @@ class AgentChatWidget:
             data_registry, ctx, execution_mode, self.show_views, True
         )
         if tools_table is not None:
+            if self.tool_column is None:  # assignment in configure is not persisted
+                self.tool_column = _last_tool_column(tools_table.schema)
             tool_cells = _extract_tools_from_table(tools_table, self.tool_column)
             tools = [tool_converter.to_langchain_tool(tool) for tool in tool_cells]
         else:
@@ -1370,7 +1372,7 @@ class AgentChatWidget:
             self.recursion_limit_handling,
             self.show_tool_calls_and_results,
             self.reexecution_trigger,
-            self.errors.error_column_name if self.errors.has_error_column else None
+            self.errors.error_column_name if self.errors.has_error_column else None,
         )
 
         return AgentChatWidgetDataService(

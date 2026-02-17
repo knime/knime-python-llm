@@ -1,13 +1,14 @@
 import { expect } from "vitest";
+
 import type {
   AiMessage,
   Config,
-  ToolMessage,
-  ViewMessage,
+  HumanMessage,
+  ReexecutionTrigger,
   Timeline,
   ToolCallTimelineItem,
-  ReexecutionTrigger,
-  HumanMessage,
+  ToolMessage,
+  ViewMessage,
 } from "@/types";
 
 export const createErrorMessage = (content: string) => ({

@@ -2,21 +2,25 @@
 import WrenchIcon from "@knime/styles/img/icons/wrench.svg";
 
 import AnimatedEllipsis from "./AnimatedEllipsis.vue";
+
+defineProps<{
+  label: string;
+}>();
 </script>
 
 <template>
-  <div class="tool-use-indicator-container">
+  <div class="status-indicator-container">
     <div class="icon">
       <WrenchIcon />
     </div>
-    <span>Using tools<AnimatedEllipsis /></span>
+    <span>{{ label }}<AnimatedEllipsis /></span>
   </div>
 </template>
 
 <style lang="postcss" scoped>
 @import url("@knime/styles/css/mixins");
 
-.tool-use-indicator-container {
+.status-indicator-container {
   font-size: 12px;
   margin-bottom: var(--space-8);
   align-self: flex-start;

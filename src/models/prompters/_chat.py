@@ -48,10 +48,10 @@ import knime.extension as knext
 from ..base import (
     ChatModelPortObject,
     ChatModelPortObjectSpec,
+    OutputFormatOptions,
     _assert_tool_title_openai_compatibility,
     model_category,
     chat_model_port_type,
-    _get_output_format_value_switch,
     _validate_json_output_format,
     _initialize_model,
 )
@@ -66,6 +66,26 @@ def _is_history_present(ctx: knext.DialogCreationContext) -> bool:
 def _is_tool_table_present(ctx: knext.DialogCreationContext) -> bool:
     specs = ctx.get_input_specs()
     return len(specs) > 2 and specs[2] is not None
+
+
+def _hidden_chat_output_formats(ctx: knext.DialogCreationContext):
+    hidden = [OutputFormatOptions.Structured]
+
+    if ctx is None:
+        return hidden
+
+    input_specs = ctx.get_input_specs()
+    if not input_specs or input_specs[0] is None:
+        return hidden
+
+    input_spec: ChatModelPortObjectSpec = input_specs[0]
+    supported = input_spec.supported_output_formats
+    hidden.extend(
+        opt
+        for opt in OutputFormatOptions
+        if opt not in supported and opt not in hidden
+    )
+    return hidden
 
 
 @knext.node(
@@ -179,7 +199,15 @@ class ChatPrompter:
         default_value="",
     )
 
-    output_format = _get_output_format_value_switch()
+    output_format = knext.EnumParameter(
+        "Output format",
+        "Choose between different output formats.",
+        OutputFormatOptions.Text.name,
+        OutputFormatOptions,
+        style=knext.EnumParameter.Style.VALUE_SWITCH,
+        since_version="5.4.1",
+        hidden_choices=_hidden_chat_output_formats,
+    )
 
     message_column = knext.ColumnParameter(
         "Message column",

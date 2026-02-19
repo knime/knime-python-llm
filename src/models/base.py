@@ -150,7 +150,7 @@ class OutputFormatOptions(knext.EnumParameterOptions):
         in your prompt or system message to instruct the model to output valid JSON 
         when this mode is selected.  
         For example: "Tell me a joke. Please only reply in valid JSON."
-        Please refer to the OpenAI [guide](https://platform.openai.com/docs/guides/structured-outputs/structured-outputs-vs-json-mode) 
+        Please refer to the OpenAI [guide](https://developers.openai.com/api/docs/guides/structured-outputs/#structured-outputs-vs-json-mode) 
         to see which models currently support JSON outputs.
         """,
     )

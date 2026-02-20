@@ -41,7 +41,9 @@
 #  may freely choose the license terms applicable to such Node, including
 #  when such Node is propagated with or for interoperation with KNIME.
 # ------------------------------------------------------------------------
+import os
 
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
 import indexes.base
 import indexes.faiss

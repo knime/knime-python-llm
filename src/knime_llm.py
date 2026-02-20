@@ -43,7 +43,10 @@
 # ------------------------------------------------------------------------
 import os
 
-os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+# Temporary workaround to suppress duplicate OpenMP library warnings (e.g., from faiss).
+# Users can override this behavior by pre-setting KMP_DUPLICATE_LIB_OK in the environment.
+if "KMP_DUPLICATE_LIB_OK" not in os.environ:
+    os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
 import indexes.base
 import indexes.faiss

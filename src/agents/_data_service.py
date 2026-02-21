@@ -53,6 +53,7 @@ from ._agent import (
 )
 from ._parameters import IterationLimitModeForView
 from dataclasses import dataclass
+import re
 import yaml
 import queue
 import threading
@@ -62,7 +63,7 @@ from langchain_core.messages.human import HumanMessage
 from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
-    from .base import AgentPrompterConversation
+    from ._conversation import AgentPrompterConversation
 
 
 @dataclass
@@ -219,6 +220,8 @@ class AgentChatWidgetDataService:
 
 
 class FrontendConversation:
+    _MESSAGE_ID_SUFFIX_PATTERN = re.compile(r"\n\n\[message_id:\s*([^\]]+)\]\s*$")
+
     def __init__(
         self,
         backend: "AgentPrompterConversation",
@@ -311,8 +314,20 @@ class FrontendConversation:
         content = None
         viewNodeIds = []
         if hasattr(message, "content"):
-            split = message.content.split("View node IDs")
+            raw_content = message.content
+            message_id_suffix = ""
+            if isinstance(raw_content, str):
+                message_id_match = self._MESSAGE_ID_SUFFIX_PATTERN.search(raw_content)
+                if message_id_match:
+                    message_id_suffix = (
+                        f"\n\n[message_id: {message_id_match.group(1).strip()}]"
+                    )
+                    raw_content = raw_content[: message_id_match.start()]
+
+            split = raw_content.split("View node IDs")
             content = split[0]
+            if message_id_suffix:
+                content = f"{content}{message_id_suffix}"
             viewNodeIds = split[1].strip().split(",") if len(split) > 1 else []
 
         fe_message = {

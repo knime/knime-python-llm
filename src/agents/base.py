@@ -893,6 +893,7 @@ def _create_agent_conversation(
     Used by both AgentPrompter2 and AgentChatWidget.
     """
     from langchain_core.messages import SystemMessage, HumanMessage
+    from ._conversation import AgentPrompterConversation
 
     conversation = AgentPrompterConversation(error_handling, ctx)
     has_history = False
@@ -919,132 +920,6 @@ def _create_agent_conversation(
         conversation.append_messages(HumanMessage(user_message))
 
     return conversation
-
-
-class AgentPrompterConversation:
-    def __init__(self, error_handling, ctx: knext.ExecutionContext = None):
-        self._error_handling = error_handling
-        self._message_and_errors = []
-        self._is_message = []
-        self._ctx = ctx
-
-    def append_messages(self, messages):
-        """Raises a CancelError if the context was canceled."""
-        from langchain_core.messages import AIMessage, BaseMessage
-        from ._agent import validate_ai_message, CancelError
-
-        if isinstance(messages, BaseMessage):
-            messages = [messages]
-
-        if self._ctx and self._ctx.is_canceled():
-            raise CancelError("Execution canceled.")
-
-        for msg in messages:
-            # Validate AI messages as they are added
-            if isinstance(msg, AIMessage):
-                try:
-                    validate_ai_message(msg)
-                except Exception as e:
-                    if self._error_handling == ErrorHandlingMode.FAIL.name:
-                        # For FAIL mode, set warning and don't add the message
-                        if self._ctx:
-                            self._ctx.set_warning(str(e))
-                        continue
-                    else:
-                        # For COLUMN mode, append the error and skip the message
-                        self._append(e)
-                        continue
-            self._append(msg)
-
-    def append_error(self, error):
-        if not isinstance(error, Exception):
-            raise error
-
-        if self._error_handling == ErrorHandlingMode.FAIL.name:
-            raise error
-        else:
-            self._append(error)
-
-    def get_messages(self):
-        messages = [
-            moe
-            for is_msg, moe in zip(self._is_message, self._message_and_errors)
-            if is_msg
-        ]
-        return messages
-
-    def _append(self, message_or_error):
-        from langchain_core.messages import BaseMessage
-
-        self._message_and_errors.append(message_or_error)
-        self._is_message.append(isinstance(message_or_error, BaseMessage))
-
-    def _construct_output(self):
-        return [
-            {
-                "message": moe if is_msg else None,
-                "error": moe if not is_msg else None,
-            }
-            for is_msg, moe in zip(self._is_message, self._message_and_errors)
-        ]
-
-    def create_output_table(
-        self,
-        tool_converter,
-        output_column_name: str,
-        error_column_name: str = None,
-    ) -> knext.Table:
-        import pandas as pd
-        from knime.types.message import from_langchain_message
-        from langchain_core.messages import SystemMessage
-
-        def to_knime_message_or_none(msg, tool_converter):
-            """Convert a message to KNIME format, or return None if input is None."""
-            if msg is None:
-                return None
-            desanitized = tool_converter.desanitize_tool_names(msg)
-            return from_langchain_message(desanitized)
-
-        if error_column_name is None:
-            messages = self.get_messages()
-            if messages and isinstance(messages[0], SystemMessage):
-                messages = messages[1:]
-            result_df = pd.DataFrame(
-                {
-                    output_column_name: [
-                        to_knime_message_or_none(msg, tool_converter)
-                        for msg in messages
-                    ]
-                }
-            )
-        else:
-            messages_and_errors = [
-                moe
-                for moe in self._construct_output()
-                if not isinstance(moe["message"], SystemMessage)
-            ]
-            messages = [
-                to_knime_message_or_none(moe["message"], tool_converter)
-                for moe in messages_and_errors
-            ]
-            errors = [
-                str(moe["error"]) if moe["error"] is not None else None
-                for moe in messages_and_errors
-            ]
-            result_df = pd.DataFrame(
-                {output_column_name: messages, error_column_name: errors}
-            )
-
-            if not any(messages):
-                result_df[output_column_name] = result_df[output_column_name].astype(
-                    _message_type().to_pandas()
-                )
-            if not any(errors):
-                result_df[error_column_name] = result_df[error_column_name].astype(
-                    "string"
-                )
-
-        return knext.Table.from_pandas(result_df)
 
 
 class AgentPrompterToolset:

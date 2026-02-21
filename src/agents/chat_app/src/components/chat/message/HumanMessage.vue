@@ -11,12 +11,12 @@ defineProps<HumanMessage>();
 </script>
 
 <template>
-  <MessageBox :is-user="true">
+  <MessageBox :anchor-id="id" :is-user="true">
     <template #icon>
       <Tooltip text="User">
         <UserIcon />
       </Tooltip>
     </template>
-    <MarkdownRenderer v-if="content" :markdown="content" />
+    <MarkdownRenderer v-if="content" :markdown="content" :message-id="id" />
   </MessageBox>
 </template>

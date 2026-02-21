@@ -10,7 +10,7 @@ defineProps<ErrorMessage>();
 </script>
 
 <template>
-  <MessageBox is-error>
+  <MessageBox :anchor-id="id" is-error>
     <template #icon>
       <Tooltip text="AI">
         <AiIcon />

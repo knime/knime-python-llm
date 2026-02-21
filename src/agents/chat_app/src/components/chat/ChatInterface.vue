@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 
 import { SkeletonItem } from "@knime/components";
 
@@ -33,12 +33,83 @@ const chatItemComponents = {
 };
 
 useScrollToBottom(scrollableContainer, messagesList);
+
+const HIGHLIGHT_CLASS = "link-target-highlight";
+const HIGHLIGHT_DURATION_MS = 1800;
+let highlightedElement: HTMLElement | null = null;
+let highlightTimer: number | undefined;
+
+const clearHighlight = () => {
+  if (highlightedElement) {
+    highlightedElement.classList.remove(HIGHLIGHT_CLASS);
+    highlightedElement = null;
+  }
+  if (highlightTimer !== undefined) {
+    window.clearTimeout(highlightTimer);
+    highlightTimer = undefined;
+  }
+};
+
+const resolveFragmentTarget = (hash: string): HTMLElement | null => {
+  if (!hash || !hash.startsWith("#")) {
+    return null;
+  }
+  const targetId = decodeURIComponent(hash.slice(1));
+  if (!targetId) {
+    return null;
+  }
+  return document.getElementById(targetId);
+};
+
+const navigateToHash = (hash: string, updateLocation: boolean) => {
+  const target = resolveFragmentTarget(hash);
+  if (!target) {
+    return;
+  }
+  if (updateLocation && window.location.hash !== hash) {
+    window.location.hash = hash;
+  }
+  target.scrollIntoView({ behavior: "smooth", block: "start" });
+  clearHighlight();
+  target.classList.add(HIGHLIGHT_CLASS);
+  highlightedElement = target;
+  highlightTimer = window.setTimeout(clearHighlight, HIGHLIGHT_DURATION_MS);
+};
+
+const onClickMessageList = (event: MouseEvent) => {
+  const link = (event.target as HTMLElement | null)?.closest("a");
+  if (!link) {
+    return;
+  }
+  const href = link.getAttribute("href");
+  if (!href || !href.startsWith("#")) {
+    return;
+  }
+  event.preventDefault();
+  navigateToHash(href, true);
+};
+
+const onHashChange = () => {
+  navigateToHash(window.location.hash, false);
+};
+
+onMounted(() => {
+  window.addEventListener("hashchange", onHashChange);
+  if (window.location.hash) {
+    navigateToHash(window.location.hash, false);
+  }
+});
+
+onUnmounted(() => {
+  window.removeEventListener("hashchange", onHashChange);
+  clearHighlight();
+});
 </script>
 
 <template>
   <main class="chat-interface">
     <div ref="scrollableContainer" class="scrollable-container">
-      <div ref="messagesList" class="message-list">
+      <div ref="messagesList" class="message-list" @click="onClickMessageList">
         <template v-for="item in chatStore.chatItems" :key="item.id">
           <component :is="chatItemComponents[item.type]" v-bind="item" />
         </template>
@@ -83,5 +154,11 @@ useScrollToBottom(scrollableContainer, messagesList);
   flex-direction: column;
   gap: var(--space-24);
   padding: var(--space-24) 0;
+
+  :deep(.link-target-highlight) {
+    outline: 2px solid var(--knime-masala);
+    outline-offset: 4px;
+    transition: outline-color 0.25s ease;
+  }
 }
 </style>

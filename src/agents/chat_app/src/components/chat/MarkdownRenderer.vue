@@ -5,9 +5,10 @@ import { renderMarkdown } from "../../utils/markdown";
 
 const props = defineProps<{
   markdown: string;
+  messageId?: string;
 }>();
 
-const htmlContent = computed(() => renderMarkdown(props.markdown));
+const htmlContent = computed(() => renderMarkdown(props.markdown, props.messageId));
 </script>
 
 <template>

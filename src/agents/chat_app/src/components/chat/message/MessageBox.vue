@@ -2,8 +2,14 @@
 import { defineProps, useSlots } from "vue";
 
 withDefaults(
-  defineProps<{ isUser?: boolean; isError?: boolean; isNodeView?: boolean }>(),
+  defineProps<{
+    anchorId?: string;
+    isUser?: boolean;
+    isError?: boolean;
+    isNodeView?: boolean;
+  }>(),
   {
+    anchorId: undefined,
     isUser: false,
     isError: false,
     isNodeView: false,
@@ -17,6 +23,7 @@ const hasIconSlot = slots.icon;
 
 <template>
   <div
+    :id="anchorId"
     class="wrapper"
     :class="{
       user: isUser,

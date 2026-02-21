@@ -60,4 +60,21 @@ describe("renderMarkdown", () => {
     expect(result).toContain("&lt;script&gt;");
     expect(includesTag(result, "code")).toBe(true);
   });
+
+  it("keeps anchor links for in-chat navigation", () => {
+    const input = "[Jump](#msg-0001)";
+
+    const result = renderMarkdown(input);
+
+    expect(result).toContain('<a href="#msg-0001">');
+  });
+
+  it("adds deterministic section IDs when messageId is provided", () => {
+    const input = "## Overview\n\n## Overview";
+
+    const result = renderMarkdown(input, "msg-0007");
+
+    expect(result).toContain('<h2 id="msg-0007__overview">');
+    expect(result).toContain('<h2 id="msg-0007__overview-2">');
+  });
 });

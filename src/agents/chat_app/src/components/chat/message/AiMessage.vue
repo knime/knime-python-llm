@@ -11,10 +11,10 @@ defineProps<AiMessage>();
 </script>
 
 <template>
-  <MessageBox>
+  <MessageBox :anchor-id="id">
     <template #icon>
       <Tooltip text="AI"> <AiIcon /> </Tooltip>
     </template>
-    <MarkdownRenderer v-if="content" :markdown="content" />
+    <MarkdownRenderer v-if="content" :markdown="content" :message-id="id" />
   </MessageBox>
 </template>

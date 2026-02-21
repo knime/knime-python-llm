@@ -163,7 +163,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <MessageBox class="message" is-node-view>
+  <MessageBox :anchor-id="id" class="message" is-node-view>
     <template #icon>
       <ChartDotsIcon />
     </template>

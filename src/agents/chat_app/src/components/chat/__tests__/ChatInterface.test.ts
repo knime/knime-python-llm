@@ -390,4 +390,49 @@ describe("ChatInterface", () => {
 
     wrapper.unmount();
   });
+
+  it("shows backlinks for selected message and navigates to backlink source", async () => {
+    const wrapper = createNavigationWrapper();
+    const chatStore = useChatStore();
+
+    chatStore.chatItems = [
+      {
+        id: "msg-0001",
+        type: "ai",
+        content:
+          'Reasoning with a reference to <a href="#msg-0002">the user message</a>.',
+      } as AiMessage,
+      {
+        id: "msg-0002",
+        type: "human",
+        content: "User question content",
+      } as HumanMessage,
+    ];
+    await wrapper.vm.$nextTick();
+
+    const selectedTarget = wrapper.find("#msg-0002");
+    expect(selectedTarget.exists()).toBe(true);
+    selectedTarget.element.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await wrapper.vm.$nextTick();
+
+    const panel = wrapper.find('[data-testid="backlink-panel"]');
+    expect(panel.exists()).toBe(true);
+    expect(panel.text()).toContain("Backlinks to msg-0002");
+    expect(panel.text()).toContain("msg-0001");
+
+    const source = wrapper.find("#msg-0001");
+    const scrollIntoViewMock = vi.fn();
+    (source.element as HTMLElement).scrollIntoView = scrollIntoViewMock;
+
+    await wrapper.find(".backlink-item").trigger("click");
+
+    expect(scrollIntoViewMock).toHaveBeenCalledWith({
+      behavior: "smooth",
+      block: "start",
+    });
+    expect(window.location.hash).toBe("#msg-0001");
+    expect(source.classes()).toContain("link-target-highlight");
+
+    wrapper.unmount();
+  });
 });

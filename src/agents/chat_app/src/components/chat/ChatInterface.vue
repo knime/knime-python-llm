@@ -5,6 +5,7 @@ import { SkeletonItem } from "@knime/components";
 
 import { useScrollToBottom } from "@/composables/useScrollToBottom";
 import { useChatStore } from "@/stores/chat";
+import type { ChatItem } from "@/types";
 import { renderMarkdown } from "@/utils/markdown";
 
 import MessageInput from "./MessageInput.vue";
@@ -46,6 +47,7 @@ const previewTop = ref(0);
 const previewLeft = ref(0);
 const PREVIEW_OFFSET_PX = 12;
 const previewHtml = computed(() => renderMarkdown(previewText.value));
+const selectedMessageId = ref<string | null>(null);
 
 const clearHighlight = () => {
   if (highlightedElement) {
@@ -57,6 +59,68 @@ const clearHighlight = () => {
     highlightTimer = undefined;
   }
 };
+
+type BacklinkEntry = {
+  sourceId: string;
+  preview: string;
+};
+
+const MESSAGE_REF_PATTERN =
+  /#([A-Za-z0-9][A-Za-z0-9_-]*(?:__[A-Za-z0-9][A-Za-z0-9_-]*)?)/g;
+const MAX_BACKLINK_PREVIEW_CHARS = 120;
+type NonTimelineChatItem = Exclude<ChatItem, { type: "timeline" }>;
+
+const isMessageItem = (
+  item: ChatItem,
+): item is NonTimelineChatItem =>
+  item.type !== "timeline";
+
+const normalizeMessageId = (id: string) => id.split("__")[0];
+
+const extractReferences = (content: string): string[] => {
+  const result = new Set<string>();
+  for (const match of content.matchAll(MESSAGE_REF_PATTERN)) {
+    if (match[1]) {
+      result.add(normalizeMessageId(match[1]));
+    }
+  }
+  return Array.from(result);
+};
+
+const toBacklinkPreview = (content: string): string => {
+  const plain = content.replace(/\s+/g, " ").trim();
+  if (plain.length <= MAX_BACKLINK_PREVIEW_CHARS) {
+    return plain;
+  }
+  return `${plain.slice(0, MAX_BACKLINK_PREVIEW_CHARS)}...`;
+};
+
+const backlinks = computed(() => {
+  if (!selectedMessageId.value) {
+    return [] as BacklinkEntry[];
+  }
+
+  const selected = selectedMessageId.value;
+  const entries: BacklinkEntry[] = [];
+
+  for (const item of chatStore.chatItems) {
+    if (!isMessageItem(item)) {
+      continue;
+    }
+    if (!("content" in item) || typeof item.content !== "string") {
+      continue;
+    }
+    const refs = extractReferences(item.content);
+    if (refs.includes(selected)) {
+      entries.push({
+        sourceId: item.id,
+        preview: toBacklinkPreview(item.content),
+      });
+    }
+  }
+
+  return entries;
+});
 
 const resolveFragmentTarget = (hash: string): HTMLElement | null => {
   if (!hash || !hash.startsWith("#")) {
@@ -74,6 +138,8 @@ const navigateToHash = (hash: string, updateLocation: boolean) => {
   if (!target) {
     return;
   }
+  const normalized = normalizeMessageId(decodeURIComponent(hash.slice(1)));
+  selectedMessageId.value = normalized || null;
   if (updateLocation && window.location.hash !== hash) {
     window.location.hash = hash;
   }
@@ -84,17 +150,39 @@ const navigateToHash = (hash: string, updateLocation: boolean) => {
   highlightTimer = window.setTimeout(clearHighlight, HIGHLIGHT_DURATION_MS);
 };
 
+const selectMessageFromEvent = (event: MouseEvent) => {
+  const clickedElement = event.target as HTMLElement | null;
+  const idElement = clickedElement?.closest("[id]");
+  const id = idElement?.getAttribute("id");
+  if (!id) {
+    return;
+  }
+  const normalized = normalizeMessageId(id);
+  const exists = chatStore.chatItems.some(
+    (item) => isMessageItem(item) && item.id === normalized,
+  );
+  if (exists) {
+    selectedMessageId.value = normalized;
+  }
+};
+
 const onClickMessageList = (event: MouseEvent) => {
   const link = (event.target as HTMLElement | null)?.closest("a");
   if (!link) {
+    selectMessageFromEvent(event);
     return;
   }
   const href = link.getAttribute("href");
   if (!href || !href.startsWith("#")) {
+    selectMessageFromEvent(event);
     return;
   }
   event.preventDefault();
   navigateToHash(href, true);
+};
+
+const onClickBacklink = (sourceId: string) => {
+  navigateToHash(`#${sourceId}`, true);
 };
 
 const extractTargetMessageId = (href: string): string | null => {
@@ -231,6 +319,27 @@ onUnmounted(() => {
         </MessageBox>
       </div>
     </div>
+
+    <aside
+      v-if="selectedMessageId"
+      class="backlink-panel"
+      data-testid="backlink-panel"
+    >
+      <div class="backlink-title">Backlinks to {{ selectedMessageId }}</div>
+      <div v-if="backlinks.length === 0" class="backlink-empty">
+        No backlinks yet.
+      </div>
+      <button
+        v-for="entry in backlinks"
+        :key="entry.sourceId"
+        class="backlink-item"
+        type="button"
+        @click="onClickBacklink(entry.sourceId)"
+      >
+        <div class="backlink-item-id">{{ entry.sourceId }}</div>
+        <div class="backlink-item-preview">{{ entry.preview }}</div>
+      </button>
+    </aside>
     <div
       v-if="previewTargetId"
       class="reference-preview"
@@ -313,5 +422,52 @@ onUnmounted(() => {
       margin-bottom: 0;
     }
   }
+}
+
+.backlink-panel {
+  position: absolute;
+  top: var(--space-24);
+  right: var(--space-24);
+  width: 280px;
+  max-height: 320px;
+  overflow-y: auto;
+  background: var(--knime-white);
+  border: 1px solid var(--knime-silver-sand);
+  border-radius: var(--space-4);
+  box-shadow: var(--knime-shadow-level-2);
+  padding: var(--space-8);
+  z-index: 900;
+}
+
+.backlink-title {
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: var(--space-8);
+}
+
+.backlink-empty {
+  font-size: 12px;
+}
+
+.backlink-item {
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--knime-silver-sand-semi);
+  border-radius: var(--space-4);
+  background: var(--knime-white);
+  margin-bottom: var(--space-8);
+  padding: var(--space-8);
+  cursor: pointer;
+}
+
+.backlink-item-id {
+  font-size: 11px;
+  font-weight: 600;
+  margin-bottom: var(--space-4);
+}
+
+.backlink-item-preview {
+  font-size: 12px;
+  line-height: 1.3;
 }
 </style>

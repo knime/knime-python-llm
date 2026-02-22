@@ -2,18 +2,50 @@
 import { computed } from "vue";
 
 import { renderMarkdown } from "../../utils/markdown";
+import { extractReferenceTargets } from "../../utils/messageReferences";
 
 const props = defineProps<{
+  backlinkCount?: number;
   markdown: string;
   messageId?: string;
 }>();
 
+const emit = defineEmits<{
+  navigateRef: [hash: string];
+  toggleBacklinks: [messageId: string];
+}>();
+
 const htmlContent = computed(() => renderMarkdown(props.markdown, props.messageId));
+const referenceTargets = computed(() => extractReferenceTargets(props.markdown));
+
+const onNavigateRef = (target: string) => {
+  emit("navigateRef", `#${target}`);
+};
+
+const onToggleBacklinks = () => {
+  if (props.messageId) {
+    emit("toggleBacklinks", props.messageId);
+  }
+};
 </script>
 
 <template>
   <!-- eslint-disable-next-line vue/no-v-html -->
   <div class="content" v-html="htmlContent" />
+  <div v-if="messageId" class="citation-chips">
+    <button
+      v-for="target in referenceTargets"
+      :key="target"
+      class="chip"
+      type="button"
+      @click.stop="onNavigateRef(target)"
+    >
+      {{ target }}
+    </button>
+    <button class="chip backlink-chip" type="button" @click.stop="onToggleBacklinks">
+      Backlinks ({{ backlinkCount ?? 0 }})
+    </button>
+  </div>
 </template>
 
 <style lang="postcss" scoped>
@@ -96,5 +128,25 @@ const htmlContent = computed(() => renderMarkdown(props.markdown, props.messageI
       }
     }
   }
+}
+
+.citation-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin-top: var(--space-8);
+}
+
+.chip {
+  border: 1px solid var(--knime-silver-sand-semi);
+  border-radius: 999px;
+  background: var(--knime-white);
+  font-size: 11px;
+  padding: 2px var(--space-8);
+  cursor: pointer;
+}
+
+.backlink-chip {
+  font-weight: 600;
 }
 </style>

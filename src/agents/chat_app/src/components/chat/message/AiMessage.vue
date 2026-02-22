@@ -7,7 +7,12 @@ import MarkdownRenderer from "../MarkdownRenderer.vue";
 
 import MessageBox from "./MessageBox.vue";
 
-defineProps<AiMessage>();
+defineProps<AiMessage & { backlinkCount?: number }>();
+
+const emit = defineEmits<{
+  navigateRef: [hash: string];
+  toggleBacklinks: [messageId: string];
+}>();
 </script>
 
 <template>
@@ -15,6 +20,13 @@ defineProps<AiMessage>();
     <template #icon>
       <Tooltip text="AI"> <AiIcon /> </Tooltip>
     </template>
-    <MarkdownRenderer v-if="content" :markdown="content" :message-id="id" />
+    <MarkdownRenderer
+      v-if="content"
+      :backlink-count="backlinkCount"
+      :markdown="content"
+      :message-id="id"
+      @navigate-ref="emit('navigateRef', $event)"
+      @toggle-backlinks="emit('toggleBacklinks', $event)"
+    />
   </MessageBox>
 </template>

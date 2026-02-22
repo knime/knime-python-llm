@@ -7,6 +7,10 @@ import { useScrollToBottom } from "@/composables/useScrollToBottom";
 import { useChatStore } from "@/stores/chat";
 import type { ChatItem } from "@/types";
 import { renderMarkdown } from "@/utils/markdown";
+import {
+  extractReferencedMessageIds,
+  normalizeMessageId,
+} from "@/utils/messageReferences";
 
 import MessageInput from "./MessageInput.vue";
 import StatusIndicator from "./StatusIndicator.vue";
@@ -65,8 +69,6 @@ type BacklinkEntry = {
   previewMarkdown: string;
 };
 
-const MESSAGE_REF_PATTERN =
-  /#([A-Za-z0-9][A-Za-z0-9_-]*(?:__[A-Za-z0-9][A-Za-z0-9_-]*)?)/g;
 type NonTimelineChatItem = Exclude<ChatItem, { type: "timeline" }>;
 
 const isMessageItem = (
@@ -74,28 +76,11 @@ const isMessageItem = (
 ): item is NonTimelineChatItem =>
   item.type !== "timeline";
 
-const normalizeMessageId = (id: string) => id.split("__")[0];
-
-const extractReferences = (content: string): string[] => {
-  const result = new Set<string>();
-  for (const match of content.matchAll(MESSAGE_REF_PATTERN)) {
-    if (match[1]) {
-      result.add(normalizeMessageId(match[1]));
-    }
-  }
-  return Array.from(result);
-};
-
 const renderBacklinkPreview = (markdown: string): string =>
   renderMarkdown(markdown);
 
-const backlinks = computed(() => {
-  if (!selectedMessageId.value) {
-    return [] as BacklinkEntry[];
-  }
-
-  const selected = selectedMessageId.value;
-  const entries: BacklinkEntry[] = [];
+const backlinksByTarget = computed(() => {
+  const byTarget = new Map<string, BacklinkEntry[]>();
 
   for (const item of chatStore.chatItems) {
     if (!isMessageItem(item)) {
@@ -104,17 +89,41 @@ const backlinks = computed(() => {
     if (!("content" in item) || typeof item.content !== "string") {
       continue;
     }
-    const refs = extractReferences(item.content);
-    if (refs.includes(selected)) {
-      entries.push({
+    const refs = extractReferencedMessageIds(item.content);
+    for (const targetId of refs) {
+      const current = byTarget.get(targetId) ?? [];
+      current.push({
         sourceId: item.id,
         previewMarkdown: item.content,
       });
+      byTarget.set(targetId, current);
     }
   }
 
-  return entries;
+  return byTarget;
 });
+
+const backlinks = computed(() => {
+  if (!selectedMessageId.value) {
+    return [] as BacklinkEntry[];
+  }
+  return backlinksByTarget.value.get(selectedMessageId.value) ?? [];
+});
+
+const backlinkCountByMessageId = computed(() => {
+  const counts = new Map<string, number>();
+  for (const [targetId, entries] of backlinksByTarget.value) {
+    counts.set(targetId, entries.length);
+  }
+  return counts;
+});
+
+const getBacklinkCount = (item: ChatItem): number => {
+  if (!isMessageItem(item)) {
+    return 0;
+  }
+  return backlinkCountByMessageId.value.get(item.id) ?? 0;
+};
 
 const resolveFragmentTarget = (hash: string): HTMLElement | null => {
   if (!hash || !hash.startsWith("#")) {
@@ -177,6 +186,15 @@ const onClickMessageList = (event: MouseEvent) => {
 
 const onClickBacklink = (sourceId: string) => {
   navigateToHash(`#${sourceId}`, true);
+};
+
+const onNavigateRef = (hash: string) => {
+  navigateToHash(hash, true);
+};
+
+const onToggleBacklinks = (messageId: string) => {
+  selectedMessageId.value =
+    selectedMessageId.value === messageId ? null : messageId;
 };
 
 const extractTargetMessageId = (href: string): string | null => {
@@ -300,7 +318,13 @@ onUnmounted(() => {
         @mouseout="onMouseOutMessageList"
       >
         <template v-for="item in chatStore.chatItems" :key="item.id">
-          <component :is="chatItemComponents[item.type]" v-bind="item" />
+          <component
+            :is="chatItemComponents[item.type]"
+            :backlink-count="getBacklinkCount(item)"
+            v-bind="item"
+            @navigate-ref="onNavigateRef"
+            @toggle-backlinks="onToggleBacklinks"
+          />
         </template>
 
         <StatusIndicator

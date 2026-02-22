@@ -75,13 +75,23 @@ describe("ChatInterface", () => {
       global: {
         stubs: {
           AiMessage: {
-            props: ["id", "content"],
-            template: "<div :id='id' class='ai-message' v-html='content || \"AI Message\"' />",
+            props: ["id", "content", "backlinkCount"],
+            emits: ["navigate-ref", "toggle-backlinks"],
+            template:
+              "<div>" +
+              "<div :id='id' class='ai-message' v-html='content || \"AI Message\"' />" +
+              "<button class='ai-nav-ref' @click=\"$emit('navigate-ref', '#msg-0002')\">ref</button>" +
+              "<button class='ai-backlink-toggle' @click=\"$emit('toggle-backlinks', id)\">backlinks {{ backlinkCount }}</button>" +
+              "</div>",
           },
           HumanMessage: {
-            props: ["id", "content"],
+            props: ["id", "content", "backlinkCount"],
+            emits: ["navigate-ref", "toggle-backlinks"],
             template:
-              "<div :id='id' class='human-message'>{{ content || 'Human Message' }}</div>",
+              "<div>" +
+              "<div :id='id' class='human-message'>{{ content || 'Human Message' }}</div>" +
+              "<button class='human-backlink-toggle' @click=\"$emit('toggle-backlinks', id)\">backlinks {{ backlinkCount }}</button>" +
+              "</div>",
           },
           ErrorMessage: {
             props: ["id"],
@@ -432,6 +442,36 @@ describe("ChatInterface", () => {
     });
     expect(window.location.hash).toBe("#msg-0001");
     expect(source.classes()).toContain("link-target-highlight");
+
+    wrapper.unmount();
+  });
+
+  it("toggles backlink panel when backlink chip is clicked", async () => {
+    const wrapper = createNavigationWrapper();
+    const chatStore = useChatStore();
+
+    chatStore.chatItems = [
+      {
+        id: "msg-0001",
+        type: "ai",
+        content: "No explicit references yet",
+      } as AiMessage,
+    ];
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.find('[data-testid="backlink-panel"]').exists()).toBe(false);
+
+    await wrapper.find(".ai-backlink-toggle").trigger("click");
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.find('[data-testid="backlink-panel"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="backlink-panel"]').text()).toContain(
+      "Backlinks to msg-0001",
+    );
+
+    await wrapper.find(".ai-backlink-toggle").trigger("click");
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find('[data-testid="backlink-panel"]').exists()).toBe(false);
 
     wrapper.unmount();
   });

@@ -118,6 +118,9 @@ class AgentChatWidgetDataService:
 
     def post_user_message(self, user_message: str):
         self._is_canceled = False
+        human_message = HumanMessage(content=user_message)
+        self._conversation.append_messages_to_backend(human_message)
+
         if not self._thread or not self._thread.is_alive():
             while not self._message_queue.empty():
                 try:
@@ -125,10 +128,10 @@ class AgentChatWidgetDataService:
                 except queue.Empty:
                     continue
 
-            self._thread = threading.Thread(
-                target=self._post_user_message, args=(user_message,)
-            )
+            self._thread = threading.Thread(target=self._post_user_message)
             self._thread.start()
+
+        return {"id": human_message.id}
 
     def get_last_messages(self):
         messages = []
@@ -177,12 +180,8 @@ class AgentChatWidgetDataService:
         }
         return view_data
 
-    def _post_user_message(self, user_message: str):
+    def _post_user_message(self):
         from langchain_core.messages import AIMessage
-
-        self._conversation.append_messages_to_backend(
-            HumanMessage(content=user_message)
-        )
 
         try:
             self._agent.run()

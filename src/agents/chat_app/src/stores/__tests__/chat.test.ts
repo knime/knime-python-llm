@@ -557,6 +557,29 @@ describe("chat store", () => {
       expect(store.isLoading).toBe(false);
     });
 
+    it("reconciles user message ID with backend-assigned message ID", async () => {
+      const { store } = setupStore();
+
+      mockJsonDataService.data.mockClear();
+      mockJsonDataService.data
+        .mockResolvedValueOnce({ id: "msg-0002" }) // post_user_message
+        .mockResolvedValueOnce([]) // get_last_messages
+        .mockResolvedValueOnce({ is_processing: false }); // is_processing
+
+      store.jsonDataService = mockJsonDataService;
+      store.initState = "ready";
+
+      await store.sendUserMessage("Hello!");
+      await nextTick();
+
+      expect(store.chatItems).toHaveLength(1);
+      expect(store.chatItems[0]).toMatchObject({
+        type: "human",
+        id: "msg-0002",
+        content: "Hello!",
+      });
+    });
+
     it("ignores empty messages", async () => {
       const { store } = setupStore();
 

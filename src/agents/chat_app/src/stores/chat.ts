@@ -389,10 +389,11 @@ export const useChatStore = defineStore("chat", () => {
 
   async function postUserMessage(msg: string) {
     try {
-      await jsonDataService.value?.data({
+      const response = await jsonDataService.value?.data({
         method: "post_user_message",
         options: [msg],
       });
+      return response;
     } catch (error) {
       consola.error("Chat Store: Failed to post user message:", error);
       throw error;
@@ -406,8 +407,9 @@ export const useChatStore = defineStore("chat", () => {
     isLoading.value = true;
 
     try {
-      await postUserMessage(msg);
+      const response = await postUserMessage(msg);
       pollForNewMessages();
+      return response;
     } catch (error) {
       consola.error("Chat Store: Error sending user message:", error);
       addErrorMessage("sending");
@@ -415,6 +417,29 @@ export const useChatStore = defineStore("chat", () => {
   }
 
   // ==== HIGHER LEVEL CHAT ACTIONS ====
+  function reconcileMessageId(tempId: string, backendId: string) {
+    if (!backendId || tempId === backendId) {
+      return;
+    }
+
+    for (const item of chatItems.value) {
+      if (
+        item.type !== "timeline" &&
+        item.type !== "view" &&
+        item.type !== "tool" &&
+        item.id === tempId
+      ) {
+        item.id = backendId;
+      }
+    }
+
+    for (const msg of messagesToPersist) {
+      if (msg.id === tempId) {
+        msg.id = backendId;
+      }
+    }
+  }
+
   async function sendUserMessage(msg: string) {
     if (!msg.trim() || isLoading.value) {
       return;
@@ -425,7 +450,10 @@ export const useChatStore = defineStore("chat", () => {
       const message: Message = { id: useId(), content: msg, type: "human" };
       addMessages([message], shouldShowToolCalls.value || false);
       // 2. send to backend
-      await sendMessageToBackend(msg);
+      const response = await sendMessageToBackend(msg);
+      if (response?.id && message.type === "human") {
+        reconcileMessageId(message.id, response.id as string);
+      }
     };
 
     if (initState.value === "ready") {

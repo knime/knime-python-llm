@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import { createTestingPinia } from "@pinia/testing";
 import { setActivePinia } from "pinia";
@@ -23,6 +23,8 @@ vi.mock("@/composables/useScrollToBottom", () => ({
 }));
 
 describe("ChatInterface", () => {
+  const originalHash = window.location.hash;
+
   beforeEach(() => {
     setActivePinia(
       createTestingPinia({
@@ -30,6 +32,12 @@ describe("ChatInterface", () => {
         stubActions: false,
       }),
     );
+    window.location.hash = "";
+  });
+
+  afterEach(() => {
+    window.location.hash = originalHash;
+    vi.restoreAllMocks();
   });
 
   const createWrapper = () => {
@@ -45,6 +53,42 @@ describe("ChatInterface", () => {
           },
           NodeViewMessage: {
             template: "<div class='view-message'>View Message</div>",
+          },
+          ExpandableTimeline: {
+            template: "<div class='timeline'>Timeline</div>",
+          },
+          StatusIndicator: {
+            props: ["label"],
+            template: "<div class='status-indicator'>{{ label }}</div>",
+          },
+          MessageInput: {
+            template: "<div class='message-input'>Message Input</div>",
+          },
+        },
+      },
+    });
+  };
+
+  const createNavigationWrapper = () => {
+    return mount(ChatInterface, {
+      attachTo: document.body,
+      global: {
+        stubs: {
+          AiMessage: {
+            props: ["id"],
+            template: "<div :id='id' class='ai-message'>AI Message</div>",
+          },
+          HumanMessage: {
+            props: ["id"],
+            template: "<div :id='id' class='human-message'>Human Message</div>",
+          },
+          ErrorMessage: {
+            props: ["id"],
+            template: "<div :id='id' class='error-message'>Error Message</div>",
+          },
+          NodeViewMessage: {
+            props: ["id"],
+            template: "<div :id='id' class='view-message'>View Message</div>",
           },
           ExpandableTimeline: {
             template: "<div class='timeline'>Timeline</div>",
@@ -264,5 +308,41 @@ describe("ChatInterface", () => {
     await wrapper.vm.$nextTick();
     expect(chatStore.isLoading).toBe(false);
     expect(wrapper.find(".skeleton-item").exists()).toBe(false);
+  });
+
+  it("navigates to a user message when clicking a hash link", async () => {
+    const wrapper = createNavigationWrapper();
+    const chatStore = useChatStore();
+
+    const humanMessage: HumanMessage = {
+      id: "msg-0002",
+      type: "human",
+      content: "Hello",
+    };
+
+    chatStore.chatItems = [humanMessage];
+    await wrapper.vm.$nextTick();
+
+    const target = wrapper.find("#msg-0002");
+    expect(target.exists()).toBe(true);
+
+    const scrollIntoViewMock = vi.fn();
+    (target.element as HTMLElement).scrollIntoView = scrollIntoViewMock;
+
+    const link = document.createElement("a");
+    link.setAttribute("href", "#msg-0002");
+    target.element.appendChild(link);
+
+    link.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await wrapper.vm.$nextTick();
+
+    expect(scrollIntoViewMock).toHaveBeenCalledWith({
+      behavior: "smooth",
+      block: "start",
+    });
+    expect(window.location.hash).toBe("#msg-0002");
+    expect(target.classes()).toContain("link-target-highlight");
+
+    wrapper.unmount();
   });
 });

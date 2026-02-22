@@ -56,10 +56,12 @@ const laneLabels: Array<{ type: NonTimelineChatItem["type"]; label: string }> = 
 ];
 
 const laneOffsetPattern = [0, -28, 28, -56, 56, -84, 84];
-const DAG_COLUMN_START = 120;
-const DAG_COLUMN_GAP = 180;
-const DAG_ROW_START = 90;
-const DAG_ROW_GAP = 92;
+const DAG_COLUMN_START = 70;
+const DAG_COLUMN_GAP = 64;
+const DAG_ROW_START = 68;
+const DAG_ROW_GAP = 64;
+const DAG_NODE_RADIUS = 11;
+const DAG_LABEL_GAP = 84;
 
 const offsetForLaneIndex = (laneIndex: number) =>
   laneOffsetPattern[laneIndex % laneOffsetPattern.length];
@@ -148,6 +150,21 @@ const dagColumnCount = computed(() =>
 );
 
 const dagColumnX = (column: number) => DAG_COLUMN_START + column * DAG_COLUMN_GAP;
+const dagLabelX = computed(
+  () => dagColumnX(Math.max(0, dagColumnCount.value - 1)) + DAG_LABEL_GAP,
+);
+
+const dagPalette = [
+  "#b85652",
+  "#b7b84a",
+  "#65b85b",
+  "#6fbac7",
+  "#5a5ec7",
+  "#cc7a45",
+  "#7d66c7",
+];
+
+const colorForColumn = (column: number) => dagPalette[column % dagPalette.length];
 
 const nodes = computed<GraphNode[]>(() => {
   const laneCounts: Record<NonTimelineChatItem["type"], number> = {
@@ -212,16 +229,18 @@ const edges = computed<GraphEdge[]>(() => {
 
       let path = "";
       if (layoutMode.value === "dag") {
-        const sourceOrder = messageOrderById.value.get(source.id) ?? 0;
-        const targetOrder = messageOrderById.value.get(targetId) ?? 0;
-        const startNode = targetOrder <= sourceOrder ? targetNode : sourceNode;
-        const endNode = targetOrder <= sourceOrder ? sourceNode : targetNode;
-        const sx = startNode.x;
-        const sy = startNode.y + 22;
-        const ex = endNode.x;
-        const ey = endNode.y - 22;
-        const midY = sy + (ey - sy) * 0.5;
-        path = `M ${sx} ${sy} C ${sx} ${midY}, ${ex} ${midY}, ${ex} ${ey}`;
+        const sx = sourceNode.x;
+        const sy = sourceNode.y;
+        const tx = targetNode.x;
+        const ty = targetNode.y;
+        if (sx === tx) {
+          path = `M ${sx} ${sy} L ${tx} ${ty}`;
+        } else {
+          const direction = ty >= sy ? 1 : -1;
+          const bendY = sy + direction * Math.max(14, Math.abs(ty - sy) * 0.3);
+          const curveY = bendY + direction * 12;
+          path = `M ${sx} ${sy} L ${sx} ${bendY} C ${sx} ${curveY}, ${tx} ${curveY}, ${tx} ${bendY} L ${tx} ${ty}`;
+        }
       } else {
         const curvature = Math.max(60, Math.abs(x2 - x1) * 0.25);
         const c1x = x1 + (x2 >= x1 ? curvature : -curvature);
@@ -290,15 +309,26 @@ const svgWidth = computed(() =>
     ? Math.max(1200, nodes.value.length * 220 + 220)
     : layoutMode.value === "vertical"
       ? 700
-      : Math.max(900, DAG_COLUMN_START + dagColumnCount.value * DAG_COLUMN_GAP + 220),
+      : Math.max(680, dagLabelX.value + 180),
 );
 const svgHeight = computed(() =>
   layoutMode.value === "horizontal"
     ? 620
-    : layoutMode.value === "vertical"
+      : layoutMode.value === "vertical"
       ? Math.max(720, nodes.value.length * 140 + 180)
-      : Math.max(720, DAG_ROW_START + nodes.value.length * DAG_ROW_GAP + 80),
+      : Math.max(420, DAG_ROW_START + nodes.value.length * DAG_ROW_GAP + 80),
 );
+
+const edgeStyle = (edge: GraphEdge) => {
+  if (layoutMode.value !== "dag") {
+    return undefined;
+  }
+  const sourceNode = nodeById.value.get(edge.sourceId);
+  if (!sourceNode) {
+    return undefined;
+  }
+  return { stroke: colorForColumn(sourceNode.column) };
+};
 
 const selectNode = (nodeId: string) => {
   selectedNodeId.value = nodeId;
@@ -381,15 +411,6 @@ const openSelectedMessage = () => {
               :y2="svgHeight - 40"
               class="dag-column-line"
             />
-            <text
-              v-for="column in dagColumnCount"
-              :key="`column-label-${column}`"
-              :x="dagColumnX(column - 1) - 18"
-              :y="24"
-              class="dag-column-label"
-            >
-              b{{ column }}
-            </text>
           </g>
 
           <g class="edges">
@@ -402,18 +423,28 @@ const openSelectedMessage = () => {
               }"
               :d="edge.path"
               class="edge-path"
+              :style="edgeStyle(edge)"
             />
           </g>
 
-          <g v-if="layoutMode === 'dag'" class="dag-rows">
+          <g v-if="layoutMode === 'dag'" class="dag-row-guides">
+            <line
+              v-for="node in nodes"
+              :key="`guide-${node.id}`"
+              :x1="node.x + DAG_NODE_RADIUS + 6"
+              :x2="dagLabelX - 10"
+              :y1="node.y"
+              :y2="node.y"
+              class="dag-label-guide"
+            />
             <text
               v-for="node in nodes"
-              :key="`row-${node.id}`"
-              :x="24"
-              :y="node.y + 4"
-              class="dag-row-label"
+              :key="`label-${node.id}`"
+              :x="dagLabelX"
+              :y="node.y + 5"
+              class="dag-node-text"
             >
-              #{{ node.order + 1 }}
+              {{ node.displayId }}
             </text>
           </g>
 
@@ -421,15 +452,25 @@ const openSelectedMessage = () => {
             <g
               v-for="node in nodes"
               :key="node.id"
-              :transform="`translate(${node.x - 70}, ${node.y - 22})`"
+              :transform="
+                layoutMode === 'dag'
+                  ? `translate(${node.x}, ${node.y})`
+                  : `translate(${node.x - 70}, ${node.y - 22})`
+              "
               class="node"
               :class="[node.type, { selected: selectedNodeId === node.id }]"
+              :style="layoutMode === 'dag' ? { '--dag-node-color': colorForColumn(node.column) } : undefined"
               @click="selectNode(node.id)"
             >
               <title>{{ node.id }}: {{ node.fullLabel }}</title>
-              <rect height="44" rx="8" ry="8" width="140" />
-              <text x="8" y="16" class="node-id">{{ node.displayId }}</text>
-              <text x="8" y="32" class="node-label">{{ node.label }}</text>
+              <template v-if="layoutMode === 'dag'">
+                <circle :r="DAG_NODE_RADIUS" class="dag-node-circle" />
+              </template>
+              <template v-else>
+                <rect height="44" rx="8" ry="8" width="140" />
+                <text x="8" y="16" class="node-id">{{ node.displayId }}</text>
+                <text x="8" y="32" class="node-label">{{ node.label }}</text>
+              </template>
             </g>
           </g>
         </svg>
@@ -543,14 +584,15 @@ const openSelectedMessage = () => {
   stroke-width: 1;
 }
 
-.dag-column-label {
-  font-size: 10px;
-  fill: var(--knime-dove-gray);
+.dag-label-guide {
+  stroke: var(--knime-silver-sand-semi);
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
 }
 
-.dag-row-label {
-  font-size: 10px;
-  fill: var(--knime-dove-gray);
+.dag-node-text {
+  font-size: 13px;
+  fill: var(--knime-masala);
 }
 
 .edge-path {
@@ -562,7 +604,7 @@ const openSelectedMessage = () => {
 
 .edge-path.secondary {
   stroke-dasharray: 5 4;
-  opacity: 0.45;
+  opacity: 0.5;
 }
 
 .edge-path.selected {
@@ -581,9 +623,20 @@ const openSelectedMessage = () => {
   stroke-width: 1.2;
 }
 
+.node .dag-node-circle {
+  fill: var(--dag-node-color, var(--knime-masala));
+  stroke: var(--dag-node-color, var(--knime-masala));
+  stroke-width: 2;
+}
+
 .node.selected rect {
   stroke: var(--knime-masala);
   stroke-width: 2;
+}
+
+.node.selected .dag-node-circle {
+  stroke: var(--knime-masala);
+  stroke-width: 2.5;
 }
 
 .node.human rect {

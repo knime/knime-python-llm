@@ -35,6 +35,10 @@ const emit = defineEmits<{
 const chatStore = useChatStore();
 const selectedNodeId = ref<string | null>(null);
 const layoutMode = ref<"horizontal" | "vertical" | "dag">("dag");
+const focusRootId = ref<string | null>(null);
+const focusDepth = ref<1 | 2>(1);
+const focusHistory = ref<string[]>([]);
+const focusHistoryIndex = ref(-1);
 
 const isMessageItem = (item: ChatItem): item is NonTimelineChatItem =>
   item.type !== "timeline";
@@ -209,6 +213,32 @@ const nodes = computed<GraphNode[]>(() => {
 
 const nodeById = computed(() => new Map(nodes.value.map((node) => [node.id, node])));
 
+const messageIdSet = computed(() => new Set(graphMessages.value.map((item) => item.id)));
+
+const outgoingRefsById = computed(() => {
+  const map = new Map<string, string[]>();
+  for (const [sourceId, refs] of referenceIdsBySource.value.entries()) {
+    const filtered = refs.filter((targetId) => messageIdSet.value.has(targetId));
+    map.set(sourceId, filtered);
+  }
+  return map;
+});
+
+const incomingRefsById = computed(() => {
+  const map = new Map<string, string[]>();
+  for (const messageId of messageIdSet.value) {
+    map.set(messageId, []);
+  }
+  for (const [sourceId, refs] of outgoingRefsById.value.entries()) {
+    for (const targetId of refs) {
+      const inbound = map.get(targetId) ?? [];
+      inbound.push(sourceId);
+      map.set(targetId, inbound);
+    }
+  }
+  return map;
+});
+
 const edges = computed<GraphEdge[]>(() => {
   const result: GraphEdge[] = [];
   for (const source of graphMessages.value) {
@@ -260,6 +290,43 @@ const edges = computed<GraphEdge[]>(() => {
   return result;
 });
 
+const visibleNodeIdSet = computed(() => {
+  if (!focusRootId.value) {
+    return new Set(nodes.value.map((node) => node.id));
+  }
+  const visible = new Set<string>([focusRootId.value]);
+  const frontier = [focusRootId.value];
+
+  for (let depth = 0; depth < focusDepth.value; depth += 1) {
+    const next: string[] = [];
+    for (const messageId of frontier) {
+      const neighbors = [
+        ...(outgoingRefsById.value.get(messageId) ?? []),
+        ...(incomingRefsById.value.get(messageId) ?? []),
+      ];
+      for (const neighbor of neighbors) {
+        if (!visible.has(neighbor)) {
+          visible.add(neighbor);
+          next.push(neighbor);
+        }
+      }
+    }
+    frontier.splice(0, frontier.length, ...next);
+  }
+
+  return visible;
+});
+
+const visibleNodes = computed(() =>
+  nodes.value.filter((node) => visibleNodeIdSet.value.has(node.id)),
+);
+
+const visibleEdges = computed(() =>
+  edges.value.filter(
+    (edge) => visibleNodeIdSet.value.has(edge.sourceId) && visibleNodeIdSet.value.has(edge.targetId),
+  ),
+);
+
 const inboundById = computed(() => {
   const map = new Map<string, number>();
   for (const edge of edges.value) {
@@ -304,9 +371,32 @@ const selectedSummary = computed(() => {
   };
 });
 
+const selectedOutgoingRefs = computed(() => {
+  if (!selectedNode.value) {
+    return [];
+  }
+  return outgoingRefsById.value.get(selectedNode.value.id) ?? [];
+});
+
+const selectedIncomingRefs = computed(() => {
+  if (!selectedNode.value) {
+    return [];
+  }
+  return incomingRefsById.value.get(selectedNode.value.id) ?? [];
+});
+
+const hasFocus = computed(() => Boolean(focusRootId.value));
+const canFocusBack = computed(() => focusHistoryIndex.value > 0);
+const canFocusForward = computed(
+  () => focusHistoryIndex.value >= 0 && focusHistoryIndex.value < focusHistory.value.length - 1,
+);
+const focusTrail = computed(() =>
+  focusHistory.value.slice(0, Math.max(0, focusHistoryIndex.value + 1)),
+);
+
 const svgWidth = computed(() =>
   layoutMode.value === "horizontal"
-    ? Math.max(1200, nodes.value.length * 220 + 220)
+    ? Math.max(1200, visibleNodes.value.length * 220 + 220)
     : layoutMode.value === "vertical"
       ? 700
       : Math.max(680, dagLabelX.value + 180),
@@ -315,8 +405,8 @@ const svgHeight = computed(() =>
   layoutMode.value === "horizontal"
     ? 620
       : layoutMode.value === "vertical"
-      ? Math.max(720, nodes.value.length * 140 + 180)
-      : Math.max(420, DAG_ROW_START + nodes.value.length * DAG_ROW_GAP + 80),
+      ? Math.max(720, visibleNodes.value.length * 140 + 180)
+      : Math.max(420, DAG_ROW_START + visibleNodes.value.length * DAG_ROW_GAP + 80),
 );
 
 const edgeStyle = (edge: GraphEdge) => {
@@ -334,6 +424,52 @@ const selectNode = (nodeId: string) => {
   selectedNodeId.value = nodeId;
 };
 
+const applyFocus = (nodeId: string, recordHistory = true) => {
+  if (!messageIdSet.value.has(nodeId)) {
+    return;
+  }
+  focusRootId.value = nodeId;
+  selectedNodeId.value = nodeId;
+  if (!recordHistory) {
+    return;
+  }
+  const nextHistory = focusHistory.value.slice(0, focusHistoryIndex.value + 1);
+  nextHistory.push(nodeId);
+  focusHistory.value = nextHistory;
+  focusHistoryIndex.value = nextHistory.length - 1;
+};
+
+const clearFocus = () => {
+  focusRootId.value = null;
+};
+
+const focusBack = () => {
+  if (!canFocusBack.value) {
+    return;
+  }
+  focusHistoryIndex.value -= 1;
+  const previousId = focusHistory.value[focusHistoryIndex.value];
+  applyFocus(previousId, false);
+};
+
+const focusForward = () => {
+  if (!canFocusForward.value) {
+    return;
+  }
+  focusHistoryIndex.value += 1;
+  const nextId = focusHistory.value[focusHistoryIndex.value];
+  applyFocus(nextId, false);
+};
+
+const jumpToTrailIndex = (trailIndex: number) => {
+  if (trailIndex < 0 || trailIndex > focusHistoryIndex.value) {
+    return;
+  }
+  focusHistoryIndex.value = trailIndex;
+  const messageId = focusHistory.value[trailIndex];
+  applyFocus(messageId, false);
+};
+
 const openSelectedMessage = () => {
   if (selectedNode.value) {
     emit("openMessage", selectedNode.value.id);
@@ -346,7 +482,8 @@ const openSelectedMessage = () => {
     <div class="graph-header">
       <div class="title">Reference Graph</div>
       <div class="summary">
-        {{ nodes.length }} messages · {{ edges.length }} references
+        {{ visibleNodes.length }}/{{ nodes.length }} messages · {{ visibleEdges.length }}/{{ edges.length }}
+        references
       </div>
       <div class="layout-toggle">
         <button
@@ -374,6 +511,41 @@ const openSelectedMessage = () => {
           DAG
         </button>
       </div>
+    </div>
+    <div class="focus-toolbar">
+      <button class="focus-button" :disabled="!selectedNode" type="button" @click="selectedNode && applyFocus(selectedNode.id)">
+        Focus Selected
+      </button>
+      <button class="focus-button" :disabled="!hasFocus" type="button" @click="clearFocus">
+        Show All
+      </button>
+      <button class="focus-button" :disabled="!canFocusBack" type="button" @click="focusBack">
+        Back
+      </button>
+      <button class="focus-button" :disabled="!canFocusForward" type="button" @click="focusForward">
+        Forward
+      </button>
+      <label class="depth-select">
+        Depth
+        <select v-model.number="focusDepth" :disabled="!hasFocus">
+          <option :value="1">1</option>
+          <option :value="2">2</option>
+        </select>
+      </label>
+      <div v-if="hasFocus" class="focus-root">
+        Focus: {{ focusRootId }}
+      </div>
+    </div>
+    <div v-if="focusTrail.length > 0" class="focus-trail">
+      <button
+        v-for="(trailId, index) in focusTrail"
+        :key="`trail-${trailId}-${index}`"
+        class="trail-chip"
+        type="button"
+        @click="jumpToTrailIndex(index)"
+      >
+        {{ trailId }}
+      </button>
     </div>
 
     <div v-if="nodes.length === 0" class="empty">
@@ -415,7 +587,7 @@ const openSelectedMessage = () => {
 
           <g class="edges">
             <path
-              v-for="edge in edges"
+              v-for="edge in visibleEdges"
               :key="edge.id"
               :class="{
                 selected: selectedNodeId === edge.sourceId || selectedNodeId === edge.targetId,
@@ -429,7 +601,7 @@ const openSelectedMessage = () => {
 
           <g v-if="layoutMode === 'dag'" class="dag-row-guides">
             <line
-              v-for="node in nodes"
+              v-for="node in visibleNodes"
               :key="`guide-${node.id}`"
               :x1="node.x + DAG_NODE_RADIUS + 6"
               :x2="dagLabelX - 10"
@@ -438,7 +610,7 @@ const openSelectedMessage = () => {
               class="dag-label-guide"
             />
             <text
-              v-for="node in nodes"
+              v-for="node in visibleNodes"
               :key="`label-${node.id}`"
               :x="dagLabelX"
               :y="node.y + 5"
@@ -450,7 +622,7 @@ const openSelectedMessage = () => {
 
           <g class="nodes">
             <g
-              v-for="node in nodes"
+              v-for="node in visibleNodes"
               :key="node.id"
               :transform="
                 layoutMode === 'dag'
@@ -493,6 +665,32 @@ const openSelectedMessage = () => {
           <button class="open-button" type="button" @click="openSelectedMessage">
             Open in chat
           </button>
+          <div class="reference-lists">
+            <div class="reference-list">
+              <div class="reference-title">References</div>
+              <button
+                v-for="targetId in selectedOutgoingRefs"
+                :key="`out-${targetId}`"
+                class="reference-item"
+                type="button"
+                @click="applyFocus(targetId)"
+              >
+                {{ targetId }}
+              </button>
+            </div>
+            <div class="reference-list">
+              <div class="reference-title">Referenced By</div>
+              <button
+                v-for="sourceId in selectedIncomingRefs"
+                :key="`in-${sourceId}`"
+                class="reference-item"
+                type="button"
+                @click="applyFocus(sourceId)"
+              >
+                {{ sourceId }}
+              </button>
+            </div>
+          </div>
         </div>
       </aside>
     </div>
@@ -544,6 +742,63 @@ const openSelectedMessage = () => {
   border-color: var(--knime-masala);
   color: var(--knime-masala);
   font-weight: 700;
+}
+
+.focus-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+  align-items: center;
+  margin-bottom: var(--space-8);
+}
+
+.focus-button {
+  border: 1px solid var(--knime-silver-sand);
+  border-radius: var(--space-4);
+  background: var(--knime-white);
+  padding: var(--space-4) var(--space-8);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.focus-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.depth-select {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  font-size: 11px;
+}
+
+.depth-select select {
+  border: 1px solid var(--knime-silver-sand);
+  border-radius: var(--space-4);
+  padding: 2px var(--space-4);
+  font-size: 11px;
+}
+
+.focus-root {
+  font-size: 11px;
+  color: var(--knime-dove-gray);
+}
+
+.focus-trail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin-bottom: var(--space-12);
+}
+
+.trail-chip {
+  border: 1px solid var(--knime-silver-sand-semi);
+  border-radius: 999px;
+  background: var(--knime-white);
+  padding: 2px var(--space-8);
+  font-size: 10px;
+  cursor: pointer;
 }
 
 .empty {
@@ -732,6 +987,33 @@ const openSelectedMessage = () => {
   border-radius: var(--space-4);
   background: var(--knime-white);
   padding: var(--space-6) var(--space-8);
+  cursor: pointer;
+}
+
+.reference-lists {
+  margin-top: var(--space-8);
+}
+
+.reference-list + .reference-list {
+  margin-top: var(--space-8);
+}
+
+.reference-title {
+  font-size: 11px;
+  font-weight: 700;
+  margin-bottom: var(--space-4);
+}
+
+.reference-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--knime-silver-sand-semi);
+  border-radius: var(--space-4);
+  background: var(--knime-white);
+  padding: var(--space-4) var(--space-6);
+  font-size: 11px;
+  margin-bottom: var(--space-4);
   cursor: pointer;
 }
 </style>

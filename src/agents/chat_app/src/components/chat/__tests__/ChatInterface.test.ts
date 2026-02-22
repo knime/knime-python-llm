@@ -75,12 +75,13 @@ describe("ChatInterface", () => {
       global: {
         stubs: {
           AiMessage: {
-            props: ["id"],
-            template: "<div :id='id' class='ai-message'>AI Message</div>",
+            props: ["id", "content"],
+            template: "<div :id='id' class='ai-message' v-html='content || \"AI Message\"' />",
           },
           HumanMessage: {
-            props: ["id"],
-            template: "<div :id='id' class='human-message'>Human Message</div>",
+            props: ["id", "content"],
+            template:
+              "<div :id='id' class='human-message'>{{ content || 'Human Message' }}</div>",
           },
           ErrorMessage: {
             props: ["id"],
@@ -342,6 +343,50 @@ describe("ChatInterface", () => {
     });
     expect(window.location.hash).toBe("#msg-0002");
     expect(target.classes()).toContain("link-target-highlight");
+
+    wrapper.unmount();
+  });
+
+  it("shows a hover preview for hash links to previous messages", async () => {
+    const wrapper = createNavigationWrapper();
+    const chatStore = useChatStore();
+
+    chatStore.chatItems = [
+      {
+        id: "msg-0001",
+        type: "ai",
+        content: '<a href="#msg-0002">See previous</a>',
+      } as AiMessage,
+      {
+        id: "msg-0002",
+        type: "human",
+        content: "This is the referenced user message content.",
+      } as HumanMessage,
+    ];
+    await wrapper.vm.$nextTick();
+
+    const link = wrapper.find("#msg-0001 a");
+    expect(link.exists()).toBe(true);
+
+    link.element.dispatchEvent(
+      new MouseEvent("mouseover", {
+        bubbles: true,
+        clientX: 120,
+        clientY: 80,
+      }),
+    );
+    await wrapper.vm.$nextTick();
+
+    const preview = wrapper.find('[data-testid="reference-preview"]');
+    expect(preview.exists()).toBe(true);
+    expect(preview.text()).toContain("msg-0002");
+    expect(preview.text()).toContain("referenced user message content");
+
+    link.element.dispatchEvent(new MouseEvent("mouseout", { bubbles: true }));
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find('[data-testid="reference-preview"]').exists()).toBe(
+      false,
+    );
 
     wrapper.unmount();
   });

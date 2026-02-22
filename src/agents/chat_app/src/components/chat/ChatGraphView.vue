@@ -14,6 +14,8 @@ type GraphNode = {
   fullLabel: string;
   label: string;
   type: NonTimelineChatItem["type"];
+  column: number;
+  order: number;
   x: number;
   y: number;
 };
@@ -23,6 +25,7 @@ type GraphEdge = {
   sourceId: string;
   targetId: string;
   path: string;
+  isPrimary: boolean;
 };
 
 const emit = defineEmits<{
@@ -31,7 +34,7 @@ const emit = defineEmits<{
 
 const chatStore = useChatStore();
 const selectedNodeId = ref<string | null>(null);
-const layoutMode = ref<"horizontal" | "vertical">("horizontal");
+const layoutMode = ref<"horizontal" | "vertical" | "dag">("dag");
 
 const isMessageItem = (item: ChatItem): item is NonTimelineChatItem =>
   item.type !== "timeline";
@@ -53,6 +56,10 @@ const laneLabels: Array<{ type: NonTimelineChatItem["type"]; label: string }> = 
 ];
 
 const laneOffsetPattern = [0, -28, 28, -56, 56, -84, 84];
+const DAG_COLUMN_START = 120;
+const DAG_COLUMN_GAP = 180;
+const DAG_ROW_START = 90;
+const DAG_ROW_GAP = 92;
 
 const offsetForLaneIndex = (laneIndex: number) =>
   laneOffsetPattern[laneIndex % laneOffsetPattern.length];
@@ -63,6 +70,84 @@ const truncateForNode = (value: string, maxLength: number) =>
 const graphMessages = computed(() =>
   chatStore.chatItems.filter(isMessageItem).filter((item) => Boolean(item.id)),
 );
+
+const messageOrderById = computed(
+  () => new Map(graphMessages.value.map((item, index) => [item.id, index])),
+);
+
+const referenceIdsBySource = computed(() => {
+  const map = new Map<string, string[]>();
+  for (const source of graphMessages.value) {
+    if (!("content" in source) || typeof source.content !== "string") {
+      continue;
+    }
+    map.set(source.id, extractReferencedMessageIds(source.content));
+  }
+  return map;
+});
+
+const primaryParentById = computed(() => {
+  const map = new Map<string, string>();
+  graphMessages.value.forEach((source, sourceIndex) => {
+    const refs = referenceIdsBySource.value.get(source.id) ?? [];
+    const olderRefs = refs
+      .map((id) => ({ id, order: messageOrderById.value.get(id) ?? -1 }))
+      .filter((entry) => entry.order >= 0 && entry.order < sourceIndex)
+      .sort((a, b) => b.order - a.order);
+    if (olderRefs.length > 0) {
+      map.set(source.id, olderRefs[0].id);
+    }
+  });
+  return map;
+});
+
+const childrenByPrimaryParent = computed(() => {
+  const map = new Map<string, string[]>();
+  for (const item of graphMessages.value) {
+    const parentId = primaryParentById.value.get(item.id);
+    if (!parentId) {
+      continue;
+    }
+    const children = map.get(parentId) ?? [];
+    children.push(item.id);
+    map.set(parentId, children);
+  }
+  return map;
+});
+
+const dagColumnById = computed(() => {
+  const map = new Map<string, number>();
+  let nextColumn = 0;
+
+  for (const item of graphMessages.value) {
+    const parentId = primaryParentById.value.get(item.id);
+    if (!parentId) {
+      map.set(item.id, nextColumn);
+      nextColumn += 1;
+      continue;
+    }
+
+    const parentColumn = map.get(parentId);
+    const siblings = childrenByPrimaryParent.value.get(parentId) ?? [];
+    const isFirstChild = siblings[0] === item.id;
+
+    if (typeof parentColumn === "number" && isFirstChild) {
+      map.set(item.id, parentColumn);
+      continue;
+    }
+
+    map.set(item.id, nextColumn);
+    nextColumn += 1;
+  }
+
+  return map;
+});
+
+const dagColumnCount = computed(() =>
+  Math.max(1, ...Array.from(dagColumnById.value.values()).map((value) => value + 1)),
+);
+
+const dagColumnX = (column: number) => DAG_COLUMN_START + column * DAG_COLUMN_GAP;
 
 const nodes = computed<GraphNode[]>(() => {
   const laneCounts: Record<NonTimelineChatItem["type"], number> = {
@@ -76,6 +161,7 @@ const nodes = computed<GraphNode[]>(() => {
   return graphMessages.value.map((item, index) => {
     const laneIndex = laneCounts[item.type];
     laneCounts[item.type] += 1;
+    const column = dagColumnById.value.get(item.id) ?? 0;
 
     const content = "content" in item && typeof item.content === "string" ? item.content : "";
     const compact = content.replace(/\s+/g, " ").trim();
@@ -86,14 +172,20 @@ const nodes = computed<GraphNode[]>(() => {
       fullLabel,
       label: truncateForNode(fullLabel, 24),
       type: item.type,
+      column,
+      order: index,
       x:
         layoutMode.value === "horizontal"
           ? 180 + index * 220
-          : laneYByType[item.type] + offsetForLaneIndex(laneIndex),
+          : layoutMode.value === "vertical"
+            ? laneYByType[item.type] + offsetForLaneIndex(laneIndex)
+            : dagColumnX(column),
       y:
         layoutMode.value === "horizontal"
           ? laneYByType[item.type] + offsetForLaneIndex(laneIndex)
-          : 120 + index * 140,
+          : layoutMode.value === "vertical"
+            ? 120 + index * 140
+            : DAG_ROW_START + index * DAG_ROW_GAP,
     };
   });
 });
@@ -117,15 +209,32 @@ const edges = computed<GraphEdge[]>(() => {
       const y1 = sourceNode.y;
       const x2 = targetNode.x;
       const y2 = targetNode.y;
-      const curvature = Math.max(60, Math.abs(x2 - x1) * 0.25);
-      const c1x = x1 + (x2 >= x1 ? curvature : -curvature);
-      const c2x = x2 - (x2 >= x1 ? curvature : -curvature);
-      const path = `M ${x1} ${y1} C ${c1x} ${y1}, ${c2x} ${y2}, ${x2} ${y2}`;
+
+      let path = "";
+      if (layoutMode.value === "dag") {
+        const sourceOrder = messageOrderById.value.get(source.id) ?? 0;
+        const targetOrder = messageOrderById.value.get(targetId) ?? 0;
+        const startNode = targetOrder <= sourceOrder ? targetNode : sourceNode;
+        const endNode = targetOrder <= sourceOrder ? sourceNode : targetNode;
+        const sx = startNode.x;
+        const sy = startNode.y + 22;
+        const ex = endNode.x;
+        const ey = endNode.y - 22;
+        const midY = sy + (ey - sy) * 0.5;
+        path = `M ${sx} ${sy} C ${sx} ${midY}, ${ex} ${midY}, ${ex} ${ey}`;
+      } else {
+        const curvature = Math.max(60, Math.abs(x2 - x1) * 0.25);
+        const c1x = x1 + (x2 >= x1 ? curvature : -curvature);
+        const c2x = x2 - (x2 >= x1 ? curvature : -curvature);
+        path = `M ${x1} ${y1} C ${c1x} ${y1}, ${c2x} ${y2}, ${x2} ${y2}`;
+      }
+
       result.push({
         id: `${source.id}->${targetId}`,
         sourceId: source.id,
         targetId,
         path,
+        isPrimary: primaryParentById.value.get(source.id) === targetId,
       });
     }
   }
@@ -179,12 +288,16 @@ const selectedSummary = computed(() => {
 const svgWidth = computed(() =>
   layoutMode.value === "horizontal"
     ? Math.max(1200, nodes.value.length * 220 + 220)
-    : 700,
+    : layoutMode.value === "vertical"
+      ? 700
+      : Math.max(900, DAG_COLUMN_START + dagColumnCount.value * DAG_COLUMN_GAP + 220),
 );
 const svgHeight = computed(() =>
   layoutMode.value === "horizontal"
     ? 620
-    : Math.max(720, nodes.value.length * 140 + 180),
+    : layoutMode.value === "vertical"
+      ? Math.max(720, nodes.value.length * 140 + 180)
+      : Math.max(720, DAG_ROW_START + nodes.value.length * DAG_ROW_GAP + 80),
 );
 
 const selectNode = (nodeId: string) => {
@@ -222,6 +335,14 @@ const openSelectedMessage = () => {
         >
           Vertical
         </button>
+        <button
+          class="layout-button"
+          :class="{ active: layoutMode === 'dag' }"
+          type="button"
+          @click="layoutMode = 'dag'"
+        >
+          DAG
+        </button>
       </div>
     </div>
 
@@ -232,20 +353,7 @@ const openSelectedMessage = () => {
     <div v-else class="graph-layout">
       <div class="graph-scroll">
         <svg :height="svgHeight" :width="svgWidth" class="graph-svg">
-          <defs>
-            <marker
-              id="edge-arrow"
-              markerHeight="6"
-              markerWidth="6"
-              orient="auto-start-reverse"
-              refX="5"
-              refY="3"
-            >
-              <path d="M 0 0 L 6 3 L 0 6 z" fill="var(--knime-masala)" />
-            </marker>
-          </defs>
-
-          <g class="lanes">
+          <g v-if="layoutMode !== 'dag'" class="lanes">
             <template v-for="lane in laneLabels" :key="lane.type">
               <line
                 :x1="layoutMode === 'horizontal' ? 60 : laneYByType[lane.type]"
@@ -263,16 +371,50 @@ const openSelectedMessage = () => {
               </text>
             </template>
           </g>
+          <g v-else class="dag-guides">
+            <line
+              v-for="column in dagColumnCount"
+              :key="`column-${column}`"
+              :x1="dagColumnX(column - 1)"
+              :x2="dagColumnX(column - 1)"
+              :y1="42"
+              :y2="svgHeight - 40"
+              class="dag-column-line"
+            />
+            <text
+              v-for="column in dagColumnCount"
+              :key="`column-label-${column}`"
+              :x="dagColumnX(column - 1) - 18"
+              :y="24"
+              class="dag-column-label"
+            >
+              b{{ column }}
+            </text>
+          </g>
 
           <g class="edges">
             <path
               v-for="edge in edges"
               :key="edge.id"
-              :class="{ selected: selectedNodeId === edge.sourceId || selectedNodeId === edge.targetId }"
+              :class="{
+                selected: selectedNodeId === edge.sourceId || selectedNodeId === edge.targetId,
+                secondary: layoutMode === 'dag' && !edge.isPrimary,
+              }"
               :d="edge.path"
               class="edge-path"
-              marker-end="url(#edge-arrow)"
             />
+          </g>
+
+          <g v-if="layoutMode === 'dag'" class="dag-rows">
+            <text
+              v-for="node in nodes"
+              :key="`row-${node.id}`"
+              :x="24"
+              :y="node.y + 4"
+              class="dag-row-label"
+            >
+              #{{ node.order + 1 }}
+            </text>
           </g>
 
           <g class="nodes">
@@ -396,11 +538,31 @@ const openSelectedMessage = () => {
   fill: var(--knime-dove-gray);
 }
 
+.dag-column-line {
+  stroke: var(--knime-silver-sand-semi);
+  stroke-width: 1;
+}
+
+.dag-column-label {
+  font-size: 10px;
+  fill: var(--knime-dove-gray);
+}
+
+.dag-row-label {
+  font-size: 10px;
+  fill: var(--knime-dove-gray);
+}
+
 .edge-path {
   fill: none;
   stroke: var(--knime-dove-gray);
   stroke-width: 1.5;
   opacity: 0.7;
+}
+
+.edge-path.secondary {
+  stroke-dasharray: 5 4;
+  opacity: 0.45;
 }
 
 .edge-path.selected {

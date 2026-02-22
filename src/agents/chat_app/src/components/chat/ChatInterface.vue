@@ -62,12 +62,11 @@ const clearHighlight = () => {
 
 type BacklinkEntry = {
   sourceId: string;
-  preview: string;
+  previewMarkdown: string;
 };
 
 const MESSAGE_REF_PATTERN =
   /#([A-Za-z0-9][A-Za-z0-9_-]*(?:__[A-Za-z0-9][A-Za-z0-9_-]*)?)/g;
-const MAX_BACKLINK_PREVIEW_CHARS = 120;
 type NonTimelineChatItem = Exclude<ChatItem, { type: "timeline" }>;
 
 const isMessageItem = (
@@ -87,13 +86,8 @@ const extractReferences = (content: string): string[] => {
   return Array.from(result);
 };
 
-const toBacklinkPreview = (content: string): string => {
-  const plain = content.replace(/\s+/g, " ").trim();
-  if (plain.length <= MAX_BACKLINK_PREVIEW_CHARS) {
-    return plain;
-  }
-  return `${plain.slice(0, MAX_BACKLINK_PREVIEW_CHARS)}...`;
-};
+const renderBacklinkPreview = (markdown: string): string =>
+  renderMarkdown(markdown);
 
 const backlinks = computed(() => {
   if (!selectedMessageId.value) {
@@ -114,7 +108,7 @@ const backlinks = computed(() => {
     if (refs.includes(selected)) {
       entries.push({
         sourceId: item.id,
-        preview: toBacklinkPreview(item.content),
+        previewMarkdown: item.content,
       });
     }
   }
@@ -337,7 +331,11 @@ onUnmounted(() => {
         @click="onClickBacklink(entry.sourceId)"
       >
         <div class="backlink-item-id">{{ entry.sourceId }}</div>
-        <div class="backlink-item-preview">{{ entry.preview }}</div>
+        <!-- eslint-disable-next-line vue/no-v-html -->
+        <div
+          class="backlink-item-preview"
+          v-html="renderBacklinkPreview(entry.previewMarkdown)"
+        />
       </button>
     </aside>
     <div
@@ -469,5 +467,17 @@ onUnmounted(() => {
 .backlink-item-preview {
   font-size: 12px;
   line-height: 1.3;
+  max-height: 80px;
+  overflow: hidden;
+
+  :deep() {
+    & > *:first-child {
+      margin-top: 0;
+    }
+
+    & > *:last-child {
+      margin-bottom: 0;
+    }
+  }
 }
 </style>

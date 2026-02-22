@@ -31,6 +31,7 @@ const emit = defineEmits<{
 
 const chatStore = useChatStore();
 const selectedNodeId = ref<string | null>(null);
+const layoutMode = ref<"horizontal" | "vertical">("horizontal");
 
 const isMessageItem = (item: ChatItem): item is NonTimelineChatItem =>
   item.type !== "timeline";
@@ -85,8 +86,14 @@ const nodes = computed<GraphNode[]>(() => {
       fullLabel,
       label: truncateForNode(fullLabel, 24),
       type: item.type,
-      x: 180 + index * 220,
-      y: laneYByType[item.type] + offsetForLaneIndex(laneIndex),
+      x:
+        layoutMode.value === "horizontal"
+          ? 180 + index * 220
+          : laneYByType[item.type] + offsetForLaneIndex(laneIndex),
+      y:
+        layoutMode.value === "horizontal"
+          ? laneYByType[item.type] + offsetForLaneIndex(laneIndex)
+          : 120 + index * 140,
     };
   });
 });
@@ -169,8 +176,16 @@ const selectedSummary = computed(() => {
   };
 });
 
-const svgWidth = computed(() => Math.max(1200, nodes.value.length * 220 + 220));
-const svgHeight = 620;
+const svgWidth = computed(() =>
+  layoutMode.value === "horizontal"
+    ? Math.max(1200, nodes.value.length * 220 + 220)
+    : 700,
+);
+const svgHeight = computed(() =>
+  layoutMode.value === "horizontal"
+    ? 620
+    : Math.max(720, nodes.value.length * 140 + 180),
+);
 
 const selectNode = (nodeId: string) => {
   selectedNodeId.value = nodeId;
@@ -189,6 +204,24 @@ const openSelectedMessage = () => {
       <div class="title">Reference Graph</div>
       <div class="summary">
         {{ nodes.length }} messages · {{ edges.length }} references
+      </div>
+      <div class="layout-toggle">
+        <button
+          class="layout-button"
+          :class="{ active: layoutMode === 'horizontal' }"
+          type="button"
+          @click="layoutMode = 'horizontal'"
+        >
+          Horizontal
+        </button>
+        <button
+          class="layout-button"
+          :class="{ active: layoutMode === 'vertical' }"
+          type="button"
+          @click="layoutMode = 'vertical'"
+        >
+          Vertical
+        </button>
       </div>
     </div>
 
@@ -215,13 +248,17 @@ const openSelectedMessage = () => {
           <g class="lanes">
             <template v-for="lane in laneLabels" :key="lane.type">
               <line
-                :x1="60"
-                :x2="svgWidth - 60"
-                :y1="laneYByType[lane.type]"
-                :y2="laneYByType[lane.type]"
+                :x1="layoutMode === 'horizontal' ? 60 : laneYByType[lane.type]"
+                :x2="layoutMode === 'horizontal' ? svgWidth - 60 : laneYByType[lane.type]"
+                :y1="layoutMode === 'horizontal' ? laneYByType[lane.type] : 40"
+                :y2="layoutMode === 'horizontal' ? laneYByType[lane.type] : svgHeight - 40"
                 class="lane-line"
               />
-              <text :x="20" :y="laneYByType[lane.type] + 4" class="lane-label">
+              <text
+                :x="layoutMode === 'horizontal' ? 20 : laneYByType[lane.type] - 18"
+                :y="layoutMode === 'horizontal' ? laneYByType[lane.type] + 4 : 24"
+                class="lane-label"
+              >
                 {{ lane.label }}
               </text>
             </template>
@@ -290,8 +327,9 @@ const openSelectedMessage = () => {
 
 .graph-header {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
+  gap: var(--space-12);
   margin-bottom: var(--space-12);
 }
 
@@ -302,6 +340,27 @@ const openSelectedMessage = () => {
 
 .summary {
   font-size: 12px;
+  margin-right: auto;
+}
+
+.layout-toggle {
+  display: flex;
+  gap: var(--space-4);
+}
+
+.layout-button {
+  border: 1px solid var(--knime-silver-sand);
+  border-radius: var(--space-4);
+  background: var(--knime-white);
+  padding: var(--space-4) var(--space-8);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.layout-button.active {
+  border-color: var(--knime-masala);
+  color: var(--knime-masala);
+  font-weight: 700;
 }
 
 .empty {

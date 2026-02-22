@@ -716,14 +716,17 @@ state that the tool could not be executed due to reaching the iteration limit.""
         )
 
         tool_cells = _extract_tools_from_table(tools_table, self.tool_column)
+        # @ToolTypeDispatch - Update when adding new ToolType values
         # Convert tools based on their type
         tools = []
         for tool in tool_cells:
-            if isinstance(tool, MCPTool):
-                tools.append(tool_converter.to_langchain_tool_from_mcp(tool))
-            else:
-                # Assume WorkflowTool
-                tools.append(tool_converter.to_langchain_tool(tool))
+            match tool.tool_type:
+                case 0:  # ToolType.WORKFLOW
+                    tools.append(tool_converter.to_langchain_tool(tool))
+                case 1:  # ToolType.MCP
+                    tools.append(tool_converter.to_langchain_tool_from_mcp(tool))
+                case _:
+                    raise ValueError(f"Unknown tool type: {tool.tool_type}")
         toolset = AgentPrompterToolset(tools)
 
         conversation = self._create_conversation_history(
@@ -1412,14 +1415,17 @@ class AgentChatWidget:
         )
         if tools_table is not None:
             tool_cells = _extract_tools_from_table(tools_table, self.tool_column)
+            # @ToolTypeDispatch - Update when adding new ToolType values
             # Convert tools based on their type
             tools = []
             for tool in tool_cells:
-                if isinstance(tool, MCPTool):
-                    tools.append(tool_converter.to_langchain_tool_from_mcp(tool))
-                else:
-                    # Assume WorkflowTool
-                    tools.append(tool_converter.to_langchain_tool(tool))
+                match tool.tool_type:
+                    case 0:  # ToolType.WORKFLOW
+                        tools.append(tool_converter.to_langchain_tool(tool))
+                    case 1:  # ToolType.MCP
+                        tools.append(tool_converter.to_langchain_tool_from_mcp(tool))
+                    case _:
+                        raise ValueError(f"Unknown tool type: {tool.tool_type}")
         else:
             tools = []
 

@@ -1,0 +1,388 @@
+<script setup lang="ts">
+import { computed, ref } from "vue";
+
+import { useChatStore } from "@/stores/chat";
+import type { ChatItem } from "@/types";
+import { extractReferencedMessageIds } from "@/utils/messageReferences";
+
+type NonTimelineChatItem = Exclude<ChatItem, { type: "timeline" }>;
+
+type GraphNode = {
+  id: string;
+  label: string;
+  type: NonTimelineChatItem["type"];
+  x: number;
+  y: number;
+};
+
+type GraphEdge = {
+  id: string;
+  sourceId: string;
+  targetId: string;
+  path: string;
+};
+
+const emit = defineEmits<{
+  openMessage: [messageId: string];
+}>();
+
+const chatStore = useChatStore();
+const selectedNodeId = ref<string | null>(null);
+
+const isMessageItem = (item: ChatItem): item is NonTimelineChatItem =>
+  item.type !== "timeline";
+
+const laneYByType: Record<NonTimelineChatItem["type"], number> = {
+  human: 110,
+  ai: 220,
+  tool: 330,
+  view: 440,
+  error: 550,
+};
+
+const laneLabels: Array<{ type: NonTimelineChatItem["type"]; label: string }> = [
+  { type: "human", label: "Human" },
+  { type: "ai", label: "AI" },
+  { type: "tool", label: "Tool" },
+  { type: "view", label: "View" },
+  { type: "error", label: "Error" },
+];
+
+const graphMessages = computed(() =>
+  chatStore.chatItems.filter(isMessageItem).filter((item) => Boolean(item.id)),
+);
+
+const nodes = computed<GraphNode[]>(() =>
+  graphMessages.value.map((item, index) => {
+    const content = "content" in item && typeof item.content === "string" ? item.content : "";
+    const compact = content.replace(/\s+/g, " ").trim();
+    const label = compact ? compact.slice(0, 42) + (compact.length > 42 ? "..." : "") : item.id;
+    return {
+      id: item.id,
+      label,
+      type: item.type,
+      x: 180 + index * 220,
+      y: laneYByType[item.type],
+    };
+  }),
+);
+
+const nodeById = computed(() => new Map(nodes.value.map((node) => [node.id, node])));
+
+const edges = computed<GraphEdge[]>(() => {
+  const result: GraphEdge[] = [];
+  for (const source of graphMessages.value) {
+    const sourceNode = nodeById.value.get(source.id);
+    if (!sourceNode || !("content" in source) || typeof source.content !== "string") {
+      continue;
+    }
+    const refs = extractReferencedMessageIds(source.content);
+    for (const targetId of refs) {
+      const targetNode = nodeById.value.get(targetId);
+      if (!targetNode) {
+        continue;
+      }
+      const x1 = sourceNode.x;
+      const y1 = sourceNode.y;
+      const x2 = targetNode.x;
+      const y2 = targetNode.y;
+      const curvature = Math.max(60, Math.abs(x2 - x1) * 0.25);
+      const c1x = x1 + (x2 >= x1 ? curvature : -curvature);
+      const c2x = x2 - (x2 >= x1 ? curvature : -curvature);
+      const path = `M ${x1} ${y1} C ${c1x} ${y1}, ${c2x} ${y2}, ${x2} ${y2}`;
+      result.push({
+        id: `${source.id}->${targetId}`,
+        sourceId: source.id,
+        targetId,
+        path,
+      });
+    }
+  }
+  return result;
+});
+
+const inboundById = computed(() => {
+  const map = new Map<string, number>();
+  for (const edge of edges.value) {
+    map.set(edge.targetId, (map.get(edge.targetId) ?? 0) + 1);
+  }
+  return map;
+});
+
+const outboundById = computed(() => {
+  const map = new Map<string, number>();
+  for (const edge of edges.value) {
+    map.set(edge.sourceId, (map.get(edge.sourceId) ?? 0) + 1);
+  }
+  return map;
+});
+
+const selectedNode = computed(() =>
+  selectedNodeId.value ? nodeById.value.get(selectedNodeId.value) ?? null : null,
+);
+
+const selectedSummary = computed(() => {
+  if (!selectedNode.value) {
+    return null;
+  }
+  return {
+    inbound: inboundById.value.get(selectedNode.value.id) ?? 0,
+    outbound: outboundById.value.get(selectedNode.value.id) ?? 0,
+  };
+});
+
+const svgWidth = computed(() => Math.max(1200, nodes.value.length * 220 + 220));
+const svgHeight = 620;
+
+const selectNode = (nodeId: string) => {
+  selectedNodeId.value = nodeId;
+};
+
+const openSelectedMessage = () => {
+  if (selectedNode.value) {
+    emit("openMessage", selectedNode.value.id);
+  }
+};
+</script>
+
+<template>
+  <main class="graph-view">
+    <div class="graph-header">
+      <div class="title">Reference Graph</div>
+      <div class="summary">
+        {{ nodes.length }} messages · {{ edges.length }} references
+      </div>
+    </div>
+
+    <div v-if="nodes.length === 0" class="empty">
+      No messages available to render as a graph.
+    </div>
+
+    <div v-else class="graph-layout">
+      <div class="graph-scroll">
+        <svg :height="svgHeight" :width="svgWidth" class="graph-svg">
+          <defs>
+            <marker
+              id="edge-arrow"
+              markerHeight="6"
+              markerWidth="6"
+              orient="auto-start-reverse"
+              refX="5"
+              refY="3"
+            >
+              <path d="M 0 0 L 6 3 L 0 6 z" fill="var(--knime-masala)" />
+            </marker>
+          </defs>
+
+          <g class="lanes">
+            <template v-for="lane in laneLabels" :key="lane.type">
+              <line
+                :x1="60"
+                :x2="svgWidth - 60"
+                :y1="laneYByType[lane.type]"
+                :y2="laneYByType[lane.type]"
+                class="lane-line"
+              />
+              <text :x="20" :y="laneYByType[lane.type] + 4" class="lane-label">
+                {{ lane.label }}
+              </text>
+            </template>
+          </g>
+
+          <g class="edges">
+            <path
+              v-for="edge in edges"
+              :key="edge.id"
+              :class="{ selected: selectedNodeId === edge.sourceId || selectedNodeId === edge.targetId }"
+              :d="edge.path"
+              class="edge-path"
+              marker-end="url(#edge-arrow)"
+            />
+          </g>
+
+          <g class="nodes">
+            <g
+              v-for="node in nodes"
+              :key="node.id"
+              :transform="`translate(${node.x - 70}, ${node.y - 22})`"
+              class="node"
+              :class="[node.type, { selected: selectedNodeId === node.id }]"
+              @click="selectNode(node.id)"
+            >
+              <rect height="44" rx="8" ry="8" width="140" />
+              <text x="8" y="16" class="node-id">{{ node.id }}</text>
+              <text x="8" y="32" class="node-label">{{ node.label }}</text>
+            </g>
+          </g>
+        </svg>
+      </div>
+
+      <aside class="node-panel">
+        <div v-if="!selectedNode" class="node-empty">
+          Select a node to inspect references.
+        </div>
+        <div v-else class="node-details">
+          <div class="node-title">{{ selectedNode.id }}</div>
+          <div class="node-meta">Type: {{ selectedNode.type }}</div>
+          <div class="node-meta">Inbound: {{ selectedSummary?.inbound ?? 0 }}</div>
+          <div class="node-meta">Outbound: {{ selectedSummary?.outbound ?? 0 }}</div>
+          <button class="open-button" type="button" @click="openSelectedMessage">
+            Open in chat
+          </button>
+        </div>
+      </aside>
+    </div>
+  </main>
+</template>
+
+<style lang="postcss" scoped>
+.graph-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  padding: var(--space-24);
+}
+
+.graph-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-12);
+}
+
+.title {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.summary {
+  font-size: 12px;
+}
+
+.empty {
+  font-size: 13px;
+}
+
+.graph-layout {
+  display: flex;
+  gap: var(--space-16);
+  min-height: 0;
+  height: 100%;
+}
+
+.graph-scroll {
+  flex: 1;
+  overflow: auto;
+  border: 1px solid var(--knime-silver-sand-semi);
+  border-radius: var(--space-4);
+  background: var(--knime-white);
+}
+
+.graph-svg {
+  display: block;
+}
+
+.lane-line {
+  stroke: var(--knime-silver-sand-semi);
+  stroke-width: 1;
+}
+
+.lane-label {
+  font-size: 11px;
+  fill: var(--knime-dove-gray);
+}
+
+.edge-path {
+  fill: none;
+  stroke: var(--knime-dove-gray);
+  stroke-width: 1.5;
+  opacity: 0.7;
+}
+
+.edge-path.selected {
+  stroke: var(--knime-masala);
+  opacity: 1;
+  stroke-width: 2;
+}
+
+.node {
+  cursor: pointer;
+}
+
+.node rect {
+  fill: var(--knime-white);
+  stroke: var(--knime-silver-sand);
+  stroke-width: 1.2;
+}
+
+.node.selected rect {
+  stroke: var(--knime-masala);
+  stroke-width: 2;
+}
+
+.node.human rect {
+  fill: var(--knime-porcelain);
+}
+
+.node.ai rect {
+  fill: var(--knime-white);
+}
+
+.node.error rect {
+  fill: var(--knime-coral-light);
+}
+
+.node.tool rect {
+  fill: var(--knime-aquamarine-semi);
+}
+
+.node.view rect {
+  fill: var(--knime-azure);
+}
+
+.node-id {
+  font-size: 10px;
+  font-weight: 700;
+  fill: var(--knime-masala);
+}
+
+.node-label {
+  font-size: 10px;
+  fill: var(--knime-dove-gray);
+}
+
+.node-panel {
+  width: 240px;
+  border: 1px solid var(--knime-silver-sand-semi);
+  border-radius: var(--space-4);
+  background: var(--knime-white);
+  padding: var(--space-12);
+  height: fit-content;
+}
+
+.node-empty {
+  font-size: 12px;
+}
+
+.node-title {
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: var(--space-8);
+}
+
+.node-meta {
+  font-size: 12px;
+  margin-bottom: var(--space-4);
+}
+
+.open-button {
+  margin-top: var(--space-8);
+  width: 100%;
+  border: 1px solid var(--knime-silver-sand);
+  border-radius: var(--space-4);
+  background: var(--knime-white);
+  padding: var(--space-6) var(--space-8);
+  cursor: pointer;
+}
+</style>

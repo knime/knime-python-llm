@@ -75,18 +75,18 @@ describe("ChatInterface", () => {
       global: {
         stubs: {
           AiMessage: {
-            props: ["id", "content", "backlinkCount"],
-            emits: ["navigate-ref", "toggle-backlinks"],
+            props: ["id", "content", "backlinkCount", "referenceCount"],
+            emits: ["toggle-references", "toggle-backlinks"],
             template:
               "<div>" +
               "<div :id='id' class='ai-message' v-html='content || \"AI Message\"' />" +
-              "<button class='ai-nav-ref' @click=\"$emit('navigate-ref', '#msg-0002')\">ref</button>" +
+              "<button class='ai-reference-toggle' @click=\"$emit('toggle-references', id)\">references {{ referenceCount }}</button>" +
               "<button class='ai-backlink-toggle' @click=\"$emit('toggle-backlinks', id)\">backlinks {{ backlinkCount }}</button>" +
               "</div>",
           },
           HumanMessage: {
-            props: ["id", "content", "backlinkCount"],
-            emits: ["navigate-ref", "toggle-backlinks"],
+            props: ["id", "content", "backlinkCount", "referenceCount"],
+            emits: ["toggle-references", "toggle-backlinks"],
             template:
               "<div>" +
               "<div :id='id' class='human-message'>{{ content || 'Human Message' }}</div>" +
@@ -470,6 +470,42 @@ describe("ChatInterface", () => {
     );
 
     await wrapper.find(".ai-backlink-toggle").trigger("click");
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find('[data-testid="backlink-panel"]').exists()).toBe(false);
+
+    wrapper.unmount();
+  });
+
+  it("toggles references panel when references chip is clicked", async () => {
+    const wrapper = createNavigationWrapper();
+    const chatStore = useChatStore();
+
+    chatStore.chatItems = [
+      {
+        id: "msg-0001",
+        type: "ai",
+        content: 'Points to <a href="#msg-0002">context</a>.',
+      } as AiMessage,
+      {
+        id: "msg-0002",
+        type: "human",
+        content: "Target message content",
+      } as HumanMessage,
+    ];
+    await wrapper.vm.$nextTick();
+
+    await wrapper.find(".ai-reference-toggle").trigger("click");
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.find('[data-testid="backlink-panel"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="backlink-panel"]').text()).toContain(
+      "References in msg-0001",
+    );
+    expect(wrapper.find('[data-testid="backlink-panel"]').text()).toContain(
+      "msg-0002",
+    );
+
+    await wrapper.find(".ai-reference-toggle").trigger("click");
     await wrapper.vm.$nextTick();
     expect(wrapper.find('[data-testid="backlink-panel"]').exists()).toBe(false);
 

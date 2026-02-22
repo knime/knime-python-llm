@@ -8,6 +8,7 @@ import { useChatStore } from "@/stores/chat";
 import type { ChatItem } from "@/types";
 import { renderMarkdown } from "@/utils/markdown";
 import {
+  extractReferenceTargets,
   extractReferencedMessageIds,
   normalizeMessageId,
 } from "@/utils/messageReferences";
@@ -52,6 +53,7 @@ const previewLeft = ref(0);
 const PREVIEW_OFFSET_PX = 12;
 const previewHtml = computed(() => renderMarkdown(previewText.value));
 const selectedMessageId = ref<string | null>(null);
+const selectedPanel = ref<"backlinks" | "references" | null>(null);
 
 const clearHighlight = () => {
   if (highlightedElement) {
@@ -67,6 +69,16 @@ const clearHighlight = () => {
 type BacklinkEntry = {
   sourceId: string;
   previewMarkdown: string;
+};
+type ReferenceEntry = {
+  targetHash: string;
+  targetMessageId: string;
+  previewMarkdown: string;
+};
+type PanelEntry = {
+  id: string;
+  previewMarkdown: string;
+  type: "backlink" | "reference";
 };
 
 type NonTimelineChatItem = Exclude<ChatItem, { type: "timeline" }>;
@@ -110,6 +122,48 @@ const backlinks = computed(() => {
   return backlinksByTarget.value.get(selectedMessageId.value) ?? [];
 });
 
+const referencesBySource = computed(() => {
+  const bySource = new Map<string, ReferenceEntry[]>();
+  const messageById = new Map<string, NonTimelineChatItem>();
+  for (const item of chatStore.chatItems) {
+    if (isMessageItem(item)) {
+      messageById.set(item.id, item);
+    }
+  }
+
+  for (const item of chatStore.chatItems) {
+    if (!isMessageItem(item)) {
+      continue;
+    }
+    if (!("content" in item) || typeof item.content !== "string") {
+      continue;
+    }
+    const targets = extractReferenceTargets(item.content);
+    const entries: ReferenceEntry[] = targets.map((targetHash) => {
+      const targetMessageId = normalizeMessageId(targetHash);
+      const targetMessage = messageById.get(targetMessageId);
+      return {
+        targetHash,
+        targetMessageId,
+        previewMarkdown:
+          targetMessage && "content" in targetMessage
+            ? targetMessage.content
+            : "Reference target not found.",
+      };
+    });
+    bySource.set(item.id, entries);
+  }
+
+  return bySource;
+});
+
+const references = computed(() => {
+  if (!selectedMessageId.value) {
+    return [] as ReferenceEntry[];
+  }
+  return referencesBySource.value.get(selectedMessageId.value) ?? [];
+});
+
 const backlinkCountByMessageId = computed(() => {
   const counts = new Map<string, number>();
   for (const [targetId, entries] of backlinksByTarget.value) {
@@ -124,6 +178,52 @@ const getBacklinkCount = (item: ChatItem): number => {
   }
   return backlinkCountByMessageId.value.get(item.id) ?? 0;
 };
+
+const referenceCountByMessageId = computed(() => {
+  const counts = new Map<string, number>();
+  for (const [sourceId, entries] of referencesBySource.value) {
+    counts.set(sourceId, entries.length);
+  }
+  return counts;
+});
+
+const getReferenceCount = (item: ChatItem): number => {
+  if (!isMessageItem(item)) {
+    return 0;
+  }
+  return referenceCountByMessageId.value.get(item.id) ?? 0;
+};
+
+const panelTitle = computed(() => {
+  if (!selectedMessageId.value) {
+    return "";
+  }
+  if (selectedPanel.value === "references") {
+    return `References in ${selectedMessageId.value}`;
+  }
+  return `Backlinks to ${selectedMessageId.value}`;
+});
+
+const panelEntries = computed((): PanelEntry[] => {
+  if (selectedPanel.value === "references") {
+    return references.value.map((entry) => ({
+      id: entry.targetHash,
+      previewMarkdown: entry.previewMarkdown,
+      type: "reference",
+    }));
+  }
+  return backlinks.value.map((entry) => ({
+    id: entry.sourceId,
+    previewMarkdown: entry.previewMarkdown,
+    type: "backlink",
+  }));
+});
+
+const panelEmptyText = computed(() =>
+  selectedPanel.value === "backlinks"
+    ? "No backlinks yet."
+    : "No references in this message.",
+);
 
 const resolveFragmentTarget = (hash: string): HTMLElement | null => {
   if (!hash || !hash.startsWith("#")) {
@@ -143,6 +243,7 @@ const navigateToHash = (hash: string, updateLocation: boolean) => {
   }
   const normalized = normalizeMessageId(decodeURIComponent(hash.slice(1)));
   selectedMessageId.value = normalized || null;
+  selectedPanel.value = "backlinks";
   if (updateLocation && window.location.hash !== hash) {
     window.location.hash = hash;
   }
@@ -166,6 +267,7 @@ const selectMessageFromEvent = (event: MouseEvent) => {
   );
   if (exists) {
     selectedMessageId.value = normalized;
+    selectedPanel.value = "backlinks";
   }
 };
 
@@ -188,13 +290,42 @@ const onClickBacklink = (sourceId: string) => {
   navigateToHash(`#${sourceId}`, true);
 };
 
-const onNavigateRef = (hash: string) => {
-  navigateToHash(hash, true);
+const onClickReference = (targetHash: string) => {
+  navigateToHash(`#${targetHash}`, true);
+};
+
+const onClickPanelEntry = (entry: PanelEntry) => {
+  if (entry.type === "backlink") {
+    onClickBacklink(entry.id);
+    return;
+  }
+  onClickReference(entry.id);
 };
 
 const onToggleBacklinks = (messageId: string) => {
-  selectedMessageId.value =
-    selectedMessageId.value === messageId ? null : messageId;
+  if (
+    selectedPanel.value === "backlinks" &&
+    selectedMessageId.value === messageId
+  ) {
+    selectedMessageId.value = null;
+    selectedPanel.value = null;
+    return;
+  }
+  selectedMessageId.value = messageId;
+  selectedPanel.value = "backlinks";
+};
+
+const onToggleReferences = (messageId: string) => {
+  if (
+    selectedPanel.value === "references" &&
+    selectedMessageId.value === messageId
+  ) {
+    selectedMessageId.value = null;
+    selectedPanel.value = null;
+    return;
+  }
+  selectedMessageId.value = messageId;
+  selectedPanel.value = "references";
 };
 
 const extractTargetMessageId = (href: string): string | null => {
@@ -321,8 +452,9 @@ onUnmounted(() => {
           <component
             :is="chatItemComponents[item.type]"
             :backlink-count="getBacklinkCount(item)"
+            :reference-count="getReferenceCount(item)"
             v-bind="item"
-            @navigate-ref="onNavigateRef"
+            @toggle-references="onToggleReferences"
             @toggle-backlinks="onToggleBacklinks"
           />
         </template>
@@ -339,27 +471,24 @@ onUnmounted(() => {
     </div>
 
     <aside
-      v-if="selectedMessageId"
+      v-if="selectedMessageId && selectedPanel"
       class="backlink-panel"
       data-testid="backlink-panel"
     >
-      <div class="backlink-title">Backlinks to {{ selectedMessageId }}</div>
-      <div v-if="backlinks.length === 0" class="backlink-empty">
-        No backlinks yet.
+      <div class="backlink-title">{{ panelTitle }}</div>
+      <div v-if="panelEntries.length === 0" class="backlink-empty">
+        {{ panelEmptyText }}
       </div>
       <button
-        v-for="entry in backlinks"
-        :key="entry.sourceId"
+        v-for="entry in panelEntries"
+        :key="entry.id"
         class="backlink-item"
         type="button"
-        @click="onClickBacklink(entry.sourceId)"
+        @click="onClickPanelEntry(entry)"
       >
-        <div class="backlink-item-id">{{ entry.sourceId }}</div>
+        <div class="backlink-item-id">{{ entry.id }}</div>
         <!-- eslint-disable-next-line vue/no-v-html -->
-        <div
-          class="backlink-item-preview"
-          v-html="renderBacklinkPreview(entry.previewMarkdown)"
-        />
+        <div class="backlink-item-preview" v-html="renderBacklinkPreview(entry.previewMarkdown)" />
       </button>
     </aside>
     <div

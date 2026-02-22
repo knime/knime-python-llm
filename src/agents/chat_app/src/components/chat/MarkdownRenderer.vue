@@ -2,29 +2,30 @@
 import { computed } from "vue";
 
 import { renderMarkdown } from "../../utils/markdown";
-import { extractReferenceTargets } from "../../utils/messageReferences";
 
 const props = defineProps<{
   backlinkCount?: number;
+  referenceCount?: number;
   markdown: string;
   messageId?: string;
 }>();
 
 const emit = defineEmits<{
-  navigateRef: [hash: string];
+  toggleReferences: [messageId: string];
   toggleBacklinks: [messageId: string];
 }>();
 
 const htmlContent = computed(() => renderMarkdown(props.markdown, props.messageId));
-const referenceTargets = computed(() => extractReferenceTargets(props.markdown));
-
-const onNavigateRef = (target: string) => {
-  emit("navigateRef", `#${target}`);
-};
 
 const onToggleBacklinks = () => {
   if (props.messageId) {
     emit("toggleBacklinks", props.messageId);
+  }
+};
+
+const onToggleReferences = () => {
+  if (props.messageId) {
+    emit("toggleReferences", props.messageId);
   }
 };
 </script>
@@ -34,13 +35,11 @@ const onToggleBacklinks = () => {
   <div class="content" v-html="htmlContent" />
   <div v-if="messageId" class="citation-chips">
     <button
-      v-for="target in referenceTargets"
-      :key="target"
       class="chip"
       type="button"
-      @click.stop="onNavigateRef(target)"
+      @click.stop="onToggleReferences"
     >
-      {{ target }}
+      References ({{ referenceCount ?? 0 }})
     </button>
     <button class="chip backlink-chip" type="button" @click.stop="onToggleBacklinks">
       Backlinks ({{ backlinkCount ?? 0 }})

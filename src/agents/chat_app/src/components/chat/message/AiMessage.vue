@@ -7,10 +7,10 @@ import MarkdownRenderer from "../MarkdownRenderer.vue";
 
 import MessageBox from "./MessageBox.vue";
 
-defineProps<AiMessage & { backlinkCount?: number }>();
+defineProps<AiMessage & { backlinkCount?: number; referenceCount?: number }>();
 
 const emit = defineEmits<{
-  navigateRef: [hash: string];
+  toggleReferences: [messageId: string];
   toggleBacklinks: [messageId: string];
 }>();
 </script>
@@ -25,7 +25,8 @@ const emit = defineEmits<{
       :backlink-count="backlinkCount"
       :markdown="content"
       :message-id="id"
-      @navigate-ref="emit('navigateRef', $event)"
+      :reference-count="referenceCount"
+      @toggle-references="emit('toggleReferences', $event)"
       @toggle-backlinks="emit('toggleBacklinks', $event)"
     />
   </MessageBox>

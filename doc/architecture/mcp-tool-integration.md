@@ -210,6 +210,360 @@ Field usage by tool type:
 
 ### Next Steps
 
-1. Implement Phase 2 (Python unified factory) as proof of concept
-2. Coordinate with KNIME Core team for Phase 1 (Java implementation)
-3. After Phase 1-2 complete, implement Phase 3 (Agent updates)
+1. ✅ **Completed**: Phase 2 (Python unified factory) 
+2. ✅ **Completed**: Phase 1 (Java ToolType enum and ToolValueFactory)
+3. ✅ **Completed**: Unified ToolCell implementation
+4. ⏳ **In Progress**: MCP tool execution logic
+5. **Pending**: Agent updates (Phase 3)
+
+## Cell and Value Factory Architecture
+
+### KNIME Type System Constraints
+
+KNIME tables have a fundamental constraint: each column has exactly ONE `DataType`, and all cells in that column must be instances of that specific cell class. This means you cannot mix `WorkflowToolCell` and `MCPToolCell` in the same column—they're different classes with different types.
+
+**Solution**: Create a unified `ToolCell` that uses an internal discriminator to represent both tool types within a single cell class.
+
+### Cell Inheritance Hierarchy
+
+```
+DataCell (abstract)
+  └── FileStoreCell (abstract)
+        └── ToolCell (concrete, implements WorkflowToolValue)
+```
+
+**Design Rationale:**
+- **FileStoreCell**: Enables persistent storage of workflow bytes via KNIME's file store mechanism (needed for workflow tools)
+- **WorkflowToolValue**: Interface that defines tool execution and metadata access methods
+- **ToolCell**: Single concrete implementation handling both workflow and MCP tools internally
+
+### Discriminator Pattern
+
+ToolCell uses a `ToolType` enum field to determine behavior at runtime:
+
+```
+ToolCell
+├── m_toolType: WORKFLOW | MCP
+├── Common fields: name, description, parameter_schema
+├── Workflow-only fields: inputs, outputs, workflow_bytes, file_store_path
+└── MCP-only fields: server_uri, tool_name
+```
+
+Type-specific fields are null/empty when not applicable. The discriminator drives all type-dependent behavior.
+
+### Type-Aware Behavior
+
+ToolCell methods check the `m_toolType` field and branch accordingly:
+
+**Persistence Lifecycle:**
+- `postConstruct()`: Only workflow tools load their serialized workflow bytes from the file store; MCP tools are stateless
+- `flushToFileStore()`: Only workflow tools save their workflow data; MCP tools have nothing to persist
+
+**Execution:**
+- `execute()`: Dispatches to `executeWorkflowTool()` or `executeMCPTool()` based on type
+- Workflow execution loads the workflow bytes and runs via `CombinedExecutor`
+- MCP execution will make HTTP JSON-RPC calls to the server URI (currently a stub)
+
+**Serialization:**
+- First byte written/read is the type discriminator (0=WORKFLOW, 1=MCP)
+- Common fields (name, description, parameter_schema) written for both types
+- Type-specific fields only written for the appropriate type
+- Deserialization reads discriminator first, then constructs the appropriate cell variant
+
+### Value Factory Integration
+
+The `ToolValueFactory` bridges between Python's Arrow representation and Java's `ToolCell`:
+
+**Arrow Schema (9 fields):**
+```
+[0] tool_type (BYTE)        - Discriminator
+[1-3] name, description, parameter_schema (STRING) - Common
+[4-7] input_spec, output_spec, msg_port, workflow_filestore - Workflow-only
+[8] server_uri (STRING)     - MCP-only
+```
+
+**Arrow → Java (Python to KNIME):**
+1. Read discriminator byte from field 0
+2. Read common fields (1-3)
+3. If WORKFLOW: read fields 4-7, construct workflow ToolCell
+4. If MCP: read field 8, construct MCP ToolCell
+
+**Java → Arrow (KNIME to Python):**
+1. Detect type from ToolCell instance
+2. Write discriminator to field 0
+3. Write common fields (1-3)
+4. If WORKFLOW: write fields 4-7, mark field 8 as missing
+5. If MCP: write field 8, mark fields 4-7 as missing
+
+### Complete Data Flow
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Python (knime-python-llm)                                    │
+│   MCPTool / WorkflowTool objects                             │
+└───────────────────────────┬─────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│ ToolValueFactory.encode() (Python)                           │
+│   → 9-field Arrow struct with discriminator                 │
+└───────────────────────────┬─────────────────────────────────┘
+                            │
+                            ▼ Arrow IPC (memory-mapped file)
+                            │
+┌─────────────────────────────────────────────────────────────┐
+│ ToolValueFactory.createCell() (Java)                         │
+│   → ToolCell with correct m_toolType                         │
+└───────────────────────────┬─────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│ ToolCell.execute()                                           │
+│   ├─ WORKFLOW → executeWorkflowTool()                        │
+│   └─ MCP → executeMCPTool()                                  │
+└───────────────────────────┬─────────────────────────────────┘
+                            │
+                            ▼
+                    WorkflowToolResult
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│ ToolValueFactory.setTableData() (Java)                       │
+│   → 9-field Arrow struct                                     │
+└───────────────────────────┬─────────────────────────────────┘
+                            │
+                            ▼ Arrow IPC
+                            │
+┌─────────────────────────────────────────────────────────────┐
+│ ToolValueFactory.decode() (Python)                           │
+│   → MCPTool / WorkflowTool objects                           │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Key Benefits
+
+1. **Single Column Type**: Use `ToolCell.TYPE` for entire column, enabling mixed tool sources
+2. **Seamless Concatenation**: Workflow Tool Provider + MCP Tool Provider outputs can be concatenated
+3. **Type Safety**: Discriminator ensures correct execution path
+4. **Efficient Storage**: Only stores fields relevant to each type
+5. **KNIME Compliance**: Follows standard DataCell/FileStoreCell patterns
+
+### Implementation Status
+
+✅ ToolType enum (Java + Python)  
+✅ ToolCell with discriminator and type-specific fields  
+✅ ToolCell constructors for both types  
+✅ Type-aware lifecycle methods (postConstruct/flushToFileStore)  
+✅ execute() dispatch to type-specific methods  
+✅ Binary serialization with discriminator byte  
+✅ ToolValueFactory Arrow conversion with type branching  
+⏳ executeMCPTool() implementation (HTTP client stub)  
+⏳ MCP Tool Caller node (Java)  
+⏳ Audit workflow node creation dispatch
+
+## MCP Tool Caller Node Design
+
+### Purpose & Use Cases
+
+The **MCP Tool Caller** node enables users to execute tools from MCP servers, either manually or as part of an agent audit workflow.
+
+**Primary use cases:**
+1. **Manual tool testing**: Users can test MCP tools directly without running a full agent
+2. **Workflow integration**: Incorporate MCP tool calls into regular KNIME workflows
+3. **Agent audit trail**: Automatically created by agents to record MCP tool executions for reproducibility
+
+**Parallel to Workflow Segment Executor**: Just as workflow tools execute via Workflow Segment Executor nodes, MCP tools execute via MCP Tool Caller nodes. This symmetry makes audit workflows intuitive.
+
+### Node Configuration
+
+**Input Ports:**
+- Port 0: Tool table (from MCP Tool Provider or Workflow to Tool nodes)
+- Port 1 (optional): Parameters table for dynamic parameter values
+
+**Output Ports:**
+- Port 0: Result table containing tool execution output
+
+**Configuration Dialog:**
+
+The dialog displays human-readable information extracted from the selected tool:
+
+```
+Tool Selection:
+  └─ Row ID: [dropdown of tool rows]
+
+Selected Tool Details (read-only):
+  ├─ Type: MCP Tool
+  ├─ Name: search_web
+  ├─ Description: Searches the web for information
+  ├─ Server: http://localhost:8080/mcp
+  └─ Parameter Schema:
+      {
+        "query": {"type": "string", "description": "Search query"},
+        "max_results": {"type": "integer", "default": 10}
+      }
+
+Parameters (JSON):
+  {
+    "query": "KNIME tutorials",
+    "max_results": 5
+  }
+```
+
+**Key features:**
+- Tool metadata displayed clearly for user understanding
+- Parameter schema shown to guide manual parameter entry
+- JSON editor for parameter input with validation against schema
+- Can use parameter port or manual JSON configuration
+
+### Implementation Language: Java
+
+**Rationale:**
+- **Consistency**: Matches Workflow Segment Executor architecture
+- **Audit workflow creation**: Easier integration with agent code that builds audit workflows
+- **HTTP client**: Native `java.net.http.HttpClient` (Java 11+) handles MCP server communication
+- **Error handling**: Better integration with KNIME node lifecycle
+- **No Python bridge**: Direct execution without Py4J overhead
+
+**Location:** `org.knime.core/src/eclipse/org/knime/core/node/agentic/tool/` (alongside WorkflowToolCell)
+
+### Execution Flow
+
+1. **Configure phase**: Validate tool table schema, check parameter format
+2. **Execute phase**:
+   - Extract selected ToolCell from input table
+   - Verify it's an MCP tool (check `ToolType.MCP`)
+   - Parse parameters (from JSON config or parameter port)
+   - Construct JSON-RPC 2.0 request
+   - HTTP POST to server URI from ToolCell
+   - Parse JSON-RPC response
+   - Convert result to KNIME table
+   - Handle errors and return as node warnings/errors
+
+## Type Dispatch Points (Critical for Maintainability)
+
+When adding new tool types in the future, these locations MUST be updated. Use exhaustive switch statements to ensure compiler/interpreter catches missing cases.
+
+### 1. Tool Execution Dispatch
+
+**Location:** `ToolCell.execute()` methods
+
+**Status:** Already implemented with discriminator
+
+**Pattern:** Use switch statement rather than if-else to ensure exhaustiveness
+
+**Purpose:** Route execution to appropriate handler (workflow engine vs HTTP client)
+
+### 2. Audit Workflow Node Creation ⚠️ **MOST CRITICAL**
+
+**Location:** Agent execution code (likely `ToolExecutor.java` or agent Python code)
+
+**Purpose:** When agent creates audit workflow after tool execution, it must create the appropriate node type
+
+**Required logic:**
+- Inspect `ToolCell.getToolType()`
+- For `WORKFLOW`: Create Workflow Segment Executor node, configure with workflow segment
+- For `MCP`: Create MCP Tool Caller node, configure with server URI, tool name, parameters
+- Set node positions, connections, and metadata for audit trail
+
+**Why critical:** This is the main integration point for the new MCP Tool Caller node. Missing this means MCP tools won't appear in audit workflows.
+
+**Search hints:** Look for code that instantiates `WorkflowSegmentExecutor` or creates nodes in audit workflows. Agent execution likely has a method that builds the trace workflow after each tool call.
+
+### 3. Serialization/Deserialization
+
+**Location:** `ToolCell.WorkflowToolCellSerializer`
+
+**Status:** Already implemented with type byte discriminator
+
+**Purpose:** Binary serialization for workflow persistence
+
+**Pattern:** Write type byte first, then branch to type-specific fields
+
+### 4. Arrow Schema Conversion
+
+**Location:** `ToolValueFactory` (Java and Python)
+
+**Status:** Already implemented
+
+**Purpose:** Convert between KNIME tables (Arrow format) and Java ToolCell objects
+
+**Pattern:** Read field 0 discriminator, dispatch to appropriate constructor
+
+### 5. LangChain Tool Conversion
+
+**Location:** `knime-python-llm/src/agents/_tool.py`
+
+**Status:** Already implemented
+
+**Purpose:** Convert KNIME ToolCell to LangChain StructuredTool for agent use
+
+**Pattern:** Python match statement on `tool.tool_type`
+
+### 6. Tool Execution Context Setup
+
+**Location:** Agent initialization code
+
+**Purpose:** Set up execution environment before tool runs (file stores for workflows, HTTP clients for MCP)
+
+**Pattern:** Branch based on tool type to prepare appropriate resources
+
+### Non-Critical Dispatch Points
+
+These improve clarity and performance but aren't strictly required:
+
+- **Debug display strings**: Format tool names for logging/UI
+- **Resource cleanup**: Close connections or file stores after execution
+- **Icon/visualization**: Show different icons for different tool types
+
+### Ensuring Exhaustiveness
+
+**Java approach:**
+Use switch expressions (Java 14+) without default clause. Compiler enforces all enum values handled:
+
+```java
+// @ToolTypeDispatch - Update when adding new ToolType enum values
+var result = switch (tool.getToolType()) {
+    case WORKFLOW -> handleWorkflow(tool);
+    case MCP -> handleMCP(tool);
+    // No default - compiler error if case missing
+};
+```
+
+**Python approach:**
+Use match statements (Python 3.10+) with explicit error case:
+
+```python
+# @ToolTypeDispatch - Update when adding new ToolType values
+match tool.tool_type:
+    case ToolType.WORKFLOW:
+        return handle_workflow(tool)
+    case ToolType.MCP:
+        return handle_mcp(tool)
+    case _:
+        raise ValueError(f"Unhandled tool type: {tool.tool_type}")
+```
+
+**Code review marker:**
+Add `@ToolTypeDispatch` comments at all critical dispatch points. When adding new tool types, search for this marker to find all locations requiring updates.
+
+## Next Steps
+
+1. **Implement MCP Tool Caller node** (Java)
+   - Node model with tool table input and configuration
+   - HTTP client for JSON-RPC communication
+   - Error handling and result conversion
+
+2. **Find and update audit workflow creation code**
+   - Search for Workflow Segment Executor instantiation
+   - Add type dispatch to create MCP Tool Caller nodes
+   - Ensure audit workflows show both tool types correctly
+
+3. **Convert dispatch points to exhaustive switches**
+   - Replace if-else with switch statements in Java
+   - Use match statements in Python
+   - Add `@ToolTypeDispatch` markers
+
+4. **Testing**
+   - Manual: Use MCP Tool Caller node with tool table
+   - Agent: Verify MCP tools appear in audit workflow
+   - Mixed: Test workflows with both tool types

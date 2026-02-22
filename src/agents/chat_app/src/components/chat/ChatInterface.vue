@@ -5,6 +5,7 @@ import { SkeletonItem } from "@knime/components";
 
 import { useScrollToBottom } from "@/composables/useScrollToBottom";
 import { useChatStore } from "@/stores/chat";
+import { renderMarkdown } from "@/utils/markdown";
 
 import MessageInput from "./MessageInput.vue";
 import StatusIndicator from "./StatusIndicator.vue";
@@ -44,7 +45,7 @@ const previewText = ref<string>("");
 const previewTop = ref(0);
 const previewLeft = ref(0);
 const PREVIEW_OFFSET_PX = 12;
-const MAX_PREVIEW_CHARS = 220;
+const previewHtml = computed(() => renderMarkdown(previewText.value));
 
 const clearHighlight = () => {
   if (highlightedElement) {
@@ -118,10 +119,7 @@ const getMessagePreview = (messageId: string) => {
   if (!content) {
     return null;
   }
-  return (
-    content.slice(0, MAX_PREVIEW_CHARS) +
-    (content.length > MAX_PREVIEW_CHARS ? "..." : "")
-  );
+  return content;
 };
 
 const hidePreview = () => {
@@ -240,7 +238,8 @@ onUnmounted(() => {
       data-testid="reference-preview"
     >
       <div class="preview-title">{{ previewTargetId }}</div>
-      <div class="preview-content">{{ previewText }}</div>
+      <!-- eslint-disable-next-line vue/no-v-html -->
+      <div class="preview-content" v-html="previewHtml" />
     </div>
 
     <MessageInput />
@@ -301,6 +300,18 @@ onUnmounted(() => {
 .preview-content {
   font-size: 12px;
   line-height: 1.4;
-  white-space: pre-wrap;
+  max-height: 180px;
+  overflow: hidden;
+  white-space: normal;
+
+  :deep() {
+    & > *:first-child {
+      margin-top: 0;
+    }
+
+    & > *:last-child {
+      margin-bottom: 0;
+    }
+  }
 }
 </style>

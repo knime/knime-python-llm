@@ -48,12 +48,28 @@ const laneLabels: Array<{ type: NonTimelineChatItem["type"]; label: string }> = 
   { type: "error", label: "Error" },
 ];
 
+const laneOffsetPattern = [0, -28, 28, -56, 56, -84, 84];
+
+const offsetForLaneIndex = (laneIndex: number) =>
+  laneOffsetPattern[laneIndex % laneOffsetPattern.length];
+
 const graphMessages = computed(() =>
   chatStore.chatItems.filter(isMessageItem).filter((item) => Boolean(item.id)),
 );
 
-const nodes = computed<GraphNode[]>(() =>
-  graphMessages.value.map((item, index) => {
+const nodes = computed<GraphNode[]>(() => {
+  const laneCounts: Record<NonTimelineChatItem["type"], number> = {
+    human: 0,
+    ai: 0,
+    tool: 0,
+    view: 0,
+    error: 0,
+  };
+
+  return graphMessages.value.map((item, index) => {
+    const laneIndex = laneCounts[item.type];
+    laneCounts[item.type] += 1;
+
     const content = "content" in item && typeof item.content === "string" ? item.content : "";
     const compact = content.replace(/\s+/g, " ").trim();
     const label = compact ? compact.slice(0, 42) + (compact.length > 42 ? "..." : "") : item.id;
@@ -62,10 +78,10 @@ const nodes = computed<GraphNode[]>(() =>
       label,
       type: item.type,
       x: 180 + index * 220,
-      y: laneYByType[item.type],
+      y: laneYByType[item.type] + offsetForLaneIndex(laneIndex),
     };
-  }),
-);
+  });
+});
 
 const nodeById = computed(() => new Map(nodes.value.map((node) => [node.id, node])));
 

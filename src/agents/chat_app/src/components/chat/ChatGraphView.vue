@@ -3,6 +3,7 @@ import { computed, ref } from "vue";
 
 import { useChatStore } from "@/stores/chat";
 import type { ChatItem } from "@/types";
+import { renderMarkdown } from "@/utils/markdown";
 import { extractReferencedMessageIds } from "@/utils/messageReferences";
 
 type NonTimelineChatItem = Exclude<ChatItem, { type: "timeline" }>;
@@ -144,6 +145,20 @@ const selectedNode = computed(() =>
   selectedNodeId.value ? nodeById.value.get(selectedNodeId.value) ?? null : null,
 );
 
+const selectedMessage = computed(() => {
+  if (!selectedNodeId.value) {
+    return null;
+  }
+  return graphMessages.value.find((item) => item.id === selectedNodeId.value) ?? null;
+});
+
+const selectedMessageHtml = computed(() => {
+  if (!selectedMessage.value || typeof selectedMessage.value.content !== "string") {
+    return "";
+  }
+  return renderMarkdown(selectedMessage.value.content, selectedMessage.value.id);
+});
+
 const selectedSummary = computed(() => {
   if (!selectedNode.value) {
     return null;
@@ -250,6 +265,11 @@ const openSelectedMessage = () => {
           <div class="node-meta">Type: {{ selectedNode.type }}</div>
           <div class="node-meta">Inbound: {{ selectedSummary?.inbound ?? 0 }}</div>
           <div class="node-meta">Outbound: {{ selectedSummary?.outbound ?? 0 }}</div>
+          <div
+            v-if="selectedMessageHtml"
+            class="node-message"
+            v-html="selectedMessageHtml"
+          />
           <button class="open-button" type="button" @click="openSelectedMessage">
             Open in chat
           </button>
@@ -382,7 +402,8 @@ const openSelectedMessage = () => {
   border-radius: var(--space-4);
   background: var(--knime-white);
   padding: var(--space-12);
-  height: fit-content;
+  max-height: 100%;
+  overflow: auto;
 }
 
 .node-empty {
@@ -398,6 +419,36 @@ const openSelectedMessage = () => {
 .node-meta {
   font-size: 12px;
   margin-bottom: var(--space-4);
+}
+
+.node-message {
+  margin-top: var(--space-8);
+  border: 1px solid var(--knime-silver-sand-semi);
+  border-radius: var(--space-4);
+  padding: var(--space-8);
+  font-size: 12px;
+  line-height: 1.4;
+  max-height: 260px;
+  overflow: auto;
+}
+
+.node-message :deep() {
+  overflow-wrap: break-word;
+  overflow-x: hidden;
+
+  & > *:first-child {
+    margin-top: 0;
+  }
+
+  & > *:last-child {
+    margin-bottom: 0;
+  }
+
+  & pre {
+    border: 1px solid var(--knime-silver-sand);
+    padding: var(--space-4);
+    overflow: auto;
+  }
 }
 
 .open-button {

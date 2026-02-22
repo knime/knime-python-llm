@@ -9,6 +9,8 @@ type NonTimelineChatItem = Exclude<ChatItem, { type: "timeline" }>;
 
 type GraphNode = {
   id: string;
+  displayId: string;
+  fullLabel: string;
   label: string;
   type: NonTimelineChatItem["type"];
   x: number;
@@ -53,6 +55,9 @@ const laneOffsetPattern = [0, -28, 28, -56, 56, -84, 84];
 const offsetForLaneIndex = (laneIndex: number) =>
   laneOffsetPattern[laneIndex % laneOffsetPattern.length];
 
+const truncateForNode = (value: string, maxLength: number) =>
+  value.length > maxLength ? `${value.slice(0, maxLength - 3)}...` : value;
+
 const graphMessages = computed(() =>
   chatStore.chatItems.filter(isMessageItem).filter((item) => Boolean(item.id)),
 );
@@ -72,10 +77,12 @@ const nodes = computed<GraphNode[]>(() => {
 
     const content = "content" in item && typeof item.content === "string" ? item.content : "";
     const compact = content.replace(/\s+/g, " ").trim();
-    const label = compact ? compact.slice(0, 42) + (compact.length > 42 ? "..." : "") : item.id;
+    const fullLabel = compact || item.id;
     return {
       id: item.id,
-      label,
+      displayId: truncateForNode(item.id, 22),
+      fullLabel,
+      label: truncateForNode(fullLabel, 24),
       type: item.type,
       x: 180 + index * 220,
       y: laneYByType[item.type] + offsetForLaneIndex(laneIndex),
@@ -225,8 +232,9 @@ const openSelectedMessage = () => {
               :class="[node.type, { selected: selectedNodeId === node.id }]"
               @click="selectNode(node.id)"
             >
+              <title>{{ node.id }}: {{ node.fullLabel }}</title>
               <rect height="44" rx="8" ry="8" width="140" />
-              <text x="8" y="16" class="node-id">{{ node.id }}</text>
+              <text x="8" y="16" class="node-id">{{ node.displayId }}</text>
               <text x="8" y="32" class="node-label">{{ node.label }}</text>
             </g>
           </g>

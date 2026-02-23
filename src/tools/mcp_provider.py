@@ -135,7 +135,7 @@ class MCPToolProvider:
         import knime.types.tool as ktt
 
         return knext.Schema.from_columns(
-            [knext.Column(knext.logical(ktt.MCPTool), "MCP Tools")]
+            [knext.Column(knext.logical(ktt.Tool), "MCP Tools")]
         )
 
     def execute(self, ctx: knext.ExecutionContext) -> knext.Table:
@@ -158,13 +158,13 @@ class MCPToolProvider:
 
             _logger.info(f"Found {len(tool_infos)} tools from MCP server")
 
-            # Convert each MCP tool info to MCPTool object
+            # Convert each MCP tool info to Tool object
             mcp_tools = []
             for tool_info in tool_infos:
                 # Filter to only include simple types
                 filtered_schema = _filter_simple_types(tool_info.input_schema)
 
-                mcp_tool = ktt.MCPTool(
+                mcp_tool = ktt.Tool.create_mcp_tool(
                     name=tool_info.name,
                     description=tool_info.description,
                     parameter_schema=filtered_schema,
@@ -177,7 +177,13 @@ class MCPToolProvider:
             if not mcp_tools:
                 _logger.warning("No tools found on MCP server")
                 # Return empty table with correct schema
-                df = pd.DataFrame({"MCP Tools": pd.Series([], dtype=object)})
+                df = pd.DataFrame(
+                    {
+                        "MCP Tools": pd.Series(
+                            [], dtype=knext.logical(ktt.Tool).to_pandas()
+                        )
+                    }
+                )
             else:
                 df = pd.DataFrame({"MCP Tools": mcp_tools})
 

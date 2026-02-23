@@ -69,6 +69,12 @@
             factory-class="org.knime.ai.core.node.tool.workflow2tool.WorkflowToToolNodeFactory"
             hidden="false">
       </node>
+      <node
+      	category-path="/labs/kai/agents"
+            deprecated="false"
+            factory-class="org.knime.ai.core.node.tool.mcp.call.MCPToolCallerNodeFactory"
+            hidden="false">
+      </node>
    </extension>
    
    <extension point="org.knime.core.DataValueRenderer">

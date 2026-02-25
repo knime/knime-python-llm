@@ -184,7 +184,7 @@ class MCPToolProvider:
                 import httpx
 
                 auth = httpx.BasicAuth(
-                    username=cred.login,
+                    username=cred.username,
                     password=cred.password,
                 )
                 credential_name = self.credentials_param

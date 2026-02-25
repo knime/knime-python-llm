@@ -55,6 +55,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.UUID;
 
 import org.knime.core.data.DataCell;
@@ -69,6 +70,8 @@ import org.knime.core.node.KNIMEException;
 import org.knime.core.node.agentic.tool.ToolCell;
 import org.knime.core.node.agentic.tool.ToolType;
 import org.knime.core.node.agentic.tool.ToolValue;
+import org.knime.core.node.workflow.ICredentials;
+import org.knime.core.node.workflow.NodeContext;
 import org.knime.node.DefaultModel.ConfigureInput;
 import org.knime.node.DefaultModel.ConfigureOutput;
 import org.knime.node.DefaultModel.ExecuteInput;
@@ -250,10 +253,8 @@ public final class MCPToolCallerNodeFactory extends DefaultNodeFactory {
     private static String executeMCPTool(final ToolCell toolCell, final JsonObject parameters,
         final java.util.function.Consumer<String> setMessage) throws IOException, InterruptedException {
 
-        // TODO: Support authentication for MCP servers.
-        // The ToolCell now carries an optional credentialName (see toolCell.getCredentialName()).
-        // When non-null, the credential should be resolved from the workflow's credential store
-        // and used to set an Authorization header (e.g. Basic Auth) on the HTTP request below.
+        // Resolve authentication header if the tool has an associated credential
+        String authHeader = resolveAuthHeader(toolCell);
 
         // Create JSON-RPC 2.0 request
         var requestId = UUID.randomUUID().toString();
@@ -268,11 +269,16 @@ public final class MCPToolCallerNodeFactory extends DefaultNodeFactory {
         var requestJson = requestBuilder.build().toString();
 
         // Create HTTP request
-        var httpRequest = HttpRequest.newBuilder()
+        var httpRequestBuilder = HttpRequest.newBuilder()
             .uri(URI.create(toolCell.getServerUri()))
             .header("Content-Type", "application/json")
-            .POST(HttpRequest.BodyPublishers.ofString(requestJson, StandardCharsets.UTF_8))
-            .build();
+            .POST(HttpRequest.BodyPublishers.ofString(requestJson, StandardCharsets.UTF_8));
+
+        if (authHeader != null) {
+            httpRequestBuilder.header("Authorization", authHeader);
+        }
+
+        var httpRequest = httpRequestBuilder.build();
 
         // Send request
         setMessage.accept("Calling MCP server...");
@@ -304,6 +310,61 @@ public final class MCPToolCallerNodeFactory extends DefaultNodeFactory {
 
         } catch (Exception e) {
             throw new IOException("Failed to parse MCP response: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Resolves the authentication header for an MCP tool call based on the credential stored in the {@link ToolCell}.
+     *
+     * <p>If the tool has no associated credential name, returns {@code null} (no authentication).
+     *
+     * <p>The auth type is inferred from the credential's fields:
+     * <ul>
+     *   <li>If a {@link ICredentials#getSecondAuthenticationFactor() second authentication factor} is present,
+     *       it is used as a Bearer token (e.g. for JWT / API key authentication).</li>
+     *   <li>If a non-empty {@link ICredentials#getLogin() login} is present, Basic Auth is used
+     *       with login and password.</li>
+     *   <li>Otherwise, the {@link ICredentials#getPassword() password} is used as a Bearer token.</li>
+     * </ul>
+     *
+     * @param toolCell the tool cell containing the optional credential name
+     * @return the Authorization header value, or {@code null} if the tool has no credential
+     * @throws IOException if the credential cannot be resolved
+     */
+    private static String resolveAuthHeader(final ToolCell toolCell) throws IOException {
+        var credentialName = toolCell.getCredentialName();
+        if (credentialName == null) {
+            return null;
+        }
+
+        try {
+            var wfm = NodeContext.getContext().getWorkflowManager();
+            ICredentials credentials = wfm.getCredentialsStore().get(credentialName);
+
+            // Prefer second authentication factor as Bearer token (JWT / API Key)
+            var secondFactor = credentials.getSecondAuthenticationFactor();
+            if (secondFactor.isPresent() && !secondFactor.get().isEmpty()) {
+                return "Bearer " + secondFactor.get();
+            }
+
+            // If login is present, use Basic Auth
+            var login = credentials.getLogin();
+            if (login != null && !login.isEmpty()) {
+                var password = credentials.getPassword() != null ? credentials.getPassword() : "";
+                return "Basic " + Base64.getEncoder()
+                    .encodeToString((login + ":" + password).getBytes(StandardCharsets.UTF_8));
+            }
+
+            // Fall back to using the password as a Bearer token
+            var password = credentials.getPassword();
+            if (password != null && !password.isEmpty()) {
+                return "Bearer " + password;
+            }
+
+            throw new IOException("Credential \"" + credentialName
+                + "\" has neither login/password for Basic Auth nor a token for Bearer Auth.");
+        } catch (IllegalArgumentException e) {
+            throw new IOException("Could not resolve credential \"" + credentialName + "\": " + e.getMessage(), e);
         }
     }
 

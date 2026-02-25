@@ -71,6 +71,7 @@ import org.knime.core.node.agentic.tool.ToolCell;
 import org.knime.core.node.agentic.tool.ToolType;
 import org.knime.core.node.agentic.tool.ToolValue;
 import org.knime.core.node.workflow.ICredentials;
+import org.knime.core.node.workflow.NativeNodeContainer;
 import org.knime.core.node.workflow.NodeContext;
 import org.knime.node.DefaultModel.ConfigureInput;
 import org.knime.node.DefaultModel.ConfigureOutput;
@@ -338,8 +339,11 @@ public final class MCPToolCallerNodeFactory extends DefaultNodeFactory {
         }
 
         try {
-            var wfm = NodeContext.getContext().getWorkflowManager();
-            ICredentials credentials = wfm.getCredentialsStore().get(credentialName);
+            var nc = NodeContext.getContext().getNodeContainer();
+            if (!(nc instanceof NativeNodeContainer nnc)) {
+                throw new IOException("Cannot resolve credentials outside of a native node context.");
+            }
+            ICredentials credentials = nnc.getNode().getCredentialsProvider().get(credentialName);
 
             // Prefer second authentication factor as Bearer token (JWT / API Key)
             var secondFactor = credentials.getSecondAuthenticationFactor();

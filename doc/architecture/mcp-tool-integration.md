@@ -13,7 +13,7 @@ Implement prototype support for Model Context Protocol (MCP) servers in KNIME ag
 - Add `ToolType` IntEnum with values: `WORKFLOW = 0`, `MCP = 1` (matching Java enum indices)
 - Add `MCPTool` dataclass with: `name`, `description`, `parameter_schema` (JSON schema), `server_uri`, `tool_name`
 - Add `tool_type` property returning `ToolType.MCP`
-- Add `MCPToolValueFactory` class similar to `WorkflowToolValueFactory` for Arrow serialization
+- Add unified `ToolValueFactory` class similar to `WorkflowToolValueFactory` for Arrow serialization
 - Keep simple types only (string/int/float) in parameter schema
 - Simplified from unified design: Fields removed (`input_schema`, `output_type`) since outputs are always strings for prototype
 
@@ -93,7 +93,7 @@ Implement prototype support for Model Context Protocol (MCP) servers in KNIME ag
 
 The initial implementation (steps 1-6 above) uses separate value factories for `WorkflowTool` and `MCPTool`:
 - `WorkflowToolValueFactory` (Java + Python) for workflow-based tools
-- `MCPToolValueFactory` (Python only) for MCP server tools
+- `ToolValueFactory` for unified tools across MCP server and workflow  tools
 
 This creates several issues:
 1. **Separate columns required**: Cannot mix tool types in same column

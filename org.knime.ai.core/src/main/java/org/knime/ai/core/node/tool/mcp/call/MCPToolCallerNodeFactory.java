@@ -250,6 +250,11 @@ public final class MCPToolCallerNodeFactory extends DefaultNodeFactory {
     private static String executeMCPTool(final ToolCell toolCell, final JsonObject parameters,
         final java.util.function.Consumer<String> setMessage) throws IOException, InterruptedException {
 
+        // TODO: Support authentication for MCP servers.
+        // The ToolCell now carries an optional credentialName (see toolCell.getCredentialName()).
+        // When non-null, the credential should be resolved from the workflow's credential store
+        // and used to set an Authorization header (e.g. Basic Auth) on the HTTP request below.
+
         // Create JSON-RPC 2.0 request
         var requestId = UUID.randomUUID().toString();
         JsonObjectBuilder requestBuilder = Json.createObjectBuilder()

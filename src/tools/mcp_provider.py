@@ -51,6 +51,12 @@ import knime.extension as knext
 import pandas as pd
 
 _logger = logging.getLogger(__name__)
+_debugger_attached = False
+
+
+def _get_credential_names(identifier):
+    """Return available credential names for the dialog dropdown."""
+    return knext.DialogCreationContext.get_credential_names(identifier)
 
 
 def _filter_simple_types(schema: dict) -> dict:
@@ -114,11 +120,28 @@ class MCPToolProvider:
     **MCP Server Configuration:**
     Provide the URL of your MCP server endpoint (e.g., "http://localhost:8080/mcp").
     The server must support the Model Context Protocol with tools/list capability.
+
+    **Authentication:**
+    If the MCP server requires authentication, select a credentials flow variable.
+    The *username* and *password* from the selected credential are sent as HTTP Basic Auth.
+    Credentials can be created with a *Credentials Configuration* node or similar.
+    If no credential is selected, requests are sent without authentication.
     """
 
     server_url = knext.StringParameter(
         label="Server URL",
         description="The URL of the MCP server endpoint (e.g., 'http://localhost:8080/mcp')",
+        default_value="",
+    )
+
+    credentials_param = knext.StringParameter(
+        label="Credentials",
+        description=(
+            "Optional credentials flow variable for authenticating with the MCP server. "
+            "The *username* and *password* from the selected credential are sent as HTTP Basic Auth. "
+            "Leave empty for unauthenticated access."
+        ),
+        choices=_get_credential_names,
         default_value="",
     )
 
@@ -152,8 +175,25 @@ class MCPToolProvider:
 
         _logger.info(f"Connecting to MCP server: {self.server_url}")
 
+        # Build auth from credentials flow variable (if configured)
+        auth = None
+        credential_name = None
+        if self.credentials_param:
+            try:
+                cred = ctx.get_credentials(self.credentials_param)
+                import httpx
+
+                auth = httpx.BasicAuth(
+                    username=cred.login,
+                    password=cred.password,
+                )
+                credential_name = self.credentials_param
+                _logger.info("Using Basic Auth credentials for MCP server")
+            except Exception as e:
+                _logger.warning(f"Could not resolve credentials: {e}")
+
         try:
-            client = MCPClient(self.server_url)
+            client = MCPClient(self.server_url, auth=auth)
             tool_infos = client.list_tools()
 
             _logger.info(f"Found {len(tool_infos)} tools from MCP server")
@@ -170,29 +210,27 @@ class MCPToolProvider:
                     parameter_schema=filtered_schema,
                     server_uri=self.server_url,
                     tool_name=tool_info.name,
+                    credential_name=credential_name,
                 )
                 mcp_tools.append(mcp_tool)
 
-            # Create output table with MCP tools
             if not mcp_tools:
+                ctx.set_warning("No tools found on MCP server")
                 _logger.warning("No tools found on MCP server")
-                # Return empty table with correct schema
-                df = pd.DataFrame(
-                    {
-                        "MCP Tools": pd.Series(
-                            [], dtype=knext.logical(ktt.Tool).to_pandas()
-                        )
-                    }
-                )
-            else:
-                df = pd.DataFrame({"MCP Tools": mcp_tools})
+
+            # Create output table with MCP tools
+            df = pd.DataFrame(
+                {
+                    "MCP Tools": pd.Series(
+                        mcp_tools, dtype=knext.logical(ktt.Tool).to_pandas()
+                    )
+                }
+            )
 
             return knext.Table.from_pandas(df)
 
         except MCPConnectionError as e:
-            raise knext.InvalidParametersError(
-                f"Failed to connect to MCP server: {e}"
-            )
+            raise knext.InvalidParametersError(f"Failed to connect to MCP server: {e}")
         except MCPClientError as e:
             raise RuntimeError(f"MCP client error: {e}")
         except Exception as e:

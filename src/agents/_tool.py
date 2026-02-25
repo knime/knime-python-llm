@@ -44,7 +44,7 @@
 
 from dataclasses import dataclass
 import re
-from typing import Optional
+from typing import Optional, List
 from ._data import Port, DataRegistry, port_to_dict
 from ._common import render_structured
 from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
@@ -52,7 +52,7 @@ from langchain.tools import StructuredTool
 import knime.extension as knext
 import logging
 
-from enum import Enum, auto
+from enum import Enum, auto, IntEnum
 
 _logger = logging.getLogger(__name__)
 
@@ -143,22 +143,32 @@ class WorkflowTool:
     input_ports: list[Port]
     output_ports: list[Port]
 
+class ToolType(IntEnum):
+    """Tool type enumeration matching Java enum indices."""
+
+    WORKFLOW = 0
+    MCP = 1
 
 @dataclass
-class MCPTool:
-    """Mirrors the MCPTool class defined in knime.types.tool."""
+class Tool:
+    """
+    Mirrors the Tool clas from knime-python so we can use type hints
+    """
 
+    tool_type: ToolType
     name: str
     description: str
     parameter_schema: dict
-    server_uri: str
-    tool_name: str
 
-    @property
-    def tool_type(self):
-        \"\"\"Returns MCP tool type (1 in ToolType enum).\"\"\"
-        return 1  # ToolType.MCP
+    # Workflow-specific fields (None for MCP tools)
+    message_output_port_index: Optional[int] = None
+    input_ports: Optional[List[Port]] = None
+    output_ports: Optional[List[Port]] = None
+    _filestore_keys: Optional[List[str]] = None
 
+    # MCP-specific fields (None for workflow tools)
+    server_uri: Optional[str] = None
+    tool_name: Optional[str] = None
 
 class ExecutionMode(Enum):
     DEBUG = auto()
@@ -261,13 +271,13 @@ class LangchainToolConverter:
             args_schema=args_schema,
         )
 
-    def to_langchain_tool_from_mcp(self, tool: MCPTool) -> StructuredTool:
+    def to_langchain_tool_from_mcp(self, tool: Tool) -> StructuredTool:
         """
-        Convert an MCPTool to a LangChain StructuredTool.
+        Convert an Tool to a LangChain StructuredTool.
 
         Parameters
         ----------
-        tool : MCPTool
+        tool : Tool
             The MCP tool to convert
 
         Returns

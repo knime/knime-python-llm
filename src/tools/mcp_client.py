@@ -91,7 +91,7 @@ class MCPClient:
     Supports listing available tools and executing them with parameters.
     """
 
-    def __init__(self, server_uri: str):
+    def __init__(self, server_uri: str, auth: Optional[Any] = None):
         """
         Initialize MCP client.
 
@@ -99,9 +99,14 @@ class MCPClient:
         ----------
         server_uri : str
             The URI of the MCP server (e.g., "http://localhost:8080/mcp")
+        auth : optional
+            An ``httpx.Auth`` instance (e.g. ``httpx.BasicAuth``) or any auth
+            object accepted by ``httpx.Client``.  ``None`` for unauthenticated
+            requests.
         """
         self.server_uri = server_uri
         self._request_id = 0
+        self._auth = auth
 
     def _get_next_request_id(self) -> str:
         """Generate next request ID for JSON-RPC."""
@@ -149,7 +154,7 @@ class MCPClient:
             request_data["params"] = params
 
         try:
-            with httpx.Client(timeout=30.0) as client:
+            with httpx.Client(timeout=30.0, auth=self._auth) as client:
                 response = client.post(
                     self.server_uri,
                     json=request_data,

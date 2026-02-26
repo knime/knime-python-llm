@@ -298,10 +298,16 @@ class AgentPrompter:
         return knext.Table.from_pandas(chat_history_df)
 
 
-def _tool_type() -> knext.LogicalType:
+def _workflow_tool_type() -> knext.LogicalType:
     import knime.types.tool as ktt
 
     return knext.logical(ktt.WorkflowTool)
+
+
+def _tool_type() -> knext.LogicalType:
+    import knime.types.tool as ktt
+
+    return knext.logical(ktt.Tool)
 
 
 def _tool_column_parameter():
@@ -309,13 +315,13 @@ def _tool_column_parameter():
         "Tool column",
         "The column of the tools table holding the tools the agent can use.",
         port_index=1,
-        column_filter=util.create_type_filter(_tool_type()),
+        column_filter=util.create_type_filter([_tool_type(), _workflow_tool_type()]),
     )
 
 
 def _last_tool_column(schema: knext.Schema):
-    tool_type = _tool_type()
-    tool_columns = [col for col in schema if col.ktype == tool_type]
+    tool_types = [_tool_type(), _workflow_tool_type()]
+    tool_columns = [col for col in schema if col.ktype in tool_types]
     if not tool_columns:
         raise knext.InvalidParametersError(
             "No tool column found in the tools table. Please provide a valid tool column."
@@ -1408,7 +1414,10 @@ class AgentChatWidget:
             data_registry, ctx, execution_mode, self.show_views, True
         )
         if tools_table is not None:
-            tool_cells = _extract_tools_from_table(tools_table, self.tool_column)
+            tool_column = self.tool_column
+            if tool_column is None:
+                tool_column = _last_tool_column(tools_table.schema)
+            tool_cells = _extract_tools_from_table(tools_table, tool_column)
             # @ToolTypeDispatch - Update when adding new ToolType values
             # Convert tools based on their type
             tools = []

@@ -695,12 +695,9 @@ state that the tool could not be executed due to reaching the iteration limit.""
             DataRegistry,
             LangchainToolConverter,
         )
-        from ._tool import ExecutionMode, MCPTool
+        from ._tool import ExecutionMode
         from ._agent import Agent, AgentConfig
         from ._error_handler import AgentPrompterErrorHandler
-
-        # Add MCP tool execution method to ctx
-        ctx._execute_mcp_tool = _execute_mcp_tool
 
         data_registry = DataRegistry.create_with_input_tables(
             input_tables, data_message_prefix=self.data_message_prefix
@@ -1380,10 +1377,7 @@ class AgentChatWidget:
             AgentChatWidgetDataService,
             AgentChatWidgetConfig,
         )
-        from ._tool import ExecutionMode, MCPTool
-
-        # Add MCP tool execution method to ctx
-        ctx._execute_mcp_tool = _execute_mcp_tool
+        from ._tool import ExecutionMode
 
         execution_mode = ExecutionMode.DEBUG if self.debug else ExecutionMode.DETACHED
 

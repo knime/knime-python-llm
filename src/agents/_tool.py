@@ -170,6 +170,9 @@ class Tool:
     server_uri: Optional[str] = None
     tool_name: Optional[str] = None
 
+    # Credential reference for authenticated MCP servers (None if unauthenticated)
+    credential_name: Optional[str] = None
+
 class ExecutionMode(Enum):
     DEBUG = auto()
     DEFAULT = auto()
@@ -273,7 +276,12 @@ class LangchainToolConverter:
 
     def to_langchain_tool_from_mcp(self, tool: Tool) -> StructuredTool:
         """
-        Convert an Tool to a LangChain StructuredTool.
+        Convert a Tool to a LangChain StructuredTool.
+
+        MCP tool calls are routed through the Java ToolExecutor which provides
+        proper credential resolution from the KNIME workflow credential store
+        and, when using the combined tools workflow, records the MCP call for
+        audit/reproducibility.
 
         Parameters
         ----------
@@ -300,11 +308,20 @@ class LangchainToolConverter:
                 "required": tool.parameter_schema.get("required", []),
             }
 
-        # Create tool function that calls the MCP server
+        # Create tool function that routes execution through the Java ToolExecutor
         def mcp_tool_function(**params: dict) -> str:
             try:
-                result = self._ctx._execute_mcp_tool(tool, params)
-                return str(result)
+                if self._use_combined_tools_workflow:
+                    message, outputs, output_ids, view_node_ids = (
+                        self._ctx._execute_tool_in_combined_workflow(
+                            tool, params, [], self._execution_hints
+                        )
+                    )
+                else:
+                    message, outputs, view_node_ids = self._ctx._execute_tool(
+                        tool, params, [], self._execution_hints
+                    )
+                return str(message)
             except Exception as e:
                 _logger.exception(f"Error executing MCP tool {tool.name}: {e}")
                 raise

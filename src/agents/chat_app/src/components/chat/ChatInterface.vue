@@ -8,6 +8,7 @@ import { useChatStore } from "@/stores/chat";
 
 import MessageInput from "./MessageInput.vue";
 import StatusIndicator from "./StatusIndicator.vue";
+import WarningBanner from "./WarningBanner.vue";
 import AiMessage from "./message/AiMessage.vue";
 import ErrorMessage from "./message/ErrorMessage.vue";
 import HumanMessage from "./message/HumanMessage.vue";
@@ -53,6 +54,12 @@ useScrollToBottom(scrollableContainer, messagesList);
         </MessageBox>
       </div>
     </div>
+
+    <WarningBanner
+      v-if="chatStore.warningMessage"
+      :warning="chatStore.warningMessage"
+      @dismiss="chatStore.dismissWarning"
+    />
 
     <MessageInput />
   </main>

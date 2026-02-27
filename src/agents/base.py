@@ -1104,6 +1104,15 @@ class AgentChatWidgetErrorSettings:
     ).rule(knext.OneOf(has_error_column, [True]), knext.Effect.SHOW)
 
 
+def _validate_chat_model_credentials(ctx, chat_model_port: ChatModelPortObject):
+    try:
+        chat_model_port.spec.validate_context(ctx)
+    except Exception as exc:
+        return str(exc)
+
+    return None
+
+
 @knext.node(
     "Agent Chat Widget (experimental)",
     node_type=knext.NodeType.VISUALIZER,
@@ -1327,9 +1336,7 @@ class AgentChatWidget:
 
         view_data = ctx._get_view_data()
 
-        chat_model = chat_model.create_model(
-            ctx, output_format=OutputFormatOptions.Text
-        )
+        chat_model, startup_error = self._create_model_safely(ctx, chat_model)
 
         if view_data is None:
             project_id, workflow_id, input_ids = ctx._init_combined_tools_workflow(
@@ -1388,7 +1395,22 @@ class AgentChatWidget:
                 "project_id": project_id,
                 "workflow_id": workflow_id,
             },
+            startup_error=startup_error,
         )
+
+    def _create_model_safely(self, ctx, chat_model: ChatModelPortObject):
+        credential_error = _validate_chat_model_credentials(ctx, chat_model)
+        if credential_error:
+            return None, credential_error
+        else:
+            try:
+                model = chat_model.create_model(ctx, output_format=OutputFormatOptions.Text)
+                return model, None
+            except Exception as exc:
+                startup_error = (
+                    f"Failed to initialize the selected model. {exc}"
+                )
+                return None, startup_error
 
     def _create_conversation_history(self, view_data, data_registry, tool_converter):
         history_table = view_data["ports"][0] if view_data is not None else None

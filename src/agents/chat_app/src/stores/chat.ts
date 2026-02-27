@@ -17,6 +17,7 @@ import type {
   ToolCallTimelineItem,
   ToolMessage,
   ViewData,
+  WarningMessage,
   WorkflowInfo,
 } from "@/types";
 
@@ -169,6 +170,17 @@ function isErrorMessage(msg?: Message): boolean {
   return msg.type === "error";
 }
 
+function isWarningMessage(msg?: Message): msg is WarningMessage {
+  if (!msg) {
+    return false;
+  }
+  return msg.type === "warning";
+}
+
+// function normalizeMessageIds(msgs: Message[]): Message[] {
+//   return msgs.map((msg) => (msg.id ? msg : { ...msg, id: useId() }));
+// }
+
 function isAiMessageWithToolCalls(msg?: Message): boolean {
   if (!msg) {
     return false;
@@ -195,6 +207,7 @@ export const useChatStore = defineStore("chat", () => {
   const jsonDataService = ref<JsonDataService | null>(null);
   const sharedDataService = ref<SharedDataService | null>(null);
   const initState = ref<InitializationState>("idle");
+  const warningMessage = ref<WarningMessage | null>(null);
   const requestQueue: Array<() => void> = []; // populated with messages sent before data service is ready
 
   // getters
@@ -241,6 +254,37 @@ export const useChatStore = defineStore("chat", () => {
     }
   }
 
+  function setWarningMessage(messages: Message[]) {
+    const warnings = messages.filter(isWarningMessage);
+    if (warnings.length == 0) {
+      return;
+    }
+
+    const latestWarning = warnings.at(-1);
+    const content = latestWarning?.content?.trim();
+    if (!content) {
+      return;
+    }
+
+    warningMessage.value = latestWarning || null;
+  }
+
+  function dismissWarning() {
+    warningMessage.value = null;
+  }
+
+  // fetches initial warnings from the backend
+  async function addStartupMessages() {
+    try {
+      const startupMessages = await getLastMessages();
+      if (startupMessages.length > 0) {
+        addMessages(startupMessages, shouldShowToolCalls.value || false, false);
+      }
+    } catch (error) {
+      consola.error("Chat Store: Failed to fetch startup messages:", error);
+    }
+  }
+
   async function init() {
     if (initState.value !== "idle") {
       return;
@@ -271,6 +315,8 @@ export const useChatStore = defineStore("chat", () => {
           config: toRaw(config.value),
         });
       }
+
+      await addStartupMessages();
 
       initState.value = "ready";
       flushRequestQueue();
@@ -481,8 +527,16 @@ export const useChatStore = defineStore("chat", () => {
     showToolCallsResults: boolean,
     shallApplyOnFinish: boolean = true,
   ) {
-    messagesToPersist.push(...msgs);
-    lastMessage.value = msgs.at(-1);
+    // const normalizedMessages = normalizeMessageIds(msgs); // TODO check if necessary
+
+    setWarningMessage(msgs);
+    const messages = msgs.filter((msg) => !isWarningMessage(msg));
+    if (messages.length === 0) {
+      return;
+    }
+
+    messagesToPersist.push(...messages);
+    lastMessage.value = messages.at(-1);
 
     const isInteractionFinished =
       isAiMessageWithoutToolCalls(lastMessage.value) ||
@@ -494,8 +548,8 @@ export const useChatStore = defineStore("chat", () => {
 
     // update chatItems
     const lastMessagesToDisplay = showToolCallsResults
-      ? msgs
-      : msgs.filter(
+      ? messages
+      : messages.filter(
           (msg) => !isToolMessage(msg) && !isAiMessageWithToolCalls(msg),
         );
     const activeTimeline = chatItems.value.findLast(
@@ -538,6 +592,7 @@ export const useChatStore = defineStore("chat", () => {
     lastUserMessage.value = "";
     jsonDataService.value = null;
     initState.value = "idle";
+    warningMessage.value = null;
     requestQueue.length = 0;
   }
 
@@ -551,6 +606,7 @@ export const useChatStore = defineStore("chat", () => {
     lastUserMessage,
     jsonDataService,
     initState,
+    warningMessage,
 
     // getters
     shouldShowStatusIndicator,
@@ -562,6 +618,7 @@ export const useChatStore = defineStore("chat", () => {
     addErrorMessage,
     addMessages,
     init,
+    dismissWarning,
     getConfiguration,
     getCombinedToolsWorkflowInfo,
     getInitialMessage,

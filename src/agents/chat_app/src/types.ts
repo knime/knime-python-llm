@@ -1,5 +1,5 @@
 // Message-related entities
-type MessageType = "human" | "ai" | "tool" | "view" | "error";
+type MessageType = "human" | "ai" | "tool" | "view" | "error" | "warning";
 
 interface BaseMessage {
   id: string;
@@ -30,6 +30,11 @@ export interface ErrorMessage extends BaseMessage {
   type: "error";
 }
 
+export interface WarningMessage extends BaseMessage {
+  content: string;
+  type: "warning";
+}
+
 export interface HumanMessage extends BaseMessage {
   content: string;
   type: "human";
@@ -45,6 +50,7 @@ export type Message =
   | AiMessage
   | ViewMessage
   | ErrorMessage
+  | WarningMessage
   | HumanMessage
   | ToolMessage;
 

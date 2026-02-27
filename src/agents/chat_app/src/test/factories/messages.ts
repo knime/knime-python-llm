@@ -9,11 +9,16 @@ import type {
   ToolCallTimelineItem,
   ToolMessage,
   ViewMessage,
+  Warning,
 } from "@/types";
 
 export const createErrorMessage = (content: string) => ({
   id: expect.any(String),
   type: "error",
+  content,
+});
+
+export const createWarningMessage = (content: string): Warning => ({
   content,
 });
 

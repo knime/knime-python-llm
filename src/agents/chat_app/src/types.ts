@@ -48,6 +48,10 @@ export type Message =
   | HumanMessage
   | ToolMessage;
 
+export interface Warning {
+  content: string;
+}
+
 // Timeline-related entities
 export type TimelineItemType = "reasoning" | "tool_call";
 

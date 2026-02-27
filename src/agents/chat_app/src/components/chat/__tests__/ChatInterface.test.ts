@@ -53,6 +53,11 @@ describe("ChatInterface", () => {
             props: ["label"],
             template: "<div class='status-indicator'>{{ label }}</div>",
           },
+          WarningBanner: {
+            props: ["warning"],
+            template:
+              "<div class='warning-banner'><button class='dismiss' @click=\"$emit('dismiss')\">Dismiss</button></div>",
+          },
           MessageInput: {
             template: "<div class='message-input'>Message Input</div>",
           },
@@ -247,6 +252,37 @@ describe("ChatInterface", () => {
     const wrapper = createWrapper();
 
     expect(wrapper.find(".message-input").exists()).toBe(true);
+  });
+
+  it("shows warning banner when warning message is set", async () => {
+    const wrapper = createWrapper();
+    const chatStore = useChatStore();
+
+    chatStore.warningMessage = {
+      id: "warning-1",
+      type: "warning",
+      content: "Heads up",
+    } as any;
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.find(".warning-banner").exists()).toBe(true);
+  });
+
+  it("dismisses warning banner when dismiss is triggered", async () => {
+    const wrapper = createWrapper();
+    const chatStore = useChatStore();
+
+    chatStore.warningMessage = {
+      id: "warning-2",
+      type: "warning",
+      content: "Be careful",
+    } as any;
+    const dismissSpy = vi.spyOn(chatStore, "dismissWarning");
+    await wrapper.vm.$nextTick();
+
+    await wrapper.find(".warning-banner .dismiss").trigger("click");
+
+    expect(dismissSpy).toHaveBeenCalledTimes(1);
   });
 
   it("finishes loading when the last message is an AI message without tool calls", async () => {

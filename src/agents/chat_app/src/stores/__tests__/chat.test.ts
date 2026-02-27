@@ -13,6 +13,7 @@ import {
   createToolMessage,
   createUserMessage,
   createViewMessage,
+  createWarningMessage,
 } from "@/test/factories/messages";
 import type { Timeline, ViewData } from "@/types";
 import { useChatStore } from "../chat";
@@ -75,7 +76,50 @@ describe("chat store", () => {
         lastUserMessage: "",
         jsonDataService: null,
         initState: "idle",
+        warningMessage: null,
       });
+    });
+  });
+
+  describe("warning handling", () => {
+    it("stores warning message without adding it to chat items", () => {
+      const { store } = setupStore();
+      const warningMessage = {
+        id: "warning-1",
+        type: "warning",
+        content: "Warning from backend",
+      } as any;
+
+      store.addMessages([warningMessage], true);
+
+      expect(store.warningMessage).toMatchObject(
+        createWarningMessage("Warning from backend"),
+      );
+      expect(store.chatItems).toHaveLength(0);
+      expect(store.lastMessage).toBeUndefined();
+    });
+
+    it("keeps non-warning messages in chat items", () => {
+      const { store } = setupStore();
+      const warningMessage = {
+        id: "warning-2",
+        type: "warning",
+        content: "Banner warning",
+      } as any;
+      const aiMessage = {
+        id: "ai-1",
+        type: "ai",
+        content: "Hello",
+      } as any;
+
+      store.addMessages([warningMessage, aiMessage], true);
+
+      expect(store.warningMessage).toMatchObject(
+        createWarningMessage("Banner warning"),
+      );
+      expect(store.chatItems).toHaveLength(1);
+      expect(store.chatItems[0]).toMatchObject(createAiMessage("Hello"));
+      expect(store.lastMessage).toMatchObject(createAiMessage("Hello"));
     });
   });
 
@@ -874,6 +918,7 @@ describe("chat store", () => {
       mockJsonDataService.data
         .mockResolvedValueOnce(config)
         .mockResolvedValueOnce(initialMessage)
+        .mockResolvedValueOnce([]) // get_last_messages
         .mockResolvedValue({}); // for pending message post
 
       // Initialize the store
@@ -933,6 +978,7 @@ describe("chat store", () => {
       mockJsonDataService.data
         .mockResolvedValueOnce(config)
         .mockResolvedValueOnce(null) // No initial AI message
+        .mockResolvedValueOnce([]) // get_last_messages
         .mockResolvedValue({}); // for message posts
 
       // Initialize the store
@@ -973,6 +1019,7 @@ describe("chat store", () => {
       mockJsonDataService.data
         .mockResolvedValueOnce(config)
         .mockResolvedValueOnce(null) // No initial AI message
+        .mockResolvedValueOnce([]) // get_last_messages
         .mockResolvedValue({}); // for pending message post
 
       // Initialize the store
@@ -1019,6 +1066,7 @@ describe("chat store", () => {
       mockJsonDataService.data
         .mockResolvedValueOnce(config)
         .mockResolvedValueOnce(initialMessage)
+        .mockResolvedValueOnce([]) // get_last_messages
         .mockRejectedValueOnce(new Error("Network error")); // Fail on pending message post
 
       // Initialize the store

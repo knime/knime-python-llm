@@ -928,7 +928,7 @@ class AgentPrompterConversation:
         self._is_message = []
         self._ctx = ctx
 
-    def append_messages(self, messages):
+    def append_messages(self, messages, validate=True):
         """Raises a CancelError if the context was canceled."""
         from langchain_core.messages import AIMessage, BaseMessage
         from ._agent import validate_ai_message, CancelError
@@ -941,7 +941,7 @@ class AgentPrompterConversation:
 
         for msg in messages:
             # Validate AI messages as they are added
-            if isinstance(msg, AIMessage):
+            if validate and isinstance(msg, AIMessage):
                 try:
                     validate_ai_message(msg)
                 except Exception as e:
@@ -954,6 +954,7 @@ class AgentPrompterConversation:
                         # For COLUMN mode, append the error and skip the message
                         self._append(e)
                         continue
+
             self._append(msg)
 
     def append_error(self, error):

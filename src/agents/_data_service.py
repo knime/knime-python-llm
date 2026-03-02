@@ -280,10 +280,9 @@ class FrontendConversation:
         """Appends messages to both backend and frontend without checking for cancellation."""
         from langchain_core.messages import HumanMessage
 
-        # will not raise since backend has no context
-        self._backend_messages.append_messages(messages)
-
         for new_message in messages:
+            self._backend_messages._append(new_message) # _backend_messages.append_messages does validation
+
             if isinstance(new_message, HumanMessage):
                 continue
 
@@ -293,8 +292,13 @@ class FrontendConversation:
 
     def append_messages_to_backend(self, messages):
         """Appends messages only to the backend conversation."""
-        # will not raise since backend has no context
-        self._backend_messages.append_messages(messages)
+        from langchain_core.messages import BaseMessage
+
+        if isinstance(messages, BaseMessage):
+            messages = [messages]
+
+        for msg in messages:
+            self._backend_messages._append(msg) # _backend_messages.append_messages does validation
 
     def append_error(self, error: Exception):
         """Appends an error to both backend and frontend."""

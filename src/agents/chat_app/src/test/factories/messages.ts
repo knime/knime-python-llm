@@ -17,6 +17,12 @@ export const createErrorMessage = (content: string) => ({
   content,
 });
 
+export const createWarningMessage = (content: string) => ({
+  id: expect.any(String),
+  type: "warning",
+  content,
+});
+
 export const createAiMessage = (
   content: string,
   toolCalls?: AiMessage["toolCalls"],

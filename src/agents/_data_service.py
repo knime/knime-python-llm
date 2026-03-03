@@ -59,7 +59,7 @@ import threading
 import knime.extension as knext
 from langchain_core.messages.human import HumanMessage
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, Union
 
 if TYPE_CHECKING:
     from .base import AgentPrompterConversation
@@ -87,17 +87,21 @@ class AgentChatWidgetDataService:
         widget_config: AgentChatWidgetConfig,
         tool_converter: LangchainToolConverter,
         combined_tools_workflow_info: dict,
+        startup_error: Optional[str] = None,
     ):
         self._ctx = ctx
 
         self._chat_model = chat_model
+        self._startup_error = startup_error
         self._conversation = FrontendConversation(
             conversation, tool_converter, self._check_canceled
         )
         self._agent_config = agent_config
-        self._agent = Agent(
-            self._conversation, self._chat_model, toolset, self._agent_config
-        )
+        self._agent = None
+        if self._chat_model is not None:
+            self._agent = Agent(
+                self._conversation, self._chat_model, toolset, self._agent_config
+            )
 
         self._data_registry = data_registry
         self._widget_config = widget_config
@@ -107,6 +111,9 @@ class AgentChatWidgetDataService:
         self._message_queue = self._conversation.frontend
         self._thread = None
         self._is_canceled = False
+
+        if self._startup_error:
+            self._conversation.append_warning_to_frontend(self._startup_error)
 
     def get_initial_message(self):
         if self._widget_config.initial_message:
@@ -179,9 +186,19 @@ class AgentChatWidgetDataService:
     def _post_user_message(self, user_message: str):
         from langchain_core.messages import AIMessage
 
+        # append user message before checking for start-up error to mirror UI
         self._conversation.append_messages_to_backend(
             HumanMessage(content=user_message)
         )
+
+        if self._agent is None:
+            self._conversation.append_error(
+                Exception(
+                    self._startup_error
+                    or "The selected model is not available."
+                )
+            )
+            return
 
         try:
             self._agent.run()
@@ -263,10 +280,9 @@ class FrontendConversation:
         """Appends messages to both backend and frontend without checking for cancellation."""
         from langchain_core.messages import HumanMessage
 
-        # will not raise since backend has no context
-        self._backend_messages.append_messages(messages)
-
         for new_message in messages:
+            self._backend_messages._append(new_message) # _backend_messages.append_messages does validation
+
             if isinstance(new_message, HumanMessage):
                 continue
 
@@ -276,8 +292,13 @@ class FrontendConversation:
 
     def append_messages_to_backend(self, messages):
         """Appends messages only to the backend conversation."""
-        # will not raise since backend has no context
-        self._backend_messages.append_messages(messages)
+        from langchain_core.messages import BaseMessage
+
+        if isinstance(messages, BaseMessage):
+            messages = [messages]
+
+        for msg in messages:
+            self._backend_messages._append(msg) # _backend_messages.append_messages does validation
 
     def append_error(self, error: Exception):
         """Appends an error to both backend and frontend."""
@@ -293,6 +314,13 @@ class FrontendConversation:
 
         error_message = {"type": "error", "content": content}
         self._frontend.put(error_message)
+
+    def append_warning_to_frontend(self, warning: Union[Exception, str]):
+        """Appends a warning only to the frontend."""
+        content = str(warning)
+
+        warning_message = {"type": "warning", "content": content}
+        self._frontend.put(warning_message)
 
     def get_messages(self):
         return self._backend_messages.get_messages()

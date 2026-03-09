@@ -480,8 +480,9 @@ environments:
       - conda: https://conda.anaconda.org/knime/label/nightly/linux-64/knime-python-versions-5.11.1-py313_202602181439.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/krb5-1.21.3-h659f571_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/langchain-anthropic-1.3.3-pyhd8ed1ab_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/langchain-core-1.2.13-pyhd8ed1ab_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/langchain-core-1.2.19-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/langchain-google-genai-4.2.0-pyhd8ed1ab_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/langchain-mistralai-1.1.2-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/langchain-openai-1.1.9-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/langdetect-1.0.9-pyhd8ed1ab_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/langsmith-0.3.45-pyhd8ed1ab_1.conda
@@ -882,8 +883,9 @@ environments:
       - conda: https://conda.anaconda.org/knime/label/nightly/osx-64/knime-python-versions-5.11.1-py313_202602181439.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/krb5-1.21.3-h37d8d59_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/langchain-anthropic-1.3.3-pyhd8ed1ab_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/langchain-core-1.2.13-pyhd8ed1ab_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/langchain-core-1.2.19-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/langchain-google-genai-4.2.0-pyhd8ed1ab_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/langchain-mistralai-1.1.2-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/langchain-openai-1.1.9-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/langdetect-1.0.9-pyhd8ed1ab_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/langsmith-0.3.45-pyhd8ed1ab_1.conda
@@ -1238,8 +1240,9 @@ environments:
       - conda: https://conda.anaconda.org/knime/label/nightly/osx-arm64/knime-python-versions-5.11.1-py313_202602181439.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/krb5-1.21.3-h237132a_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/langchain-anthropic-1.3.3-pyhd8ed1ab_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/langchain-core-1.2.13-pyhd8ed1ab_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/langchain-core-1.2.19-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/langchain-google-genai-4.2.0-pyhd8ed1ab_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/langchain-mistralai-1.1.2-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/langchain-openai-1.1.9-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/langdetect-1.0.9-pyhd8ed1ab_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/langsmith-0.3.45-pyhd8ed1ab_1.conda
@@ -1596,8 +1599,9 @@ environments:
       - conda: https://conda.anaconda.org/knime/label/nightly/win-64/knime-python-versions-5.11.1-py313_202602181439.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/krb5-1.21.3-hdf4eb48_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/langchain-anthropic-1.3.3-pyhd8ed1ab_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/langchain-core-1.2.13-pyhd8ed1ab_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/langchain-core-1.2.19-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/langchain-google-genai-4.2.0-pyhd8ed1ab_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/langchain-mistralai-1.1.2-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/langchain-openai-1.1.9-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/langdetect-1.0.9-pyhd8ed1ab_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/langsmith-0.3.45-pyhd8ed1ab_1.conda
@@ -1975,8 +1979,9 @@ environments:
       - conda: https://conda.anaconda.org/knime/label/nightly/linux-64/knime-python-versions-5.11.0-py313_202602051638.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/krb5-1.21.3-h659f571_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/langchain-anthropic-1.3.2-pyhd8ed1ab_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/langchain-core-1.2.9-pyhd8ed1ab_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/langchain-core-1.2.19-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/langchain-google-genai-4.2.0-pyhd8ed1ab_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/langchain-mistralai-1.1.2-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/langchain-openai-1.1.7-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/langdetect-1.0.9-pyhd8ed1ab_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/langsmith-0.3.45-pyhd8ed1ab_1.conda
@@ -2378,8 +2383,9 @@ environments:
       - conda: https://conda.anaconda.org/knime/label/nightly/osx-64/knime-python-versions-5.11.0-py313_202602051638.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/krb5-1.21.3-h37d8d59_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/langchain-anthropic-1.3.2-pyhd8ed1ab_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/langchain-core-1.2.9-pyhd8ed1ab_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/langchain-core-1.2.19-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/langchain-google-genai-4.2.0-pyhd8ed1ab_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/langchain-mistralai-1.1.2-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/langchain-openai-1.1.7-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/langdetect-1.0.9-pyhd8ed1ab_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/langsmith-0.3.45-pyhd8ed1ab_1.conda
@@ -2735,8 +2741,9 @@ environments:
       - conda: https://conda.anaconda.org/knime/label/nightly/osx-arm64/knime-python-versions-5.11.0-py313_202602051638.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/krb5-1.21.3-h237132a_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/langchain-anthropic-1.3.2-pyhd8ed1ab_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/langchain-core-1.2.9-pyhd8ed1ab_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/langchain-core-1.2.19-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/langchain-google-genai-4.2.0-pyhd8ed1ab_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/langchain-mistralai-1.1.2-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/langchain-openai-1.1.7-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/langdetect-1.0.9-pyhd8ed1ab_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/langsmith-0.3.45-pyhd8ed1ab_1.conda
@@ -3094,8 +3101,9 @@ environments:
       - conda: https://conda.anaconda.org/knime/label/nightly/win-64/knime-python-versions-5.11.0-py313_202602051638.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/krb5-1.21.3-hdf4eb48_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/langchain-anthropic-1.3.2-pyhd8ed1ab_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/langchain-core-1.2.9-pyhd8ed1ab_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/langchain-core-1.2.19-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/langchain-google-genai-4.2.0-pyhd8ed1ab_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/langchain-mistralai-1.1.2-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/langchain-openai-1.1.7-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/langdetect-1.0.9-pyhd8ed1ab_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/langsmith-0.3.45-pyhd8ed1ab_1.conda
@@ -9429,9 +9437,9 @@ packages:
   - numpy>=1.26.2 ; python_full_version < '3.13'
   - numpy>=2.1.0 ; python_full_version >= '3.13'
   requires_python: '>=3.10.0,<4.0.0'
-- conda: https://conda.anaconda.org/conda-forge/noarch/langchain-core-1.2.13-pyhd8ed1ab_0.conda
-  sha256: 74124f5d020b339382cf690beea135675a150780e2b6fe8e9379e0a79b16c48f
-  md5: 6eb95f0bd52e0eac0a3f732bb481ac52
+- conda: https://conda.anaconda.org/conda-forge/noarch/langchain-core-1.2.19-pyhd8ed1ab_0.conda
+  sha256: 24c30a6879711648a6227c2defd02320215d91240a4b611418344ca910f2a2ad
+  md5: 7f71e5c3e2237e8ec0dc86f000eab216
   depends:
   - jsonpatch >=1.33.0,<2.0.0
   - langsmith >=0.3.45,<1.0.0
@@ -9445,32 +9453,10 @@ packages:
   constrains:
   - jinja2 >=3.0.0,<4.0.0
   license: MIT
-  license_family: MIT
   purls:
   - pkg:pypi/langchain-core?source=hash-mapping
-  size: 329772
-  timestamp: 1771148316208
-- conda: https://conda.anaconda.org/conda-forge/noarch/langchain-core-1.2.9-pyhd8ed1ab_0.conda
-  sha256: 011283e333967d394971f211cf663961456b779f731eea99806ede687e509ca1
-  md5: 552db2dd97e05ef454e26756ab14806a
-  depends:
-  - jsonpatch >=1.33.0,<2.0.0
-  - langsmith >=0.3.45,<1.0.0
-  - packaging >=23.2.0
-  - pydantic >=2.7.4,<3.0.0
-  - python >=3.10,<4.0
-  - pyyaml >=5.3.0,<7.0.0
-  - tenacity !=8.4.0,>=8.1.0,<10.0.0
-  - typing_extensions >=4.7.0,<5.0.0
-  - uuid-utils >=0.12.0,<1.0
-  constrains:
-  - jinja2 >=3.0.0,<4.0.0
-  license: MIT
-  license_family: MIT
-  purls:
-  - pkg:pypi/langchain-core?source=hash-mapping
-  size: 325604
-  timestamp: 1770306969209
+  size: 331682
+  timestamp: 1773417887813
 - conda: https://conda.anaconda.org/conda-forge/noarch/langchain-google-genai-4.2.0-pyhd8ed1ab_0.conda
   sha256: 67c86b4c335e030883b50bd2070720ad3efed722c300aa5554e82abb84500fb9
   md5: 28d2192627f45bbcffa274662f6879fb
@@ -9486,6 +9472,21 @@ packages:
   - pkg:pypi/langchain-google-genai?source=hash-mapping
   size: 58784
   timestamp: 1768352867482
+- conda: https://conda.anaconda.org/conda-forge/noarch/langchain-mistralai-1.1.2-pyhd8ed1ab_0.conda
+  sha256: 22a1f2b6d5b228c480393d50e1e475ad07248f1881ffd4d0aeebc81a9f95b656
+  md5: 9f834ac9f6266117aeacc3ba7ceba7cb
+  depends:
+  - httpx >=0.25.2,<1.0.0
+  - httpx-sse >=0.3.1,<1.0.0
+  - langchain-core >=1.2.19,<2.0.0
+  - pydantic >=2.0.0,<3.0.0
+  - python >=3.10,<4.0
+  - tokenizers >=0.15.1,<1.0.0
+  license: MIT
+  purls:
+  - pkg:pypi/langchain-mistralai?source=hash-mapping
+  size: 24894
+  timestamp: 1773425011212
 - conda: https://conda.anaconda.org/conda-forge/noarch/langchain-openai-1.1.7-pyhd8ed1ab_0.conda
   sha256: 037a0d85787621c9f34a33ed13ae40d3f2c2f8fd7a616a6889522e643b889aff
   md5: 8e8347f6ebf01342c19e64a7ea0f8c92

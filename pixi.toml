@@ -34,6 +34,7 @@ langchain-core = "~=1.2.7" # Direct: used for LLM abstractions and message types
 langchain-openai = "~=1.1.7" # Direct: used in models/openai.py, models/azure.py
 langchain-anthropic = "~=1.3.1" # Direct: used in models/anthropic_api/_custom_chat.py
 langchain-google-genai = "~=4.2.0" # Direct: used in models/google/_port_types.py
+langchain-mistralai = "~=1.1.2" # Direct: used in models/mistral/
 langsmith = "~=0.3.45" # Transitive: required by langchain-core
 openai = "~=2.15.0" # Direct: used in models/openai.py, models/azure.py
 google-genai = "~=1.59.0" # Direct: used in models/google/

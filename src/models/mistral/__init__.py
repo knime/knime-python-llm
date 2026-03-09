@@ -41,44 +41,7 @@
 #  may freely choose the license terms applicable to such Node, including
 #  when such Node is propagated with or for interoperation with KNIME.
 # ------------------------------------------------------------------------
-import os
 
-# Temporary workaround to suppress duplicate OpenMP library warnings (e.g., from faiss).
-# Users can override this behavior by pre-setting KMP_DUPLICATE_LIB_OK in the environment.
-if "KMP_DUPLICATE_LIB_OK" not in os.environ:
-    os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+from ._auth import MistralAuthenticator
 
-import indexes.base
-import indexes.faiss
-import indexes.chroma
-
-import models.base
-import models.prompters
-import models.huggingface
-import models.fake
-import models.openai
-import models.knime
-import models.databricks
-import models.deepseek
-import models.mistral
-import models.ibm
-import models.google
-import models.anthropic_api
-
-try:
-    import models.gpt4all
-except Exception as e:
-    print(f"Could not import gpt4all: {e}")
-
-import models.azure
-
-import agents.base
-import agents.base_deprecated
-import agents.openai
-
-import tools.base
-import tools.vectorstore
-
-import util_nodes.base
-
-import eval.giskard
+__all__ = ["MistralAuthenticator"]

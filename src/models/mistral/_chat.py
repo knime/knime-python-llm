@@ -44,21 +44,64 @@
 
 
 import knime.extension as knext
-from ..base import ChatModelPortObject, ChatModelPortObjectSpec, OutputFormatOptions
-from ._base import deepseek_icon, deepseek_category
+
+from ._util import MISTRAL_MODELS_FALLBACK
+from ..base import (
+    ChatModelPortObject,
+    ChatModelPortObjectSpec,
+    OutputFormatOptions,
+)
+from ._base import mistral_icon, mistral_category
 from ._auth import (
-    DeepSeekAuthenticationPortObjectSpec,
-    DeepSeekAuthenticationPortObject,
-    deepseek_auth_port_type,
+    MistralAuthenticationPortObjectSpec,
+    MistralAuthenticationPortObject,
+    mistral_auth_port_type,
 )
 
 
-class DeepSeekChatModelPortObjectSpec(ChatModelPortObjectSpec):
-    """Spec of a DeepSeek Chat Model"""
+@knext.parameter_group(label="Model Parameters")
+class MistralChatModelSettings:
+    temperature = knext.DoubleParameter(
+        "Temperature",
+        description="""
+        Sampling temperature to use, between 0.0 and 1.0.
+
+        Higher values produce more random and creative outputs,
+        while lower values produce more focused and deterministic outputs.
+        Mistral AI recommends values between 0.0 and 0.7.
+        """,
+        default_value=0.7,
+        min_value=0.0,
+        max_value=1.0,
+    )
+
+    max_tokens = knext.IntParameter(
+        "Max Tokens",
+        description="The maximum number of tokens to generate in the response.",
+        default_value=4096,
+    )
+
+    n_requests = knext.IntParameter(
+        label="Number of concurrent requests",
+        description="""Maximum number of requests sent to Mistral AI in parallel.
+
+        Increasing this value can improve throughput, but each parallel request also counts toward
+        your Mistral AI API usage limits. If this value is set too high, some requests may be rejected
+        because rate limits are exceeded, such as the allowed number of requests per second or tokens
+        per minute.
+        """,
+        default_value=1,
+        min_value=1,
+        is_advanced=True,
+    )
+
+
+class MistralChatModelPortObjectSpec(ChatModelPortObjectSpec):
+    """Spec of a Mistral AI Chat Model"""
 
     def __init__(
         self,
-        auth: DeepSeekAuthenticationPortObjectSpec,
+        auth: MistralAuthenticationPortObjectSpec,
         model: str,
         temperature: float,
         max_tokens: int,
@@ -83,12 +126,15 @@ class DeepSeekChatModelPortObjectSpec(ChatModelPortObjectSpec):
         return self._max_tokens
 
     @property
-    def auth(self) -> DeepSeekAuthenticationPortObjectSpec:
+    def auth(self) -> MistralAuthenticationPortObjectSpec:
         return self._auth
 
     @property
     def supported_output_formats(self) -> list[OutputFormatOptions]:
-        return [OutputFormatOptions.Text, OutputFormatOptions.Structured]
+        return [
+            OutputFormatOptions.Text,
+            OutputFormatOptions.Structured,
+        ]
 
     def validate_context(self, ctx):
         self.auth.validate_context(ctx)
@@ -104,19 +150,19 @@ class DeepSeekChatModelPortObjectSpec(ChatModelPortObjectSpec):
 
     @classmethod
     def deserialize(cls, data: dict):
-        auth = DeepSeekAuthenticationPortObjectSpec.deserialize(data["auth"])
+        auth = MistralAuthenticationPortObjectSpec.deserialize(data["auth"])
         return cls(
             auth=auth,
             model=data["model"],
             temperature=data["temperature"],
             max_tokens=data["max_tokens"],
-            n_requests=data.get("n_requests", 1),
+            n_requests=data["n_requests"],
         )
 
 
-class DeepSeekChatModelPortObject(ChatModelPortObject):
+class MistralChatModelPortObject(ChatModelPortObject):
     @property
-    def spec(self) -> DeepSeekChatModelPortObjectSpec:
+    def spec(self) -> MistralChatModelPortObjectSpec:
         return super().spec
 
     def create_model(
@@ -124,118 +170,84 @@ class DeepSeekChatModelPortObject(ChatModelPortObject):
         ctx: knext.ExecutionContext,
         output_format: OutputFormatOptions = OutputFormatOptions.Text,
     ):
-        from langchain_openai import ChatOpenAI
+        from langchain_mistralai import ChatMistralAI
 
-        class ChatDeepseek(ChatOpenAI):
-            def with_structured_output(
-                self, *args, method="function_calling", **kwargs
-            ):
-                return super().with_structured_output(*args, method=method, **kwargs)
-
-        if "reasoner" in self.spec.model:
-            return ChatDeepseek(
-                openai_api_key=ctx.get_credentials(self.spec.auth.credentials).password,
-                base_url=self.spec.auth.base_url,
-                model=self.spec.model,
-                temperature=1,
-                max_completion_tokens=self.spec.max_tokens,
-            )
-
-        return ChatDeepseek(
-            openai_api_key=ctx.get_credentials(self.spec.auth.credentials).password,
-            base_url=self.spec.auth.base_url,
+        return ChatMistralAI(
+            mistral_api_key=ctx.get_credentials(self.spec.auth.credentials).password,
+            endpoint=self.spec.auth.base_url,
             model=self.spec.model,
             temperature=self.spec.temperature,
             max_tokens=self.spec.max_tokens,
         )
 
 
-deepseek_chat_model_port_type = knext.port_type(
-    "DeepSeek Chat Model", DeepSeekChatModelPortObject, DeepSeekChatModelPortObjectSpec
+mistral_chat_model_port_type = knext.port_type(
+    "Mistral AI Chat Model",
+    MistralChatModelPortObject,
+    MistralChatModelPortObjectSpec,
 )
 
 
 def _list_models(ctx: knext.ConfigurationContext):
     if (specs := ctx.get_input_specs()) and (auth_spec := specs[0]):
         return auth_spec.get_model_list(ctx)
-    return ["deepseek-chat", "deepseek-reasoner"]
+    return MISTRAL_MODELS_FALLBACK
 
 
 @knext.node(
-    name="DeepSeek LLM Selector",
+    name="Mistral AI LLM Selector",
     node_type=knext.NodeType.SOURCE,
-    icon_path=deepseek_icon,
-    category=deepseek_category,
-    keywords=["DeepSeek", "GenAI", "Reasoning"],
+    icon_path=mistral_icon,
+    category=mistral_category,
+    keywords=["Mistral", "GenAI", "Gen AI", "Generative AI"],
 )
 @knext.input_port(
-    "DeepSeek Authentication",
-    "The authentication for the DeepSeek API.",
-    deepseek_auth_port_type,
+    "Mistral AI Authentication",
+    "The authentication for the Mistral AI API.",
+    mistral_auth_port_type,
 )
 @knext.output_port(
-    "DeepSeek Large Language Model",
-    "The DeepSeek large language model which can be used in the LLM Prompter (Table) and LLM Prompter (Conversation) nodes.",
-    deepseek_chat_model_port_type,
+    "Mistral AI Large Language Model",
+    "The Mistral AI large language model which can be used in the LLM Prompter (Table) and LLM Prompter (Conversation) nodes.",
+    mistral_chat_model_port_type,
 )
-class DeepSeekChatModelConnector:
-    """Select an LLM provided by the DeepSeek API.
+class MistralChatModelConnector:
+    """Select an LLM provided by the Mistral AI API.
 
-    This node establishes a connection with a Large Language Model (LLM) from DeepSeek. After successfully authenticating
-    using the **DeepSeek Authenticator** node, you can select a model from a predefined list.
-
-    **Note**: Data sent to the DeepSeek API is stored and used for training future models.
+    This node establishes a connection with a Large Language Model (LLM) from Mistral AI. After successfully
+    authenticating using the **Mistral AI Authenticator** node, you can select a model from those available in
+    the Mistral AI API.
     """
 
     model = knext.StringParameter(
         "Model",
-        description="The model to use. The available models are fetched from the DeepSeek API if possible.",
-        default_value="deepseek-chat",
+        description="The model to use. The available models are fetched from the Mistral AI API if possible.",
+        default_value="mistral-large-latest",
         choices=_list_models,
     )
 
-    temperature = knext.DoubleParameter(
-        "Temperature",
-        description="""
-        Sampling temperature to use, between 0.0 and 2.0.
-
-        Higher values will lead to less deterministic but more creative answers.
-        Recommended values for different tasks:
-
-        - Coding / math: 0.0
-        - Data cleaning / data analysis: 1.0
-        - General conversation: 1.3
-        - Translation: 1.3
-        - Creative writing: 1.5
-        """,
-        default_value=1,
-    )
-
-    max_tokens = knext.IntParameter(
-        "Max Tokens",
-        description="The maximum number of tokens to generate in the response.",
-        default_value=4096,
-    )
+    model_settings = MistralChatModelSettings()
 
     def configure(
         self,
         ctx: knext.ConfigurationContext,
-        auth: DeepSeekAuthenticationPortObjectSpec,
-    ) -> DeepSeekChatModelPortObjectSpec:
+        auth: MistralAuthenticationPortObjectSpec,
+    ) -> MistralChatModelPortObjectSpec:
         auth.validate_context(ctx)
         return self.create_spec(auth)
 
     def create_spec(
-        self, auth: DeepSeekAuthenticationPortObjectSpec
-    ) -> DeepSeekChatModelPortObjectSpec:
-        return DeepSeekChatModelPortObjectSpec(
+        self, auth: MistralAuthenticationPortObjectSpec
+    ) -> MistralChatModelPortObjectSpec:
+        return MistralChatModelPortObjectSpec(
             auth=auth,
             model=self.model,
-            temperature=self.temperature,
-            max_tokens=self.max_tokens,
+            temperature=self.model_settings.temperature,
+            max_tokens=self.model_settings.max_tokens,
+            n_requests=self.model_settings.n_requests,
         )
 
     def execute(
-        self, ctx: knext.ExecutionContext, auth: DeepSeekAuthenticationPortObject
-    ) -> DeepSeekChatModelPortObject:
-        return DeepSeekChatModelPortObject(self.create_spec(auth.spec))
+        self, ctx: knext.ExecutionContext, auth: MistralAuthenticationPortObject
+    ) -> MistralChatModelPortObject:
+        return MistralChatModelPortObject(self.create_spec(auth.spec))

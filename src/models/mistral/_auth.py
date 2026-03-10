@@ -43,6 +43,8 @@
 # ------------------------------------------------------------------------
 
 import knime.extension as knext
+
+from ._util import MISTRAL_MODELS_FALLBACK
 from ._base import mistral_icon, mistral_category
 from ..base import CredentialsSettings, AIPortObjectSpec
 
@@ -106,14 +108,20 @@ class MistralAuthenticationPortObjectSpec(AIPortObjectSpec):
 
             capabilities = getattr(model, "capabilities", None)
             supports_chat = bool(
-                isinstance(capabilities, dict) and capabilities.get("chat_completion")
+                isinstance(capabilities, dict) and capabilities.get("completion_chat")
             )
 
             if supports_chat and model_id not in seen_ids:
                 seen_ids.add(model_id)
                 unique_chat_model_ids.append(model_id)
 
-        return unique_chat_model_ids
+        return unique_chat_model_ids or MISTRAL_MODELS_FALLBACK
+
+    def get_model_list(self, ctx: knext.ConfigurationContext) -> list[str]:
+        try:
+            return self._list_models(ctx)
+        except Exception:
+            return MISTRAL_MODELS_FALLBACK
 
     def serialize(self) -> dict:
         return {

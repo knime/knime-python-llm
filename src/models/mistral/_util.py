@@ -42,7 +42,7 @@
 #  when such Node is propagated with or for interoperation with KNIME.
 # ------------------------------------------------------------------------
 
-from ._auth import MistralAuthenticator
-from ._chat import MistralChatModelConnector
-
-__all__ = ["MistralAuthenticator", "MistralChatModelConnector"]
+MISTRAL_MODELS_FALLBACK = [
+    "mistral-large-latest",
+    "mistral-small-latest",
+]

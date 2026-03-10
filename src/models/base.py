@@ -167,14 +167,15 @@ def _get_output_format_value_switch() -> knext.EnumParameter:
         hidden_choices=_hidden_output_formats,
     )
 
+
 def _hidden_output_formats(
     ctx: knext.DialogCreationContext,
 ) -> List[OutputFormatOptions]:
     if ctx is None:
         return []
-    
+
     input_specs = ctx.get_input_specs()
-    
+
     if not input_specs or input_specs[0] is None:
         return []
 
@@ -758,7 +759,10 @@ class LLMPrompter:
         "Name for the column holding the LLM's responses.",
         default_value="Response",
     ).rule(
-        knext.OneOf(output_format, [OutputFormatOptions.Text.name, OutputFormatOptions.JSON.name]),
+        knext.OneOf(
+            output_format,
+            [OutputFormatOptions.Text.name, OutputFormatOptions.JSON.name],
+        ),
         knext.Effect.SHOW,
     )
 
@@ -854,7 +858,7 @@ class LLMPrompter:
             msg = (
                 f"The selected output format '{selected_format.label}' is not supported by the LLM. "
                 f"Supported formats: {', '.join(supported_names)}."
-                )
+            )
             if selected_format == OutputFormatOptions.JSON:
                 ctx.set_warning(msg + " Falling back to text output.")
             else:
@@ -865,8 +869,7 @@ class LLMPrompter:
             so.validate_output_columns(self.structured_output_settings.output_columns)
             # Create output schema with structured output columns
             return so.add_structured_output_columns(
-                input_table_spec, 
-                self.structured_output_settings
+                input_table_spec, self.structured_output_settings
             )
         else:
             # Text or JSON output format
@@ -944,7 +947,9 @@ class LLMPrompter:
                         output_col_names,
                     )
                 else:
-                    output_schema = pa.schema([(self.response_column_name, pa.string())])
+                    output_schema = pa.schema(
+                        [(self.response_column_name, pa.string())]
+                    )
                     missing_values_table = pa.table(
                         {self.response_column_name: [None] * len(messages)},
                         schema=output_schema,
@@ -971,7 +976,7 @@ class LLMPrompter:
 
             table_from_batch = pa.Table.from_batches([pa_table])
             result_table = mapper.map(table_from_batch)
-            
+
             # Postprocess structured output (add row IDs, explode lists if needed)
             if is_structured:
                 final_table = so.postprocess_table(
@@ -987,7 +992,7 @@ class LLMPrompter:
                     pa_table.columns + result_table.columns,
                     pa_table.column_names + result_table.column_names,
                 )
-            
+
             output_table.append(knext.Table.from_pyarrow(final_table))
 
         if mapper.all_missing:

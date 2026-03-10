@@ -92,12 +92,28 @@ class MistralAuthenticationPortObjectSpec(AIPortObjectSpec):
         from openai import Client as OpenAIClient
 
         api_key = ctx.get_credentials(self.credentials).password
-        return [
-            model.id
-            for model in OpenAIClient(api_key=api_key, base_url=self.base_url)
-            .models.list()
-            .data
-        ]
+        models = (
+            OpenAIClient(api_key=api_key, base_url=self.base_url).models.list().data
+        )
+        # filter for chat models and de-duplicate ids.
+        unique_chat_model_ids: list[str] = []
+        seen_ids: set[str] = set()
+
+        for model in models:
+            model_id = getattr(model, "id", None)
+            if model_id is None:
+                continue
+
+            capabilities = getattr(model, "capabilities", None)
+            supports_chat = bool(
+                isinstance(capabilities, dict) and capabilities.get("chat_completion")
+            )
+
+            if supports_chat and model_id not in seen_ids:
+                seen_ids.add(model_id)
+                unique_chat_model_ids.append(model_id)
+
+        return unique_chat_model_ids
 
     def serialize(self) -> dict:
         return {

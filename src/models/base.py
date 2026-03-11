@@ -708,6 +708,7 @@ class LLMPrompter:
         The column containing the system message for each prompt.
         """,
         port_index=1,
+        column_filter=util.create_type_filter(knext.string()),
         since_version="5.4.0",
     ).rule(
         knext.And(

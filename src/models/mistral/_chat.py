@@ -208,7 +208,7 @@ def _list_models(ctx: knext.ConfigurationContext):
 )
 @knext.output_port(
     "Mistral AI Large Language Model",
-    "The Mistral AI large language model which can be used in the LLM Prompter (Table) and LLM Prompter (Conversation) nodes.",
+    "The Mistral AI large language model which can be used in the LLM Prompter and LLM Chat Prompter nodes.",
     mistral_chat_model_port_type,
 )
 class MistralChatModelConnector:

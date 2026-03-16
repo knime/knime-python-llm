@@ -93,7 +93,7 @@ class KnimeHubChatModelPortObjectSpec(ChatModelPortObjectSpec):
     @property
     def n_requests(self) -> int:
         return self._n_requests
-    
+
     @property
     def supported_output_formats(self) -> list[OutputFormatOptions]:
         return [
@@ -154,7 +154,9 @@ class KnimeHubChatModelPortObject(ChatModelPortObject):
         )
 
         class KnimeChatOpenAI(ChatOpenAI):
-            def with_structured_output(self, *args, method="function_calling", **kwargs):
+            def with_structured_output(
+                self, *args, method="function_calling", **kwargs
+            ):
                 return super().with_structured_output(*args, method=method, **kwargs)
 
         auth_spec = self.spec.auth_spec
@@ -205,7 +207,7 @@ class ModelSettings(GeneralSettings):
 
     n_requests = knext.IntParameter(
         label="Number of concurrent requests",
-        description="""Maximum number of concurrent requests a single node (e.g. LLM Prompter (Table)) can make to the GenAI Gateway.
+        description="""Maximum number of concurrent requests a single node (e.g. LLM Prompter) can make to the GenAI Gateway.
         The more requests a node can make in parallel, the faster it executes. Too many requests might get rate-limited by some
         GenAI providers.
         """,

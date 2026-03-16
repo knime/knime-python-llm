@@ -193,7 +193,7 @@ ibm_watsonx_chat_model_port_type = knext.port_type(
 )
 @knext.output_port(
     "IBM watsonx.ai Large Language Model",
-    "The IBM watsonx.ai Large Language Model which can be used in the LLM Prompter (Table) and LLM Prompter (Conversation) nodes.",
+    "The IBM watsonx.ai Large Language Model which can be used in the LLM Prompter and LLM Chat Prompter nodes.",
     ibm_watsonx_chat_model_port_type,
 )
 class IBMwatsonxChatModelConnector:

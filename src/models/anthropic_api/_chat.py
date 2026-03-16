@@ -86,13 +86,10 @@ class AnthropicChatModelPortObjectSpec(ChatModelPortObjectSpec):
     @property
     def auth(self) -> AnthropicAuthenticationPortObjectSpec:
         return self._auth
-    
+
     @property
     def supported_output_formats(self) -> list[OutputFormatOptions]:
-        return [
-            OutputFormatOptions.Text,
-            OutputFormatOptions.Structured
-        ]
+        return [OutputFormatOptions.Text, OutputFormatOptions.Structured]
 
     def validate_context(self, ctx):
         self.auth.validate_context(ctx)
@@ -166,7 +163,7 @@ def _list_models(ctx: knext.ConfigurationContext):
 )
 @knext.output_port(
     "Anthropic Large Language Model",
-    "The Anthropic large language model which can be used in the LLM Prompter (Table) and LLM Prompter (Conversation) nodes.",
+    "The Anthropic large language model which can be used in the LLM Prompter and LLM Chat Prompter nodes.",
     anthropic_chat_model_port_type,
 )
 class AnthropicChatModelConnector:

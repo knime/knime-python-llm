@@ -1100,9 +1100,13 @@ class OpenAIAuthenticationPortObjectSpec(AIPortObjectSpec):
     def get_model_list(self, ctx: knext.ConfigurationContext) -> list[str]:
         try:
             client = self.get_openai_client(ctx)
-            model_list = list(dict.fromkeys(
-                model.id for model in client.models.list().data if model.id is not None
-                ))
+            model_list = list(
+                dict.fromkeys(
+                    model.id
+                    for model in client.models.list().data
+                    if model.id is not None
+                )
+            )
         except Exception:
             # TODO Add warning to user once possible
             LOGGER.warning(
@@ -1800,8 +1804,8 @@ class OpenAIEmbeddingsConnector:
     using the **OpenAI Authenticator** node, you can select an embedding model. Follow
     [OpenAI](https://platform.openai.com/docs/models/models) to find the latest embedding models.
 
-    If OpenAI releases a new embedding model that is not contained in the predefined list, you can select it from
-    the list in the advanced settings which contains all OpenAI models available for your OpenAI API key.
+    If OpenAI releases a new embedding model that is not contained in the predefined list, you can also select
+    from a list of all available OpenAI models.
 
     **Note**: If you use the
     [Credentials Configuration node](https://hub.knime.com/knime/extensions/org.knime.features.js.quickforms/latest/org.knime.js.base.node.configuration.input.credentials.CredentialsDialogNodeFactory)

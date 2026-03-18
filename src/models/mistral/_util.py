@@ -42,7 +42,14 @@
 #  when such Node is propagated with or for interoperation with KNIME.
 # ------------------------------------------------------------------------
 
-MISTRAL_MODELS_FALLBACK = [
+MISTRAL_CHAT_DEFAULT = "mistral-large-latest"
+MISTRAL_CHAT_MODELS_FALLBACK = [
     "mistral-large-latest",
     "mistral-small-latest",
+]
+
+MISTRAL_EMBEDDING_DEFAULT = "mistral-embed"
+MISTRAL_EMBEDDING_MODELS_FALLBACK = [
+    "mistral-embed",
+    "codestral-embed",
 ]

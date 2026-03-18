@@ -45,7 +45,7 @@
 
 import knime.extension as knext
 
-from ._util import MISTRAL_MODELS_FALLBACK
+from ._util import MISTRAL_CHAT_MODELS_FALLBACK, MISTRAL_CHAT_DEFAULT
 from ..base import (
     ChatModelPortObject,
     ChatModelPortObjectSpec,
@@ -190,8 +190,8 @@ mistral_chat_model_port_type = knext.port_type(
 
 def _list_models(ctx: knext.ConfigurationContext):
     if (specs := ctx.get_input_specs()) and (auth_spec := specs[0]):
-        return auth_spec.get_model_list(ctx)
-    return MISTRAL_MODELS_FALLBACK
+        return auth_spec.get_chat_model_list(ctx)
+    return MISTRAL_CHAT_MODELS_FALLBACK
 
 
 @knext.node(
@@ -222,7 +222,7 @@ class MistralChatModelConnector:
     model = knext.StringParameter(
         "Model",
         description="The model to use. The available models are fetched from the Mistral AI API if possible.",
-        default_value="mistral-large-latest",
+        default_value=MISTRAL_CHAT_DEFAULT,
         choices=_list_models,
     )
 

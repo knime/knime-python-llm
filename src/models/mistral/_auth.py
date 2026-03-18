@@ -126,26 +126,37 @@ class MistralAuthenticationPortObjectSpec(AIPortObjectSpec):
     def _list_embedding_models(
         self, ctx: knext.ConfigurationContext | knext.ExecutionContext
     ) -> list[str]:
-        # The Mistral AI API does not expose an embedding-specific capability flag,
-        # so all model IDs are returned and the user must select a compatible one.
+        # The Mistral AI API does not expose an embedding-specific capability flag.
+        # As a heuristic, models are prioritised as embedding models if their ID
+        # contains "embed" or if all of their capability flags are False
         from openai import Client as OpenAIClient
 
         api_key = ctx.get_credentials(self.credentials).password
         models = (
             OpenAIClient(api_key=api_key, base_url=self.base_url).models.list().data
         )
-        unique_model_ids: list[str] = []
+        likely_embedding: list[str] = []
+        other: list[str] = []
         seen_ids: set[str] = set()
 
         for model in models:
             model_id = getattr(model, "id", None)
-            if model_id is None:
+            if model_id is None or model_id in seen_ids:
                 continue
-            if model_id not in seen_ids:
-                seen_ids.add(model_id)
-                unique_model_ids.append(model_id)
+            seen_ids.add(model_id)
 
-        return unique_model_ids
+            capabilities = getattr(model, "capabilities", None)
+            all_caps_false = (
+                isinstance(capabilities, dict)
+                and capabilities
+                and not any(capabilities.values())
+            )
+            if "embed" in model_id or all_caps_false:
+                likely_embedding.append(model_id)
+            else:
+                other.append(model_id)
+
+        return (likely_embedding + other) or MISTRAL_EMBEDDING_MODELS_FALLBACK
 
     def get_embedding_model_list(self, ctx: knext.ConfigurationContext) -> list[str]:
         try:

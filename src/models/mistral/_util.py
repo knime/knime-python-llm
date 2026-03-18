@@ -46,3 +46,8 @@ MISTRAL_MODELS_FALLBACK = [
     "mistral-large-latest",
     "mistral-small-latest",
 ]
+
+MISTRAL_EMBEDDING_MODELS_FALLBACK = [
+    "mistral-embed",
+    "codestral-embed",
+]

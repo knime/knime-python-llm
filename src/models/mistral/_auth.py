@@ -44,7 +44,7 @@
 
 import knime.extension as knext
 
-from ._util import MISTRAL_MODELS_FALLBACK
+from ._util import MISTRAL_MODELS_FALLBACK, MISTRAL_EMBEDDING_MODELS_FALLBACK
 from ._base import mistral_icon, mistral_category
 from ..base import CredentialsSettings, AIPortObjectSpec
 
@@ -84,11 +84,11 @@ class MistralAuthenticationPortObjectSpec(AIPortObjectSpec):
 
     def validate_api_key(self, ctx: knext.ExecutionContext):
         try:
-            self._list_models(ctx)
+            self._list_chat_models(ctx)
         except Exception as e:
             raise RuntimeError("Could not authenticate with the Mistral AI API.") from e
 
-    def _list_models(
+    def _list_chat_models(
         self, ctx: knext.ConfigurationContext | knext.ExecutionContext
     ) -> list[str]:
         from openai import Client as OpenAIClient
@@ -117,11 +117,41 @@ class MistralAuthenticationPortObjectSpec(AIPortObjectSpec):
 
         return unique_chat_model_ids or MISTRAL_MODELS_FALLBACK
 
-    def get_model_list(self, ctx: knext.ConfigurationContext) -> list[str]:
+    def get_chat_model_list(self, ctx: knext.ConfigurationContext) -> list[str]:
         try:
-            return self._list_models(ctx)
+            return self._list_chat_models(ctx)
         except Exception:
             return MISTRAL_MODELS_FALLBACK
+
+    def _list_embedding_models(
+        self, ctx: knext.ConfigurationContext | knext.ExecutionContext
+    ) -> list[str]:
+        # The Mistral AI API does not expose an embedding-specific capability flag,
+        # so all model IDs are returned and the user must select a compatible one.
+        from openai import Client as OpenAIClient
+
+        api_key = ctx.get_credentials(self.credentials).password
+        models = (
+            OpenAIClient(api_key=api_key, base_url=self.base_url).models.list().data
+        )
+        unique_model_ids: list[str] = []
+        seen_ids: set[str] = set()
+
+        for model in models:
+            model_id = getattr(model, "id", None)
+            if model_id is None:
+                continue
+            if model_id not in seen_ids:
+                seen_ids.add(model_id)
+                unique_model_ids.append(model_id)
+
+        return unique_model_ids
+
+    def get_embedding_model_list(self, ctx: knext.ConfigurationContext) -> list[str]:
+        try:
+            return self._list_embedding_models(ctx)
+        except Exception:
+            return MISTRAL_EMBEDDING_MODELS_FALLBACK
 
     def serialize(self) -> dict:
         return {

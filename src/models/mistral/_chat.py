@@ -190,7 +190,7 @@ mistral_chat_model_port_type = knext.port_type(
 
 def _list_models(ctx: knext.ConfigurationContext):
     if (specs := ctx.get_input_specs()) and (auth_spec := specs[0]):
-        return auth_spec.get_model_list(ctx)
+        return auth_spec.get_chat_model_list(ctx)
     return MISTRAL_MODELS_FALLBACK
 
 

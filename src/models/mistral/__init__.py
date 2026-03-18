@@ -44,5 +44,6 @@
 
 from ._auth import MistralAuthenticator
 from ._chat import MistralChatModelConnector
+from ._embedding import MistralEmbeddingModelConnector
 
-__all__ = ["MistralAuthenticator", "MistralChatModelConnector"]
+__all__ = ["MistralAuthenticator", "MistralChatModelConnector", "MistralEmbeddingModelConnector"]

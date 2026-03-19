@@ -158,12 +158,14 @@ class DataRegistry:
             f"No data item found with id: {id}. Available ids: {[data.id for data in self._data]}"
         )
 
-    def get_last_tables(self, num_tables: int) -> list[knext.Table]:
+    def get_last_tables(
+        self, num_tables: int, fill_missing: bool = True
+    ) -> list[knext.Table]:
         """Returns the last `num_tables` tables added to the registry."""
         if num_tables <= 0:
             return []
         tables = [data_item.data for data_item in self._data[-num_tables:]]
-        if len(tables) < num_tables:
+        if fill_missing and len(tables) < num_tables:
             empty_table = _empty_table()
             tables = tables + [empty_table] * (num_tables - len(tables))
         return tables

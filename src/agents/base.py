@@ -1272,9 +1272,7 @@ class AgentChatWidget:
         tools_table: Optional[knext.Table],
         input_tables: list[knext.Table],
     ):
-        import pandas as pd
         from ._data_service import DataRegistry
-        import pyarrow as pa
 
         view_data = ctx._get_view_data()
         num_data_outputs = ctx.get_connected_output_port_numbers()[2]
@@ -1285,36 +1283,20 @@ class AgentChatWidget:
             data_registry = DataRegistry.load(
                 view_data["data"]["data_registry"], view_data["ports_for_ids"]
             )
+            data_outputs = data_registry.get_last_tables(
+                num_data_outputs, fill_missing=False
+            )
             return (
                 combined_tools_workflow,
                 conversation_table,
-                data_registry.get_last_tables(num_data_outputs),
+                data_outputs
+                + [knext.InactivePort] * (num_data_outputs - len(data_outputs)),
             )
         else:
-            message_type = _message_type()
-            columns = [
-                util.OutputColumn(
-                    self.conversation_column_name,
-                    message_type,
-                    message_type.to_pyarrow(),
-                )
-            ]
-            if self.errors.has_error_column:
-                columns.append(
-                    util.OutputColumn(
-                        self.errors.error_column_name,
-                        knext.string(),
-                        pa.string(),
-                    )
-                )
-            conversation_table = util.create_empty_table(None, columns)
             return (
                 combined_tools_workflow,
-                conversation_table,
-                [
-                    knext.Table.from_pandas(pd.DataFrame())  # empty table
-                ]
-                * num_data_outputs,
+                knext.InactivePort,
+                [knext.InactivePort] * num_data_outputs,
             )
 
     def get_data_service(

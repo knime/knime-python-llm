@@ -14,24 +14,61 @@ class _MockBackend:
         return kn.PortType(id, name, object_class, spec_class)
 
 
-kn._backend = _MockBackend()
-knext.logical = lambda value_type: knext.string()
-if not hasattr(knext, "InactivePort"):
-    knext.InactivePort = object()
-
 knime_types_module = types.ModuleType("knime.types")
 knime_types_tool_module = types.ModuleType("knime.types.tool")
 knime_types_tool_module.WorkflowTool = type("WorkflowTool", (), {})
 knime_types_message_module = types.ModuleType("knime.types.message")
 knime_types_message_module.MessageValue = type("MessageValue", (), {})
 
-sys.modules.setdefault("knime.types", knime_types_module)
-sys.modules.setdefault("knime.types.tool", knime_types_tool_module)
-sys.modules.setdefault("knime.types.message", knime_types_message_module)
 
-from agents.base import AgentChatWidget
+def setUpModule():
+    """Set up patched KNIME backend and types for this test module."""
+    global _backend_patcher
+    global _logical_patcher
+    global _sysmodules_patcher
+    global _inactiveport_present
+    global _inactiveport_original
+    global AgentChatWidget
+
+    _backend_patcher = patch.object(kn, "_backend", _MockBackend())
+    _backend_patcher.start()
+
+    _logical_patcher = patch.object(
+        knext, "logical", lambda value_type: knext.string()
+    )
+    _logical_patcher.start()
+
+    _inactiveport_present = hasattr(knext, "InactivePort")
+    _inactiveport_original = getattr(knext, "InactivePort", None)
+    knext.InactivePort = object()
+
+    _sysmodules_patcher = patch.dict(
+        sys.modules,
+        {
+            "knime.types": knime_types_module,
+            "knime.types.tool": knime_types_tool_module,
+            "knime.types.message": knime_types_message_module,
+        },
+        clear=False,
+    )
+    _sysmodules_patcher.start()
+
+    from agents.base import AgentChatWidget as _AgentChatWidget
+
+    AgentChatWidget = _AgentChatWidget
 
 
+def tearDownModule():
+    """Tear down patched KNIME backend and types for this test module."""
+    _backend_patcher.stop()
+    _logical_patcher.stop()
+
+    if _inactiveport_present:
+        knext.InactivePort = _inactiveport_original
+    else:
+        delattr(knext, "InactivePort")
+
+   _sysmodules_patcher.stop()
 class _MockContext:
     def __init__(self, view_data, num_data_outputs, combined_tools_workflow):
         self._view_data_value = view_data

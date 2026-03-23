@@ -50,6 +50,7 @@ _logger = logging.getLogger(__name__)
 
 _DEFAULT_MISTRAL_API_BASE = "https://api.mistral.ai/v1"
 
+
 def _is_mistral_api(base_url: str) -> bool:
     """
     Check if the base URL points to Mistral's API.
@@ -57,6 +58,7 @@ def _is_mistral_api(base_url: str) -> bool:
     Mistral's API doesn't support max_completion_tokens, so we need to use max_tokens instead.
     """
     return base_url == _DEFAULT_MISTRAL_API_BASE
+
 
 class _ChatOpenAI(ChatOpenAI):
     """
@@ -91,9 +93,6 @@ class _ChatOpenAI(ChatOpenAI):
             )
             if self._ctx and hasattr(self._ctx, "set_warning"):
                 self._ctx.set_warning(warn_msg)
-            else:
-                # TODO update once warning can be set in Agent Chat View node
-                _logger.warning(warn_msg)
 
     def invoke(
         self,

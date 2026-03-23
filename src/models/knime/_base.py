@@ -72,6 +72,18 @@ def create_authorization_headers(
 
 
 def validate_auth_spec(auth_spec: ks.HubAuthenticationPortObjectSpec) -> None:
+    from py4j.protocol import Py4JJavaError
+
+    try:
+        auth_spec.auth_parameters
+    except ValueError as ex:
+        if isinstance(ex.__cause__, Py4JJavaError):
+            raise knext.InvalidParametersError(
+                "The KNIME Hub credentials are not available. Make sure that you are still connected to "
+                "the Hub and that the node you are using to pass the credential port object is still passing "
+                "the valid API key to the downstream nodes."
+            )
+
     if auth_spec.hub_url is None:
         raise knext.InvalidParametersError(
             "KNIME Hub connection not available. Please re-execute the node."
@@ -83,19 +95,19 @@ def _extract_hub_service_url(
 ) -> str:
     """
     Extract a normalized service URL from the hub URL.
-    
+
     Args:
         auth_spec: Hub authentication specification
         path: Service path (e.g., "ai-gateway/v1", "accounts")
-    
+
     Returns:
         Normalized URL with scheme, netloc, and path
     """
-    try:
-        validate_auth_spec(auth_spec)
-    except knext.InvalidParametersError as ex:
+    if auth_spec.hub_url is None:
         # ValueError does not add the exception type to the error message in the dialog
-        raise ValueError(str(ex))
+        raise ValueError(
+            "KNIME Hub connection not available. Please re-execute the node."
+        )
     hub_url = auth_spec.hub_url
     parsed_url = urlparse(hub_url)
     # drop params, query and fragment
@@ -118,37 +130,35 @@ def _get_user_team_names(
     """
     Build a cache mapping team IDs to team names from the user's identity.
     Makes a single API call to get all teams the user is a member of.
-    
+
     Returns:
         Dictionary mapping team ID to team name.
     """
     import requests
     from ._models import AccountIdentityResponse
-    
+
     try:
         accounts_base = _extract_accounts_base(auth_spec)
         identity_url = f"{accounts_base}/identity"
-        
+
         response = requests.get(
-            url=identity_url,
-            headers=create_authorization_headers(auth_spec)
+            url=identity_url, headers=create_authorization_headers(auth_spec)
         )
         response.raise_for_status()
-        
+
         identity = AccountIdentityResponse.model_validate(response.json())
         return {team.id: team.name for team in identity.teams}
     except Exception as ex:
         logger.warning(
             "Failed to fetch team names from identity endpoint: %s. "
             "Team scopes will be displayed with IDs instead of names.",
-            ex
+            ex,
         )
         return {}
 
 
 def _get_team_name_by_id(
-    auth_spec: ks.HubAuthenticationPortObjectSpec,
-    team_id: str
+    auth_spec: ks.HubAuthenticationPortObjectSpec, team_id: str
 ) -> str | None:
     """
     Fetch team name directly by team ID.
@@ -156,20 +166,20 @@ def _get_team_name_by_id(
     """
     import requests
     from ._models import TeamInfo
-    
+
     try:
         accounts_base = _extract_accounts_base(auth_spec)
         team_url = f"{accounts_base}/{team_id}"
-        
+
         response = requests.get(
             url=team_url,
             headers={
                 **create_authorization_headers(auth_spec),
-                "Prefer": "representation=minimal"
-            }
+                "Prefer": "representation=minimal",
+            },
         )
         response.raise_for_status()
-        
+
         team = TeamInfo.model_validate(response.json())
         return team.name
     except Exception as ex:
@@ -177,37 +187,38 @@ def _get_team_name_by_id(
             "Failed to fetch team name for team ID '%s': %s. "
             "Team scope will be displayed with ID instead of name.",
             team_id,
-            ex
+            ex,
         )
         return None
 
 
 def _fetch_team_names_concurrently(
-    auth_spec: ks.HubAuthenticationPortObjectSpec,
-    team_ids: list[str]
+    auth_spec: ks.HubAuthenticationPortObjectSpec, team_ids: list[str]
 ) -> dict[str, str]:
     """
     Fetch multiple team names concurrently.
-    
+
     Args:
         auth_spec: Hub authentication specification
         team_ids: List of team IDs to fetch
-    
+
     Returns:
         Dictionary mapping team IDs to team names (only successful fetches)
     """
     import concurrent.futures
-    
+
     team_names = {}
-    
+
     # Use ThreadPoolExecutor for I/O-bound operations
-    with concurrent.futures.ThreadPoolExecutor(max_workers=min(10, len(team_ids))) as executor:
+    with concurrent.futures.ThreadPoolExecutor(
+        max_workers=min(10, len(team_ids))
+    ) as executor:
         # Submit all fetch tasks
         future_to_team_id = {
             executor.submit(_get_team_name_by_id, auth_spec, team_id): team_id
             for team_id in team_ids
         }
-        
+
         # Collect results as they complete
         for future in concurrent.futures.as_completed(future_to_team_id):
             team_id = future_to_team_id[future]
@@ -217,26 +228,23 @@ def _fetch_team_names_concurrently(
                     team_names[team_id] = team_name
             except Exception as ex:
                 logger.warning(
-                    "Exception while fetching team name for '%s': %s",
-                    team_id,
-                    ex
+                    "Exception while fetching team name for '%s': %s", team_id, ex
                 )
-    
+
     return team_names
 
 
 def _resolve_scope_display_name_with_cache(
-    scope_id: str | None,
-    team_name_cache: dict[str, str]
+    scope_id: str | None, team_name_cache: dict[str, str]
 ) -> str | None:
     """
     Resolve a scope ID to a human-readable display name using a pre-built cache.
-    
+
     Args:
         auth_spec: Hub authentication specification
         scope_id: Scope identifier to resolve
         team_name_cache: Pre-built mapping of team IDs to team names
-    
+
     Returns:
         - "Global" for hub:global scope or None
         - Team name for account:team:* scopes (from cache)
@@ -244,11 +252,11 @@ def _resolve_scope_display_name_with_cache(
     """
     if scope_id is None or scope_id == "hub:global":
         return "Global"
-    
+
     if scope_id.startswith("account:team:"):
         # Return cached team name or None if not found (omit scope prefix)
         return team_name_cache.get(scope_id)
-    
+
     # For unknown scope types (e.g., future user scopes), return None
     return None
 
@@ -272,17 +280,17 @@ def _build_complete_team_name_cache(
 ) -> dict[str, str]:
     """
     Build a complete cache of team names for all models.
-    
+
     Args:
         auth_spec: Hub authentication specification
         models: List of ModelInfo objects
-    
+
     Returns:
         Dictionary mapping team IDs to team names
     """
     # Build a mapping of team IDs to team names from identity (one API call)
     team_name_cache = _get_user_team_names(auth_spec)
-    
+
     # Identify team IDs that are missing from the cache
     missing_team_ids = set()
     for model in models:
@@ -292,21 +300,23 @@ def _build_complete_team_name_cache(
             and model.scope_id not in team_name_cache
         ):
             missing_team_ids.add(model.scope_id)
-    
+
     # Fetch missing team names concurrently
     if missing_team_ids:
         missing_team_names = _fetch_team_names_concurrently(
             auth_spec, list(missing_team_ids)
         )
         team_name_cache.update(missing_team_names)
-    
+
     return team_name_cache
 
 
-def list_model_choices(auth_spec, mode: str | None = None) -> list[knext.StringParameter.Choice]:
+def list_model_choices(
+    auth_spec, mode: str | None = None
+) -> list[knext.StringParameter.Choice]:
     models = list_models(auth_spec, mode)
     team_name_cache = _build_complete_team_name_cache(auth_spec, models)
-    
+
     # Build choices with resolved scope names
     choices = []
     for model in models:
@@ -314,23 +324,32 @@ def list_model_choices(auth_spec, mode: str | None = None) -> list[knext.StringP
         scope_display = _resolve_scope_display_name_with_cache(
             model.scope_id, team_name_cache
         )
-        
+
         # Format label with scope prefix
         if scope_display is not None:
             label = f"{scope_display} » {model.name}"
             # Description: <scope name> » <model name>: <model description>
-            description = f"{scope_display} » {model.name}: {model.description}" if model.description else f"{scope_display} » {model.name}"
+            description = (
+                f"{scope_display} » {model.name}: {model.description}"
+                if model.description
+                else f"{scope_display} » {model.name}"
+            )
         else:
             label = model.name
             # Description: <model name>: <model description>
-            description = f"{model.name}: {model.description}" if model.description else model.name
-        
+            description = (
+                f"{model.name}: {model.description}"
+                if model.description
+                else model.name
+            )
+
         choices.append(knext.StringParameter.Choice(model.id, label, description))
-    
+
     # Sort by display label (case-insensitive)
     choices.sort(key=lambda c: c.label.lower())
-    
+
     return choices
+
 
 def is_available_model(auth_spec, model_id: str, mode: str) -> bool:
     models = list_models(auth_spec, mode)
@@ -343,8 +362,10 @@ def is_available_model(auth_spec, model_id: str, mode: str) -> bool:
             allowed_ids.add(model.name)
     return model_id in allowed_ids
 
+
 def list_model_ids(auth_spec, mode: str) -> list[str]:
     return [model.id for model in list_models(auth_spec, mode)]
+
 
 def list_models(auth_spec, mode: str | None = None):
     import requests
@@ -376,7 +397,7 @@ def list_models_with_descriptions(auth_spec, mode: str) -> list[tuple[str, str, 
 def list_models_with_scope_info(auth_spec, mode: str | None = None):
     """
     List models with resolved scope information.
-    
+
     Returns:
         List of tuples containing (model, scope_id, scope_name) where:
         - model: ModelInfo object
@@ -385,18 +406,18 @@ def list_models_with_scope_info(auth_spec, mode: str | None = None):
     """
     models = list_models(auth_spec, mode)
     team_name_cache = _build_complete_team_name_cache(auth_spec, models)
-    
+
     # Build result with resolved scope information
     result = []
     for model in models:
         # Normalize None scope_id to "hub:global" for legacy compatibility
         scope_id = model.scope_id if model.scope_id is not None else "hub:global"
-        
+
         # Resolve scope name (None if it can't be resolved)
         scope_name = _resolve_scope_display_name_with_cache(
             model.scope_id, team_name_cache
         )
-        
+
         result.append((model, scope_id, scope_name))
-    
+
     return result

@@ -493,6 +493,8 @@ class ChromaVectorStoreReader:
     ) -> ChromaVectorstorePortObject:
         from chromadb.errors import InvalidDimensionException
 
+        embeddings_port_object.spec.validate_context(ctx)
+
         version = self._get_database_version(self.persist_directory)
         chroma = self._create_chroma_with_version(version, embeddings_port_object, ctx)
 

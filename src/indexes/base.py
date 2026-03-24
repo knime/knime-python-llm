@@ -380,6 +380,8 @@ class BaseVectorStoreCreator(ABC):
         embeddings: EmbeddingsPortObject,
         input_table: knext.Table,
     ) -> VectorstorePortObject:
+        embeddings.spec.validate_context(ctx)
+
         metadata_columns = get_metadata_columns(
             self.metadata_settings.metadata_columns,
             self.document_column,

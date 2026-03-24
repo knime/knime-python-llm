@@ -272,6 +272,8 @@ class FAISSVectorStoreReader:
     ) -> FAISSVectorstorePortObject:
         from langchain_community.vectorstores import FAISS
 
+        embeddings_port_object.spec.validate_context(ctx)
+
         model = embeddings_port_object.create_model(ctx)
 
         # TODO: Add check if .fiass and .pkl files are in the directory instead of instatiating as check

@@ -695,6 +695,8 @@ state that the tool could not be executed due to reaching the iteration limit.""
         from ._agent import Agent, AgentConfig
         from ._error_handler import AgentPrompterErrorHandler
 
+        chat_model.spec.validate_context(ctx)
+
         data_registry = DataRegistry.create_with_input_tables(
             input_tables, data_message_prefix=self.data_message_prefix
         )
@@ -1408,9 +1410,7 @@ class AgentChatWidget:
             model = chat_model.create_model(ctx, output_format=OutputFormatOptions.Text)
             return model, None
         except Exception as exc:
-            startup_error = (
-                f"Failed to initialize the selected model. {exc}"
-            )
+            startup_error = f"Failed to initialize the selected model. {exc}"
             return None, startup_error
 
     def _create_conversation_history(self, view_data, data_registry, tool_converter):

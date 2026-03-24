@@ -132,15 +132,15 @@ class MistralModelSelectionOptions(knext.EnumParameterOptions):
     ALL_MODELS = (
         "All models",
         """Select from all models available for the provided API key.
-        This includes models that may not support embeddings, so it is the
-        responsibility of the user to select a compatible model.""",
+        Note that this includes models that may not support embeddings,
+        so please make sure to select a compatible model.""",
     )
 
 
 def _list_all_models(ctx: knext.DialogCreationContext) -> list[str]:
     if (specs := ctx.get_input_specs()) and (auth_spec := specs[0]):
         return auth_spec.get_embedding_model_list(ctx)
-    return MISTRAL_EMBEDDING_MODELS_FALLBACK
+    return []
 
 
 @knext.node(

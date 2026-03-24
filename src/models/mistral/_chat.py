@@ -45,7 +45,11 @@
 
 import knime.extension as knext
 
-from ._util import MISTRAL_CHAT_MODELS_FALLBACK, MISTRAL_CHAT_DEFAULT
+from ._util import (
+    MISTRAL_CHAT_MODELS_FALLBACK,
+    MISTRAL_CHAT_DEFAULT,
+    create_mistral_httpx_clients,
+)
 from ..base import (
     ChatModelPortObject,
     ChatModelPortObjectSpec,
@@ -172,12 +176,19 @@ class MistralChatModelPortObject(ChatModelPortObject):
     ):
         from langchain_mistralai import ChatMistralAI
 
+        api_key = ctx.get_credentials(self.spec.auth.credentials).password
+        client, async_client = create_mistral_httpx_clients(
+            api_key, self.spec.auth.base_url
+        )
+
         return ChatMistralAI(
-            mistral_api_key=ctx.get_credentials(self.spec.auth.credentials).password,
+            mistral_api_key=api_key,
             endpoint=self.spec.auth.base_url,
             model=self.spec.model,
             temperature=self.spec.temperature,
             max_tokens=self.spec.max_tokens,
+            client=client,
+            async_client=async_client,
         )
 
 

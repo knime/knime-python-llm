@@ -80,8 +80,8 @@ def validate_auth_spec(auth_spec: ks.HubAuthenticationPortObjectSpec) -> None:
         if isinstance(ex.__cause__, Py4JJavaError):
             raise knext.InvalidParametersError(
                 "The KNIME Hub credentials are not available. Make sure that you are still connected to "
-                "the Hub and that the node you are using to pass the credential port object is still passing "
-                "the valid API key to the downstream nodes."
+                "the KNIME Hub and that the node you are using to pass the credential port object is still "
+                "passing the valid API key to the downstream nodes."
             )
 
     if auth_spec.hub_url is None:

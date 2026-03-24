@@ -236,6 +236,8 @@ class GiskardLLMScanner:
         from ._llm_client import KnimeLLMClient
         import pandas as pd
 
+        llm_port.spec.validate_context(ctx)
+
         set_default_client(KnimeLLMClient(llm_port, ctx))
 
         workflow_table_spec = _get_schema_from_workflow_spec(workflow.spec, True)

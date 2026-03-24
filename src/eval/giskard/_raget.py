@@ -215,6 +215,9 @@ class TestSetGenerator:
         from ._llm_client import KnimeLLMClient
         from giskard.llm.client import set_default_client
 
+        chat_model_port_object.spec.validate_context(ctx)
+        embed_model_port_object.spec.validate_context(ctx)
+
         set_default_client(KnimeLLMClient(chat_model_port_object, ctx))
 
         df = input_table.to_pandas()
@@ -417,6 +420,8 @@ class GiskardRAGETEvaluator:
         from ._llm_client import KnimeLLMClient
         from giskard.llm.client import set_default_client
         import pandas as pd
+
+        llm.spec.validate_context(ctx)
 
         input_key = next(iter(rag_workflow.spec.inputs))
 

@@ -895,6 +895,8 @@ class LLMPrompter:
         import pyarrow as pa
         from langchain_core.language_models import BaseChatModel
 
+        llm_port.spec.validate_context(ctx)
+
         # Output rows with missing values if "Output Missing Values" option is selected
         # or fail execution if "Fail" is selected and there are missing values
         missing_value_handling_setting = util.MissingValueOutputOptions[
@@ -1613,6 +1615,8 @@ class TextEmbedder:
         table: knext.Table,
     ) -> knext.Table:
         import pyarrow as pa
+
+        embeddings_obj.spec.validate_context(ctx)
 
         # Output rows with missing values if "Output Missing Values" option is selected
         # or fail execution if "Fail" is selected and there are missing values

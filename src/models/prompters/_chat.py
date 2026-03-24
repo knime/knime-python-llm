@@ -81,9 +81,7 @@ def _hidden_chat_output_formats(ctx: knext.DialogCreationContext):
     input_spec: ChatModelPortObjectSpec = input_specs[0]
     supported = input_spec.supported_output_formats
     hidden.extend(
-        opt
-        for opt in OutputFormatOptions
-        if opt not in supported and opt not in hidden
+        opt for opt in OutputFormatOptions if opt not in supported and opt not in hidden
     )
     return hidden
 
@@ -293,7 +291,7 @@ class ChatPrompter:
                 self.tool_definition_column = util.pick_default_column(
                     tool_table_spec, knext.logical(dict)
                 )
-        
+
         if chat_model_spec.is_instruct_model:
             raise knext.InvalidParametersError(
                 "The selected model is not a chat model. Try selecting a different model."
@@ -322,6 +320,8 @@ class ChatPrompter:
         import langchain_core.messages as lcm
         import pandas as pd
         from knime.types.message import to_langchain_message
+
+        chat_model.spec.validate_context(ctx)
 
         has_history = input_table is not None
         has_tools = tool_table is not None

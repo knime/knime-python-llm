@@ -45,7 +45,11 @@
 
 import knime.extension as knext
 
-from ._util import MISTRAL_EMBEDDING_MODELS_FALLBACK, MISTRAL_EMBEDDING_DEFAULT
+from ._util import (
+    MISTRAL_EMBEDDING_MODELS_FALLBACK,
+    MISTRAL_EMBEDDING_DEFAULT,
+    create_mistral_httpx_clients,
+)
 from ._base import mistral_icon, mistral_category
 from ._auth import (
     MistralAuthenticationPortObjectSpec,
@@ -99,10 +103,17 @@ class MistralEmbeddingsPortObject(EmbeddingsPortObject):
     def create_model(self, ctx: knext.ExecutionContext):
         from langchain_mistralai import MistralAIEmbeddings
 
+        api_key = ctx.get_credentials(self.spec.auth.credentials).password
+        client, async_client = create_mistral_httpx_clients(
+            api_key, self.spec.auth.base_url
+        )
+
         return MistralAIEmbeddings(
-            api_key=ctx.get_credentials(self.spec.auth.credentials).password,
+            api_key=api_key,
             endpoint=self.spec.auth.base_url,
             model=self.spec.model,
+            client=client,
+            async_client=async_client,
         )
 
 

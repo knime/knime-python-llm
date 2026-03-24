@@ -53,3 +53,26 @@ MISTRAL_EMBEDDING_MODELS_FALLBACK = [
     "mistral-embed",
     "codestral-embed",
 ]
+
+
+# Mistral AI's fallback clients in ChatMistralAI force verify=global_ssl_context
+# and bypass environment-value-based certificate settings needed for proxied setups.
+def create_mistral_httpx_clients(api_key: str, base_url: str):
+    import httpx
+
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "Authorization": f"Bearer {api_key}",
+    }
+    client = httpx.Client(
+        base_url=base_url,
+        headers=headers,
+        timeout=120,
+    )
+    async_client = httpx.AsyncClient(
+        base_url=base_url,
+        headers=headers,
+        timeout=120,
+    )
+    return client, async_client

@@ -126,9 +126,9 @@ class MistralAuthenticationPortObjectSpec(AIPortObjectSpec):
     def _list_embedding_models(
         self, ctx: knext.ConfigurationContext | knext.ExecutionContext
     ) -> list[str]:
-        # The Mistral AI API does not expose an embedding-specific capability flag.
-        # All models are listed but models are moved to the front of the list if their ID
-        # contains "embed" or if all of their capability flags are False.
+        # The Mistral AI API does not expose an embedding-specific capability flag, so all
+        # models are listed. Models are sorted to the front if their ID contains "embed" or
+        # if all their capability flags are False (i.e. they are likely not chat models).
         from openai import Client as OpenAIClient
 
         api_key = ctx.get_credentials(self.credentials).password
@@ -146,23 +146,23 @@ class MistralAuthenticationPortObjectSpec(AIPortObjectSpec):
             seen_ids.add(model_id)
 
             capabilities = getattr(model, "capabilities", None)
-            all_caps_false = (
+            all_capabilities_false = (
                 isinstance(capabilities, dict)
                 and capabilities
                 and not any(capabilities.values())
             )
-            if "embed" in model_id or all_caps_false:
+            if "embed" in model_id or all_capabilities_false:
                 likely_embedding.append(model_id)
             else:
                 other.append(model_id)
 
-        return (likely_embedding + other) or MISTRAL_EMBEDDING_MODELS_FALLBACK
+        return likely_embedding + other
 
     def get_embedding_model_list(self, ctx: knext.ConfigurationContext) -> list[str]:
         try:
             return self._list_embedding_models(ctx)
         except Exception:
-            return MISTRAL_EMBEDDING_MODELS_FALLBACK
+            return []
 
     def serialize(self) -> dict:
         return {

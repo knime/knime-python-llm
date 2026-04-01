@@ -51,7 +51,6 @@ from ._auth import (
     AnthropicAuthenticationPortObject,
     anthropic_auth_port_type,
 )
-from ._util import latest_models
 
 
 class AnthropicChatModelPortObjectSpec(ChatModelPortObjectSpec):
@@ -146,7 +145,7 @@ anthropic_chat_model_port_type = knext.port_type(
 def _list_models(ctx: knext.ConfigurationContext):
     if (specs := ctx.get_input_specs()) and (auth_spec := specs[0]):
         return auth_spec.get_model_list(ctx)
-    return latest_models
+    return []
 
 
 @knext.node(
@@ -179,12 +178,9 @@ class AnthropicChatModelConnector:
 
     model = knext.StringParameter(
         "Model",
-        description="""The model to use. The available models are fetched from the Anthropic API if possible.
-
-        Models with the suffix -latest are the latest snapshots of the respective models. For more consistent
-        behavior, specific snapshots should be used (e.g. claude-3-7-sonnet-20250219).
-        """,
-        default_value="claude-3-7-sonnet-latest",
+        description="The model to use. An updated list of models is fetched from the Anthropic API "
+        "after successful authentication via the Anthropic Authenticator node.",
+        default_value="",
         choices=_list_models,
     )
 
@@ -218,12 +214,19 @@ class AnthropicChatModelConnector:
     def create_spec(
         self, auth: AnthropicAuthenticationPortObjectSpec
     ) -> AnthropicChatModelPortObjectSpec:
+        self._check_model()
         return AnthropicChatModelPortObjectSpec(
             auth=auth,
             model=self.model,
             temperature=self.temperature,
             max_tokens=self.max_tokens,
         )
+
+    def _check_model(self) -> str:
+        if not self.model:
+            raise knext.InvalidParametersError(
+                "No model selected. Please select a model from the list."
+            )
 
     def execute(
         self, ctx: knext.ExecutionContext, auth: AnthropicAuthenticationPortObject

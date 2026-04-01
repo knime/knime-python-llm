@@ -232,7 +232,8 @@ class MistralChatModelConnector:
 
     model = knext.StringParameter(
         "Model",
-        description="The model to use. The available models are fetched from the Mistral AI API if possible.",
+        description="The model to use. An updated list of models is fetched from the Mistral AI API "
+        "after successful authentication via the Mistral AI Authenticator node.",
         default_value=MISTRAL_CHAT_DEFAULT,
         choices=_list_models,
     )

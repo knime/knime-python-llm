@@ -46,7 +46,6 @@
 import knime.extension as knext
 from ._base import anthropic_icon, anthropic_category
 from ..base import CredentialsSettings, AIPortObjectSpec
-from ._util import latest_models
 
 _default_anthropic_api_base = "https://api.anthropic.com"
 
@@ -102,9 +101,9 @@ class AnthropicAuthenticationPortObjectSpec(AIPortObjectSpec):
 
     def get_model_list(self, ctx: knext.ConfigurationContext) -> list[str]:
         try:
-            return self._get_models_from_api(ctx) + latest_models
+            return self._get_models_from_api(ctx)
         except Exception:
-            return latest_models
+            return []
 
     def serialize(self) -> dict:
         return {
